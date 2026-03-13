@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16
+    container_name: inovatic-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inovatic
+      POSTGRES_USER: inovatic
+      POSTGRES_PASSWORD: inovatic_dev_2024
+    ports:
+      - "5432:5432"
+    volumes:
+      - inovatic_pgdata:/var/lib/postgresql/data
+    networks:
+      - inovatic_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inovatic -d inovatic"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    build:
+      context: ./docker/pgadmin
+      dockerfile: Dockerfile
+    container_name: inovatic-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@inovatic.hr
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - inovatic_pgadmin:/var/lib/pgadmin
+    networks:
+      - inovatic_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  inovatic_pgdata:
+  inovatic_pgadmin:
+
+networks:
+  inovatic_net:
+    driver: bridge

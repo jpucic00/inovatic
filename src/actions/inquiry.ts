@@ -1,0 +1,69 @@
+'use server'
+
+import { db } from '@/lib/db'
+import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
+import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
+import { InquiryConfirmationEmail } from '../../emails/inquiry-confirmation'
+import { createElement } from 'react'
+
+export type InquiryActionResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function submitInquiry(data: InquiryFormData): Promise<InquiryActionResult> {
+  const parsed = inquirySchema.safeParse(data)
+  if (!parsed.success) {
+    return { success: false, error: 'Podaci nisu valjani.' }
+  }
+
+  const {
+    parentName,
+    parentEmail,
+    parentPhone,
+    childName,
+    childAge,
+    childSchool,
+    courseLevelPref,
+    locationPref,
+    message,
+  } = parsed.data
+
+  try {
+    await db.inquiry.create({
+      data: {
+        parentName,
+        parentEmail,
+        parentPhone,
+        childName,
+        childAge,
+        childSchool: childSchool || null,
+        courseLevelPref: courseLevelPref ?? null,
+        locationPref: locationPref || null,
+        message: message || null,
+      },
+    })
+  } catch {
+    return { success: false, error: 'Greška pri slanju upita. Pokušajte ponovo.' }
+  }
+
+  try {
+    if (process.env.RESEND_API_KEY) {
+      await resend.emails.send({
+        from: FROM_EMAIL,
+        replyTo: REPLY_TO,
+        to: parentEmail,
+        subject: `Zaprimili smo vašu prijavu – Inovatic`,
+        react: createElement(InquiryConfirmationEmail, {
+          parentName,
+          childName,
+          childAge,
+          courseLevelPref,
+        }),
+      })
+    }
+  } catch {
+    // Email failure is non-fatal; inquiry is already saved
+  }
+
+  return { success: true }
+}
