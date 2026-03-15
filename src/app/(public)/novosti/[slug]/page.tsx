@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { ArrowLeft, Calendar, User, Tag } from 'lucide-react'
 import { db } from '@/lib/db'
 import { ArticleContent } from '@/components/article/article-content'
+import { ArticleGallery } from '@/components/article/article-gallery'
 import type { PartialBlock } from '@blocknote/core'
 
 export const revalidate = 3600
@@ -197,30 +198,7 @@ export default async function ArticlePage({
           {article.images.length > 0 && (
             <div className="mt-10">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Galerija fotografija</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {article.images.map((img) => (
-                  <a
-                    key={img.id}
-                    href={img.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative aspect-square rounded-xl overflow-hidden bg-gray-100 block"
-                  >
-                    <Image
-                      src={img.url}
-                      alt={img.caption ?? article.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      sizes="(max-width: 640px) 50vw, 33vw"
-                    />
-                    {img.caption && (
-                      <div className="absolute inset-x-0 bottom-0 bg-black/50 text-white text-xs px-2 py-1.5 translate-y-full group-hover:translate-y-0 transition-transform duration-200">
-                        {img.caption}
-                      </div>
-                    )}
-                  </a>
-                ))}
-              </div>
+              <ArticleGallery images={article.images} articleTitle={article.title} />
             </div>
           )}
 
