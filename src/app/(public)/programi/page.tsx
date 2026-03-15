@@ -7,11 +7,37 @@ export const metadata: Metadata = {
   title: 'Programi',
   description:
     'Sva 4 razine tečajeva LEGO robotike – Svijet LEGO Robotike 1–4. Programi za djecu od 6 do 14 godina u Splitu.',
+  openGraph: {
+    title: 'Programi – Svijet LEGO Robotike | Inovatic',
+    description: 'Sva 4 razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu.',
+    url: 'https://udruga-inovatic.hr/programi',
+  },
+  alternates: { canonical: 'https://udruga-inovatic.hr/programi' },
+}
+
+const coursesJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'Tečajevi LEGO robotike – Inovatic',
+  description: 'Četiri razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu.',
+  url: 'https://udruga-inovatic.hr/programi',
+  numberOfItems: 4,
+  itemListElement: courses.map((c, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    name: c.title,
+    url: `https://udruga-inovatic.hr/programi/${c.slug}`,
+    description: `${c.subtitle} – za djecu od ${c.ageMin} do ${c.ageMax} godina.`,
+  })),
 }
 
 export default function ProgramiPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(coursesJsonLd) }}
+      />
       {/* Hero */}
       <section className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4">
         <div className="container mx-auto max-w-3xl text-center">

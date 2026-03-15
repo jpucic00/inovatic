@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   title: 'O nama',
   description:
     'Udruga za robotiku "Inovatic" – Split, osnovana 2014. Učimo djecu robotiku i programiranje kroz LEGO Spike Prime i WeDo 2.0.',
+  openGraph: {
+    title: 'O nama – Udruga Inovatic | Split',
+    description: 'Udruga za robotiku osnovana 2014. Educiramo djecu od 6 do 14 godina kroz LEGO programe. Tim CroSpec – srebrna medalja WRO 2025.',
+    url: 'https://udruga-inovatic.hr/o-nama',
+  },
+  alternates: { canonical: 'https://udruga-inovatic.hr/o-nama' },
 }
 
 const team = [

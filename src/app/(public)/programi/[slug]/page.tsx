@@ -16,9 +16,16 @@ export async function generateMetadata({
   const { slug } = await params
   const course = getCourseBySlug(slug)
   if (!course) return { title: 'Program nije pronađen' }
+  const desc = `${course.subtitle} – za djecu od ${course.ageMin} do ${course.ageMax} godina. ${course.equipment}. Cijena: ${course.priceYear} EUR/god.`
   return {
     title: course.title,
-    description: `${course.subtitle} – za djecu od ${course.ageMin} do ${course.ageMax} godina. ${course.equipment}. Cijena: ${course.priceYear} EUR/god.`,
+    description: desc,
+    openGraph: {
+      title: `${course.title} | Inovatic`,
+      description: desc,
+      url: `https://udruga-inovatic.hr/programi/${slug}`,
+    },
+    alternates: { canonical: `https://udruga-inovatic.hr/programi/${slug}` },
   }
 }
 
@@ -34,8 +41,37 @@ export default async function CourseDetailPage({
   const courseIndex = courses.findIndex((c) => c.slug === slug)
   const nextCourse = courses[courseIndex + 1]
 
+  const courseJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Course',
+    name: course.title,
+    description: course.description,
+    url: `https://udruga-inovatic.hr/programi/${slug}`,
+    provider: {
+      '@type': 'EducationalOrganization',
+      name: 'Udruga za robotiku "Inovatic"',
+      url: 'https://udruga-inovatic.hr',
+    },
+    educationalLevel: `Razina ${courseIndex + 1} od 4`,
+    typicalAgeRange: `${course.ageMin}-${course.ageMax}`,
+    teaches: course.equipment,
+    courseMode: 'onsite',
+    inLanguage: 'hr',
+    offers: {
+      '@type': 'Offer',
+      price: course.priceYear,
+      priceCurrency: 'EUR',
+      availability: 'https://schema.org/InStock',
+      validFrom: '2025-10-01',
+    },
+  }
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(courseJsonLd) }}
+      />
       {/* Header */}
       <section className={`bg-gradient-to-br ${course.gradient} py-16 px-4`}>
         <div className="container mx-auto max-w-4xl">

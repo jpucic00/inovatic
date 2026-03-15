@@ -4,7 +4,13 @@ import { Mail, Phone, MapPin, Clock, ArrowRight, Facebook, Instagram } from 'luc
 
 export const metadata: Metadata = {
   title: 'Kontakt',
-  description: 'Kontaktirajte Udrugu Inovatic u Splitu. Dvije lokacije: Velebitska 32 i Ruđera Boškovića 33.',
+  description: 'Kontaktirajte Udrugu Inovatic u Splitu. Dvije lokacije: Velebitska 32 i Ruđera Boškovića 33. Tel: +385 99 393 6993.',
+  openGraph: {
+    title: 'Kontakt – Udruga Inovatic Split',
+    description: 'Dvije lokacije u Splitu: Velebitska 32 i Ruđera Boškovića 33. Tel: +385 99 393 6993.',
+    url: 'https://udruga-inovatic.hr/kontakt',
+  },
+  alternates: { canonical: 'https://udruga-inovatic.hr/kontakt' },
 }
 
 const locations = [

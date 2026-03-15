@@ -4,9 +4,17 @@ import { MapPin, Clock, Users, Trophy, Star, ArrowRight } from 'lucide-react'
 import { courses } from '@/lib/courses-data'
 
 export const metadata: Metadata = {
-  title: 'Inovatic – LEGO Robotika za djecu u Splitu',
+  title: {
+    absolute: 'Inovatic – LEGO Robotika za djecu u Splitu',
+  },
   description:
     'Udruga Inovatic uči djecu od 6 do 14 godina programiranje i robotiku kroz LEGO Spike Prime i WeDo 2.0 programe u Splitu. Upišite dijete danas!',
+  openGraph: {
+    title: 'Inovatic – LEGO Robotika za djecu u Splitu',
+    description: 'Udruga Inovatic uči djecu od 6 do 14 godina programiranje i robotiku u Splitu. Upišite dijete danas!',
+    url: 'https://udruga-inovatic.hr',
+  },
+  alternates: { canonical: 'https://udruga-inovatic.hr' },
 }
 
 const stats = [
@@ -38,12 +46,12 @@ export default function HomePage() {
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-100 rounded-full opacity-40 blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
         <div className="container mx-auto text-center max-w-3xl relative">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-400/20 text-yellow-800 border border-yellow-300 rounded-full text-sm font-semibold mb-8">
-            <Trophy className="w-4 h-4 text-yellow-600" />
-            Tim CroSpec – srebrna medalja WRO 2025, Singapur
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-400/20 text-yellow-800 border border-yellow-300 rounded-full text-xs sm:text-sm font-semibold mb-8">
+            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-600 flex-shrink-0" />
+            <span>Tim CroSpec – srebrna medalja WRO 2025, Singapur</span>
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 leading-tight tracking-tight">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 leading-tight tracking-tight">
             Otkrijte svijet{' '}
             <span className="text-cyan-500">LEGO robotike</span>
           </h1>

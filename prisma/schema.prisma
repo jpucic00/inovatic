@@ -216,7 +216,7 @@ model Article {
   slug        String    @unique
   title       String
   excerpt     String?   @db.Text
-  content     String    @db.Text
+  content     Json      @default("[]")
   coverImage  String?
   authorId    String
   isPublished Boolean   @default(false)
@@ -224,8 +224,19 @@ model Article {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  author User         @relation(fields: [authorId], references: [id])
+  author User          @relation(fields: [authorId], references: [id])
   tags   ArticleTag[]
+  images ArticleImage[]
+}
+
+model ArticleImage {
+  id        String  @id @default(cuid())
+  articleId String
+  url       String
+  caption   String?
+  sortOrder Int     @default(0)
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 }
 
 model Tag {

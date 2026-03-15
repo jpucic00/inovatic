@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   title: 'Proslave',
   description:
     'Organizirajte nezaboravnu proslavu rođendana uz LEGO robotiku! Djeca grade i programiraju robote. Dvije lokacije u Splitu.',
+  openGraph: {
+    title: 'Proslave uz LEGO Robotiku | Inovatic Split',
+    description: 'Nezaboravna proslava rođendana – djeca grade i programiraju LEGO robote. 5–15 sudionika, 90–120 min.',
+    url: 'https://udruga-inovatic.hr/proslave',
+  },
+  alternates: { canonical: 'https://udruga-inovatic.hr/proslave' },
 }
 
 const included = [

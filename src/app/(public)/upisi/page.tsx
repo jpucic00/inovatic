@@ -4,7 +4,13 @@ import { InquiryForm } from '@/components/public/inquiry-form'
 
 export const metadata: Metadata = {
   title: 'Upisi',
-  description: 'Upiši dijete na tečaj LEGO robotike u Splitu. Ispuni upit i kontaktirat ćemo te s dostupnim terminima.',
+  description: 'Upiši dijete na tečaj LEGO robotike u Splitu. Ispuni upit i kontaktirat ćemo te s dostupnim terminima. Bez obveza.',
+  openGraph: {
+    title: 'Upiši dijete – LEGO Robotika | Inovatic Split',
+    description: 'Ispuni kratki upit i kontaktirat ćemo te s dostupnim grupama i terminima. Bez obveza.',
+    url: 'https://udruga-inovatic.hr/upisi',
+  },
+  alternates: { canonical: 'https://udruga-inovatic.hr/upisi' },
 }
 
 const perks = [
