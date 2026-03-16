@@ -63,9 +63,9 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu — absolutely positioned so it overlays content */}
       {isOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white">
+        <div className="md:hidden absolute top-full left-0 right-0 bg-white border-t border-gray-100 shadow-lg">
           <div className="container mx-auto px-4 py-3 flex flex-col gap-1">
             {navLinks.map((link) => (
               <Link
