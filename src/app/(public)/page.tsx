@@ -29,6 +29,24 @@ const stats = [
   { value: '4', label: 'Razine programa', icon: Trophy, bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600' },
 ]
 
+const testimonials = [
+  {
+    quote: 'STEM je prije svega način razmišljanja i pristup odgoju i obrazovanju!',
+    name: 'Romana Ban',
+    role: 'Split Tech City',
+  },
+  {
+    quote: 'Djeca uključena u STEM aktivnosti imaju drugačiji način učenja. Ona uče s razumijevanjem, ne uče napamet.',
+    name: 'Dijana Barić Perić',
+    role: 'Tinker Labs Split',
+  },
+  {
+    quote: 'STEM obrazovanje pruža mladima lakše razumijevanje sadašnjeg i budućeg svijeta te pozitivno utječe na njihovu prilagodbu u današnjem društvu.',
+    name: 'Jozo Pivac',
+    role: 'Udruga Inovatic',
+  },
+]
+
 const locations = [
   {
     name: 'Velebitska 32',
@@ -294,6 +312,33 @@ export default async function HomePage() {
             <Link href="/kontakt" className="inline-flex items-center gap-2 text-cyan-600 font-semibold hover:underline text-sm">
               Pogledaj kartu i kontakt <ArrowRight className="w-4 h-4" />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-16 px-4 bg-gradient-to-br from-cyan-50 via-white to-yellow-50">
+        <div className="container mx-auto max-w-6xl">
+          <div className="text-center mb-10">
+            <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Što kažu drugi</span>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">Glasovi iz zajednice</h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {testimonials.map((t) => (
+              <div key={t.name} className="flex flex-col bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all">
+                <span className="text-5xl font-serif text-cyan-400 leading-none mb-3 select-none">&ldquo;</span>
+                <p className="text-gray-700 text-sm leading-relaxed flex-1 italic mb-5">{t.quote}</p>
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {t.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{t.name}</div>
+                    <div className="text-xs text-cyan-600">{t.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
