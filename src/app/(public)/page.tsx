@@ -6,7 +6,7 @@ import { courses } from '@/lib/courses-data'
 import { RobotSvg } from '@/components/shared/robot-svg'
 import { db } from '@/lib/db'
 
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: {
