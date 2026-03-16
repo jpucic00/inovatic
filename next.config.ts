@@ -5,9 +5,6 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'res.cloudinary.com' },
-      // Uploadthing (Phase 2 - teacher file uploads)
-      { protocol: 'https', hostname: 'utfs.io' },
-      { protocol: 'https', hostname: '*.ufs.sh' },
     ],
   },
 }

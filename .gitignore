@@ -35,9 +35,6 @@ yarn-error.log*
 next-env.d.ts
 
 
-# Uploadthing
-.uploadthing
-
 # Article images — local only, not committed or bundled
 /public/images/articles/
 
