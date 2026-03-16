@@ -2,7 +2,7 @@
 builder = "dockerfile"
 
 [deploy]
-preDeployCommand = "node_modules/.bin/prisma migrate deploy"
+preDeployCommand = "node node_modules/prisma/build/index.js migrate deploy"
 healthcheckPath = "/"
 healthcheckTimeout = 100
 restartPolicyType = "on_failure"

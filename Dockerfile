@@ -34,9 +34,9 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma CLI + engines + migrations for preDeployCommand (prisma migrate deploy)
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma_schema_build_bg.wasm ./node_modules/.bin/prisma_schema_build_bg.wasm
+# Copy Prisma package + engines + migrations for preDeployCommand (prisma migrate deploy)
+# Note: invoke via "node node_modules/prisma/build/index.js" not ".bin/prisma" — the .bin symlink
+# is dereferenced by Docker COPY which breaks __dirname-relative WASM lookups
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma/migrations ./prisma/migrations
