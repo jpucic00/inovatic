@@ -8,6 +8,11 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
 
+# Install Prisma CLI in isolation (for migrate deploy at pre-deploy)
+FROM base AS prisma-cli
+WORKDIR /prisma-cli
+RUN npm install prisma@6.19.2 --save-exact --no-save
+
 # Build the application
 FROM base AS builder
 WORKDIR /app
@@ -34,11 +39,8 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma package + engines + migrations for preDeployCommand (prisma migrate deploy)
-# Note: invoke via "node node_modules/prisma/build/index.js" not ".bin/prisma" — the .bin symlink
-# is dereferenced by Docker COPY which breaks __dirname-relative WASM lookups
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+# Copy isolated Prisma CLI + migrations for preDeployCommand
+COPY --from=prisma-cli --chown=nextjs:nodejs /prisma-cli/node_modules ./prisma-cli/node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/prisma/migrations ./prisma/migrations
 COPY --from=builder --chown=nextjs:nodejs /app/prisma/schema.prisma ./prisma/schema.prisma
 
