@@ -215,27 +215,23 @@ export default async function HomePage() {
                 href={`/programi/${course.slug}`}
                 className="group block rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all hover:-translate-y-1"
               >
-                <div className={`bg-gradient-to-br ${course.gradient} h-40 flex flex-col items-center justify-center relative overflow-hidden`}>
-                  {/* Background gear decoration */}
-                  <div className="absolute -bottom-4 -right-4 opacity-15">
-                    <GearDecor size={72} className="text-white" />
+                <div className="h-44 relative overflow-hidden">
+                  <Image
+                    src={course.coverImage}
+                    alt={course.title}
+                    fill
+                    className="object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  />
+                  <div className={`absolute inset-0 bg-gradient-to-t ${course.gradient} opacity-70`} />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center relative z-10">
+                    <span className="text-5xl font-extrabold text-white/90 tracking-tight drop-shadow">
+                      {course.title.split(' ').pop()}
+                    </span>
+                    <span className="text-xs text-white/90 font-semibold mt-1 drop-shadow">
+                      {course.ageMin}–{course.ageMax} godina
+                    </span>
                   </div>
-                  <div className="absolute -top-3 -left-3 opacity-10">
-                    <GearDecor size={44} className="text-white" />
-                  </div>
-                  {/* Floating star */}
-                  <div
-                    className="absolute top-3 right-4 text-white opacity-70 animate-twinkle"
-                    style={{ animationDelay: `${i * 0.4}s` }}
-                  >
-                    <StarDecor size={12} />
-                  </div>
-                  <span className="text-5xl font-extrabold text-white/90 tracking-tight relative z-10">
-                    {course.title.split(' ').pop()}
-                  </span>
-                  <span className="text-xs text-white/75 font-semibold mt-1 relative z-10">
-                    {course.ageMin}–{course.ageMax} godina
-                  </span>
                 </div>
                 <div className="p-5 bg-white">
                   <h3 className="font-bold text-gray-900 mb-1 text-sm">{course.title}</h3>
@@ -414,7 +410,24 @@ export default async function HomePage() {
           <RobotSvg className="w-64 translate-x-8 translate-y-8" />
         </div>
         <div className="container mx-auto text-center max-w-2xl relative">
-          <div className="text-4xl mb-4">🤖</div>
+          <div className="flex justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-16 h-16" aria-hidden="true">
+              <line x1="50" y1="19" x2="43" y2="6" stroke="#AAAAAA" strokeWidth="2.5" strokeLinecap="round"/>
+              <circle cx="41" cy="4" r="5.5" fill="#F5A200"/>
+              <circle cx="39" cy="2.5" r="2" fill="#FFD060" opacity="0.75"/>
+              <polygon points="11,91 89,91 89,51 50,17 11,51" fill="#4BBDCA"/>
+              <polygon points="50,17 89,51 89,91 50,54" fill="#2A9EAD" opacity="0.25"/>
+              <polygon points="11,51 50,17 50,54 11,91" fill="white" opacity="0.07"/>
+              <rect x="23" y="46" width="22" height="4.5" rx="2.25" fill="#2A8A9A"/>
+              <rect x="55" y="46" width="22" height="4.5" rx="2.25" fill="#2A8A9A"/>
+              <circle cx="34" cy="67" r="13.5" fill="#F5C018"/>
+              <circle cx="66" cy="67" r="13.5" fill="#F5C018"/>
+              <circle cx="34" cy="67" r="8.5" fill="#E88200"/>
+              <circle cx="66" cy="67" r="8.5" fill="#E88200"/>
+              <circle cx="29" cy="62" r="3.5" fill="white" opacity="0.65"/>
+              <circle cx="61" cy="62" r="3.5" fill="white" opacity="0.65"/>
+            </svg>
+          </div>
           <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">
             Zainteresirani ste?
           </h2>

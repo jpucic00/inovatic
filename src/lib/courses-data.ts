@@ -3,6 +3,7 @@ export type CourseLevel = 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
 export interface CourseModule {
   title: string
   description: string
+  image: string
 }
 
 export interface Course {
@@ -21,6 +22,7 @@ export interface Course {
   sessionFrequency: string
   season: string
   groupSize: number
+  coverImage: string
   modules: CourseModule[]
   color: string
   gradient: string
@@ -32,12 +34,13 @@ export const courses: Course[] = [
     slug: 'slr-1',
     level: 'SLR_1',
     title: 'Svijet LEGO Robotike 1',
-    subtitle: 'Uvod u robotiku za najmlađe',
+    subtitle: 'LEGO WeDo 2.0',
     description:
-      'Tečaj SLR 1 namijenjen je djeci od 6 do 8 godina koja prvi put ulaze u svijet robotike i programiranja. ' +
-      'Kroz igru i istraživanje djeca uče osnovne pojmove mehanike i programiranja koristeći LEGO WeDo 2.0 platformu. ' +
-      'Svaki modul traje 14 školskih sati, a nastava se odvija jednom tjedno u trajanju od 90 minuta. ' +
-      'Godišnji program obuhvaća 4 modula, ukupno 56 školskih sati.',
+      'Tečaj SLR 1 namijenjen je početnicima od 6 do 8 godina (predškolci do 2. razreda). ' +
+      'Na zabavan i kreativan način djeca se uvode u svijet robotike uz LEGO WeDo 2.0 edukacijski set i ikoničko programiranje. ' +
+      'Polaznici grade i programiraju šesnaest projekata raspoređenih u četiri tematska modula te otkrivaju znanstvene principe kroz praktičan rad. ' +
+      'Godišnji program obuhvaća 4 modula, ukupno 56 školskih sati (14 sati po modulu). ' +
+      'Završetkom programa polaznici stječu uvjete za upis u SLR 2.',
     ageMin: 6,
     ageMax: 8,
     equipment: 'LEGO WeDo 2.0',
@@ -48,22 +51,31 @@ export const courses: Course[] = [
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
     groupSize: 8,
+    coverImage: '/images/courses/slr-1/cover.jpg',
     modules: [
       {
-        title: 'Modul 1 – Uvod u mehaniku',
-        description: 'Osnove mehanike, zupčanici, poluge i koloture. Djeca otkrivaju kako jednostavni strojevi olakšavaju rad.',
+        title: 'Zabavni Sustavi 1.0',
+        description:
+          'Kako robotika i moderne tehnologije služe zabavne svrhe? Polaznici grade Vrtuljak, Leptira, Humanoid i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-1/module-1.png',
       },
       {
-        title: 'Modul 2 – Senzori i motori',
-        description: 'Rad s motorima i senzorima pokreta i nagiba. Roboti koji reagiraju na okolinu.',
+        title: 'Prometni Sustavi 1.0',
+        description:
+          'Suvremeni promet i tehnološki napredak. Četiri projekta: Utrka automobila, Motocikl, Vatrogasno vozilo i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-1/module-2.png',
       },
       {
-        title: 'Modul 3 – Programiranje',
-        description: 'Uvod u blokovno programiranje u LEGO Education aplikaciji. Naredbe, petlje i uvjetne radnje.',
+        title: 'Industrijski Sustavi 1.0',
+        description:
+          'Industrijski strojevi i ubrzavanje proizvodnje. Projekti: Lift, Viličar, Manipulator i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-1/module-3.png',
       },
       {
-        title: 'Modul 4 – Projekt',
-        description: 'Timski projektni rad: izrada i prezentacija robota. Razvoj suradnje i kreativnog razmišljanja.',
+        title: 'Svemirski Sustavi',
+        description:
+          'Spoj astronomije, inženjerstva, fizike i robotike. Polaznici grade Svemirski top, Mars rover, Svemirski brod i samostalni projekt.',
+        image: '/images/courses/slr-1/module-4.png',
       },
     ],
     color: 'text-cyan-600',
@@ -74,14 +86,16 @@ export const courses: Course[] = [
     slug: 'slr-2',
     level: 'SLR_2',
     title: 'Svijet LEGO Robotike 2',
-    subtitle: 'Napredna mehanika i programiranje',
+    subtitle: 'LEGO SPIKE Essential',
     description:
-      'Tečaj SLR 2 namijenjen je djeci od 9 do 10 godina koja su završila SLR 1 ili imaju osnovno znanje o robotici. ' +
-      'Djeca nadograđuju znanje o mehanici i programiranju koristeći napredniju primjenu LEGO WeDo 2.0 platforme. ' +
-      'Program uključuje složenije konstrukcije i uvod u algoritamsko razmišljanje.',
+      'Tečaj SLR 2 namijenjen je početnicima od 9 do 10 godina (3. i 4. razred) ili onima koji su završili SLR 1. ' +
+      'Program se izvodi uz LEGO SPIKE Essential edukacijski set. ' +
+      'Polaznici grade i programiraju šesnaest projekata u četiri tematska modula te istražuju kako tehnologija i robotika služe suvremenom društvu. ' +
+      'Godišnji program obuhvaća 4 modula, ukupno 56 školskih sati (14 sati po modulu). ' +
+      'Završetkom programa polaznici stječu uvjete za upis u SLR 3.',
     ageMin: 9,
     ageMax: 10,
-    equipment: 'LEGO WeDo 2.0',
+    equipment: 'LEGO SPIKE Essential',
     priceYear: 400,
     priceModule: 110,
     hours: 56,
@@ -89,22 +103,31 @@ export const courses: Course[] = [
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
     groupSize: 8,
+    coverImage: '/images/courses/slr-2/cover.jpg',
     modules: [
       {
-        title: 'Modul 1 – Složene konstrukcije',
-        description: 'Napredne mehaničke konstrukcije i transmisije. Polaznici grade složenije modele s više pokretnih dijelova.',
+        title: 'Zabavni Sustavi 2.0',
+        description:
+          'Robotika u zabavne svrhe i stvaranje sustava za razonodu. Projekti: Spirograf, Humanoid, Žabe i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-2/module-1.png',
       },
       {
-        title: 'Modul 2 – Napredni senzori',
-        description: 'Rad s više senzora istovremeno, uvjetni iskazi. Robot koji donosi odluke na temelju podataka.',
+        title: 'Prometni Sustavi 2.0',
+        description:
+          'Moderna prometna tehnologija i upravljanje naprednim letjelicama. Projekti: Avion, Dvokrilni avion, Helikopter i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-2/module-2.png',
       },
       {
-        title: 'Modul 3 – Algoritmi',
-        description: 'Algoritamsko razmišljanje, petlje i uvjetne grane. Rješavanje problema korak po korak.',
+        title: 'Industrijski Sustavi 2.0',
+        description:
+          'Industrijski strojevi i upravljanje proizvodnom opremom. Projekti: Rudnička željeznica, Dizalica, Robotska ruka i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-2/module-3.png',
       },
       {
-        title: 'Modul 4 – Timski projekt',
-        description: 'Izrada složenijeg robota s punom programskom logikom. Prezentacija i obrana projekta.',
+        title: 'Energetski Sustavi 1.0',
+        description:
+          'Obnovljivi i tradicionalni energetski izvori te pretvorba energije. Projekti: Vodena brana, Naftna pumpa, Vjetrenjača i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-2/module-4.png',
       },
     ],
     color: 'text-cyan-700',
@@ -115,15 +138,16 @@ export const courses: Course[] = [
     slug: 'slr-3',
     level: 'SLR_3',
     title: 'Svijet LEGO Robotike 3',
-    subtitle: 'LEGO Spike Prime – pravi inženjering',
+    subtitle: 'LEGO SPIKE Prime – Scratch',
     description:
-      'Tečaj SLR 3 uvodi djecu od 11 do 12 godina u naprednu robotiku pomoću LEGO Spike Prime platforme. ' +
-      'Polaznici uče tekstualno programiranje i rade na kompleksnijim inženjerskim izazovima. ' +
-      'LEGO Spike Prime omogućuje preciznije motore, više vrsta senzora i programiranje u Python/Scratch okruženju. ' +
-      'Ovaj tečaj priprema polaznike za natjecanja poput FLL i WRO.',
+      'Tečaj SLR 3 namijenjen je početnicima od 11 do 12 godina (5. i 6. razred) ili onima koji su završili SLR 2. ' +
+      'Uz LEGO Spike Prime edukacijski set i Scratch programsko okruženje, polaznici istražuju kako tehnologija i robotika služe suvremenom društvu. ' +
+      'Program uključuje izgradnju i programiranje šesnaest projekata raspoređenih u četiri tematska modula. ' +
+      'Godišnji program obuhvaća 4 modula, ukupno 56 školskih sati (14 sati po modulu). ' +
+      'Završetkom programa polaznici stječu uvjete za upis u SLR 4.',
     ageMin: 11,
     ageMax: 12,
-    equipment: 'LEGO Spike Prime',
+    equipment: 'LEGO SPIKE Prime + Scratch',
     priceYear: 400,
     priceModule: 110,
     hours: 56,
@@ -131,22 +155,31 @@ export const courses: Course[] = [
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
     groupSize: 8,
+    coverImage: '/images/courses/slr-3/cover.jpg',
     modules: [
       {
-        title: 'Modul 1 – Spike Prime osnove',
-        description: 'Upoznavanje s Spike Prime setom i novim mogućnostima. Precizni motori i napredni senzori.',
+        title: 'Zabavni Sustavi 3.0',
+        description:
+          'Kako tehnologija može služiti rekreacijske svrhe? Polaznici grade Spirograf, Vrtuljak, Glazbenu kutiju i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-3/module-1.png',
       },
       {
-        title: 'Modul 2 – Programiranje u Scratch',
-        description: 'Napredni Scratch za upravljanje robotima. Složeni algoritmi i paralelne radnje.',
+        title: 'Prometni Sustavi 3.0',
+        description:
+          'Razvoj modernih vozila i izazovi automatizacije prometa. Projekti: Mehanički prijenos, Trkački automobil, Motocikl i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-3/module-2.png',
       },
       {
-        title: 'Modul 3 – Uvod u Python',
-        description: 'Osnove Python programiranja za robotiku. Varijable, funkcije i petlje u pravom programskom jeziku.',
+        title: 'Industrijski Sustavi 3.0',
+        description:
+          'Industrijska automatizacija u modernoj proizvodnji. Projekti: Manipulator, Razvrstavač boja, CNC uređaj i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-3/module-3.png',
       },
       {
-        title: 'Modul 4 – Natjecateljski robot',
-        description: 'Izrada robota za natjecanje (FLL/WRO format). Strategija, preciznost i timski rad.',
+        title: 'Energetski Sustavi 2.0',
+        description:
+          'Obnovljiva energija kao učinkovita i ekološka proizvodnja. Projekti: Vjetroturbina, Vjetroelektrana, Solarna lampa i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-3/module-4.png',
       },
     ],
     color: 'text-teal-700',
@@ -157,15 +190,16 @@ export const courses: Course[] = [
     slug: 'slr-4',
     level: 'SLR_4',
     title: 'Svijet LEGO Robotike 4',
-    subtitle: 'Industrijsko doba – napredni sustavi',
+    subtitle: 'LEGO SPIKE Prime – Scratch',
     description:
-      'Tečaj SLR 4 namijenjen je polaznicima od 13 do 14 godina koji su završili SLR 3 ili imaju odgovarajuće predznanje. ' +
-      'Koristimo LEGO Spike Prime s Scratch programiranjem za simulaciju stvarnih industrijskih i prometnih sustava. ' +
-      'Program je organiziran u 4 tematska modula koja predstavljaju različite grane industrije. ' +
-      'Ovo je najviša razina programa koja priprema polaznike za napredna robotička natjecanja.',
+      'Tečaj SLR 4 namijenjen je početnicima od 13 do 14 godina (7. i 8. razred) ili onima koji su završili SLR 3. ' +
+      'Program se izvodi uz LEGO Spike Prime edukacijski set i Scratch programsko okruženje. ' +
+      'Polaznici grade i programiraju projekte koji simuliraju stvarne industrijske, prometne i zabavne sustave. ' +
+      'Godišnji program obuhvaća 4 modula, ukupno 56 školskih sati (14 sati po modulu). ' +
+      'Završetkom programa polaznici stječu uvjete za sudjelovanje na naprednim robotičkim natjecanjima (FLL, WRO).',
     ageMin: 13,
     ageMax: 14,
-    equipment: 'LEGO Spike Prime (Scratch)',
+    equipment: 'LEGO SPIKE Prime + Scratch',
     priceYear: 400,
     priceModule: 110,
     hours: 56,
@@ -173,26 +207,31 @@ export const courses: Course[] = [
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
     groupSize: 8,
+    coverImage: '/images/courses/slr-4/cover.jpg',
     modules: [
       {
         title: 'Zabavni Sustavi 4.0',
         description:
-          'Sigurnosni sef, zabavni stroj, robotski čuvar – interaktivni uređaji koji simuliraju zabavne i sigurnosne sustave moderne svakodnevice.',
+          'Kako tehnologija i robotika mogu služiti zabavne svrhe? Projekti: Sigurnosni sef, Zabavni stroj, Robotski čuvar i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-4/module-1.png',
       },
       {
         title: 'Prometni Sustavi 4.0',
         description:
-          'Helikopter, nagibni avion, simulator leta – modeli koji istražuju prometne tehnologije i mehanizme kojima se koristi suvremeni transport.',
+          'Karakteristike zračnog prometa i dizajn letjelica. Projekti: Helikopter, Nagibni avion, Simulator leta i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-4/module-2.png',
       },
       {
         title: 'Industrijski Sustavi 4.0',
         description:
-          'Lift, transportna traka, sorter – simulacija modernih industrijskih procesa koji pokretaju globalnu ekonomiju.',
+          'Industrijska automatizacija i precizni strojevi. Projekti: Lift, Transportna traka, Višenamjenski razvrstavač i projekt po slobodnom izboru.',
+        image: '/images/courses/slr-4/module-3.png',
       },
       {
         title: 'Robotsko Vozilo 1.0',
         description:
-          'Jedan sveobuhvatni projektni zadatak: izrada i programiranje autonomnog vozila koje se samostalno snalazi u prostoru.',
+          'Autonomno vozilo koje se samostalno snalazi u prostoru. Jedan sveobuhvatni projekt koji pokriva ključne komponente, motore i senzore potrebne za samostalno kretanje robota.',
+        image: '/images/courses/slr-4/module-4.jpg',
       },
     ],
     color: 'text-blue-700',

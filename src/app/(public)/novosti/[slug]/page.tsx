@@ -128,33 +128,44 @@ export default async function ArticlePage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Cover image hero */}
+      {/* Cover image */}
       {article.coverImage && (
-        <div className="relative w-full h-64 md:h-96 bg-gray-100">
-          <Image
-            src={article.coverImage}
-            alt={article.title}
-            fill
-            priority
-            className="object-cover"
-            sizes="100vw"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-        </div>
+        <section className="py-8 px-4 bg-gray-50">
+          <div className="container mx-auto max-w-3xl">
+            <Link
+              href="/novosti"
+              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors mb-4"
+            >
+              <ArrowLeft className="w-4 h-4" /> Sve novosti
+            </Link>
+            <div className="relative overflow-hidden rounded-2xl h-64 md:h-80 bg-gray-100">
+              <Image
+                src={article.coverImage}
+                alt={article.title}
+                fill
+                priority
+                className="object-cover object-center"
+                sizes="(max-width: 768px) 100vw, 768px"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            </div>
+          </div>
+        </section>
       )}
 
-      <article className={`py-12 px-4 bg-white ${article.coverImage ? '-mt-8 relative z-10' : ''}`}>
+      <article className="py-12 px-4 bg-white">
         <div className="container mx-auto max-w-3xl">
-          {/* Back link */}
-          <Link
-            href="/novosti"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-cyan-600 transition-colors mb-8"
-          >
-            <ArrowLeft className="w-4 h-4" /> Sve novosti
-          </Link>
+          {/* Back link (only when no cover image) */}
+          {!article.coverImage && (
+            <Link
+              href="/novosti"
+              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-cyan-600 transition-colors mb-8"
+            >
+              <ArrowLeft className="w-4 h-4" /> Sve novosti
+            </Link>
+          )}
 
-          {/* Card wrapper when there's a cover image */}
-          <div className={article.coverImage ? 'bg-white rounded-2xl shadow-md p-6 md:p-10' : ''}>
+          <div>
             {/* Tags */}
             {article.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, Clock, Users, Calendar, Wrench, Euro } from 'lucide-react'
 import { courses } from '@/lib/courses-data'
@@ -104,14 +105,21 @@ export default function ProgramiPage() {
                 className={`group bg-white rounded-2xl border border-gray-100 border-l-4 ${cardBorders[i]} overflow-hidden shadow-sm hover:shadow-md hover:shadow-cyan-100 transition-shadow`}
               >
                 <div className="md:flex">
-                  {/* Color strip */}
-                  <div
-                    className={`bg-gradient-to-br ${course.gradient} md:w-48 h-32 md:h-auto flex items-center justify-center flex-shrink-0`}
-                  >
-                    <div className="text-center text-white">
-                      <div className="text-4xl font-extrabold">SLR {i + 1}</div>
-                      <div className="text-sm font-medium opacity-90 mt-1">
-                        {course.ageMin}–{course.ageMax} god.
+                  {/* Cover image */}
+                  <div className={`relative md:w-56 h-44 md:h-auto flex-shrink-0 overflow-hidden bg-gradient-to-br ${course.gradient}`}>
+                    <Image
+                      src={course.coverImage}
+                      alt={course.title}
+                      fill
+                      className="object-cover object-center scale-90 origin-center"
+                      sizes="(max-width: 768px) 100vw, 224px"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent md:bg-gradient-to-t md:from-black/50 md:via-black/10 md:to-transparent flex items-end justify-start p-3">
+                      <div className="text-white drop-shadow">
+                        <div className="text-2xl font-extrabold leading-none">SLR {i + 1}</div>
+                        <div className="text-xs font-medium opacity-90">
+                          {course.ageMin}–{course.ageMax} god.
+                        </div>
                       </div>
                     </div>
                   </div>

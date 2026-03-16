@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Clock, Users, Calendar, Wrench, CheckCircle, Euro } from 'lucide-react'
 import { courses, getCourseBySlug } from '@/lib/courses-data'
@@ -73,22 +74,32 @@ export default async function CourseDetailPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(courseJsonLd) }}
       />
       {/* Header */}
-      <section className={`bg-gradient-to-br ${course.gradient} py-16 px-4`}>
+      <section className="py-8 px-4 bg-gray-50">
         <div className="container mx-auto max-w-4xl">
           <Link
             href="/programi"
-            className="inline-flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-medium mb-6 transition-colors"
+            className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm font-medium mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" /> Svi programi
           </Link>
-          <div>
-            <span className="text-white/70 text-sm font-semibold uppercase tracking-widest">
-              Razina {courseIndex + 1} od 4
-            </span>
-            <h1 className="text-3xl md:text-5xl font-extrabold text-white mt-1 leading-tight">
-              {course.title}
-            </h1>
-            <p className="text-white/90 text-lg mt-2">{course.subtitle}</p>
+          <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${course.gradient}`}>
+            <Image
+              src={course.coverImage}
+              alt={course.title}
+              fill
+              className="object-cover object-center scale-90 origin-center"
+              priority
+            />
+            <div className={`absolute inset-0 bg-gradient-to-br ${course.gradient} opacity-85`} />
+            <div className="relative px-8 py-12">
+              <span className="text-white/70 text-sm font-semibold uppercase tracking-widest">
+                Razina {courseIndex + 1} od 4
+              </span>
+              <h1 className="text-3xl md:text-5xl font-extrabold text-white mt-1 leading-tight">
+                {course.title}
+              </h1>
+              <p className="text-white/90 text-lg mt-2">{course.subtitle}</p>
+            </div>
           </div>
         </div>
       </section>
@@ -144,13 +155,23 @@ export default async function CourseDetailPage({
                     key={mod.title}
                     className="flex gap-4 p-5 rounded-xl border border-gray-100 bg-gray-50 hover:border-cyan-200 transition-colors"
                   >
-                    <div
-                      className={`w-8 h-8 rounded-lg bg-gradient-to-br ${course.gradient} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}
-                    >
-                      {i + 1}
+                    <div className="relative w-24 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
+                      <Image
+                        src={mod.image}
+                        alt={mod.title}
+                        fill
+                        className="object-cover"
+                      />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 mb-1 text-sm">{mod.title}</h3>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span
+                          className={`w-6 h-6 rounded-md bg-gradient-to-br ${course.gradient} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
+                        >
+                          {i + 1}
+                        </span>
+                        <h3 className="font-semibold text-gray-900 text-sm">{mod.title}</h3>
+                      </div>
                       <p className="text-sm text-gray-500 leading-relaxed">{mod.description}</p>
                     </div>
                   </div>
