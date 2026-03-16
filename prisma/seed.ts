@@ -672,7 +672,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2026-01-13'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656871/articles/covers/odrzane-zimske-radionice-robotike-2026.jpg',
     },
   })
 
@@ -816,7 +816,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         li(bx('1. dan'), tx(' – upoznajemo projektni zadatak i započinjemo slaganje saonica Djeda Mraza. Djeca će razvijati kreativnost, timski rad i prve konstrukcijske vještine.')),
         li(bx('2. dan'), tx(' – dovršavamo i nadograđujemo saonice te učimo '), bx('osnove programiranja'), tx(' kako bi saonice mogle izvršavati jednostavne naredbe.')),
         li(bx('3. dan'), tx(' – vrijeme je za pravi izazov! Programiramo saonice za '), bx('samostalno kretanje po snježnoj stazi'), tx(' i testiramo što smo naučili.')),
-        video('/images/articles/zimske-radionice-2026/inline/saonice-2026.mp4'),
+        video('https://res.cloudinary.com/dgc2tp4f8/video/upload/v1773657887/articles/inline/zimske-radionice-2026/saonice-2026.mp4'),
         p(tx('Radionice su prilagođene '), bx('početnicima'), tx(', a naši iskusni robo treneri vode polaznike korak po korak kroz konstrukciju, mehaniku i programiranje. Djeca rade u '), bx('paru'), tx(', koristeći LEGO edukacijske setove i laptope, u poticajnom i zabavnom okruženju.')),
         p(tx('Na kraju radionica svi polaznici dobivaju '), bx('diplomu'), tx(', a sa sobom nose nova znanja, iskustva i puno zimskih uspomena.')),
         p(tx('Ne propustite priliku da zimske praznike pretvorite u spoj igre, učenja i tehnologije! Broj mjesta je ograničen – '), bx('prijavite se na vrijeme'), tx(' i osigurajte svoje mjesto u LEGO zimskom svijetu!')),
@@ -829,7 +829,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2025-12-18'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656913/articles/covers/zimske-radionice-2026.png',
     },
   })
 
@@ -848,14 +848,14 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       excerpt: `Tim CroSpec izborili su plasman na WRO finale 2025. u Singapuru (26.–28. studenog). Pozivamo sve koji žele podržati naše mlade robotičare na putu prema svjetskom zlatu.`,
       content: [
         p(tx('Ovim putem pozivamo sve ljubitelje robotike, tehnologije i rada Udruge Inovatic da podrže naš tim '), bx('CroSpec'), tx(' i pomognu im da dostojno predstavljaju Hrvatsku na svjetskoj pozornici robotičkog natjecanja World robot olympiad (WRO), koje se održava '), bx('26.-28. studenog 2025. u Singapuru'), tx('. Više o natjecanju možete pogledati na službenim stranicama organizatora natjecanja.')),
-        img('/images/articles/donacija-singapur/inline/QR-singapur.jpeg', 280),
+        img('https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657862/articles/inline/donacija-singapur/QR-singapur.jpg', 280),
         p(tx('Put do Singapura ovisi o financijskoj podršci svih vas koji vjerujete u mlade inovatore. Svaka donacija, bez obzira na iznos, pomaže da CroSpec tim predstavlja Hrvatsku u najboljem svjetlu. Donirati možete skeniranjem koda ili uplatom na račun Udruge Inovatic: '), bx('HR7223400091110811408'), tx(' (opis plaćanja: Za put u Singapur).')),
         h2('Upoznajte naš CroSpec tim!'),
-        img('/images/articles/donacija-singapur/inline/Ivano-Tabak.jpg', 300),
+        img('https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657862/articles/inline/donacija-singapur/Ivano-Tabak.jpg', 300),
         p(tx('Ivano Tabak, maturant Elektrotehničke škole Split, jedan je od članova ekipe CroSpec, koja je postala prvak Hrvatske u robotici i osigurala plasman na svjetsko WRO finale u Singapuru! Ivano je već deset godina u udruzi Inovatic i od malena strastveno spaja matematiku, informatiku i programiranje. Sudjelovao je na brojnim natjecanjima – od FLL-a i Robokupa do MAT lige i Ideje godine – a ovo mu je dosad najveći uspjeh. Osim robotike i natjecanja koja ga pokreću, Ivano voli košarku i matematička natjecanja. Budućnost vidi u programiranju ili matematici – možda na FER-u, FESB-u ili PMF-u. Njegova poruka mladima koje zanima robotika: „Pokušajte – nemate što izgubiti, a samo možete napredovati!"')),
-        img('/images/articles/donacija-singapur/inline/Mihovil-Letina.jpg', 300),
+        img('https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657862/articles/inline/donacija-singapur/Mihovil-Letina.jpg', 300),
         p(tx('Mihovil Letina, učenik 2. razreda Tehničke škole za strojarstvo i mehatroniku Split, zajedno s Ivanom čini ekipu CroSpec – prvake Hrvatske i finaliste svjetskog WRO natjecanja u Singapuru! U robotici je već devet godina, a natjecanja su ono što ga najviše veseli jer ga stalno potiču da bude inovativan. Dvaput je osvajao drugo mjesto na državnoj razini Robokupa, sudjelovao u FLL-u i WRO-u, a plasman na svjetsko finale najveći mu je trenutak do sada. Vjeruje da će mu robotika otvoriti vrata budućnosti jer svijet ide prema automatizaciji – a on je spreman biti dio toga. Njegova poruka mladima: „Ako vas zanima robotika – probajte, a ako se pronađete u tome – ustrajte!"')),
-        img('/images/articles/donacija-singapur/inline/jozo-pivac.jpg', 300),
+        img('https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657862/articles/inline/donacija-singapur/jozo-pivac.jpg', 300),
         p(tx('Jozo Pivac, mentor i voditelj aktivnosti u Udruzi za robotiku "Inovatic" te ujedno i predsjednik udruge. Kao mentor sudjelovao na brojnim županijskim, državnim i međunarodnim natjecanjima te osvojio niz priznanja i nagrada. Dobitnik je Godišnje nagrade Hrvatske zajednice tehničke kulture (HZTK) za 2024. g., za ostvarene iznimne rezultate u radu s djecom i mladima u izvanškolskim aktivnostima. Aktivno sudjeluje u znanstvenim istraživanjima na poslijediplomskom znanstvenom studiju Istraživanje u edukaciji u području prirodnih i tehničkih znanosti na Prirodoslovno-matematičkom fakultetu Sveučilišta u Splitu, s nizom objavljenih stručnih i znanstvenih radova. Kao tajnik splitskog Društva pedagoga tehničke kulture te aktivnim članstvom u upravnim odborima Zajednice za tehničku kulturu grada Splita (ZTK Split) i Hrvatskog robotičkog saveza (HROBOS), doprinosi razvoju tehničke kulture i STEM edukacije u Hrvatskoj. Vodio je projekt Bilo kuda STEM svuda sufinanciran iz europskog socijalnog fonda i razvio inovativne projekte poput Robotičko simulacijske lige – ROSIL. Njegova posvećenost i stručnost čine ga jednim od vodećih stručnjaka u ovom području.')),
         p(tx('Hvala vam što podržavate naš rad i vjerujete u znanje naših mladih!')),
       ],
@@ -924,7 +924,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2025-06-05'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656903/articles/covers/zavrsetak-cjelogodisnje-aktivnosti-2024-2025.jpg',
     },
   })
 
@@ -1077,7 +1077,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'video',
           props: {
-            url: `/images/articles/ljetne-radionice-2025/inline/Video-projekata_Ljetne-2025.mp4`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/video/upload/v1773657927/articles/inline/ljetne-radionice-2025/Video-projekata_Ljetne-2025.mp4`,
           },
         },
         {
@@ -1170,7 +1170,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2024-06-04'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656909/articles/covers/zavrsetak-slr-2023-2024.jpg',
     },
   })
 
@@ -1269,7 +1269,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2024-02-11'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656910/articles/covers/zimska-skola-2024.jpg',
     },
   })
 
@@ -1679,7 +1679,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2023-06-18'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656904/articles/covers/zavrsetak-cjelogodisnjih-radionica-2022-2023.jpg',
     },
   })
 
@@ -2000,7 +2000,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2023-03-08'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656838/articles/covers/besplatne-proljetne-radionice-2023.jpg',
     },
   })
 
@@ -2296,7 +2296,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/besplatne-zimske-radionice-2023/inline/EU-vidljivost-lenta-1024x177.png`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657862/articles/inline/besplatne-zimske-radionice-2023/EU-vidljivost-lenta-1024x177.png`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -2332,7 +2332,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/male-bistre-glavice/inline/steam-u-splitu-male-bistre-glavice1-1024x1024.png`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657874/articles/inline/male-bistre-glavice/steam-u-splitu-male-bistre-glavice1-1024x1024.png`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -2400,7 +2400,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-09-08'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656858/articles/covers/male-bistre-glavice.png',
     },
   })
 
@@ -2935,7 +2935,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-08-13'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656863/articles/covers/odrzan-prvi-splitski-kamp-robotike.jpg',
     },
   })
 
@@ -3176,7 +3176,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-07-01'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656902/articles/covers/zavrsetak-cjelogodisnje-2022.jpg',
     },
   })
 
@@ -3519,7 +3519,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/poziv-ljetni-kamp/inline/2-1.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657876/articles/inline/poziv-ljetni-kamp/2-1.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3528,7 +3528,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/poziv-ljetni-kamp/inline/4.jpeg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657876/articles/inline/poziv-ljetni-kamp/4.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3537,7 +3537,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/poziv-ljetni-kamp/inline/Inovatic-2-e1648653149640.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657877/articles/inline/poziv-ljetni-kamp/Inovatic-2-e1648653149640.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3546,7 +3546,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/poziv-ljetni-kamp/inline/4.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657876/articles/inline/poziv-ljetni-kamp/4.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3555,7 +3555,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/poziv-ljetni-kamp/inline/Inovatic-3.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657878/articles/inline/poziv-ljetni-kamp/Inovatic-3.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3700,7 +3700,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-06-05'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656900/articles/covers/zavrsen-1-ciklus-besplatnih-radionica-iz-elementarne-robotike.jpg',
     },
   })
 
@@ -3763,7 +3763,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavni-prvaci-15-robokupa/inline/2-2.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657863/articles/inline/drzavni-prvaci-15-robokupa/2-2.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3772,7 +3772,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavni-prvaci-15-robokupa/inline/3-2.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657863/articles/inline/drzavni-prvaci-15-robokupa/3-2.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3781,7 +3781,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavni-prvaci-15-robokupa/inline/4-2.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657863/articles/inline/drzavni-prvaci-15-robokupa/4-2.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3790,7 +3790,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavni-prvaci-15-robokupa/inline/5-2.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657863/articles/inline/drzavni-prvaci-15-robokupa/5-2.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3799,7 +3799,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavni-prvaci-15-robokupa/inline/8-2.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657863/articles/inline/drzavni-prvaci-15-robokupa/8-2.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3842,7 +3842,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/festival-znanosti-2022/inline/5-1024x768.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657869/articles/inline/festival-znanosti-2022/5-1024x768.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3851,7 +3851,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/festival-znanosti-2022/inline/6-1024x768.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657869/articles/inline/festival-znanosti-2022/6-1024x768.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3860,7 +3860,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/festival-znanosti-2022/inline/7-1024x768.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657872/articles/inline/festival-znanosti-2022/7-1024x768.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3869,7 +3869,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/festival-znanosti-2022/inline/8-1024x768.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657870/articles/inline/festival-znanosti-2022/8-1024x768.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3878,7 +3878,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/festival-znanosti-2022/inline/10-1024x768.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657868/articles/inline/festival-znanosti-2022/10-1024x768.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3888,7 +3888,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-05-06'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656848/articles/covers/festival-znanosti-2022.jpg',
     },
   })
 
@@ -3932,7 +3932,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/inline/2-1-819x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657871/articles/inline/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/2-1-819x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3941,7 +3941,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/inline/3-1-819x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657873/articles/inline/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/3-1-819x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3950,7 +3950,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/inline/6-1-819x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657873/articles/inline/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/6-1-819x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3959,7 +3959,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/inline/7-1-819x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657874/articles/inline/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/7-1-819x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3968,7 +3968,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/inline/9-1-819x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657874/articles/inline/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022/9-1-819x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -3978,7 +3978,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-05-02'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656873/articles/covers/osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022.jpg',
     },
   })
 
@@ -4040,7 +4040,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/inline/2-1024x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657865/articles/inline/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/2-1024x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4049,7 +4049,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/inline/4-1024x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657868/articles/inline/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/4-1024x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4058,7 +4058,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/inline/6-1024x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657867/articles/inline/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/6-1024x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4067,7 +4067,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/inline/7-1024x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657866/articles/inline/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/7-1024x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4076,7 +4076,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/inline/8-1024x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657867/articles/inline/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/8-1024x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4085,7 +4085,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/inline/9-1024x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657867/articles/inline/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/9-1024x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4094,7 +4094,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/inline/10-1024x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657864/articles/inline/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/10-1024x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4103,7 +4103,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/inline/11-1024x1024.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657870/articles/inline/drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022/11-1024x1024.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4145,7 +4145,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetna-radionica-u-zvjezdanom-selu-mosor/inline/Proljetna2022_9_1.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657879/articles/inline/proljetna-radionica-u-zvjezdanom-selu-mosor/Proljetna2022_9_1.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4154,7 +4154,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetna-radionica-u-zvjezdanom-selu-mosor/inline/Proljetna2022_11.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657879/articles/inline/proljetna-radionica-u-zvjezdanom-selu-mosor/Proljetna2022_11.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4163,7 +4163,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetna-radionica-u-zvjezdanom-selu-mosor/inline/1651136222722-1024x766.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657877/articles/inline/proljetna-radionica-u-zvjezdanom-selu-mosor/1651136222722-1024x766.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4172,7 +4172,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetna-radionica-u-zvjezdanom-selu-mosor/inline/1651136222894-1024x768.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657877/articles/inline/proljetna-radionica-u-zvjezdanom-selu-mosor/1651136222894-1024x768.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4181,7 +4181,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetna-radionica-u-zvjezdanom-selu-mosor/inline/1651136222916-1024x766.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657878/articles/inline/proljetna-radionica-u-zvjezdanom-selu-mosor/1651136222916-1024x766.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4190,7 +4190,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetna-radionica-u-zvjezdanom-selu-mosor/inline/278678869_395420259259861_7182940540861048402_n-1024x576.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657878/articles/inline/proljetna-radionica-u-zvjezdanom-selu-mosor/278678869_395420259259861_7182940540861048402_n-1024x576.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4199,7 +4199,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetna-radionica-u-zvjezdanom-selu-mosor/inline/278842339_395420212593199_2130285941664812104_n-1024x576.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657878/articles/inline/proljetna-radionica-u-zvjezdanom-selu-mosor/278842339_395420212593199_2130285941664812104_n-1024x576.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4209,7 +4209,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-04-28'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656882/articles/covers/proljetna-radionica-u-zvjezdanom-selu-mosor.jpg',
     },
   })
 
@@ -4235,7 +4235,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/inline/1651080132239-1024x766.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657880/articles/inline/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/1651080132239-1024x766.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4244,7 +4244,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/inline/1651080132285-1024x768.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657880/articles/inline/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/1651080132285-1024x768.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4253,7 +4253,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/inline/1651080132224-1-1024x766.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657879/articles/inline/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/1651080132224-1-1024x766.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4262,7 +4262,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/inline/1651080132316-1-1024x768.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657880/articles/inline/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/1651080132316-1-1024x768.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4271,7 +4271,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/inline/1651079821692-2-1024x766.jpg`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657879/articles/inline/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda/1651079821692-2-1024x766.jpg`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4281,7 +4281,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-04-27'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656889/articles/covers/proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda.jpg',
     },
   })
 
@@ -4342,7 +4342,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-04-04'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656890/articles/covers/proljetne-radionice-robotike-2022.jpg',
     },
   })
 
@@ -4372,7 +4372,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-04-04'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656836/articles/covers/3866-2.jpg',
     },
   })
 
@@ -4404,7 +4404,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-04-04'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656835/articles/covers/3859-2.jpg',
     },
   })
 
@@ -4432,7 +4432,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-03-29'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656894/articles/covers/robokup-2022-zupanijska-razina.jpg',
     },
   })
 
@@ -4621,7 +4621,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-03-15'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656881/articles/covers/projekt-bilo-kuda-stem-svuda.jpg',
     },
   })
 
@@ -4669,7 +4669,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2022-01-09'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656916/articles/covers/zimske-radionice-robotike-2022.jpg',
     },
   })
 
@@ -4714,7 +4714,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2021-07-08'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656907/articles/covers/zavrsetak-izvanskolske-aktivnosti-2020-2021.jpg',
     },
   })
 
@@ -4754,7 +4754,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
         {
           type: 'image',
           props: {
-            url: `/images/articles/otvorili-smo-upise-u-nove-grupe-iz-robotike/inline/Plava-zgrada.png`,
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657875/articles/inline/otvorili-smo-upise-u-nove-grupe-iz-robotike/Plava-zgrada.png`,
             caption: ``,
             textAlignment: `left`,
             previewWidth: 512,
@@ -4954,7 +4954,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2020-09-12'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656876/articles/covers/pocele-radionice-robotike-u-novoj-skolskoj-godini-2020-2021.jpg',
     },
   })
 
@@ -5006,7 +5006,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2020-08-21'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656859/articles/covers/odrzan-cetvrti-ciklus-ljetnih-radionica-robotike-u-kolovozu-2020.jpg',
     },
   })
 
@@ -5965,7 +5965,7 @@ Nadahnuti zimskim praznicima pripremili smo projekte tematskog sadržaja poput; 
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2020-01-06'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656914/articles/covers/zimske-radionice-lego-robotike-2020.jpg',
     },
   })
 
@@ -6048,7 +6048,7 @@ Veselimo se nadolazećim zimskim radionicama, a do tada možete pogledati najist
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2019-07-19'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656856/articles/covers/ljetne-radionice-robotike.jpg',
     },
   })
 
@@ -6083,7 +6083,7 @@ Učenici su uz vodstvo naših predavača slagali i programirali zanimljive Lego 
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2019-07-10'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656862/articles/covers/odrzan-prvi-ciklus-ljetnih-radionica-2019.jpg',
     },
   })
 
@@ -6175,7 +6175,7 @@ Galerija slika:`, styles: {'bold': true} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2019-04-29'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656887/articles/covers/proljetne-radionice-lego-robotike-2019.jpg',
     },
   })
 
@@ -6236,7 +6236,7 @@ Mlađa dobna skupina je koristila `, styles: {} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2018-12-13'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656834/articles/covers/1082.jpg',
     },
   })
 
@@ -6313,7 +6313,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2018-08-29'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656850/articles/covers/lego-mindstorms-radionice-robotike.jpg',
     },
   })
 
@@ -6376,7 +6376,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2018-04-15'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656847/articles/covers/festival-znanosti-2018.jpg',
     },
   })
 
@@ -6449,7 +6449,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2018-04-10'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656885/articles/covers/proljetne-radionice-lego-robotike-2018-2.jpg',
     },
   })
 
@@ -6512,7 +6512,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2018-01-12'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656915/articles/covers/zimske-radionice-lego-robotike.jpg',
     },
   })
 
@@ -6557,7 +6557,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2017-10-06'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656892/articles/covers/radionice-robotike-za-djecu-zaposlenika-ht-a.jpg',
     },
   })
 
@@ -6602,7 +6602,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2017-04-07'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656884/articles/covers/proljetna-skola-lego-robotike.png',
     },
   })
 
@@ -6629,7 +6629,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2017-01-14'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656843/articles/covers/druga-zimska-skola-lego-robotike.jpg',
     },
   })
 
@@ -6656,7 +6656,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2016-12-23'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656849/articles/covers/kras-razveselio-nase-malisane-poklonima.jpg',
     },
   })
 
@@ -6697,7 +6697,7 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2016-12-05'),
-      coverImage: null,
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656911/articles/covers/zimska-skola-lego-robotike.jpg',
     },
   })
 

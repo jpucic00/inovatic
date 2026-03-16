@@ -40,3 +40,6 @@ next-env.d.ts
 
 # Article images — local only, not committed or bundled
 /public/images/articles/
+
+# Cloudinary migration mapping (local only)
+/cloudinary-mapping.json
