@@ -319,10 +319,6 @@ export default async function HomePage() {
       {/* Testimonials */}
       <section className="py-16 px-4 bg-gradient-to-br from-cyan-50 via-white to-yellow-50">
         <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-10">
-            <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Što kažu drugi</span>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">Glasovi iz zajednice</h2>
-          </div>
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t) => (
               <div key={t.name} className="flex flex-col bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all">
