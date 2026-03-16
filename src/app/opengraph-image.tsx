@@ -30,7 +30,7 @@ export default function Image() {
             width: 400,
             height: 400,
             borderRadius: '50%',
-            background: 'rgba(6, 182, 212, 0.15)',
+            background: 'rgba(75, 189, 202, 0.15)',
           }}
         />
         {/* Decorative circle bottom-left */}
@@ -51,14 +51,14 @@ export default function Image() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            background: 'rgba(6, 182, 212, 0.1)',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
+            background: 'rgba(75, 189, 202, 0.1)',
+            border: '1px solid rgba(75, 189, 202, 0.3)',
             borderRadius: 100,
             padding: '8px 24px',
             marginBottom: 32,
           }}
         >
-          <span style={{ fontSize: 18, color: '#0891b2', fontWeight: 700, letterSpacing: 3 }}>
+          <span style={{ fontSize: 18, color: '#2A9EAD', fontWeight: 700, letterSpacing: 3 }}>
             SPLIT, HRVATSKA · OD 2014.
           </span>
         </div>
@@ -75,7 +75,7 @@ export default function Image() {
             letterSpacing: -2,
           }}
         >
-          <span style={{ color: '#06b6d4' }}>LEGO Robotika</span>
+          <span style={{ color: '#4BBDCA' }}>LEGO Robotika</span>
           <br />
           za djecu u Splitu
         </div>
@@ -101,7 +101,7 @@ export default function Image() {
             left: 0,
             right: 0,
             height: 8,
-            background: 'linear-gradient(90deg, #06b6d4, #0891b2)',
+            background: 'linear-gradient(90deg, #4BBDCA, #2A9EAD)',
           }}
         />
 
@@ -115,7 +115,7 @@ export default function Image() {
             gap: 12,
           }}
         >
-          <span style={{ fontSize: 22, fontWeight: 800, color: '#0891b2' }}>udruga-inovatic.hr</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: '#2A9EAD' }}>udruga-inovatic.hr</span>
         </div>
       </div>
     ),

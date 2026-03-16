@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "inovatic-dev",
+      "runtimeExecutable": "/Users/jpucic/.nvm/versions/node/v24.13.1/bin/node",
+      "runtimeArgs": ["/Users/jpucic/Documents/GitHub/inovatic/node_modules/.bin/next", "dev", "--port", "$PORT"],
+      "cwd": "/Users/jpucic/Documents/GitHub/inovatic",
+      "port": 3002,
+      "autoPort": true
+    }
+  ]
+}

@@ -61,6 +61,17 @@ const competitions = [
   },
 ]
 
+const trainers = [
+  { name: 'Jozo Pivac', title: 'prof. inf. i tehničke kulture' },
+  { name: 'Bruno Bešlić', title: 'mag. educ. informatike i tehnike' },
+  { name: 'Slavica Jurčević', title: 'mag. educ. inf.' },
+  { name: 'Duje Topić', title: 'student Filozofskog fakulteta Split' },
+  { name: 'Josip Stepinac', title: 'student PMF-a, usmjerenje informatika i tehnika' },
+  { name: 'Ivan Stepinac', title: 'student FESB-a, smjer računarstvo' },
+  { name: 'Vito Drnjević', title: 'student FESB-a, smjer računarstvo' },
+  { name: 'Ivano Tabak', title: 'maturant, Elektrotehnička škola' },
+]
+
 const memberships = [
   { name: 'ZTK Split', full: 'Zajednica tehničke kulture Splita' },
   { name: 'HZTK', full: 'Hrvatska zajednica tehničke kulture' },
@@ -152,11 +163,26 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 text-center">
-            <p className="text-gray-600 text-sm">
-              Nastavu izvode i <strong>studenti i profesori Prirodoslovno-matematičkog fakulteta u Splitu</strong>,
-              donoseći svježe znanje iz računarstva, fizike i inženjerstva.
-            </p>
+        </div>
+      </section>
+
+      {/* Trainers */}
+      <section className="py-16 px-4 bg-white">
+        <div className="container mx-auto max-w-4xl">
+          <div className="text-center mb-10">
+            <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Naši stručnjaci</span>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">Treneri i mentori</h2>
+          </div>
+          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {trainers.map((trainer) => (
+              <div key={trainer.name} className="bg-cyan-50/60 border border-cyan-100 rounded-2xl p-5 text-center">
+                <div className="w-11 h-11 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-xl flex items-center justify-center text-white font-extrabold text-base mx-auto mb-3">
+                  {trainer.name.charAt(0)}
+                </div>
+                <h3 className="font-bold text-gray-900 text-sm mb-1">{trainer.name}</h3>
+                <p className="text-xs text-gray-500 leading-snug">{trainer.title}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

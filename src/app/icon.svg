@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Antenna wire (leaning left like in logo) -->
+  <line x1="50" y1="19" x2="43" y2="6" stroke="#AAAAAA" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Antenna ball -->
+  <circle cx="41" cy="4" r="5.5" fill="#F5A200"/>
+  <circle cx="39" cy="2.5" r="2" fill="#FFD060" opacity="0.75"/>
+
+  <!-- Robot head (pentagon / house shape) -->
+  <polygon points="11,91 89,91 89,51 50,17 11,51" fill="#4BBDCA"/>
+
+  <!-- Head right-side shading for depth -->
+  <polygon points="50,17 89,51 89,91 50,54" fill="#2A9EAD" opacity="0.25"/>
+
+  <!-- Left highlight streak -->
+  <polygon points="11,51 50,17 50,54 11,91" fill="white" opacity="0.07"/>
+
+  <!-- Eyebrows (bolt-like rectangles) -->
+  <rect x="23" y="46" width="22" height="4.5" rx="2.25" fill="#2A8A9A"/>
+  <rect x="55" y="46" width="22" height="4.5" rx="2.25" fill="#2A8A9A"/>
+
+  <!-- Eyes — outer yellow ring -->
+  <circle cx="34" cy="67" r="13.5" fill="#F5C018"/>
+  <circle cx="66" cy="67" r="13.5" fill="#F5C018"/>
+
+  <!-- Eyes — inner orange iris -->
+  <circle cx="34" cy="67" r="8.5" fill="#E88200"/>
+  <circle cx="66" cy="67" r="8.5" fill="#E88200"/>
+
+  <!-- Eyes — highlight -->
+  <circle cx="29" cy="62" r="3.5" fill="white" opacity="0.65"/>
+  <circle cx="61" cy="62" r="3.5" fill="white" opacity="0.65"/>
+</svg>
