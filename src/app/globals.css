@@ -27,6 +27,18 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  /* Override yellow palette to match logo text color (#F3CD56) */
+  --color-yellow-50: oklch(0.97 0.03 82);
+  --color-yellow-100: oklch(0.94 0.06 82);
+  --color-yellow-200: oklch(0.91 0.10 82);
+  --color-yellow-300: oklch(0.88 0.14 82);
+  --color-yellow-400: oklch(0.84 0.17 82);
+  --color-yellow-500: oklch(0.75 0.17 82);
+  --color-yellow-600: oklch(0.64 0.15 82);
+  --color-yellow-700: oklch(0.54 0.12 82);
+  --color-yellow-800: oklch(0.44 0.09 82);
+  --color-yellow-900: oklch(0.34 0.07 82);
+
   /* Override cyan palette to match logo robot head color (#4BBDCA) */
   --color-cyan-50: oklch(0.97 0.02 200);
   --color-cyan-100: oklch(0.94 0.04 200);
@@ -60,8 +72,8 @@
   --muted: oklch(0.968 0.007 247.896);
   --muted-foreground: oklch(0.554 0.046 257.417);
 
-  /* Accent: Inovatic Yellow (#eab308 ≈ yellow-500) */
-  --accent: oklch(0.795 0.167 89);
+  /* Accent: Inovatic Yellow (#F3CD56 — from logo text) */
+  --accent: oklch(0.84 0.17 82);
   --accent-foreground: oklch(0.141 0.005 285.823);
 
   --destructive: oklch(0.577 0.245 27.325);
@@ -92,7 +104,7 @@
   --muted: oklch(0.279 0.041 260.031);
   --muted-foreground: oklch(0.705 0.015 286.067);
 
-  --accent: oklch(0.795 0.167 89);
+  --accent: oklch(0.84 0.17 82);
   --accent-foreground: oklch(0.141 0.005 285.823);
 
   --destructive: oklch(0.704 0.191 22.216);
