@@ -8,11 +8,11 @@ export function RobotSvg({ className }: { className?: string }) {
       aria-hidden="true"
       overflow="visible"
     >
-      {/* Antenna — curved grey tube with orange ball, like logo */}
-      <path d="M 100 48 C 106 34 118 18 120 4" stroke="#9ca3af" strokeWidth="5" strokeLinecap="round" fill="none" />
-      <circle cx="120" cy="3" r="11" fill="#fb923c" />
-      <circle cx="120" cy="3" r="6" fill="#fde047" />
-      <circle cx="116" cy="0" r="2.5" fill="white" opacity="0.7" />
+      {/* Antenna — curved grey tube with orange ball, leaning left like logo */}
+      <path d="M 100 48 C 94 34 82 18 80 4" stroke="#9ca3af" strokeWidth="5" strokeLinecap="round" fill="none" />
+      <circle cx="80" cy="3" r="11" fill="#fb923c" />
+      <circle cx="80" cy="3" r="6" fill="#fde047" />
+      <circle cx="76" cy="0" r="2.5" fill="white" opacity="0.7" />
 
       {/* Head — pentagon/house shape matching logo */}
       <polygon points="72,48 128,48 154,82 154,128 46,128 46,82" fill="#06b6d4" />
