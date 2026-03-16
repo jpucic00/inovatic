@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, Trophy, Users, MapPin, BookOpen, Award } from 'lucide-react'
+import { GearDecor } from '@/components/shared/decorations'
 
 export const metadata: Metadata = {
   title: 'O nama',
@@ -20,12 +21,14 @@ const team = [
     role: 'Predsjednik udruge',
     description:
       'Profesor informatike i tehničke kulture. Osnivač Inovatic udruge i vizionar iza programa koji spaja zabavu s pravim STEM znanjem.',
+    accent: 'border-cyan-400',
   },
   {
     name: 'Snježana Pivac',
     role: 'Tajnica udruge',
     description:
       'Diplomirana učiteljica s dugogodišnjim iskustvom rada s djecom. Koordinira svakodnevne aktivnosti i brigu o polaznicima.',
+    accent: 'border-yellow-400',
   },
 ]
 
@@ -64,12 +67,22 @@ const memberships = [
   { name: 'HROBOS', full: 'Hrvatska robotička zajednica' },
 ]
 
+const statCards = [
+  { value: '2014.', label: 'Osnivanje', icon: BookOpen, bg: 'bg-cyan-50', border: 'border-cyan-200', color: 'text-cyan-600' },
+  { value: '4', label: 'Razine programa', icon: Trophy, bg: 'bg-yellow-50', border: 'border-yellow-200', color: 'text-yellow-600' },
+  { value: '2', label: 'Lokacije u Splitu', icon: MapPin, bg: 'bg-emerald-50', border: 'border-emerald-200', color: 'text-emerald-600' },
+  { value: '≤ 8', label: 'Djece po grupi', icon: Users, bg: 'bg-purple-50', border: 'border-purple-200', color: 'text-purple-600' },
+]
+
 export default function AboutPage() {
   return (
     <>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4">
-        <div className="container mx-auto max-w-3xl text-center">
+      <section className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4 overflow-hidden relative">
+        <div aria-hidden="true" className="absolute -top-16 -left-16 w-64 h-64 rounded-full bg-cyan-300 blur-3xl opacity-40 pointer-events-none" />
+        <div aria-hidden="true" className="absolute -bottom-12 -right-12 w-56 h-56 rounded-full bg-yellow-200 blur-3xl opacity-40 pointer-events-none" />
+        <GearDecor size={48} className="absolute top-8 right-10 text-cyan-200 opacity-60 rotate-12" />
+        <div className="container mx-auto max-w-3xl text-center relative">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">O nama</span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4 leading-tight">
             Udruga za robotiku <span className="text-cyan-500">Inovatic</span>
@@ -109,14 +122,9 @@ export default function AboutPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {[
-                { value: '2014.', label: 'Osnivanje', icon: BookOpen },
-                { value: '4', label: 'Razine programa', icon: Trophy },
-                { value: '2', label: 'Lokacije u Splitu', icon: MapPin },
-                { value: '≤ 8', label: 'Djece po grupi', icon: Users },
-              ].map((item) => (
-                <div key={item.label} className="bg-gray-50 rounded-2xl p-5 text-center">
-                  <div className="text-2xl font-extrabold text-cyan-500 mb-1">{item.value}</div>
+              {statCards.map((item) => (
+                <div key={item.label} className={`${item.bg} border ${item.border} rounded-2xl p-5 text-center`}>
+                  <div className={`text-2xl font-extrabold ${item.color} mb-1`}>{item.value}</div>
                   <div className="text-xs text-gray-500">{item.label}</div>
                 </div>
               ))}
@@ -126,7 +134,7 @@ export default function AboutPage() {
       </section>
 
       {/* Team */}
-      <section className="py-16 px-4 bg-gray-50">
+      <section className="py-16 px-4 bg-cyan-50/30">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-10">
             <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Tim</span>
@@ -134,7 +142,7 @@ export default function AboutPage() {
           </div>
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             {team.map((member) => (
-              <div key={member.name} className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm">
+              <div key={member.name} className={`bg-white rounded-2xl p-7 border border-gray-100 shadow-sm border-l-4 ${member.accent}`}>
                 <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg mb-4">
                   {member.name.charAt(0)}
                 </div>
@@ -168,7 +176,7 @@ export default function AboutPage() {
                 className={`flex gap-4 p-5 rounded-xl border transition-colors ${
                   comp.highlight
                     ? 'bg-yellow-50 border-yellow-200'
-                    : 'bg-gray-50 border-gray-100'
+                    : 'bg-cyan-50 border-cyan-100'
                 }`}
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -192,12 +200,12 @@ export default function AboutPage() {
       </section>
 
       {/* Memberships */}
-      <section className="py-12 px-4 bg-gray-50">
+      <section className="py-12 px-4 bg-yellow-50/50">
         <div className="container mx-auto max-w-3xl">
           <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Članstvo u organizacijama</h2>
           <div className="flex flex-wrap justify-center gap-4">
             {memberships.map((m) => (
-              <div key={m.name} className="bg-white rounded-xl px-5 py-3 border border-gray-200 shadow-sm text-center">
+              <div key={m.name} className="bg-yellow-50 rounded-xl px-5 py-3 border border-yellow-200 shadow-sm text-center">
                 <div className="font-bold text-cyan-600 text-sm">{m.name}</div>
                 <div className="text-xs text-gray-500 mt-0.5">{m.full}</div>
               </div>
@@ -210,15 +218,16 @@ export default function AboutPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-14 px-4 bg-white">
-        <div className="container mx-auto text-center max-w-xl">
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-4">Pridružite se Inovatic obitelji</h2>
-          <p className="text-gray-500 mb-6">
+      <section className="py-14 px-4 bg-gradient-to-r from-cyan-500 to-cyan-600 relative overflow-hidden">
+        <GearDecor size={80} className="absolute -bottom-4 right-8 text-white opacity-10" />
+        <div className="container mx-auto text-center max-w-xl relative">
+          <h2 className="text-2xl font-extrabold text-white mb-4">Pridružite se Inovatic obitelji</h2>
+          <p className="text-cyan-100 mb-6">
             Upišite dijete i dajte mu šansu da otkrije svoju strast prema robotici i programiranju.
           </p>
           <Link
             href="/upisi"
-            className="inline-flex items-center gap-2 px-7 py-3.5 bg-cyan-500 text-white font-semibold rounded-xl hover:bg-cyan-600 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-7 py-3.5 bg-yellow-400 text-gray-900 font-semibold rounded-xl hover:bg-yellow-300 transition-colors shadow-sm"
           >
             Upiši dijete <ArrowRight className="w-4 h-4" />
           </Link>

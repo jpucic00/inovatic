@@ -32,8 +32,10 @@ export default function ContactPage() {
   return (
     <>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4">
-        <div className="container mx-auto max-w-3xl text-center">
+      <section className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4 overflow-hidden relative">
+        <div aria-hidden="true" className="absolute -top-16 -left-16 w-64 h-64 rounded-full bg-cyan-300 blur-3xl opacity-40 pointer-events-none" />
+        <div aria-hidden="true" className="absolute -bottom-12 -right-12 w-56 h-56 rounded-full bg-yellow-200 blur-3xl opacity-40 pointer-events-none" />
+        <div className="container mx-auto max-w-3xl text-center relative">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Kontakt</span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Pronađite nas</h1>
           <p className="text-gray-600 text-lg">
@@ -53,10 +55,10 @@ export default function ContactPage() {
                 <div className="space-y-4">
                   <a
                     href="tel:+385993936993"
-                    className="flex items-center gap-3 text-sm text-gray-600 hover:text-cyan-600 transition-colors group"
+                    className="flex items-center gap-3 text-sm text-gray-600 hover:text-yellow-600 transition-colors group"
                   >
-                    <div className="w-9 h-9 bg-cyan-50 rounded-xl flex items-center justify-center group-hover:bg-cyan-100 transition-colors flex-shrink-0">
-                      <Phone className="w-4 h-4 text-cyan-600" />
+                    <div className="w-9 h-9 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center justify-center group-hover:bg-yellow-100 transition-colors flex-shrink-0">
+                      <Phone className="w-4 h-4 text-yellow-600" />
                     </div>
                     <div>
                       <div className="text-xs text-gray-400 font-medium">Telefon</div>
@@ -67,7 +69,7 @@ export default function ContactPage() {
                     href="mailto:prijave@udruga-inovatic.hr"
                     className="flex items-center gap-3 text-sm text-gray-600 hover:text-cyan-600 transition-colors group"
                   >
-                    <div className="w-9 h-9 bg-cyan-50 rounded-xl flex items-center justify-center group-hover:bg-cyan-100 transition-colors flex-shrink-0">
+                    <div className="w-9 h-9 bg-cyan-50 border border-cyan-200 rounded-xl flex items-center justify-center group-hover:bg-cyan-100 transition-colors flex-shrink-0">
                       <Mail className="w-4 h-4 text-cyan-600" />
                     </div>
                     <div>
@@ -77,10 +79,10 @@ export default function ContactPage() {
                   </a>
                   <a
                     href="mailto:info@udruga-inovatic.hr"
-                    className="flex items-center gap-3 text-sm text-gray-600 hover:text-cyan-600 transition-colors group"
+                    className="flex items-center gap-3 text-sm text-gray-600 hover:text-emerald-600 transition-colors group"
                   >
-                    <div className="w-9 h-9 bg-cyan-50 rounded-xl flex items-center justify-center group-hover:bg-cyan-100 transition-colors flex-shrink-0">
-                      <Mail className="w-4 h-4 text-cyan-600" />
+                    <div className="w-9 h-9 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors flex-shrink-0">
+                      <Mail className="w-4 h-4 text-emerald-600" />
                     </div>
                     <div>
                       <div className="text-xs text-gray-400 font-medium">Opći upiti</div>
@@ -92,7 +94,7 @@ export default function ContactPage() {
 
               <div>
                 <h3 className="text-sm font-bold text-gray-900 mb-3">Radno vrijeme</h3>
-                <div className="space-y-2 text-sm">
+                <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-3 space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-gray-600">
                     <Clock className="w-4 h-4 text-cyan-500" />
                     <span>Nastava: Ponedjeljak – Subota</span>
@@ -108,7 +110,7 @@ export default function ContactPage() {
                     href="https://facebook.com/udrugainovatic"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-cyan-600 transition-colors"
+                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-cyan-600 transition-colors bg-white border border-gray-200 rounded-xl px-4 py-2"
                   >
                     <Facebook className="w-4 h-4" /> Facebook
                   </a>
@@ -116,7 +118,7 @@ export default function ContactPage() {
                     href="https://instagram.com/udruga_inovatic"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-cyan-600 transition-colors"
+                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-cyan-600 transition-colors bg-white border border-gray-200 rounded-xl px-4 py-2"
                   >
                     <Instagram className="w-4 h-4" /> Instagram
                   </a>

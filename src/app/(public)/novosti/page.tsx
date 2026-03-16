@@ -66,8 +66,10 @@ export default async function NewsPage({
 
   return (
     <>
-      <section className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4">
-        <div className="container mx-auto max-w-3xl text-center">
+      <section className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4 overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-72 h-72 bg-cyan-100 rounded-full opacity-40 blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-56 h-56 bg-yellow-100 rounded-full opacity-40 blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+        <div className="relative container mx-auto max-w-3xl text-center">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Novosti</span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Vijesti i obavijesti</h1>
           <p className="text-gray-600 text-lg">
@@ -91,7 +93,7 @@ export default async function NewsPage({
                   <Link
                     key={article.id}
                     href={`/novosti/${article.slug}`}
-                    className="group flex flex-col rounded-2xl overflow-hidden border border-gray-100 hover:border-cyan-200 hover:shadow-lg bg-white transition-all"
+                    className="group flex flex-col rounded-2xl overflow-hidden border border-gray-100 hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-100 bg-white transition-all border-t-2 border-t-transparent hover:border-t-cyan-400"
                   >
                     {/* Cover image */}
                     <div className="relative h-48 overflow-hidden bg-gray-100">

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, Clock, Users, Calendar, Wrench, Euro } from 'lucide-react'
 import { courses } from '@/lib/courses-data'
+import { GearDecor, StarDecor } from '@/components/shared/decorations'
 
 export const metadata: Metadata = {
   title: 'Programi',
@@ -31,6 +32,13 @@ const coursesJsonLd = {
   })),
 }
 
+const cardBorders = [
+  'border-l-cyan-400',
+  'border-l-blue-400',
+  'border-l-indigo-400',
+  'border-l-purple-400',
+]
+
 export default function ProgramiPage() {
   return (
     <>
@@ -39,8 +47,16 @@ export default function ProgramiPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(coursesJsonLd) }}
       />
       {/* Hero */}
-      <section className="bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4">
-        <div className="container mx-auto max-w-3xl text-center">
+      <section className="relative bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4 overflow-hidden">
+        {/* Blob decorations */}
+        <div className="absolute -top-10 -right-10 w-72 h-72 bg-cyan-400 rounded-full blur-3xl opacity-40 pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-yellow-300 rounded-full blur-3xl opacity-40 pointer-events-none" />
+        {/* Gear decoration */}
+        <GearDecor
+          size={48}
+          className="absolute bottom-6 right-8 text-cyan-200 opacity-60 pointer-events-none"
+        />
+        <div className="container mx-auto max-w-3xl text-center relative">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">
             Programi
           </span>
@@ -55,7 +71,7 @@ export default function ProgramiPage() {
       </section>
 
       {/* Info bar */}
-      <section className="border-b border-gray-100 bg-white py-5 px-4">
+      <section className="bg-cyan-50 border-b border-cyan-100 py-5 px-4">
         <div className="container mx-auto">
           <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-gray-600">
             <div className="flex items-center gap-2">
@@ -85,7 +101,7 @@ export default function ProgramiPage() {
             {courses.map((course, i) => (
               <div
                 key={course.slug}
-                className="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                className={`group bg-white rounded-2xl border border-gray-100 border-l-4 ${cardBorders[i]} overflow-hidden shadow-sm hover:shadow-md hover:shadow-cyan-100 transition-shadow`}
               >
                 <div className="md:flex">
                   {/* Color strip */}
@@ -122,10 +138,10 @@ export default function ProgramiPage() {
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
                         <Wrench className="w-3 h-3" /> {course.equipment}
                       </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-gray-50 text-gray-600 rounded-full border border-gray-200">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
                         <Users className="w-3 h-3" /> do {course.groupSize} polaznika
                       </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-gray-50 text-gray-600 rounded-full border border-gray-200">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
                         <Clock className="w-3 h-3" /> {course.hours}h / {course.sessionDuration} min tjedno
                       </span>
                     </div>
@@ -135,7 +151,7 @@ export default function ProgramiPage() {
                       {course.modules.map((mod) => (
                         <span
                           key={mod.title}
-                          className="text-xs px-2.5 py-1 bg-white border border-gray-200 text-gray-500 rounded-lg"
+                          className="text-xs px-2.5 py-1 bg-cyan-50 border border-cyan-100 text-cyan-700 rounded-lg"
                         >
                           {mod.title.split('–')[0].trim()}
                         </span>
@@ -157,15 +173,15 @@ export default function ProgramiPage() {
       </section>
 
       {/* Pricing */}
-      <section className="py-16 px-4 bg-gray-50">
+      <section className="py-16 px-4 bg-yellow-50">
         <div className="container mx-auto max-w-3xl">
           <div className="text-center mb-10">
             <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-3">Cijene</h2>
             <p className="text-gray-500">Sve razine programa imaju jednaku cijenu.</p>
           </div>
           <div className="grid sm:grid-cols-2 gap-6">
-            <div className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm text-center">
-              <div className="text-4xl font-extrabold text-cyan-500 mb-1">110 EUR</div>
+            <div className="bg-white rounded-2xl p-7 border border-yellow-200 shadow-sm text-center">
+              <div className="text-4xl font-extrabold text-yellow-500 mb-1">110 EUR</div>
               <div className="text-gray-700 font-semibold mb-2">po modulu</div>
               <p className="text-sm text-gray-500">
                 Idealno za isprobavanje. Jedan modul traje 14 školskih sati (otprilike 7 tjedana).
@@ -192,14 +208,18 @@ export default function ProgramiPage() {
 
       {/* CTA */}
       <section className="py-16 px-4 bg-white">
-        <div className="container mx-auto text-center max-w-xl">
+        <div className="container mx-auto text-center max-w-xl relative">
+          <StarDecor
+            size={36}
+            className="absolute -top-2 right-4 text-yellow-300 opacity-70 pointer-events-none"
+          />
           <h2 className="text-2xl font-extrabold text-gray-900 mb-4">Nije sigurni koji program odabrati?</h2>
           <p className="text-gray-500 mb-6">
             Ispunite upit i mi ćemo na temelju dobi i iskustva vašeg djeteta preporučiti odgovarajući razred.
           </p>
           <Link
             href="/upisi"
-            className="inline-flex items-center gap-2 px-7 py-3.5 bg-cyan-500 text-white font-semibold rounded-xl hover:bg-cyan-600 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-7 py-3.5 bg-yellow-400 text-gray-900 font-semibold rounded-xl hover:bg-yellow-500 transition-colors shadow-sm"
           >
             Pošalji upit <ArrowRight className="w-4 h-4" />
           </Link>
