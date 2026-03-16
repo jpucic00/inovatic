@@ -328,14 +328,9 @@ export default async function HomePage() {
               <div key={t.name} className="flex flex-col bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all">
                 <span className="text-5xl font-serif text-cyan-400 leading-none mb-3 select-none">&ldquo;</span>
                 <p className="text-gray-700 text-sm leading-relaxed flex-1 italic mb-5">{t.quote}</p>
-                <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                    {t.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-gray-900">{t.name}</div>
-                    <div className="text-xs text-cyan-600">{t.role}</div>
-                  </div>
+                <div className="pt-4 border-t border-gray-100">
+                  <div className="text-sm font-semibold text-gray-900">{t.name}</div>
+                  <div className="text-xs text-cyan-600">{t.role}</div>
                 </div>
               </div>
             ))}
