@@ -3,7 +3,7 @@ import Link from "next/link"
 
 export const metadata: Metadata = { title: "Upravljanje grupom" }
 
-export default async function TeacherGroupPage({ params }: { params: Promise<{ groupId: string }> }) {
+export default async function TeacherGroupPage({ params }: Readonly<{ params: Promise<{ groupId: string }> }>) {
   const { groupId } = await params
   return (
     <div>

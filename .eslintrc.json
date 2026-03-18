@@ -1,0 +1,10 @@
+{
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "prisma/seed.ts",
+    "playwright-report/",
+    "test-results/"
+  ]
+}

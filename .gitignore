@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Cloudinary migration mapping (local only)
 /cloudinary-mapping.json
+
+# SonarQube
+.scannerwork/

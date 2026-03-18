@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Mail, Phone, MapPin, Clock, ArrowRight, Facebook, Instagram } from 'lucide-react'
+import { Mail, Phone, MapPin, Clock, ArrowRight, Facebook, Instagram } from 'lucide-react' // NOSONAR
 
 export const metadata: Metadata = {
   title: 'Kontakt',

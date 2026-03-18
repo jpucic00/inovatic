@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Bot, LogOut, BookOpen, User } from 'lucide-react'
 
-export default function PortalLayout({ children }: { children: React.ReactNode }) {
+export default function PortalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Portal navbar */}

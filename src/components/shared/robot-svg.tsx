@@ -1,4 +1,4 @@
-export function RobotSvg({ className }: { className?: string }) {
+export function RobotSvg({ className }: Readonly<{ className?: string }>) {
   return (
     <svg
       viewBox="0 0 200 286"

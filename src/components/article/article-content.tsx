@@ -5,6 +5,6 @@ interface Props {
   content: PartialBlock[]
 }
 
-export function ArticleContent({ content }: Props) {
+export function ArticleContent({ content }: Readonly<Props>) {
   return <ArticleRenderer content={content} />
 }

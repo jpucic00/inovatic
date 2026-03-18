@@ -16,7 +16,7 @@ interface Props {
   articleTitle: string
 }
 
-export function ArticleGallery({ images, articleTitle }: Props) {
+export function ArticleGallery({ images, articleTitle }: Readonly<Props>) {
   const [index, setIndex] = useState(-1)
 
   const slides = images.map((img) => ({

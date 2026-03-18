@@ -59,11 +59,9 @@ export async function generateStaticParams() {
   }
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>
-}): Promise<Metadata> {
+type PageProps = Readonly<{ params: Promise<{ slug: string }> }>
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const article = await getArticle(slug)
   if (!article) return { title: 'Vijest nije pronađena' }
@@ -88,11 +86,7 @@ export async function generateMetadata({
   }
 }
 
-export default async function ArticlePage({
-  params,
-}: {
-  params: Promise<{ slug: string }>
-}) {
+export default async function ArticlePage({ params }: PageProps) {
   const { slug } = await params
   const article = await getArticle(slug)
   if (!article) notFound()

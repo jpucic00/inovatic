@@ -11,7 +11,7 @@ interface LogoProps {
   onClick?: () => void
 }
 
-export function Logo({ variant = 'dark', className, onClick }: LogoProps) {
+export function Logo({ variant = 'dark', className, onClick }: Readonly<LogoProps>) {
   const [error, setError] = useState(false)
   const src = variant === 'white' ? '/images/logo_white.png' : '/images/logo_dark.png'
 

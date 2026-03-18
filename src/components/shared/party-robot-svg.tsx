@@ -1,4 +1,4 @@
-export function PartyRobotSvg({ className }: { className?: string }) {
+export function PartyRobotSvg({ className }: Readonly<{ className?: string }>) {
   return (
     <svg
       viewBox="0 0 200 286"

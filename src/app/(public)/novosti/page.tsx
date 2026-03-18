@@ -53,13 +53,17 @@ const gradients = [
   'from-sky-400 to-cyan-500',
 ]
 
-export default async function NewsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ stranica?: string }>
-}) {
+function getCountLabel(count: number): string {
+  if (count === 1) return 'objava'
+  if (count < 5) return 'objave'
+  return 'objava'
+}
+
+type PageProps = Readonly<{ searchParams: Promise<{ stranica?: string }> }>
+
+export default async function NewsPage({ searchParams }: PageProps) {
   const { stranica } = await searchParams
-  const page = Math.max(1, parseInt(stranica ?? '1', 10) || 1)
+  const page = Math.max(1, Number.parseInt(stranica ?? '1', 10) || 1)
   const { articles, total, totalPages } = await getArticles(page)
 
   return (
@@ -177,7 +181,7 @@ export default async function NewsPage({
               )}
 
               <p className="text-center text-xs text-gray-400 mt-4">
-                Ukupno {total} {total === 1 ? 'objava' : total < 5 ? 'objave' : 'objava'}
+                Ukupno {total} {getCountLabel(total)}
               </p>
             </>
           )}

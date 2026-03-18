@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Mail, Phone, MapPin, Facebook, Instagram } from 'lucide-react'
+import { Mail, Phone, MapPin, Facebook, Instagram } from 'lucide-react' // NOSONAR
 import { Logo } from '@/components/shared/logo'
 
 const quickLinks = [

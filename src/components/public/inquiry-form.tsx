@@ -10,6 +10,12 @@ import { InquiryStep1 } from './inquiry/InquiryStep1'
 import { InquiryStep2 } from './inquiry/InquiryStep2'
 import { InquiryStep3 } from './inquiry/InquiryStep3'
 
+function getStepClass(currentStep: number, stepId: number): string {
+  if (currentStep > stepId) return 'bg-cyan-500 text-white'
+  if (currentStep === stepId) return 'bg-cyan-500 text-white ring-4 ring-cyan-100'
+  return 'bg-gray-100 text-gray-400'
+}
+
 const STEPS = [
   { id: 1, label: 'Roditelj' },
   { id: 2, label: 'Dijete' },
@@ -81,11 +87,7 @@ export function InquiryForm() {
           <div key={s.id} className="flex items-center gap-2">
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                step > s.id
-                  ? 'bg-cyan-500 text-white'
-                  : step === s.id
-                  ? 'bg-cyan-500 text-white ring-4 ring-cyan-100'
-                  : 'bg-gray-100 text-gray-400'
+                getStepClass(step, s.id)
               }`}
             >
               {step > s.id ? <CheckCircle className="w-4 h-4" /> : s.id}

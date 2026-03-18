@@ -5,7 +5,7 @@ const GEAR_TOOTH_ROUNDING = 0.3
 const STAR_INNER_RADIUS_RATIO = 0.38
 const STAR_POINTS_COUNT = 10
 
-export function GearDecor({ size, className }: { size: number; className?: string }) {
+export function GearDecor({ size, className }: Readonly<{ size: number; className?: string }>) {
   const r = size / 2
   const innerR = r * GEAR_INNER_RADIUS_RATIO
   const toothW = size * GEAR_TOOTH_WIDTH_RATIO
@@ -23,7 +23,7 @@ export function GearDecor({ size, className }: { size: number; className?: strin
   )
 }
 
-export function StarDecor({ size, className }: { size: number; className?: string }) {
+export function StarDecor({ size, className }: Readonly<{ size: number; className?: string }>) {
   const c = size / 2
   const r1 = size / 2
   const r2 = size * STAR_INNER_RADIUS_RATIO

@@ -9,11 +9,9 @@ export function generateStaticParams() {
   return courses.map((c) => ({ slug: c.slug }))
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>
-}): Promise<Metadata> {
+type PageProps = Readonly<{ params: Promise<{ slug: string }> }>
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const course = getCourseBySlug(slug)
   if (!course) return { title: 'Program nije pronađen' }
@@ -31,11 +29,7 @@ export async function generateMetadata({
   }
 }
 
-export default async function CourseDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>
-}) {
+export default async function CourseDetailPage({ params }: PageProps) {
   const { slug } = await params
   const course = getCourseBySlug(slug)
   if (!course) notFound()

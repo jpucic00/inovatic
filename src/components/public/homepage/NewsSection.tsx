@@ -12,7 +12,7 @@ interface NewsArticle {
   tags: { tag: { name: string } }[]
 }
 
-export function NewsSection({ articles }: { articles: NewsArticle[] }) {
+export function NewsSection({ articles }: Readonly<{ articles: NewsArticle[] }>) {
   if (articles.length === 0) return null
 
   return (

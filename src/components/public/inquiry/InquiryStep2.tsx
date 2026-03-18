@@ -9,7 +9,7 @@ interface Props {
 
 const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition'
 
-export function InquiryStep2({ register, errors }: Props) {
+export function InquiryStep2({ register, errors }: Readonly<Props>) {
   return (
     <div className="space-y-5">
       <div>
@@ -17,10 +17,11 @@ export function InquiryStep2({ register, errors }: Props) {
         <p className="text-gray-500 text-sm">Na temelju dobi preporučit ćemo odgovarajući razred programa.</p>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label htmlFor="childName" className="block text-sm font-medium text-gray-700 mb-1.5">
           Ime djeteta <span className="text-red-500">*</span>
         </label>
         <input
+          id="childName"
           {...register('childName')}
           type="text"
           placeholder="npr. Luka"
@@ -29,10 +30,11 @@ export function InquiryStep2({ register, errors }: Props) {
         <FieldError message={errors.childName?.message} />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label htmlFor="childAge" className="block text-sm font-medium text-gray-700 mb-1.5">
           Dob djeteta <span className="text-red-500">*</span>
         </label>
         <input
+          id="childAge"
           {...register('childAge')}
           type="number"
           min={5}
@@ -43,10 +45,11 @@ export function InquiryStep2({ register, errors }: Props) {
         <FieldError message={errors.childAge?.message} />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label htmlFor="childSchool" className="block text-sm font-medium text-gray-700 mb-1.5">
           Škola <span className="text-gray-400 font-normal">(neobavezno)</span>
         </label>
         <input
+          id="childSchool"
           {...register('childSchool')}
           type="text"
           placeholder="npr. OŠ Trstenik"
