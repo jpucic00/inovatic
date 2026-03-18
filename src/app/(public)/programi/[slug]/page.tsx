@@ -25,6 +25,7 @@ export async function generateMetadata({
       title: `${course.title} | Inovatic`,
       description: desc,
       url: `https://udruga-inovatic.hr/programi/${slug}`,
+      images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: `${course.title} | Inovatic` }],
     },
     alternates: { canonical: `https://udruga-inovatic.hr/programi/${slug}` },
   }

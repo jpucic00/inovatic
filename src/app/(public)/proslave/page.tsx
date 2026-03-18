@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight, Users, Clock, Star, CheckCircle, Phone, Mail } from 'lucide-react'
+import { ArrowRight, Users, Clock, Star, Phone, Mail } from 'lucide-react'
 import { PartyRobotSvg } from '@/components/shared/party-robot-svg'
+import { GearDecor, StarDecor } from '@/components/shared/decorations'
 
 export const metadata: Metadata = {
   title: 'Proslave',
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
     title: 'Proslave uz LEGO Robotiku | Inovatic Split',
     description: 'Nezaboravna proslava rođendana – djeca grade i programiraju LEGO robote. 5–15 sudionika, 90–120 min.',
     url: 'https://udruga-inovatic.hr/proslave',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/proslave' },
 }
@@ -35,40 +37,6 @@ const details = [
   { icon: Clock, value: '90–120 min', label: 'Trajanje radionice', bg: 'bg-yellow-50', border: 'border-yellow-200', iconColor: 'text-yellow-600' },
   { icon: Star, value: '6–14', label: 'Preporučena dob', bg: 'bg-emerald-50', border: 'border-emerald-200', iconColor: 'text-emerald-600' },
 ]
-
-function StarDecor({ size, className }: { size: number; className?: string }) {
-  const c = size / 2
-  const r1 = size / 2
-  const r2 = size * 0.38
-  const points = Array.from({ length: 10 }, (_, i) => {
-    const angle = (i * Math.PI) / 5 - Math.PI / 2
-    const r = i % 2 === 0 ? r1 : r2
-    return `${c + r * Math.cos(angle)},${c + r * Math.sin(angle)}`
-  }).join(' ')
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="currentColor" className={className} aria-hidden="true">
-      <polygon points={points} />
-    </svg>
-  )
-}
-
-function GearDecor({ size, className }: { size: number; className?: string }) {
-  const r = size / 2
-  const innerR = r * 0.55
-  const toothW = size * 0.18
-  const toothH = size * 0.14
-  const cx = r
-  const cy = r
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none" className={className} aria-hidden="true">
-      <circle cx={cx} cy={cy} r={innerR} fill="currentColor" />
-      <rect x={cx - toothW / 2} y={0} width={toothW} height={toothH} rx={toothW * 0.3} fill="currentColor" />
-      <rect x={cx - toothW / 2} y={size - toothH} width={toothW} height={toothH} rx={toothW * 0.3} fill="currentColor" />
-      <rect x={0} y={cy - toothW / 2} width={toothH} height={toothW} rx={toothW * 0.3} fill="currentColor" />
-      <rect x={size - toothH} y={cy - toothW / 2} width={toothH} height={toothW} rx={toothW * 0.3} fill="currentColor" />
-    </svg>
-  )
-}
 
 export default function CelebrationsPage() {
   return (

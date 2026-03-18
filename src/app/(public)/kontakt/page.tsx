@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     title: 'Kontakt – Udruga Inovatic Split',
     description: 'Dvije lokacije u Splitu: Velebitska 32 i Ruđera Boškovića 33. Tel: +385 99 393 6993.',
     url: 'https://udruga-inovatic.hr/kontakt',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/kontakt' },
 }

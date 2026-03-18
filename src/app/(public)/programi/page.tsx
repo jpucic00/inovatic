@@ -13,6 +13,7 @@ export const metadata: Metadata = {
     title: 'Programi – Svijet LEGO Robotike | Inovatic',
     description: 'Sva 4 razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu.',
     url: 'https://udruga-inovatic.hr/programi',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/programi' },
 }

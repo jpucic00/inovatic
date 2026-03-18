@@ -11,6 +11,7 @@ export const metadata: Metadata = {
     title: 'O nama – Udruga Inovatic | Split',
     description: 'Udruga za robotiku osnovana 2014. Educiramo djecu od 6 do 14 godina kroz LEGO programe. Tim CroSpec – srebrna medalja WRO 2025.',
     url: 'https://udruga-inovatic.hr/o-nama',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/o-nama' },
 }

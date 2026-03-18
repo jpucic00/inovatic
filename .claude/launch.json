@@ -3,9 +3,8 @@
   "configurations": [
     {
       "name": "inovatic-dev",
-      "runtimeExecutable": "/Users/jpucic/.nvm/versions/node/v24.13.1/bin/node",
-      "runtimeArgs": ["/Users/jpucic/Documents/GitHub/inovatic/node_modules/.bin/next", "dev", "--port", "$PORT"],
-      "cwd": "/Users/jpucic/Documents/GitHub/inovatic",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "cd /Users/jpucic/Documents/GitHub/inovatic && /Users/jpucic/.nvm/versions/node/v24.13.1/bin/node /Users/jpucic/Documents/GitHub/inovatic/node_modules/next/dist/bin/next dev --port $PORT"],
       "port": 3002,
       "autoPort": true
     }

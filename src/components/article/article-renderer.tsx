@@ -7,6 +7,12 @@ type InlineItem =
   | { type: 'text'; text: string; styles: InlineStyle }
   | { type: 'link'; href: string; content: InlineItem[] }
 
+interface HeadingProps { level?: number }
+interface ImageProps { url?: string; caption?: string }
+interface VideoProps { url?: string }
+
+type BlockProps = HeadingProps | ImageProps | VideoProps
+
 function renderInline(items: InlineItem[], keyPrefix: string): React.ReactNode {
   return items.map((item, i) => {
     const key = `${keyPrefix}-${i}`
@@ -71,10 +77,10 @@ export function ArticleRenderer({ content }: Props) {
     }
 
     const inner = renderInline((block.content ?? []) as InlineItem[], `block-${i}`)
-    const props = (block.props ?? {}) as Record<string, unknown>
+    const props = (block.props ?? {}) as BlockProps
 
     if (block.type === 'heading') {
-      const level = (props.level as number) ?? 2
+      const { level = 2 } = props as HeadingProps
       if (level <= 2) {
         blocks.push(<h2 key={i}>{inner}</h2>)
       } else {
@@ -83,18 +89,18 @@ export function ArticleRenderer({ content }: Props) {
     } else if (block.type === 'paragraph') {
       blocks.push(<p key={i}>{inner}</p>)
     } else if (block.type === 'image') {
-      const url = props.url as string
-      const caption = props.caption as string | undefined
+      const { url, caption } = props as ImageProps
       if (url) {
         blocks.push(
           <figure key={i}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={url} alt={caption ?? ''} loading="lazy" />
             {caption && <figcaption>{caption}</figcaption>}
           </figure>,
         )
       }
     } else if (block.type === 'video') {
-      const url = props.url as string
+      const { url } = props as VideoProps
       if (url) {
         blocks.push(
           <video key={i} controls>

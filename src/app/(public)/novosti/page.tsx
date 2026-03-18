@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, Calendar, Newspaper } from 'lucide-react'
 import { db } from '@/lib/db'
+import { formatDate } from '@/lib/format'
 
 export const metadata: Metadata = {
   title: 'Novosti',
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
     title: 'Novosti | Inovatic',
     description: 'Pratite naša natjecanja, radionice i sve što se događa u Inovatic zajednici.',
     url: 'https://udruga-inovatic.hr/novosti',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/novosti' },
 }
@@ -38,14 +40,10 @@ async function getArticles(page: number, perPage = 9) {
       db.article.count({ where: { isPublished: true } }),
     ])
     return { articles, total, totalPages: Math.ceil(total / perPage) }
-  } catch {
+  } catch (error) {
+    console.error('Failed to fetch articles:', error)
     return { articles: [], total: 0, totalPages: 0 }
   }
-}
-
-function formatDate(date: Date | null) {
-  if (!date) return ''
-  return new Intl.DateTimeFormat('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date) + '.'
 }
 
 const gradients = [

@@ -4,8 +4,11 @@ import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
-import { inquirySchema, step1Schema, step2Schema, step3Schema, type InquiryFormData } from '@/lib/validators/inquiry'
+import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
 import { submitInquiry } from '@/actions/inquiry'
+import { InquiryStep1 } from './inquiry/InquiryStep1'
+import { InquiryStep2 } from './inquiry/InquiryStep2'
+import { InquiryStep3 } from './inquiry/InquiryStep3'
 
 const STEPS = [
   { id: 1, label: 'Roditelj' },
@@ -15,12 +18,6 @@ const STEPS = [
 
 const step1Fields = ['parentName', 'parentEmail', 'parentPhone'] as const
 const step2Fields = ['childName', 'childAge', 'childSchool'] as const
-const step3Fields = ['courseLevelPref', 'locationPref', 'message'] as const
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null
-  return <p className="text-sm text-red-600 mt-1">{message}</p>
-}
 
 export function InquiryForm() {
   const [step, setStep] = useState(1)
@@ -106,142 +103,9 @@ export function InquiryForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        {/* Step 1 – Parent info */}
-        {step === 1 && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Podaci o roditelju / skrbniku</h2>
-              <p className="text-gray-500 text-sm">Na ovu adresu ćemo vam poslati dostupne termine.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Ime i prezime <span className="text-red-500">*</span>
-              </label>
-              <input
-                {...register('parentName')}
-                type="text"
-                placeholder="npr. Ana Horvat"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
-              />
-              <FieldError message={errors.parentName?.message} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email adresa <span className="text-red-500">*</span>
-              </label>
-              <input
-                {...register('parentEmail')}
-                type="email"
-                placeholder="npr. ana.horvat@gmail.com"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
-              />
-              <FieldError message={errors.parentEmail?.message} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Broj telefona <span className="text-red-500">*</span>
-              </label>
-              <input
-                {...register('parentPhone')}
-                type="tel"
-                placeholder="npr. 091 234 5678"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
-              />
-              <FieldError message={errors.parentPhone?.message} />
-            </div>
-          </div>
-        )}
-
-        {/* Step 2 – Child info */}
-        {step === 2 && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Podaci o djetetu</h2>
-              <p className="text-gray-500 text-sm">Na temelju dobi preporučit ćemo odgovarajući razred programa.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Ime djeteta <span className="text-red-500">*</span>
-              </label>
-              <input
-                {...register('childName')}
-                type="text"
-                placeholder="npr. Luka"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
-              />
-              <FieldError message={errors.childName?.message} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Dob djeteta <span className="text-red-500">*</span>
-              </label>
-              <input
-                {...register('childAge')}
-                type="number"
-                min={5}
-                max={16}
-                placeholder="npr. 9"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
-              />
-              <FieldError message={errors.childAge?.message} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Škola <span className="text-gray-400 font-normal">(neobavezno)</span>
-              </label>
-              <input
-                {...register('childSchool')}
-                type="text"
-                placeholder="npr. OŠ Trstenik"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Step 3 – Preferences + message */}
-        {step === 3 && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Preferencije</h2>
-              <p className="text-gray-500 text-sm">Svi unosi su neobavezni – pomažu nam u dodjeli odgovarajuće grupe.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Program</label>
-              <select
-                {...register('courseLevelPref')}
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
-              >
-                <option value="">– Odaberite program (neobavezno) –</option>
-                <option value="SLR_1">SLR 1 – Uvod u robotiku (6–8 god.)</option>
-                <option value="SLR_2">SLR 2 – Napredna mehanika (9–10 god.)</option>
-                <option value="SLR_3">SLR 3 – Spike Prime (11–12 god.)</option>
-                <option value="SLR_4">SLR 4 – Industrijski sustavi (13–14 god.)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Preferencija lokacije</label>
-              <select
-                {...register('locationPref')}
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
-              >
-                <option value="">– Odaberite lokaciju (neobavezno) –</option>
-                <option value="Velebitska 32">Velebitska 32, Split</option>
-                <option value="Ruđera Boškovića 33">Ruđera Boškovića 33, Split</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Poruka</label>
-              <textarea
-                {...register('message')}
-                rows={4}
-                placeholder="Imate li pitanja ili posebnih napomena?"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition resize-none"
-              />
-              <FieldError message={errors.message?.message} />
-            </div>
-          </div>
-        )}
+        {step === 1 && <InquiryStep1 register={register} errors={errors} />}
+        {step === 2 && <InquiryStep2 register={register} errors={errors} />}
+        {step === 3 && <InquiryStep3 register={register} errors={errors} />}
 
         {serverError && (
           <p className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">

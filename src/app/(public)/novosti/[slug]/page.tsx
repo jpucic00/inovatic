@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Calendar, User, Tag } from 'lucide-react'
 import { db } from '@/lib/db'
+import { formatDate } from '@/lib/format'
 import { ArticleContent } from '@/components/article/article-content'
 import { ArticleGallery } from '@/components/article/article-gallery'
 import type { PartialBlock } from '@blocknote/core'
@@ -20,7 +21,8 @@ async function getArticle(slug: string) {
         images: { orderBy: { sortOrder: 'asc' } },
       },
     })
-  } catch {
+  } catch (error) {
+    console.error('Failed to fetch article:', error)
     return null
   }
 }
@@ -38,7 +40,8 @@ async function getRelatedArticles(currentSlug: string, tagIds: string[]) {
       take: 3,
       select: { slug: true, title: true, publishedAt: true, coverImage: true },
     })
-  } catch {
+  } catch (error) {
+    console.error('Failed to fetch related articles:', error)
     return []
   }
 }
@@ -50,7 +53,8 @@ export async function generateStaticParams() {
       select: { slug: true },
     })
     return articles.map((a) => ({ slug: a.slug }))
-  } catch {
+  } catch (error) {
+    console.error('Failed to generate static params for articles:', error)
     return []
   }
 }
@@ -82,11 +86,6 @@ export async function generateMetadata({
     },
     alternates: { canonical: `https://udruga-inovatic.hr/novosti/${slug}` },
   }
-}
-
-function formatDate(date: Date | null) {
-  if (!date) return ''
-  return new Intl.DateTimeFormat('hr-HR', { day: '2-digit', month: 'long', year: 'numeric' }).format(date)
 }
 
 export default async function ArticlePage({
@@ -188,7 +187,7 @@ export default async function ArticlePage({
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-8 pb-6 border-b border-gray-100">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" />
-                <span>{formatDate(article.publishedAt)}</span>
+                <span>{formatDate(article.publishedAt, 'long')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <User className="w-4 h-4" />
