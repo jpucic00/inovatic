@@ -51,6 +51,18 @@ async function main() {
   })
   console.log(`✅ Admin created: ${admin.email}`)
 
+  // ── Dev admin (generic login) ──────────────────────────────────────────────
+  const devAdmin = await prisma.user.create({
+    data: {
+      email: 'admin@inovatic.hr',
+      passwordHash: adminPassword,
+      firstName: 'Admin',
+      lastName: 'Inovatic',
+      role: UserRole.ADMIN,
+    },
+  })
+  console.log(`✅ Dev admin created: ${devAdmin.email}`)
+
   // ── Demo teacher ─────────────────────────────────────────────────────────────
   const teacherPassword = await bcrypt.hash('teacher123', 12)
   const teacher = await prisma.user.create({

@@ -40,6 +40,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
         courseLevelPref: courseLevelPref ?? null,
         locationPref: locationPref || null,
         message: message || null,
+        consentGivenAt: new Date(),
       },
     })
   } catch {

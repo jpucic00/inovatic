@@ -95,7 +95,13 @@ export function Footer() {
       <div className="border-t border-gray-800">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-gray-500">
           <p>© {new Date().getFullYear()} Udruga za robotiku &quot;Inovatic&quot;. Sva prava pridržana.</p>
-          <p>OIB: 83709136328</p>
+          <div className="flex items-center gap-3">
+            <Link href="/politika-privatnosti" className="hover:text-cyan-400 transition-colors">
+              Politika privatnosti
+            </Link>
+            <span>|</span>
+            <p>OIB: 83709136328</p>
+          </div>
         </div>
       </div>
     </footer>

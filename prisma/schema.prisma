@@ -66,25 +66,27 @@ model User {
 }
 
 model Course {
-  id          String      @id @default(cuid())
-  slug        String      @unique
-  level       CourseLevel
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  level       CourseLevel?
   title       String
   subtitle    String?
-  description String      @db.Text
+  description String       @db.Text
   ageMin      Int
   ageMax      Int
   equipment   String
-  priceYear   Decimal?    @db.Decimal(10, 2)
-  priceModule Decimal?    @db.Decimal(10, 2)
+  priceYear   Decimal?     @db.Decimal(10, 2)
+  priceModule Decimal?     @db.Decimal(10, 2)
   imageUrl    String?
-  sortOrder   Int         @default(0)
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  sortOrder   Int          @default(0)
+  isCustom    Boolean      @default(false)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   modules         CourseModule[]
   scheduledGroups ScheduledGroup[]
+  inquiries       Inquiry[]
 }
 
 model CourseModule {
@@ -112,26 +114,29 @@ model Location {
 }
 
 model ScheduledGroup {
-  id          String   @id @default(cuid())
-  courseId    String
-  locationId  String
-  name        String
-  dayOfWeek   Int // 0=Sunday, 1=Monday, ..., 6=Saturday
-  startTime   String // "19:00"
-  endTime     String // "20:30"
-  schoolYear  String // "2025/2026"
-  maxCapacity Int
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String    @id @default(cuid())
+  courseId        String
+  locationId      String
+  name            String?
+  dayOfWeek       String?
+  startTime       String?
+  endTime         String?
+  schoolYear      String?
+  maxStudents     Int       @default(12)
+  enrollmentStart DateTime?
+  enrollmentEnd   DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  course              Course               @relation(fields: [courseId], references: [id])
-  location            Location             @relation(fields: [locationId], references: [id])
-  teacherAssignments  TeacherAssignment[]
-  enrollments         Enrollment[]
-  materials           Material[]
-  inquiryGroupOptions InquiryGroupOption[]
-  inquiries           Inquiry[]            @relation("AssignedGroup")
+  course               Course               @relation(fields: [courseId], references: [id])
+  location             Location             @relation(fields: [locationId], references: [id])
+  teacherAssignments   TeacherAssignment[]
+  enrollments          Enrollment[]
+  materials            Material[]
+  inquiryGroupOptions  InquiryGroupOption[]
+  assignedInquiries    Inquiry[]            @relation("AssignedGroup")
+  preferredInquiries   Inquiry[]            @relation("PreferredGroup")
 }
 
 model TeacherAssignment {
@@ -155,14 +160,19 @@ model Inquiry {
   childSchool     String?
   courseLevelPref CourseLevel?
   locationPref    String?
+  courseId        String?
+  scheduledGroupId String?
   message         String?       @db.Text
+  consentGivenAt  DateTime?
   status          InquiryStatus @default(NEW)
   assignedGroupId String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  groupOptions  InquiryGroupOption[]
-  assignedGroup ScheduledGroup?      @relation("AssignedGroup", fields: [assignedGroupId], references: [id])
+  groupOptions     InquiryGroupOption[]
+  course           Course?         @relation(fields: [courseId], references: [id])
+  scheduledGroup   ScheduledGroup? @relation("PreferredGroup", fields: [scheduledGroupId], references: [id])
+  assignedGroup    ScheduledGroup? @relation("AssignedGroup", fields: [assignedGroupId], references: [id])
 }
 
 model InquiryGroupOption {

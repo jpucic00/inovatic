@@ -20,6 +20,9 @@ export const step3Schema = z.object({
   courseLevelPref: z.enum(['SLR_1', 'SLR_2', 'SLR_3', 'SLR_4']).optional(),
   locationPref: z.string().optional(),
   message: z.string().max(1000, 'Poruka može imati najviše 1000 znakova').optional(),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: 'Morate pristati na obradu osobnih podataka.' }),
+  }),
 })
 
 export const inquirySchema = step1Schema.merge(step2Schema).merge(step3Schema)

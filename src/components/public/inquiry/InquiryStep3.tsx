@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import { FieldError } from './FieldError'
@@ -19,7 +20,7 @@ export function InquiryStep3({ register, errors }: Readonly<Props>) {
       </div>
       <div>
         <label htmlFor="courseLevelPref" className="block text-sm font-medium text-gray-700 mb-1.5">Program</label>
-        <select id="courseLevelPref" {...register('courseLevelPref')} className={selectClass}>
+        <select id="courseLevelPref" {...register('courseLevelPref', { setValueAs: (v) => v || undefined })} className={selectClass}>
           <option value="">– Odaberite program (neobavezno) –</option>
           <option value="SLR_1">SLR 1 – Uvod u robotiku (6–8 god.)</option>
           <option value="SLR_2">SLR 2 – Napredna mehanika (9–10 god.)</option>
@@ -29,7 +30,7 @@ export function InquiryStep3({ register, errors }: Readonly<Props>) {
       </div>
       <div>
         <label htmlFor="locationPref" className="block text-sm font-medium text-gray-700 mb-1.5">Preferencija lokacije</label>
-        <select id="locationPref" {...register('locationPref')} className={selectClass}>
+        <select id="locationPref" {...register('locationPref', { setValueAs: (v) => v || undefined })} className={selectClass}>
           <option value="">– Odaberite lokaciju (neobavezno) –</option>
           <option value="Velebitska 32">Velebitska 32, Split</option>
           <option value="Ruđera Boškovića 33">Ruđera Boškovića 33, Split</option>
@@ -45,6 +46,23 @@ export function InquiryStep3({ register, errors }: Readonly<Props>) {
           className={`${inputClass} resize-none`}
         />
         <FieldError message={errors.message?.message} />
+      </div>
+      <div>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            {...register('consent')}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"
+          />
+          <span className="text-sm text-gray-600">
+            Suglasan/na sam s{' '}
+            <Link href="/politika-privatnosti" target="_blank" className="text-cyan-600 hover:underline">
+              politikom privatnosti
+            </Link>{' '}
+            i obradom osobnih podataka u svrhu obrade upita.
+          </span>
+        </label>
+        <FieldError message={errors.consent?.message} />
       </div>
     </div>
   )
