@@ -236,11 +236,11 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       courseId: slr1.id,
       locationId: velebitska.id,
       name: 'Grupa 1',
-      dayOfWeek: 1, // Monday
+      dayOfWeek: 'Ponedjeljak',
       startTime: '19:00',
       endTime: '20:30',
       schoolYear: '2025/2026',
-      maxCapacity: 8,
+      maxStudents: 8,
       isActive: true,
     },
   })
@@ -250,11 +250,11 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       courseId: slr1.id,
       locationId: boskovica.id,
       name: 'Grupa 2',
-      dayOfWeek: 3, // Wednesday
+      dayOfWeek: 'Srijeda',
       startTime: '18:30',
       endTime: '20:00',
       schoolYear: '2025/2026',
-      maxCapacity: 8,
+      maxStudents: 8,
       isActive: true,
     },
   })
@@ -264,11 +264,11 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       courseId: slr4.id,
       locationId: velebitska.id,
       name: 'Grupa 1',
-      dayOfWeek: 2, // Tuesday
+      dayOfWeek: 'Utorak',
       startTime: '18:00',
       endTime: '19:30',
       schoolYear: '2025/2026',
-      maxCapacity: 8,
+      maxStudents: 8,
       isActive: true,
     },
   })

@@ -12,6 +12,7 @@ import {
   COURSE_LEVEL_LABELS,
   STATUS_FLOW,
 } from '@/lib/inquiry-status'
+import { formatChildName } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Admin – Upit' }
 
@@ -19,7 +20,7 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailRow({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 py-3 border-b last:border-b-0">
       <dt className="text-sm font-medium text-gray-500 sm:w-44 shrink-0">{label}</dt>
@@ -28,7 +29,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-function StatusTimeline({ currentStatus }: { currentStatus: string }) {
+function StatusTimeline({ currentStatus }: Readonly<{ currentStatus: string }>) {
   const currentIdx = STATUS_FLOW.indexOf(currentStatus as (typeof STATUS_FLOW)[number])
   const isDeclined = currentStatus === 'DECLINED'
 
@@ -37,19 +38,23 @@ function StatusTimeline({ currentStatus }: { currentStatus: string }) {
       {STATUS_FLOW.map((step, idx) => {
         const isDone = !isDeclined && currentIdx >= idx
         const isCurrent = !isDeclined && currentIdx === idx
+        let circleClass: string
+        if (isDeclined) {
+          circleClass = 'bg-gray-100 border-gray-200 text-gray-400'
+        } else if (isDone && !isCurrent) {
+          circleClass = 'bg-cyan-600 border-cyan-600 text-white'
+        } else if (isCurrent) {
+          circleClass = 'bg-white border-cyan-600 text-cyan-600 font-bold'
+        } else {
+          circleClass = 'bg-white border-gray-200 text-gray-400'
+        }
         return (
           <div key={step} className="flex items-center">
             <div className="flex flex-col items-center">
               <div
                 className={[
                   'w-7 h-7 rounded-full flex items-center justify-center text-xs border-2 transition-colors',
-                  isDeclined
-                    ? 'bg-gray-100 border-gray-200 text-gray-400'
-                    : isDone && !isCurrent
-                    ? 'bg-cyan-600 border-cyan-600 text-white'
-                    : isCurrent
-                    ? 'bg-white border-cyan-600 text-cyan-600 font-bold'
-                    : 'bg-white border-gray-200 text-gray-400',
+                  circleClass,
                 ].join(' ')}
               >
                 {isDone && !isCurrent ? <Check className="w-3.5 h-3.5" /> : idx + 1}
@@ -67,7 +72,7 @@ function StatusTimeline({ currentStatus }: { currentStatus: string }) {
               <div
                 className={[
                   'h-0.5 w-8 mb-5 mx-1',
-                  !isDeclined && currentIdx > idx ? 'bg-cyan-600' : 'bg-gray-200',
+                  isDeclined || currentIdx <= idx ? 'bg-gray-200' : 'bg-cyan-600',
                 ].join(' ')}
               />
             )}
@@ -78,7 +83,7 @@ function StatusTimeline({ currentStatus }: { currentStatus: string }) {
   )
 }
 
-export default async function InquiryDetailPage({ params }: PageProps) {
+export default async function InquiryDetailPage({ params }: Readonly<PageProps>) {
   await requireAdmin()
 
   const { id } = await params
@@ -89,6 +94,28 @@ export default async function InquiryDetailPage({ params }: PageProps) {
   const isDeclined = inquiry.status === 'DECLINED'
   const isAccountCreated = inquiry.status === 'ACCOUNT_CREATED'
   const canDecline = !isDeclined && !isAccountCreated
+
+  let birthInfo: React.ReactNode
+  if (inquiry.childDateOfBirth) {
+    birthInfo = new Date(inquiry.childDateOfBirth).toLocaleDateString('hr-HR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  } else if (inquiry.childAge == null) {
+    birthInfo = <span className="text-gray-400 italic">Nije navedeno</span>
+  } else {
+    birthInfo = `${inquiry.childAge} god.`
+  }
+
+  let preferredProgram: React.ReactNode
+  if (inquiry.course) {
+    preferredProgram = inquiry.course.title
+  } else if (inquiry.courseLevelPref) {
+    preferredProgram = COURSE_LEVEL_LABELS[inquiry.courseLevelPref] ?? inquiry.courseLevelPref
+  } else {
+    preferredProgram = <span className="text-gray-400 italic">Nije navedeno</span>
+  }
 
   return (
     <div className="max-w-3xl">
@@ -105,7 +132,9 @@ export default async function InquiryDetailPage({ params }: PageProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{inquiry.childName}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {formatChildName(inquiry)}
+          </h1>
           <p className="text-gray-500 text-sm mt-1">
             Upit primljen{' '}
             {inquiry.createdAt.toLocaleDateString('hr-HR', {
@@ -166,8 +195,11 @@ export default async function InquiryDetailPage({ params }: PageProps) {
       <div className="bg-white rounded-xl border p-6 mb-6">
         <h2 className="text-sm font-semibold text-gray-700 mb-2">Podaci o djetetu</h2>
         <dl>
-          <DetailRow label="Ime i prezime" value={inquiry.childName} />
-          <DetailRow label="Dob" value={`${inquiry.childAge} godina`} />
+          <DetailRow
+            label="Ime i prezime"
+            value={formatChildName(inquiry, '') || <span className="text-gray-400 italic">Nije navedeno</span>}
+          />
+          <DetailRow label="Datum rođenja" value={birthInfo} />
           {inquiry.childSchool && (
             <DetailRow label="Škola" value={inquiry.childSchool} />
           )}
@@ -178,18 +210,30 @@ export default async function InquiryDetailPage({ params }: PageProps) {
       <div className="bg-white rounded-xl border p-6 mb-6">
         <h2 className="text-sm font-semibold text-gray-700 mb-2">Preferencije</h2>
         <dl>
-          <DetailRow
-            label="Željeni tečaj"
-            value={
-              inquiry.courseLevelPref
-                ? COURSE_LEVEL_LABELS[inquiry.courseLevelPref] ?? inquiry.courseLevelPref
-                : <span className="text-gray-400 italic">Nije navedeno</span>
-            }
-          />
-          <DetailRow
-            label="Željena lokacija"
-            value={inquiry.locationPref || <span className="text-gray-400 italic">Nije navedeno</span>}
-          />
+          <DetailRow label="Željeni program" value={preferredProgram} />
+          {inquiry.scheduledGroup && (() => {
+            const sg = inquiry.scheduledGroup
+            const timeWithEnd = sg.endTime ? `${sg.startTime}–${sg.endTime}` : sg.startTime
+            const timeRange = sg.startTime ? timeWithEnd : null
+            return (
+              <DetailRow
+                label="Željeni termin"
+                value={
+                  <span>
+                    {[sg.name, sg.dayOfWeek, timeRange, sg.location.name]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                }
+              />
+            )
+          })()}
+          {!inquiry.scheduledGroup && (
+            <DetailRow
+              label="Željena lokacija"
+              value={inquiry.locationPref || <span className="text-gray-400 italic">Nije navedeno</span>}
+            />
+          )}
           <DetailRow
             label="Poruka"
             value={
@@ -224,9 +268,9 @@ export default async function InquiryDetailPage({ params }: PageProps) {
       {/* Actions */}
       <div className="flex items-center gap-3">
         {canDecline && (
-          <DeclineDialog inquiryId={inquiry.id} childName={inquiry.childName} />
+          <DeclineDialog inquiryId={inquiry.id} childName={formatChildName(inquiry)} />
         )}
-        <DeleteDialog inquiryId={inquiry.id} childName={inquiry.childName} />
+        <DeleteDialog inquiryId={inquiry.id} childName={formatChildName(inquiry)} />
       </div>
     </div>
   )

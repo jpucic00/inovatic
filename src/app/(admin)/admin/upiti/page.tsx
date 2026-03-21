@@ -15,7 +15,7 @@ interface PageProps {
   searchParams: Promise<{ status?: string; search?: string; page?: string }>
 }
 
-export default async function InquiriesPage({ searchParams }: PageProps) {
+export default async function InquiriesPage({ searchParams }: Readonly<PageProps>) {
   await requireAdmin()
 
   const params = await searchParams
@@ -24,9 +24,9 @@ export default async function InquiriesPage({ searchParams }: PageProps) {
   const statusFilter =
     status && VALID_STATUSES.includes(status) ? (status as InquiryStatus) : undefined
 
-  const currentPage = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
+  const currentPage = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1)
 
-  const { data: inquiries, total, pageCount } = await getInquiries({
+  const { data: inquiries, total } = await getInquiries({
     status: statusFilter ?? 'ALL',
     search: search?.trim() || undefined,
     page: currentPage,

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
 import { submitInquiry } from '@/actions/inquiry'
+import type { ActiveProgram } from '@/actions/public/programs'
 import { InquiryStep1 } from './inquiry/InquiryStep1'
 import { InquiryStep2 } from './inquiry/InquiryStep2'
 import { InquiryStep3 } from './inquiry/InquiryStep3'
@@ -19,13 +20,18 @@ function getStepClass(currentStep: number, stepId: number): string {
 const STEPS = [
   { id: 1, label: 'Roditelj' },
   { id: 2, label: 'Dijete' },
-  { id: 3, label: 'Preferencije' },
+  { id: 3, label: 'Dostupni termini' },
 ]
 
 const step1Fields = ['parentName', 'parentEmail', 'parentPhone'] as const
-const step2Fields = ['childName', 'childAge', 'childSchool'] as const
+const step2Fields = ['childFirstName', 'childLastName', 'childDateOfBirth', 'childSchool'] as const
 
-export function InquiryForm() {
+interface InquiryFormProps {
+  programs: ActiveProgram[]
+  preselectedCourseId?: string
+}
+
+export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryFormProps>) {
   const [step, setStep] = useState(1)
   const [done, setDone] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -35,10 +41,12 @@ export function InquiryForm() {
     register,
     trigger,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<InquiryFormData>({
     resolver: zodResolver(inquirySchema),
     mode: 'onTouched',
+    defaultValues: preselectedCourseId ? { courseId: preselectedCourseId, grade: 'workshop' } : undefined,
   })
 
   async function handleNext() {
@@ -106,8 +114,10 @@ export function InquiryForm() {
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         {step === 1 && <InquiryStep1 register={register} errors={errors} />}
-        {step === 2 && <InquiryStep2 register={register} errors={errors} />}
-        {step === 3 && <InquiryStep3 register={register} errors={errors} />}
+        {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} />}
+        {step === 3 && (
+          <InquiryStep3 register={register} errors={errors} setValue={setValue} programs={programs} preselectedCourseId={preselectedCourseId} />
+        )}
 
         {serverError && (
           <p className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">

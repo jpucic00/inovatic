@@ -20,7 +20,7 @@ interface InquiryFiltersProps {
   currentSearch: string
 }
 
-export function InquiryFilters({ currentStatus, currentSearch }: InquiryFiltersProps) {
+export function InquiryFilters({ currentStatus, currentSearch }: Readonly<InquiryFiltersProps>) {
   const router = useRouter()
   const pathname = usePathname()
   const [, startTransition] = useTransition()
@@ -29,7 +29,7 @@ export function InquiryFilters({ currentStatus, currentSearch }: InquiryFiltersP
   const pushUrl = (params: { status?: string; search?: string }) => {
     const sp = new URLSearchParams()
     const s = params.status ?? currentStatus
-    const q = params.search !== undefined ? params.search : currentSearch
+    const q = params.search ?? currentSearch
     if (s && s !== 'ALL') sp.set('status', s)
     if (q) sp.set('search', q)
     // Always reset to page 1 when filters change
@@ -38,7 +38,7 @@ export function InquiryFilters({ currentStatus, currentSearch }: InquiryFiltersP
     })
   }
 
-  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSearchSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     pushUrl({ search: searchRef.current?.value ?? '' })
   }

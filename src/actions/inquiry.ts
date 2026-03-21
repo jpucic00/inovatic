@@ -20,11 +20,12 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     parentName,
     parentEmail,
     parentPhone,
-    childName,
-    childAge,
+    childFirstName,
+    childLastName,
+    childDateOfBirth,
     childSchool,
-    courseLevelPref,
-    locationPref,
+    courseId,
+    scheduledGroupId,
     message,
   } = parsed.data
 
@@ -34,16 +35,18 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
         parentName,
         parentEmail,
         parentPhone,
-        childName,
-        childAge,
+        childFirstName,
+        childLastName,
+        childDateOfBirth,
         childSchool: childSchool || null,
-        courseLevelPref: courseLevelPref ?? null,
-        locationPref: locationPref || null,
+        courseId: courseId || null,
+        scheduledGroupId: scheduledGroupId || null,
         message: message || null,
         consentGivenAt: new Date(),
       },
     })
-  } catch {
+  } catch (err) {
+    console.error('submitInquiry failed:', err)
     return { success: false, error: 'Greška pri slanju upita. Pokušajte ponovo.' }
   }
 
@@ -56,14 +59,14 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
         subject: `Zaprimili smo vašu prijavu – Inovatic`,
         react: createElement(InquiryConfirmationEmail, {
           parentName,
-          childName,
-          childAge,
-          courseLevelPref,
+          childName: `${childFirstName} ${childLastName}`,
+          childDateOfBirth,
+          courseLevelPref: undefined,
         }),
       })
     }
-  } catch {
-    // Email failure is non-fatal; inquiry is already saved
+  } catch (err) {
+    console.error('Failed to send inquiry confirmation email:', err)
   }
 
   return { success: true }

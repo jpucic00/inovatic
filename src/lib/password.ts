@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { randomBytes } from 'crypto'
+import { randomBytes } from 'node:crypto'
 
 const SALT_ROUNDS = 12
 

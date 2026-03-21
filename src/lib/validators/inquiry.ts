@@ -1,24 +1,22 @@
 import { z } from 'zod'
 
-export const step1Schema = z.object({
+const step1Schema = z.object({
   parentName: z.string().min(2, 'Unesite ime i prezime (najmanje 2 znaka)'),
   parentEmail: z.string().email('Unesite valjanu email adresu'),
   parentPhone: z.string().min(9, 'Unesite valjani broj telefona'),
 })
 
-export const step2Schema = z.object({
-  childName: z.string().min(2, 'Unesite ime djeteta (najmanje 2 znaka)'),
-  childAge: z.coerce
-    .number({ invalid_type_error: 'Unesite dob' })
-    .int()
-    .min(5, 'Dob mora biti najmanje 5 godina')
-    .max(16, 'Dob mora biti najviše 16 godina'),
+const step2Schema = z.object({
+  childFirstName: z.string().min(2, 'Unesite ime djeteta (najmanje 2 znaka)'),
+  childLastName: z.string().min(2, 'Unesite prezime djeteta (najmanje 2 znaka)'),
+  childDateOfBirth: z.string().min(1, 'Unesite datum rođenja'),
   childSchool: z.string().optional(),
 })
 
-export const step3Schema = z.object({
-  courseLevelPref: z.enum(['SLR_1', 'SLR_2', 'SLR_3', 'SLR_4']).optional(),
-  locationPref: z.string().optional(),
+const step3Schema = z.object({
+  grade: z.string().min(1, 'Odaberite razred djeteta'),
+  courseId: z.string().optional(),
+  scheduledGroupId: z.string().optional(),
   message: z.string().max(1000, 'Poruka može imati najviše 1000 znakova').optional(),
   consent: z.literal(true, {
     errorMap: () => ({ message: 'Morate pristati na obradu osobnih podataka.' }),

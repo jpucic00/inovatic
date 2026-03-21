@@ -54,13 +54,18 @@ export function Pagination({
   currentPage,
   searchParams,
   basePath,
-}: PaginationProps) {
+}: Readonly<PaginationProps>) {
   const pageCount = Math.ceil(total / pageSize)
   if (pageCount <= 1) return null
 
   const from = (currentPage - 1) * pageSize + 1
   const to = Math.min(currentPage * pageSize, total)
-  const pages = getPages(currentPage, pageCount)
+  const rawPages = getPages(currentPage, pageCount)
+  let ellipsisIdx = 0
+  const pages = rawPages.map((p) => ({
+    value: p,
+    key: p === '…' ? `ellipsis-${++ellipsisIdx}` : String(p),
+  }))
 
   const prevHref =
     currentPage > 1 ? buildUrl(basePath, searchParams, currentPage - 1) : null
@@ -88,14 +93,14 @@ export function Pagination({
           </span>
         )}
 
-        {pages.map((p, i) =>
+        {pages.map(({ value: p, key }) =>
           p === '…' ? (
-            <span key={`ellipsis-${i}`} className="px-2 py-1.5 text-sm text-gray-400 select-none">
+            <span key={key} className="px-2 py-1.5 text-sm text-gray-400 select-none">
               …
             </span>
           ) : (
             <Link
-              key={p}
+              key={key}
               href={buildUrl(basePath, searchParams, p)}
               className={cn(
                 'min-w-[2rem] text-center px-2 py-1.5 text-sm rounded-md border transition-colors',

@@ -1,12 +1,12 @@
-export type CourseLevel = 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
+type CourseLevel = 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
 
-export interface CourseModule {
+interface CourseModule {
   title: string
   description: string
   image: string
 }
 
-export interface Course {
+interface Course {
   slug: string
   level: CourseLevel
   title: string

@@ -5,9 +5,7 @@ export const createCourseSchema = z.object({
   description: z.string().min(5, 'Opis mora imati najmanje 5 znakova'),
   ageMin: z.coerce.number().int().min(3).max(18),
   ageMax: z.coerce.number().int().min(3).max(18),
-  equipment: z.string().min(1, 'Oprema je obavezna'),
-  priceYear: z.coerce.number().optional(),
-  priceModule: z.coerce.number().optional(),
+  price: z.coerce.number().positive('Cijena mora biti veća od 0').optional(),
   imageUrl: z.string().url().optional().or(z.literal('')),
 })
 

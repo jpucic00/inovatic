@@ -28,12 +28,19 @@ interface DataTableProps<TData> {
 
 type SortDir = 'asc' | 'desc' | null
 
+function normalizeValue(val: unknown): string | number {
+  if (typeof val === 'string') return val
+  if (typeof val === 'number') return val
+  if (val instanceof Date) return val.getTime()
+  return ''
+}
+
 export function DataTable<TData>({
   columns,
   data,
   emptyMessage = 'Nema podataka.',
   getRowKey,
-}: DataTableProps<TData>) {
+}: Readonly<DataTableProps<TData>>) {
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>(null)
 
@@ -53,8 +60,12 @@ export function DataTable<TData>({
     sortKey && sortDir
       ? [...data].sort((a, b) => {
           const col = columns.find((c) => c.key === sortKey)
-          const av = col?.sortValue ? col.sortValue(a) : String((a as Record<string, unknown>)[sortKey] ?? '')
-          const bv = col?.sortValue ? col.sortValue(b) : String((b as Record<string, unknown>)[sortKey] ?? '')
+          const av = col?.sortValue
+            ? col.sortValue(a)
+            : normalizeValue((a as Record<string, unknown>)[sortKey])
+          const bv = col?.sortValue
+            ? col.sortValue(b)
+            : normalizeValue((b as Record<string, unknown>)[sortKey])
 
           let cmp: number
           if (av instanceof Date && bv instanceof Date) {
@@ -73,32 +84,34 @@ export function DataTable<TData>({
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50 hover:bg-gray-50">
-            {columns.map((col) => (
-              <TableHead
-                key={col.key}
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-              >
-                {col.sortable ? (
-                  <button
-                    onClick={() => handleSort(col.key)}
-                    className="flex items-center gap-1 hover:text-gray-900 transition-colors"
-                  >
-                    {col.header}
-                    {sortKey === col.key ? (
-                      sortDir === 'asc' ? (
-                        <ChevronUp className="w-3 h-3" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3" />
-                      )
-                    ) : (
-                      <ChevronsUpDown className="w-3 h-3 opacity-40" />
-                    )}
-                  </button>
-                ) : (
-                  col.header
-                )}
-              </TableHead>
-            ))}
+            {columns.map((col) => {
+              let sortIcon: React.ReactNode
+              if (sortKey === col.key && sortDir === 'asc') {
+                sortIcon = <ChevronUp className="w-3 h-3" />
+              } else if (sortKey === col.key) {
+                sortIcon = <ChevronDown className="w-3 h-3" />
+              } else {
+                sortIcon = <ChevronsUpDown className="w-3 h-3 opacity-40" />
+              }
+              return (
+                <TableHead
+                  key={col.key}
+                  className="text-xs font-semibold text-gray-500"
+                >
+                  {col.sortable ? (
+                    <button
+                      onClick={() => handleSort(col.key)}
+                      className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+                    >
+                      {col.header}
+                      {sortIcon}
+                    </button>
+                  ) : (
+                    col.header
+                  )}
+                </TableHead>
+              )
+            })}
           </TableRow>
         </TableHeader>
         <TableBody>

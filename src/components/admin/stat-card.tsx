@@ -24,7 +24,7 @@ export function StatCard({
   description,
   icon: Icon,
   color = 'gray',
-}: StatCardProps) {
+}: Readonly<StatCardProps>) {
   return (
     <div className={cn('rounded-xl border p-5', colorMap[color])}>
       <div className="flex items-center justify-between mb-2">

@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { Mail, Phone, MapPin, Facebook, Instagram } from 'lucide-react' // NOSONAR
+import { Mail, Phone, MapPin } from 'lucide-react'
+import { FacebookIcon, InstagramIcon } from '@/components/shared/social-icons'
 import { Logo } from '@/components/shared/logo'
 
 const quickLinks = [
@@ -31,7 +32,7 @@ export function Footer() {
                 className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-cyan-500 hover:text-white transition-colors"
                 aria-label="Facebook"
               >
-                <Facebook className="w-4 h-4" />
+                <FacebookIcon className="w-4 h-4" />
               </a>
               <a
                 href="https://instagram.com/udruga_inovatic"
@@ -40,7 +41,7 @@ export function Footer() {
                 className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-cyan-500 hover:text-white transition-colors"
                 aria-label="Instagram"
               >
-                <Instagram className="w-4 h-4" />
+                <InstagramIcon className="w-4 h-4" />
               </a>
             </div>
           </div>

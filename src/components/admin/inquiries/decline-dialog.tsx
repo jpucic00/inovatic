@@ -20,7 +20,7 @@ interface DeclineDialogProps {
   childName: string
 }
 
-export function DeclineDialog({ inquiryId, childName }: DeclineDialogProps) {
+export function DeclineDialog({ inquiryId, childName }: Readonly<DeclineDialogProps>) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()

@@ -5,14 +5,18 @@ import { Eye } from 'lucide-react'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { InquiryStatusBadge } from './inquiry-status-badge'
 import { COURSE_LEVEL_LABELS } from '@/lib/inquiry-status'
+import { formatChildName } from '@/lib/format'
 
 // Minimal type matching what we pass from the server
-export type InquiryRow = {
+type InquiryRow = {
   id: string
   parentName: string
   parentEmail: string
-  childName: string
-  childAge: number
+  childName: string | null
+  childFirstName: string | null
+  childLastName: string | null
+  childAge: number | null
+  childDateOfBirth: string | null
   courseLevelPref: string | null
   locationPref: string | null
   status: string
@@ -51,24 +55,36 @@ const columns: ColumnDef<InquiryRow>[] = [
     key: 'childName',
     header: 'Dijete',
     sortable: true,
-    sortValue: (row) => row.childName,
-    cell: (row) => (
-      <div>
-        <p className="text-sm text-gray-900">{row.childName}</p>
-        <p className="text-xs text-gray-500">{row.childAge} god.</p>
-      </div>
-    ),
+    sortValue: (row) => formatChildName(row, ''),
+    cell: (row) => {
+      const name = formatChildName(row)
+      let age: string | null = null
+      if (row.childDateOfBirth) {
+        age = `r. ${row.childDateOfBirth}`
+      } else if (row.childAge != null) {
+        age = `${row.childAge} god.`
+      }
+      return (
+        <div>
+          <p className="text-sm text-gray-900">{name}</p>
+          {age && <p className="text-xs text-gray-500">{age}</p>}
+        </div>
+      )
+    },
   },
   {
     key: 'courseLevelPref',
     header: 'Tečaj',
-    cell: (row) => (
-      <span className="text-sm text-gray-600">
-        {row.courseLevelPref
-          ? COURSE_LEVEL_LABELS[row.courseLevelPref] ?? row.courseLevelPref
-          : <span className="text-gray-400 italic">—</span>}
-      </span>
-    ),
+    cell: (row) => {
+      const levelLabel = row.courseLevelPref
+        ? (COURSE_LEVEL_LABELS[row.courseLevelPref] ?? row.courseLevelPref)
+        : null
+      return (
+        <span className="text-sm text-gray-600">
+          {levelLabel ?? <span className="text-gray-400 italic">—</span>}
+        </span>
+      )
+    },
   },
   {
     key: 'status',
@@ -96,7 +112,7 @@ interface InquiryTableProps {
   data: InquiryRow[]
 }
 
-export function InquiryTable({ data }: InquiryTableProps) {
+export function InquiryTable({ data }: Readonly<InquiryTableProps>) {
   return (
     <DataTable
       columns={columns}

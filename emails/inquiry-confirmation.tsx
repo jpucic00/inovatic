@@ -21,14 +21,14 @@ const courseLevelLabels: Record<string, string> = {
 interface InquiryConfirmationProps {
   parentName: string
   childName: string
-  childAge: number
+  childDateOfBirth: string
   courseLevelPref?: string
 }
 
 export function InquiryConfirmationEmail({
   parentName,
   childName,
-  childAge,
+  childDateOfBirth,
   courseLevelPref,
 }: InquiryConfirmationProps) {
   const courseLabel = courseLevelPref ? courseLevelLabels[courseLevelPref] : undefined
@@ -41,8 +41,7 @@ export function InquiryConfirmationEmail({
         <Container style={container}>
           <Heading style={h1}>Hvala na upitu, {parentName}!</Heading>
           <Text style={text}>
-            Zaprimili smo vašu prijavu za upis djeteta <strong>{childName}</strong> (dob: {childAge}{' '}
-            {childAge === 1 ? 'godina' : 'godina'}) u program LEGO robotike.
+            Zaprimili smo vašu prijavu za upis djeteta <strong>{childName}</strong> (datum rođenja: {childDateOfBirth}) u program LEGO robotike.
           </Text>
           {courseLabel && (
             <Text style={text}>
@@ -117,5 +116,3 @@ const footer = {
   lineHeight: '1.6',
   margin: '0',
 }
-
-export default InquiryConfirmationEmail

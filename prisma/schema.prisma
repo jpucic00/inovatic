@@ -74,7 +74,8 @@ model Course {
   description String       @db.Text
   ageMin      Int
   ageMax      Int
-  equipment   String
+  equipment   String?
+  price       Float?
   priceYear   Decimal?     @db.Decimal(10, 2)
   priceModule Decimal?     @db.Decimal(10, 2)
   imageUrl    String?
@@ -118,6 +119,7 @@ model ScheduledGroup {
   courseId        String
   locationId      String
   name            String?
+  date            String?
   dayOfWeek       String?
   startTime       String?
   endTime         String?
@@ -155,9 +157,12 @@ model Inquiry {
   parentName      String
   parentEmail     String
   parentPhone     String
-  childName       String
-  childAge        Int
-  childSchool     String?
+  childName           String?
+  childFirstName      String?
+  childLastName       String?
+  childAge            Int?
+  childDateOfBirth    String?
+  childSchool         String?
   courseLevelPref CourseLevel?
   locationPref    String?
   courseId        String?

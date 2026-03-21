@@ -6,7 +6,7 @@ interface InquiryStatusBadgeProps {
   className?: string
 }
 
-export function InquiryStatusBadge({ status, className }: InquiryStatusBadgeProps) {
+export function InquiryStatusBadge({ status, className }: Readonly<InquiryStatusBadgeProps>) {
   return (
     <span
       className={cn(

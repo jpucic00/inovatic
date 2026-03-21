@@ -20,7 +20,7 @@ interface DeleteDialogProps {
   childName: string
 }
 
-export function DeleteDialog({ inquiryId, childName }: DeleteDialogProps) {
+export function DeleteDialog({ inquiryId, childName }: Readonly<DeleteDialogProps>) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()

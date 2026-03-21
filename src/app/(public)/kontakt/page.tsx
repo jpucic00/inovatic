@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Mail, Phone, MapPin, Clock, ArrowRight, Facebook, Instagram } from 'lucide-react' // NOSONAR
+import { Mail, Phone, MapPin, Clock, ArrowRight } from 'lucide-react'
+import { FacebookIcon, InstagramIcon } from '@/components/shared/social-icons'
 
 export const metadata: Metadata = {
   title: 'Kontakt',
@@ -113,7 +114,7 @@ export default function ContactPage() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm text-gray-600 hover:text-cyan-600 transition-colors bg-white border border-gray-200 rounded-xl px-4 py-2"
                   >
-                    <Facebook className="w-4 h-4" /> Facebook
+                    <FacebookIcon className="w-4 h-4" /> Facebook
                   </a>
                   <a
                     href="https://instagram.com/udruga_inovatic"
@@ -121,7 +122,7 @@ export default function ContactPage() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm text-gray-600 hover:text-cyan-600 transition-colors bg-white border border-gray-200 rounded-xl px-4 py-2"
                   >
-                    <Instagram className="w-4 h-4" /> Instagram
+                    <InstagramIcon className="w-4 h-4" /> Instagram
                   </a>
                 </div>
               </div>

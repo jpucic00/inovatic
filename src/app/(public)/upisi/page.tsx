@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { CheckCircle } from 'lucide-react'
 import { InquiryForm } from '@/components/public/inquiry-form'
+import { getActivePrograms } from '@/actions/public/programs'
 
 export const metadata: Metadata = {
   title: 'Upisi',
@@ -35,7 +36,8 @@ const stepStyles = [
   'bg-orange-400 text-gray-900',
 ]
 
-export default function InquiryPage() {
+export default async function InquiryPage() {
+  const programs = await getActivePrograms()
   return (
     <>
       <section className="relative bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-12 px-4 overflow-hidden">
@@ -103,7 +105,7 @@ export default function InquiryPage() {
             {/* Form */}
             <div className="lg:col-span-3">
               <div className="bg-white rounded-2xl border border-cyan-100 ring-1 ring-cyan-50 shadow-sm p-7">
-                <InquiryForm />
+                <InquiryForm programs={programs} />
               </div>
             </div>
           </div>

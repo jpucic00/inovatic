@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, Inbox, Calendar, BookOpen, Users, GraduationCap, Newspaper, LogOut } from 'lucide-react'
+import { LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, LogOut } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { requireAdmin } from '@/lib/auth-guard'
 import { logoutAction } from '@/actions/logout'
@@ -8,8 +8,9 @@ import { Logo } from '@/components/shared/logo'
 const sidebarLinks = [
   { href: '/admin', label: 'Nadzorna ploča', icon: LayoutDashboard },
   { href: '/admin/upiti', label: 'Upiti', icon: Inbox },
-  { href: '/admin/raspored', label: 'Raspored', icon: Calendar },
-  { href: '/admin/tecajevi', label: 'Tečajevi', icon: BookOpen },
+  { href: '/admin/grupe', label: 'Grupe', icon: Users2 },
+  { href: '/admin/programi', label: 'Programi', icon: BookOpen },
+  { href: '/admin/lokacije', label: 'Lokacije', icon: MapPin },
   { href: '/admin/ucenici', label: 'Učenici', icon: GraduationCap },
   { href: '/admin/nastavnici', label: 'Nastavnici', icon: Users },
   { href: '/admin/novosti', label: 'Novosti', icon: Newspaper },

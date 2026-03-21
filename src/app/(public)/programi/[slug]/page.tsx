@@ -134,8 +134,8 @@ export default async function CourseDetailPage({ params }: PageProps) {
             {/* Description */}
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-4">O programu</h2>
-              {course.description.split('\n').filter(Boolean).map((para, i) => (
-                <p key={i} className="text-gray-600 leading-relaxed mb-3 last:mb-0">
+              {course.description.split('\n').filter(Boolean).map((para) => (
+                <p key={para} className="text-gray-600 leading-relaxed mb-3 last:mb-0">
                   {para}
                 </p>
               ))}
