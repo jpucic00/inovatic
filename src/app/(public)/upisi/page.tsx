@@ -3,6 +3,8 @@ import { CheckCircle } from 'lucide-react'
 import { InquiryForm } from '@/components/public/inquiry-form'
 import { getActivePrograms } from '@/actions/public/programs'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Upisi',
   description: 'Upiši dijete na tečaj LEGO robotike u Splitu. Ispuni upit i kontaktirat ćemo te s dostupnim terminima. Bez obveza.',
