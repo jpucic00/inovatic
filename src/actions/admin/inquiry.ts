@@ -35,7 +35,6 @@ export async function getInquiries(
       ? {
           OR: [
             { parentName: { contains: search, mode: 'insensitive' as const } },
-            { childName: { contains: search, mode: 'insensitive' as const } },
             { childFirstName: { contains: search, mode: 'insensitive' as const } },
             { childLastName: { contains: search, mode: 'insensitive' as const } },
             { parentEmail: { contains: search, mode: 'insensitive' as const } },

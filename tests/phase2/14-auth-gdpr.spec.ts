@@ -118,8 +118,11 @@ test.describe('GDPR Consent on Inquiry Form', () => {
     await page.locator('button', { hasText: 'Dalje' }).click()
 
     // Step 2 — fill child info
-    await page.locator('#childName').fill('Ana Horvat')
-    await page.locator('#childAge').fill('8')
+    await page.locator('#childFirstName').fill('Ana')
+    await page.locator('#childLastName').fill('Horvat')
+    await page.locator('#dob-day').selectOption('15')
+    await page.locator('#dob-month').selectOption('3')
+    await page.locator('#dob-year').selectOption('2018')
     await page.locator('button', { hasText: 'Dalje' }).click()
 
     // Step 3 — verify consent checkbox is present
@@ -145,11 +148,15 @@ test.describe('GDPR Consent on Inquiry Form', () => {
     await page.locator('button', { hasText: 'Dalje' }).click()
 
     // Step 2
-    await page.locator('#childName').fill('Ana Horvat')
-    await page.locator('#childAge').fill('8')
+    await page.locator('#childFirstName').fill('Ana')
+    await page.locator('#childLastName').fill('Horvat')
+    await page.locator('#dob-day').selectOption('15')
+    await page.locator('#dob-month').selectOption('3')
+    await page.locator('#dob-year').selectOption('2018')
     await page.locator('button', { hasText: 'Dalje' }).click()
 
-    // Step 3 — submit without checking consent
+    // Step 3 — select grade but submit without checking consent
+    await page.locator('select[name="grade"]').selectOption('3')
     await page.locator('button[type="submit"]').click()
 
     // Expect validation error

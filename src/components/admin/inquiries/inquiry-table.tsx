@@ -12,10 +12,8 @@ type InquiryRow = {
   id: string
   parentName: string
   parentEmail: string
-  childName: string | null
-  childFirstName: string | null
-  childLastName: string | null
-  childAge: number | null
+  childFirstName: string
+  childLastName: string
   childDateOfBirth: string | null
   courseLevelPref: string | null
   locationPref: string | null
@@ -58,12 +56,7 @@ const columns: ColumnDef<InquiryRow>[] = [
     sortValue: (row) => formatChildName(row, ''),
     cell: (row) => {
       const name = formatChildName(row)
-      let age: string | null = null
-      if (row.childDateOfBirth) {
-        age = `r. ${row.childDateOfBirth}`
-      } else if (row.childAge != null) {
-        age = `${row.childAge} god.`
-      }
+      const age = row.childDateOfBirth ? `r. ${row.childDateOfBirth}` : null
       return (
         <div>
           <p className="text-sm text-gray-900">{name}</p>

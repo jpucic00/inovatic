@@ -8,15 +8,13 @@ export function formatDate(date: Date | null, style: DateStyle = 'short'): strin
   return new Intl.DateTimeFormat('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date) + '.'
 }
 
-/** Build display name from split or legacy child name fields. */
+/** Build display name from child name fields. */
 export function formatChildName(
-  fields: { childFirstName?: string | null; childLastName?: string | null; childName?: string | null },
+  fields: { childFirstName: string; childLastName: string },
   fallback = '–',
 ): string {
-  if (fields.childFirstName) {
-    return `${fields.childFirstName} ${fields.childLastName ?? ''}`.trim()
-  }
-  return fields.childName ?? fallback
+  const full = `${fields.childFirstName} ${fields.childLastName}`.trim()
+  return full || fallback
 }
 
 export const DAYS_HR = [

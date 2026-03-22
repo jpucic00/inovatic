@@ -95,18 +95,13 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   const isAccountCreated = inquiry.status === 'ACCOUNT_CREATED'
   const canDecline = !isDeclined && !isAccountCreated
 
-  let birthInfo: React.ReactNode
-  if (inquiry.childDateOfBirth) {
-    birthInfo = new Date(inquiry.childDateOfBirth).toLocaleDateString('hr-HR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
-  } else if (inquiry.childAge == null) {
-    birthInfo = <span className="text-gray-400 italic">Nije navedeno</span>
-  } else {
-    birthInfo = `${inquiry.childAge} god.`
-  }
+  const birthInfo: React.ReactNode = inquiry.childDateOfBirth
+    ? new Date(inquiry.childDateOfBirth).toLocaleDateString('hr-HR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+    : <span className="text-gray-400 italic">Nije navedeno</span>
 
   let preferredProgram: React.ReactNode
   if (inquiry.course) {

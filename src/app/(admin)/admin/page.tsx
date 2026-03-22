@@ -31,7 +31,8 @@ export default async function AdminDashboard() {
       select: {
         id: true,
         parentName: true,
-        childName: true,
+        childFirstName: true,
+        childLastName: true,
         status: true,
         createdAt: true,
       },
@@ -106,7 +107,7 @@ export default async function AdminDashboard() {
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {inquiry.childName}
+                      {inquiry.childFirstName} {inquiry.childLastName}
                     </p>
                     <p className="text-xs text-gray-500 truncate">{inquiry.parentName}</p>
                   </div>

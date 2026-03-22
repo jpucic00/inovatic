@@ -157,10 +157,8 @@ model Inquiry {
   parentName      String
   parentEmail     String
   parentPhone     String
-  childName           String?
-  childFirstName      String?
-  childLastName       String?
-  childAge            Int?
+  childFirstName      String
+  childLastName       String
   childDateOfBirth    String?
   childSchool         String?
   courseLevelPref CourseLevel?

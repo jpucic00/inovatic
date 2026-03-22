@@ -18,24 +18,36 @@ const INQUIRY_MAIN = {
   parentName: `Marko Testić ${RUN_ID}`,
   parentEmail: `marko.${RUN_ID}@test.com`,
   parentPhone: '0911111111',
+  childFirstName: `Luka`,
+  childLastName: `Testić ${RUN_ID}`,
   childName: `Luka Testić ${RUN_ID}`,
-  childAge: '9',
+  dobDay: '15',
+  dobMonth: '3',
+  dobYear: '2017',
 }
 
 const INQUIRY_TO_DECLINE = {
   parentName: `Ana Testić ${RUN_ID}`,
   parentEmail: `ana.${RUN_ID}@test.com`,
   parentPhone: '0922222222',
+  childFirstName: `Petra`,
+  childLastName: `Testić ${RUN_ID}`,
   childName: `Petra Testić ${RUN_ID}`,
-  childAge: '11',
+  dobDay: '1',
+  dobMonth: '6',
+  dobYear: '2015',
 }
 
 const INQUIRY_TO_DELETE = {
   parentName: `Ivan Testić ${RUN_ID}`,
   parentEmail: `ivan.${RUN_ID}@test.com`,
   parentPhone: '0933333333',
+  childFirstName: `Mia`,
+  childLastName: `Testić ${RUN_ID}`,
   childName: `Mia Testić ${RUN_ID}`,
-  childAge: '7',
+  dobDay: '20',
+  dobMonth: '9',
+  dobYear: '2019',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -50,13 +62,17 @@ async function submitInquiry(page: Page, data: typeof INQUIRY_MAIN) {
   await page.locator('button', { hasText: 'Dalje' }).click()
 
   // Step 2 — child info (wait for step to render)
-  await expect(page.locator('#childName')).toBeVisible()
-  await page.locator('#childName').fill(data.childName)
-  await page.locator('#childAge').fill(data.childAge)
+  await expect(page.locator('#childFirstName')).toBeVisible()
+  await page.locator('#childFirstName').fill(data.childFirstName)
+  await page.locator('#childLastName').fill(data.childLastName)
+  await page.locator('#dob-day').selectOption(data.dobDay)
+  await page.locator('#dob-month').selectOption(data.dobMonth)
+  await page.locator('#dob-year').selectOption(data.dobYear)
   await page.locator('button', { hasText: 'Dalje' }).click()
 
-  // Step 3 — consent + submit (wait for step to render)
+  // Step 3 — grade, consent + submit (wait for step to render)
   await expect(page.locator('input[name="consent"]')).toBeVisible()
+  await page.locator('select[name="grade"]').selectOption('3')
   await page.locator('input[name="consent"]').check()
   await page.locator('button', { hasText: 'Pošalji upit' }).click()
 
@@ -339,11 +355,12 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       await expect(page.locator(`text=${INQUIRY_MAIN.parentPhone}`)).toBeVisible()
     })
 
-    test('detail page shows child name and age', async ({ page }) => {
+    test('detail page shows child name and date of birth', async ({ page }) => {
       await loginAsAdmin(page)
       await openInquiryDetail(page, INQUIRY_MAIN.parentName)
       await expect(page.locator(`text=${INQUIRY_MAIN.childName}`).first()).toBeVisible()
-      await expect(page.locator(`text=${INQUIRY_MAIN.childAge} godina`)).toBeVisible()
+      // Date of birth displayed in HR format (dd.mm.yyyy.)
+      await expect(page.locator('text=15.').first()).toBeVisible()
     })
 
     test('detail page shows status timeline', async ({ page }) => {
