@@ -182,11 +182,9 @@ export default async function CourseDetailPage({ params }: PageProps) {
                   'Nastava jednom tjedno, 90 minuta',
                   `Korištenje opreme (${course.equipment})`,
                   'Mala grupa (do 8 polaznika)',
-                  'Stručni instruktori',
+                  'Stručni robo treneri',
                   'Certifikat o završetku',
                   'Pristup materijalima',
-                  'Priprema za natjecanja',
-                  'Završna prezentacija projekta',
                 ].map((item) => (
                   <div key={item} className="flex items-center gap-2.5">
                     <CheckCircle className="w-4 h-4 text-cyan-500 flex-shrink-0" />

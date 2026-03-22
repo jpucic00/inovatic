@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { formatDate } from '@/lib/format'
 import { ArticleContent } from '@/components/article/article-content'
 import { ArticleGallery } from '@/components/article/article-gallery'
+import { BackButton } from '@/components/public/back-button'
 import type { PartialBlock } from '@blocknote/core'
 
 export const revalidate = 3600
@@ -125,12 +126,11 @@ export default async function ArticlePage({ params }: PageProps) {
       {article.coverImage && (
         <section className="py-8 px-4 bg-gray-50">
           <div className="container mx-auto max-w-3xl">
-            <Link
-              href="/novosti"
+            <BackButton
+              fallbackHref="/novosti"
+              label="Sve novosti"
               className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors mb-4"
-            >
-              <ArrowLeft className="w-4 h-4" /> Sve novosti
-            </Link>
+            />
             <div className="relative overflow-hidden rounded-2xl h-64 md:h-80 bg-gray-100">
               <Image
                 src={article.coverImage}
@@ -150,12 +150,11 @@ export default async function ArticlePage({ params }: PageProps) {
         <div className="container mx-auto max-w-3xl">
           {/* Back link (only when no cover image) */}
           {!article.coverImage && (
-            <Link
-              href="/novosti"
+            <BackButton
+              fallbackHref="/novosti"
+              label="Sve novosti"
               className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-cyan-600 transition-colors mb-8"
-            >
-              <ArrowLeft className="w-4 h-4" /> Sve novosti
-            </Link>
+            />
           )}
 
           <div>

@@ -121,7 +121,7 @@ test.describe('GDPR Consent on Inquiry Form', () => {
     await page.locator('#childFirstName').fill('Ana')
     await page.locator('#childLastName').fill('Horvat')
     await page.locator('#dob-day').selectOption('15')
-    await page.locator('#dob-month').selectOption('3')
+    await page.locator('#dob-month').selectOption('03')
     await page.locator('#dob-year').selectOption('2018')
     await page.locator('button', { hasText: 'Dalje' }).click()
 
@@ -151,7 +151,7 @@ test.describe('GDPR Consent on Inquiry Form', () => {
     await page.locator('#childFirstName').fill('Ana')
     await page.locator('#childLastName').fill('Horvat')
     await page.locator('#dob-day').selectOption('15')
-    await page.locator('#dob-month').selectOption('3')
+    await page.locator('#dob-month').selectOption('03')
     await page.locator('#dob-year').selectOption('2018')
     await page.locator('button', { hasText: 'Dalje' }).click()
 

@@ -34,7 +34,7 @@ export const courses: Course[] = [
     slug: 'slr-1',
     level: 'SLR_1',
     title: 'Svijet LEGO Robotike 1',
-    subtitle: 'LEGO WeDo 2.0',
+    subtitle: 'LEGO WeDo 2.0 – WeDo ikone',
     description:
       'Tečaj SLR 1 namijenjen je početnicima od 6 do 8 godina (predškolci do 2. razreda). ' +
       'Na zabavan i kreativan način djeca se uvode u svijet robotike uz LEGO WeDo 2.0 edukacijski set i ikoničko programiranje. ' +
@@ -43,7 +43,7 @@ export const courses: Course[] = [
       'Završetkom programa polaznici stječu uvjete za upis u SLR 2.',
     ageMin: 6,
     ageMax: 8,
-    equipment: 'LEGO WeDo 2.0',
+    equipment: 'LEGO WeDo 2.0 – WeDo ikone',
     priceYear: 400,
     priceModule: 110,
     hours: 56,
@@ -86,7 +86,7 @@ export const courses: Course[] = [
     slug: 'slr-2',
     level: 'SLR_2',
     title: 'Svijet LEGO Robotike 2',
-    subtitle: 'LEGO SPIKE Essential',
+    subtitle: 'LEGO SPIKE Essential – SPIKE Essential ikone',
     description:
       'Tečaj SLR 2 namijenjen je početnicima od 9 do 10 godina (3. i 4. razred) ili onima koji su završili SLR 1. ' +
       'Program se izvodi uz LEGO SPIKE Essential edukacijski set. ' +
@@ -95,7 +95,7 @@ export const courses: Course[] = [
       'Završetkom programa polaznici stječu uvjete za upis u SLR 3.',
     ageMin: 9,
     ageMax: 10,
-    equipment: 'LEGO SPIKE Essential',
+    equipment: 'LEGO SPIKE Essential – SPIKE Essential ikone',
     priceYear: 400,
     priceModule: 110,
     hours: 56,

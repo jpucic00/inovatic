@@ -65,8 +65,8 @@ export default async function HomePage() {
               </div>
 
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 leading-tight tracking-tight">
-                Otkrijte svijet{' '}
-                <span className="text-cyan-500">LEGO robotike</span>
+                Otkrijte{' '}
+                <span className="text-cyan-500">Svijet LEGO Robotike</span>
               </h1>
               <p className="text-xl text-gray-600 mb-10 leading-relaxed max-w-xl mx-auto lg:mx-0">
                 Učimo djecu od 6 do 14 godina STEM vještine kroz igru, kreativnost i programiranje.
@@ -116,7 +116,7 @@ export default async function HomePage() {
       <StatsSection />
       <CoursesPreview />
 
-      {/* Achievement highlight */}
+      {/* Competitions */}
       <section className="py-16 px-4 bg-gradient-to-r from-cyan-500 to-cyan-600 relative overflow-hidden">
         <div className="absolute right-8 top-1/2 -translate-y-1/2 opacity-10">
           <GearDecor size={180} className="text-white animate-spin-slow" />
@@ -125,22 +125,40 @@ export default async function HomePage() {
           <GearDecor size={80} className="text-white animate-spin-slow-reverse" />
         </div>
         <div className="container mx-auto relative">
-          <div className="max-w-3xl mx-auto text-center">
+          <div className="max-w-4xl mx-auto text-center">
             <Trophy className="w-12 h-12 text-yellow-300 mx-auto mb-4" />
-            <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-4">
-              Tim CroSpec – WRO 2025 Singapur
+            <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-3">
+              Upoznajte naše natjecateljske programe
             </h2>
-            <p className="text-cyan-100 text-lg mb-6 leading-relaxed">
-              Naši polaznici su 2025. godine nastupili na World Robot Olympiad finalima u Singapuru
-              i <strong className="text-white">osvoji srebrnu medalju</strong>. Jedan od najuspješnijih timova na svijetu.
+            <p className="text-cyan-100 text-lg mb-8 leading-relaxed max-w-2xl mx-auto">
+              Naši najnadareniji polaznici nastupaju na najprestižnijim robotičkim natjecanjima u Hrvatskoj i svijetu.
+              Tim CroSpec 2025. godine <strong className="text-white">osvojio srebrnu medalju na WRO finalima u Singapuru</strong>.
             </p>
-            <div className="flex flex-wrap justify-center gap-4 text-sm">
-              {['FLL', 'WRO', 'Croatian Makers League', 'NMT', 'RoboCup'].map((comp) => (
-                <span key={comp} className="px-3 py-1.5 bg-white/20 text-white rounded-full font-medium">
-                  {comp}
-                </span>
+            <div className="flex flex-wrap justify-center gap-3 mb-8">
+              {[
+                { name: 'FLL', url: 'https://www.firstlegoleague.org/' },
+                { name: 'WRO', url: 'https://wro-association.org/' },
+                { name: 'Croatian Makers League', url: 'https://croatianmakers.hr/' },
+                { name: 'NMT', url: 'https://www.hztk.hr/' },
+                { name: 'RoboCup', url: 'https://www.robocup.org/' },
+              ].map((comp) => (
+                <a
+                  key={comp.name}
+                  href={comp.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-white/20 text-white rounded-full font-medium text-sm hover:bg-white/30 transition-colors"
+                >
+                  {comp.name} ↗
+                </a>
               ))}
             </div>
+            <Link
+              href="/natjecanja"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-yellow-400 text-gray-900 font-semibold rounded-xl hover:bg-yellow-300 transition-colors shadow-md text-sm"
+            >
+              Naša natjecanja i rezultati <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </div>
       </section>

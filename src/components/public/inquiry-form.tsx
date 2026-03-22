@@ -34,6 +34,7 @@ interface InquiryFormProps {
 export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryFormProps>) {
   const [step, setStep] = useState(1)
   const [done, setDone] = useState(false)
+  const [submittedCount, setSubmittedCount] = useState(0)
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -42,6 +43,8 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
     trigger,
     handleSubmit,
     setValue,
+    reset,
+    getValues,
     formState: { errors },
   } = useForm<InquiryFormData>({
     resolver: zodResolver(inquirySchema),
@@ -60,16 +63,39 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
     setStep((s) => s - 1)
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    if (e.key !== 'Enter') return
+    if ((e.target as HTMLElement).tagName === 'TEXTAREA') return
+    e.preventDefault()
+    if (step < 3) {
+      void handleNext()
+    } else {
+      void handleSubmit(onSubmit)()
+    }
+  }
+
   function onSubmit(data: InquiryFormData) {
     setServerError(null)
     startTransition(async () => {
       const result = await submitInquiry(data)
       if (result.success) {
+        setSubmittedCount((c) => c + 1)
         setDone(true)
       } else {
         setServerError(result.error)
       }
     })
+  }
+
+  function handleAnotherChild() {
+    reset({
+      parentName: getValues('parentName'),
+      parentEmail: getValues('parentEmail'),
+      parentPhone: getValues('parentPhone'),
+      ...(preselectedCourseId ? { courseId: preselectedCourseId, grade: 'workshop' } : {}),
+    })
+    setDone(false)
+    setStep(2)
   }
 
   if (done) {
@@ -78,11 +104,20 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <CheckCircle className="w-8 h-8 text-green-600" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-3">Upit je poslan!</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-3">
+          {submittedCount > 1 ? 'Još jedan upit je poslan!' : 'Upit je poslan!'}
+        </h2>
         <p className="text-gray-600 max-w-md mx-auto">
           Zahvaljujemo na upitu. Provjerite email — poslali smo potvrdu. Kontaktirat ćemo vas s dostupnim terminima u
           najkraćem mogućem roku.
         </p>
+        <button
+          type="button"
+          onClick={handleAnotherChild}
+          className="mt-8 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-cyan-200 text-cyan-600 font-medium text-sm hover:bg-cyan-50 transition"
+        >
+          Upiši još jedno dijete
+        </button>
       </div>
     )
   }
@@ -112,7 +147,7 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
         ))}
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} onKeyDown={handleKeyDown} noValidate>
         {step === 1 && <InquiryStep1 register={register} errors={errors} />}
         {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} />}
         {step === 3 && (

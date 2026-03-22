@@ -60,13 +60,13 @@ export default function ProgramiPage() {
         />
         <div className="container mx-auto max-w-3xl text-center relative">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">
-            Programi
+            Jedinstveni kurikulum
           </span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4 leading-tight">
-            Svijet LEGO Robotike
+            <span className="text-cyan-500">Svijet LEGO Robotike</span>
           </h1>
           <p className="text-gray-600 text-lg leading-relaxed">
-            Četiri razine tečajeva prilagođene dobi i predznanju djeteta. Od prvih koraka u
+            Naš jedinstveni kurikulum strukturiran je u četiri razine prilagođene dobi i predznanju djeteta. Od prvih koraka u
             mehanici do simulacije industrijskih sustava – kontinuirani razvojni put od 6 do 14 godina.
           </p>
         </div>

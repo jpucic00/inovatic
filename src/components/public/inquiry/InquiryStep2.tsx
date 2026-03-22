@@ -101,6 +101,7 @@ export function InquiryStep2({ register, errors, setValue }: Readonly<Props>) {
             ))}
           </select>
           <select
+            id="dob-month"
             value={month}
             onChange={(e) => { setMonth(e.target.value); updateDOB(day, e.target.value, year) }}
             className={`${selectClass} ${month ? 'text-gray-900' : 'text-gray-400'}`}
@@ -111,6 +112,7 @@ export function InquiryStep2({ register, errors, setValue }: Readonly<Props>) {
             ))}
           </select>
           <select
+            id="dob-year"
             value={year}
             onChange={(e) => { setYear(e.target.value); updateDOB(day, month, e.target.value) }}
             className={`${selectClass} ${year ? 'text-gray-900' : 'text-gray-400'}`}

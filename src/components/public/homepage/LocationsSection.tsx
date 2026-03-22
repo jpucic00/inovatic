@@ -5,12 +5,14 @@ const locations = [
   {
     name: 'Velebitska 32',
     address: 'Velebitska 32, 21000 Split',
-    description: 'Prostrana učionica u središtu Splita s modernom opremom.',
+    badge: null,
+    description: 'Dvije prostrane učionice namijenjene provedbi kurikuluma Svijet LEGO Robotike.',
   },
   {
-    name: 'Ruđera Boškovića 33',
+    name: 'PMF – Ruđera Boškovića 33',
     address: 'Ruđera Boškovića 33, 21000 Split',
-    description: 'Druga lokacija s potpuno opremljenim robotičkim laboratorijem.',
+    badge: 'Prirodoslovno-matematički fakultet',
+    description: 'Druga lokacija namijenjena natjecateljskim programima, smještena na Prirodoslovno-matematičkom fakultetu u Splitu.',
   },
 ]
 
@@ -30,6 +32,9 @@ export function LocationsSection() {
                 <MapPin className="w-5 h-5 text-cyan-500" />
               </div>
               <h3 className="font-bold text-gray-900 mb-1">{loc.name}</h3>
+              {loc.badge && (
+                <p className="text-xs font-semibold text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-full px-2.5 py-0.5 inline-block mb-2">{loc.badge}</p>
+              )}
               <p className="text-sm text-cyan-600 mb-2">{loc.address}</p>
               <p className="text-sm text-gray-500">{loc.description}</p>
             </div>

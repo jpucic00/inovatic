@@ -97,7 +97,7 @@ export default function AboutPage() {
         <div className="container mx-auto max-w-3xl text-center relative">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">O nama</span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4 leading-tight">
-            Udruga za robotiku <span className="text-cyan-500">Inovatic</span>
+            Udruga za robotiku <span className="text-cyan-500">{'"'}Inovatic{'"'}</span>
           </h1>
           <p className="text-gray-600 text-lg leading-relaxed">
             Od 2014. godine educiramo djecu Splita u robotici, programiranju i inženjerskom
@@ -127,7 +127,7 @@ export default function AboutPage() {
                   eksperimentirati, griješiti i učiti iz pogrešaka.
                 </p>
                 <p>
-                  S malim grupama (do 8 polaznika), stručnim instruktorima i strukturiranim
+                  S malim grupama (do 8 polaznika), stručnim robo trenerima i strukturiranim
                   programom u 4 razine, pratimo svako dijete individualno i poticemo ga da razvije
                   vlastiti potencijal.
                 </p>
@@ -172,7 +172,7 @@ export default function AboutPage() {
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-10">
             <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Naši stručnjaci</span>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">Treneri i mentori</h2>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">Robo treneri i mentori</h2>
           </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
             {trainers.map((trainer) => (

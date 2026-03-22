@@ -27,6 +27,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     courseId,
     scheduledGroupId,
     message,
+    referralSource,
   } = parsed.data
 
   try {
@@ -42,6 +43,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
         courseId: courseId || null,
         scheduledGroupId: scheduledGroupId || null,
         message: message || null,
+        referralSource: referralSource || null,
         consentGivenAt: new Date(),
       },
     })

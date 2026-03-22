@@ -73,7 +73,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
         <div className="absolute bottom-0 left-0 w-56 h-56 bg-yellow-100 rounded-full opacity-40 blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
         <div className="relative container mx-auto max-w-3xl text-center">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Novosti</span>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Vijesti i obavijesti</h1>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Vijesti i događanja</h1>
           <p className="text-gray-600 text-lg">
             Pratite naša natjecanja, radionice i sve što se događa u Inovatic zajednici.
           </p>

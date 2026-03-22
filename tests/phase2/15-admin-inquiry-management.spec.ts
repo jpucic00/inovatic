@@ -22,7 +22,7 @@ const INQUIRY_MAIN = {
   childLastName: `Testić ${RUN_ID}`,
   childName: `Luka Testić ${RUN_ID}`,
   dobDay: '15',
-  dobMonth: '3',
+  dobMonth: '03',
   dobYear: '2017',
 }
 
@@ -34,7 +34,7 @@ const INQUIRY_TO_DECLINE = {
   childLastName: `Testić ${RUN_ID}`,
   childName: `Petra Testić ${RUN_ID}`,
   dobDay: '1',
-  dobMonth: '6',
+  dobMonth: '06',
   dobYear: '2015',
 }
 
@@ -46,7 +46,7 @@ const INQUIRY_TO_DELETE = {
   childLastName: `Testić ${RUN_ID}`,
   childName: `Mia Testić ${RUN_ID}`,
   dobDay: '20',
-  dobMonth: '9',
+  dobMonth: '09',
   dobYear: '2019',
 }
 
@@ -125,7 +125,7 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       await loginAsAdmin(page)
       await expect(page.locator('aside')).toBeVisible()
       await expect(page.locator('aside a[href="/admin/upiti"]')).toBeVisible()
-      await expect(page.locator('aside a[href="/admin/raspored"]')).toBeVisible()
+      await expect(page.locator('aside a[href="/admin/grupe"]')).toBeVisible()
       await expect(page.locator('aside a[href="/admin/ucenici"]')).toBeVisible()
     })
 

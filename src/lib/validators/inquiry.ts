@@ -18,6 +18,7 @@ const step3Schema = z.object({
   courseId: z.string().optional(),
   scheduledGroupId: z.string().optional(),
   message: z.string().max(1000, 'Poruka može imati najviše 1000 znakova').optional(),
+  referralSource: z.string().max(200).optional(),
   consent: z.literal(true, {
     errorMap: () => ({ message: 'Morate pristati na obradu osobnih podataka.' }),
   }),

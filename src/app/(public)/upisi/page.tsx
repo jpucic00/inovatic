@@ -59,7 +59,7 @@ export default async function InquiryPage() {
         <div className="container mx-auto max-w-5xl">
           <div className="grid lg:grid-cols-5 gap-10">
             {/* Sidebar */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-6 order-1 lg:order-none">
               <div>
                 <h2 className="font-bold text-gray-900 mb-4">Kako funkcionira?</h2>
                 <div className="space-y-3">
@@ -93,10 +93,11 @@ export default async function InquiryPage() {
                 </div>
               </div>
 
-              <div className="bg-cyan-50 rounded-xl p-4 border border-cyan-100 text-sm text-gray-500 space-y-1">
+              {/* Imate pitanja – desktop only */}
+              <div className="hidden lg:block bg-cyan-50 rounded-xl p-4 border border-cyan-100 text-sm text-gray-500 space-y-1">
                 <p className="font-medium text-gray-700">Imate pitanja?</p>
-                <a href="mailto:prijave@udruga-inovatic.hr" className="text-cyan-500 hover:underline block">
-                  prijave@udruga-inovatic.hr
+                <a href="mailto:info@udruga-inovatic.hr" className="text-cyan-500 hover:underline block">
+                  info@udruga-inovatic.hr
                 </a>
                 <a href="tel:+385993936993" className="text-cyan-500 hover:underline block">
                   +385 99 393 6993
@@ -105,10 +106,21 @@ export default async function InquiryPage() {
             </div>
 
             {/* Form */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-3 order-2 lg:order-none">
               <div className="bg-white rounded-2xl border border-cyan-100 ring-1 ring-cyan-50 shadow-sm p-7">
                 <InquiryForm programs={programs} />
               </div>
+            </div>
+
+            {/* Imate pitanja – mobile only, below form */}
+            <div className="lg:hidden order-3 bg-cyan-50 rounded-xl p-4 border border-cyan-100 text-sm text-gray-500 space-y-1">
+              <p className="font-medium text-gray-700">Imate pitanja?</p>
+              <a href="mailto:info@udruga-inovatic.hr" className="text-cyan-500 hover:underline block">
+                info@udruga-inovatic.hr
+              </a>
+              <a href="tel:+385993936993" className="text-cyan-500 hover:underline block">
+                +385 99 393 6993
+              </a>
             </div>
           </div>
         </div>

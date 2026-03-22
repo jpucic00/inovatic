@@ -8,12 +8,12 @@ export function CoursesPreview() {
     <section className="py-20 px-4 bg-white">
       <div className="container mx-auto">
         <div className="text-center mb-12">
-          <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Programi</span>
+          <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Jedinstveni kurikulum</span>
           <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">
-            Četiri razine – jedan put naprijed
+            <span className="text-cyan-500">Svijet LEGO Robotike</span>
           </h2>
           <p className="text-gray-500 max-w-xl mx-auto text-lg">
-            Od prvih koraka u mehanici do simulacije industrijskih sustava. Svaka razina prilagođena je dobi i predznanju djeteta.
+            Naš jedinstveni kurikulum strukturiran je u četiri razine – od prvih koraka u mehanici do simulacije industrijskih sustava. Svaka razina prilagođena je dobi i predznanju djeteta.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

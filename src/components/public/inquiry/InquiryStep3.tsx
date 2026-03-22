@@ -191,6 +191,26 @@ export function InquiryStep3({ register, errors, setValue, programs, preselected
         />
         <FieldError message={errors.message?.message} />
       </div>
+
+      <div>
+        <label htmlFor="referralSource" className="block text-sm font-medium text-gray-700 mb-1.5">
+          Kako ste čuli za nas? <span className="text-gray-400 font-normal">(neobavezno)</span>
+        </label>
+        <select
+          id="referralSource"
+          {...register('referralSource')}
+          className={selectClass}
+        >
+          <option value="">– Odaberite –</option>
+          <option value="Preporuka prijatelja ili obitelji">Preporuka prijatelja ili obitelji</option>
+          <option value="Instagram">Instagram</option>
+          <option value="Facebook">Facebook</option>
+          <option value="Google pretraživanje">Google pretraživanje</option>
+          <option value="Škola ili učitelj">Škola ili učitelj</option>
+          <option value="Letak ili plakat">Letak ili plakat</option>
+          <option value="Ostalo">Ostalo</option>
+        </select>
+      </div>
       <div>
         <label className="flex items-start gap-3 cursor-pointer">
           <input

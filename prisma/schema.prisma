@@ -166,6 +166,7 @@ model Inquiry {
   courseId        String?
   scheduledGroupId String?
   message         String?       @db.Text
+  referralSource  String?
   consentGivenAt  DateTime?
   status          InquiryStatus @default(NEW)
   assignedGroupId String?

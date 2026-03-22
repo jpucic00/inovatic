@@ -1,16 +1,16 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight, Users, Clock, Star, Phone, Mail } from 'lucide-react'
+import { ArrowRight, Users, Clock, Star, Phone, Mail, Euro } from 'lucide-react'
 import { PartyRobotSvg } from '@/components/shared/party-robot-svg'
 import { GearDecor, StarDecor } from '@/components/shared/decorations'
 
 export const metadata: Metadata = {
   title: 'Proslave',
   description:
-    'Organizirajte nezaboravnu proslavu rođendana uz LEGO robotiku! Djeca grade i programiraju robote. Dvije lokacije u Splitu.',
+    'Organizirajte nezaboravnu proslavu rođendana uz LEGO robotiku! Djeca grade i programiraju robote uz LEGO WeDo 2.0, SPIKE i Mindstorms EV3. Velebitska 32, Split.',
   openGraph: {
     title: 'Proslave uz LEGO Robotiku | Inovatic Split',
-    description: 'Nezaboravna proslava rođendana – djeca grade i programiraju LEGO robote. 5–15 sudionika, 90–120 min.',
+    description: 'Nezaboravna proslava rođendana – djeca grade i programiraju LEGO robote. Do 8 sudionika, 120 min + pauza. 150 EUR.',
     url: 'https://udruga-inovatic.hr/proslave',
     images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
   },
@@ -18,24 +18,30 @@ export const metadata: Metadata = {
 }
 
 const included = [
-  { text: 'Gradnja i programiranje LEGO robota', color: 'bg-cyan-50 border-cyan-200', icon: '🤖' },
+  { text: 'Gradnja i programiranje LEGO robota (WeDo 2.0 / SPIKE / Mindstorms EV3)', color: 'bg-cyan-50 border-cyan-200', icon: '🤖' },
   { text: 'Stručni voditelj radionice', color: 'bg-yellow-50 border-yellow-200', icon: '👩‍🏫' },
-  { text: 'Svi potrebni materijali i oprema', color: 'bg-emerald-50 border-emerald-200', icon: '🧰' },
-  { text: 'Certifikat za svakog sudionika', color: 'bg-purple-50 border-purple-200', icon: '🏅' },
+  { text: 'Svi potrebni materijali, tableti i laptopi', color: 'bg-emerald-50 border-emerald-200', icon: '🧰' },
+  { text: 'Izrada pozivnice za proslavu rođendana', color: 'bg-purple-50 border-purple-200', icon: '🎨' },
   { text: 'Prilagođeno dobi djece (6–14 god.)', color: 'bg-orange-50 border-orange-200', icon: '🎯' },
-  { text: 'Trajanje: 90–120 minuta', color: 'bg-pink-50 border-pink-200', icon: '⏱️' },
+  { text: 'Trajanje: 120 min + 30 min pauza', color: 'bg-pink-50 border-pink-200', icon: '⏱️' },
+]
+
+const notIncluded = [
+  'Hrana i piće nisu uključeni u cijenu',
+  'Po dogovoru: korištenje dodatne učionice za serviranje hrane i pića te boravak odraslih',
 ]
 
 const steps = [
-  { step: '01', title: 'Kontaktirajte nas', description: 'Pošaljite email ili nazovite i recite nam datum, broj djece i dob.', color: 'bg-yellow-400' },
-  { step: '02', title: 'Dogovorimo detalje', description: 'Odaberemo lokaciju, termin i prilagodimo radionicu dobi sudionika.', color: 'bg-cyan-400' },
-  { step: '03', title: 'Proslavite uz robotiku!', description: 'Mi se brinemo za sve – vi i djeca samo uživate u izgradnji robota.', color: 'bg-emerald-400' },
+  { step: '01', title: 'Kontaktirajte nas', description: 'Pošaljite email na info@udruga-inovatic.hr ili nazovite na 099 393 6993 s datumom, brojem i dobi djece.', color: 'bg-yellow-400' },
+  { step: '02', title: 'Dogovorimo detalje', description: 'Dogovaramo termin i prilagođavamo radionicu uzrastu i iskustvu sudionika.', color: 'bg-cyan-400' },
+  { step: '03', title: 'Proslavite uz robotiku!', description: 'Nije potrebno predznanje – iskusni robo trener vodi kroz početne izazove robotike.', color: 'bg-emerald-400' },
 ]
 
 const details = [
-  { icon: Users, value: '5–15', label: 'Broj sudionika', bg: 'bg-cyan-50', border: 'border-cyan-200', iconColor: 'text-cyan-600' },
-  { icon: Clock, value: '90–120 min', label: 'Trajanje radionice', bg: 'bg-yellow-50', border: 'border-yellow-200', iconColor: 'text-yellow-600' },
-  { icon: Star, value: '6–14', label: 'Preporučena dob', bg: 'bg-emerald-50', border: 'border-emerald-200', iconColor: 'text-emerald-600' },
+  { icon: Euro, value: '150 EUR', label: 'Kotizacija', bg: 'bg-yellow-50', border: 'border-yellow-200', iconColor: 'text-yellow-600' },
+  { icon: Users, value: 'do 8', label: 'Uzvanika (sa slavljenikom)', bg: 'bg-cyan-50', border: 'border-cyan-200', iconColor: 'text-cyan-600' },
+  { icon: Clock, value: '120 + 30 min', label: 'Radionica + pauza', bg: 'bg-emerald-50', border: 'border-emerald-200', iconColor: 'text-emerald-600' },
+  { icon: Star, value: '6–14', label: 'Preporučena dob', bg: 'bg-purple-50', border: 'border-purple-200', iconColor: 'text-purple-600' },
 ]
 
 export default function CelebrationsPage() {
@@ -56,8 +62,8 @@ export default function CelebrationsPage() {
                 <span className="text-cyan-500">nezaboravna zabava</span>
               </h1>
               <p className="text-gray-600 text-lg leading-relaxed mb-8 max-w-xl mx-auto lg:mx-0">
-                Dajte djetetu proslavu kakvu neće zaboraviti! Djeca grade i programiraju LEGO robote,
-                surađuju u timovima i odlaze kući s ponosom – i certifikatom.
+                Provedi svoj rođendan zajedno sa svojim prijateljima na kreativan i zabavan način!
+                Djeca grade i programiraju LEGO robote uz iskusnog robo trenera.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <a
@@ -119,13 +125,24 @@ export default function CelebrationsPage() {
               </div>
             ))}
           </div>
+          <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Napomena</p>
+            <ul className="space-y-1">
+              {notIncluded.map((item) => (
+                <li key={item} className="text-sm text-gray-500 flex items-start gap-2">
+                  <span className="text-gray-400 mt-0.5">*</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 
       {/* Details */}
       <section className="py-16 px-4 bg-gray-50">
         <div className="container mx-auto max-w-4xl">
-          <div className="grid md:grid-cols-3 gap-6 mb-10">
+          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6 mb-10">
             {details.map(({ icon: Icon, value, label, bg, border, iconColor }) => (
               <div key={label} className={`rounded-2xl p-6 border ${bg} ${border} text-center`}>
                 <div className={`w-10 h-10 ${bg} rounded-xl border ${border} flex items-center justify-center mx-auto mb-4`}>
@@ -141,11 +158,10 @@ export default function CelebrationsPage() {
             <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-10">
               <GearDecor size={100} className="text-white animate-spin-slow" />
             </div>
-            <h3 className="text-xl font-extrabold mb-3 relative">Dostupne lokacije</h3>
-            <p className="text-cyan-100 mb-4 relative">Radionice se mogu održati u jednoj od naših dviju učionica u Splitu:</p>
+            <h3 className="text-xl font-extrabold mb-3 relative">Lokacija</h3>
+            <p className="text-cyan-100 mb-4 relative">Rođendanske radionice se održavaju na adresi:</p>
             <div className="flex flex-wrap justify-center gap-4 text-sm relative">
-              <span className="bg-white/20 px-4 py-2 rounded-full">Velebitska 32, Split</span>
-              <span className="bg-white/20 px-4 py-2 rounded-full">Ruđera Boškovića 33, Split</span>
+              <span className="bg-white/20 px-4 py-2 rounded-full">Velebitska 32, Split (Plokite)</span>
             </div>
           </div>
         </div>
