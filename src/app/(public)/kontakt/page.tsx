@@ -40,8 +40,8 @@ export default function ContactPage() {
         <div className="container mx-auto max-w-3xl text-center relative">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Kontakt</span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Pronađite nas</h1>
-          <p className="text-gray-600 text-lg">
-            Imaju li pitanja ili ste zainteresirani za upis? Slobodno nas kontaktirajte putem emaila, telefona ili
+          <p className="text-gray-600 text-lg leading-relaxed">
+            Imate li pitanja ili ste zainteresirani za upis? Slobodno nas kontaktirajte putem emaila, poziva ili
             posjetite jednu od naših lokacija u Splitu.
           </p>
         </div>

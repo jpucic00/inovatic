@@ -9,10 +9,10 @@ const locations = [
     description: 'Dvije prostrane učionice namijenjene provedbi kurikuluma Svijet LEGO Robotike.',
   },
   {
-    name: 'PMF – Ruđera Boškovića 33',
+    name: 'Ruđera Boškovića 33',
     address: 'Ruđera Boškovića 33, 21000 Split',
-    badge: 'Prirodoslovno-matematički fakultet',
-    description: 'Druga lokacija namijenjena natjecateljskim programima, smještena na Prirodoslovno-matematičkom fakultetu u Splitu.',
+    badge: null,
+    description: 'Lokacija namijenjena natjecateljskim programima.',
   },
 ]
 

@@ -100,8 +100,8 @@ export default function AboutPage() {
             Udruga za robotiku <span className="text-cyan-500">{'"'}Inovatic{'"'}</span>
           </h1>
           <p className="text-gray-600 text-lg leading-relaxed">
-            Od 2014. godine educiramo djecu Splita u robotici, programiranju i inženjerskom
-            razmišljanju – kroz igru, istraživanje i prave izazove.
+            Od 2014. godine gradimo znanje i radoznalost djece u robotici, programiranju i inženjerskom
+            razmišljanju – kroz igru, istraživanje i konkretne izazove.
           </p>
         </div>
       </section>
@@ -193,8 +193,8 @@ export default function AboutPage() {
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-10">
             <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Natjecanja</span>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-3">Gdje naši polaznici natječu</h2>
-            <p className="text-gray-500">Natjecanja su nadopuna programa – razvijaju timski rad, strategiju i samopouzdanje.</p>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-3">Gdje se naši polaznici natječu?</h2>
+            <p className="text-gray-500">Natjecanja su prirodan nastavak naših SLR programa, namijenjenih djeci koja žele dodatne izazove – kroz njih razvijaju timski rad, strategiju i samopouzdanje.</p>
           </div>
           <div className="space-y-4">
             {competitions.map((comp) => (

@@ -5,9 +5,10 @@ import { Logo } from '@/components/shared/logo'
 
 const quickLinks = [
   { href: '/programi', label: 'Programi' },
-  { href: '/o-nama', label: 'O nama' },
-  { href: '/novosti', label: 'Novosti' },
+  { href: '/natjecanja', label: 'Natjecanja' },
   { href: '/proslave', label: 'Proslave' },
+  { href: '/novosti', label: 'Novosti' },
+  { href: '/o-nama', label: 'O nama' },
   { href: '/kontakt', label: 'Kontakt' },
   { href: '/upisi', label: 'Upiši se' },
 ]

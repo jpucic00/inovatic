@@ -32,34 +32,34 @@ export const competitions: Competition[] = [
     slug: 'first-lego-league',
     title: 'FIRST LEGO League',
     shortTitle: 'FLL',
-    subtitle: 'Natjecateljski program',
+    subtitle: 'Međunarodni natjecateljski program robotike za znatiželjne i odlučne mlade inovatore',
     description:
-      'Međunarodni, multidisciplinarni istraživački program koji želi u djeci probuditi znanstvenika koji će promišljati o problemima oko sebe i tražiti način kako ih riješiti.',
+      'FIRST LEGO League (FLL) je globalni istraživački i natjecateljski program robotike koji mladima otkriva kako se znanost, tehnologija, inženjerstvo i matematika (STEM) mogu koristiti za rješavanje stvarnih izazova.',
     paragraphs: [
-      'FIRST LEGO League (FLL) je međunarodni, multidisciplinarni istraživački program koji želi u djeci probuditi znanstvenika koji će promišljati o problemima oko sebe i tražiti način kako ih riješiti. Promiče znatiželju, kreativnost, zajedničko učenje i timski rad.',
-      'Kroz igru djeca razvijaju i jačaju tehničku pismenost i logički način razmišljanja, moderne tehnologije koriste u humane svrhe, a kroz atraktivne LEGO robote koje moraju osmisliti na učinkovit i zabavan način uživaju u znanosti.',
-      'Ovaj program postoji u preko 100 država svijeta, a od 2017. i u Hrvatskoj u organizaciji Hrvatskog robotičkog saveza.',
+      'FIRST LEGO League (FLL) je globalni istraživački i natjecateljski program robotike koji mladima otkriva kako se znanost, tehnologija, inženjerstvo i matematika (STEM) mogu koristiti za rješavanje stvarnih izazova. Kroz kombinaciju izgradnje LEGO robota, kreativnog timskog istraživanja i prezentiranja inovativnih ideja, program razvija ključne vještine kao što su rješavanje problema, strategija, suradnja i samopouzdanje. Program se provodi u više od 100 država širom svijeta, a u Hrvatskoj ga koordinira Hrvatski robotički savez u partnerstvu s lokalnim timovima i mentorima.',
+      'FIRST LEGO League nije samo robotičko natjecanje – to je iskustvo u kojem djeca rade kao tim na stvarnim problemima, grade i programiraju robote, razvijaju inovativna rješenja i prezentiraju ih pred ocjenjivačima.',
+      'Program je namijenjen djeci i mladima koji pokazuju poseban interes za robotiku i STEM područja, a žele i dodatne izazove te iskustvo pripadanja globalnoj zajednici mladih inovatora. Sudjelovanje u FIRST LEGO League timu ostvaruje se po preporuci naših robo trenera nakon završetka programa Svijet LEGO robotike 4, čime se polaznicima otvara jedinstvena prilika da razviju napredne tehnološke i socijalne vještine kroz praktičan rad, timsku suradnju i natjecateljski duh – iskustvo koje nadilazi standardnu edukaciju robotike.',
     ],
     categories: [
       {
-        name: 'Projekt',
-        description: 'Timovi moraju pronaći i istraživati rješenje na aktualan problem vezan uz trenutnu temu.',
+        name: 'Inovativni projekt',
+        description: 'Timovi moraju pronaći i istraživati rješenje na aktualan problem vezan uz trenutnu temu natjecanja.',
       },
       {
-        name: 'Robotske igre',
-        description: 'Cilj je napraviti robota koji efikasno rješava zadane zadatke u vremenski ograničenom roku od dvije i pol minute.',
+        name: 'Robotska igra',
+        description: 'Timovi dizajniraju i programiraju autonomnog LEGO robota koji rješava zadane zadatke na polju natjecanja.',
       },
       {
         name: 'Tehnički intervju',
-        description: 'Ocjenjuju se dizajn i konstrukcija robota te njihovi programi.',
+        description: 'Suci ocjenjuju konstrukciju i program robota te pristup timskog rješavanja problema.',
       },
       {
         name: 'Temeljne vrijednosti',
-        description: 'Cilj je poticanje sportskog natjecanja i suradnje na natjecanju.',
+        description: 'Potiču fair play, timsku suradnju, kreativnost i uzajamno poštovanje.',
       },
     ],
     externalLinks: [
-      { label: 'FIRST LEGO League Croatia', url: 'https://www.fll.hr' },
+      { label: 'FIRST LEGO League Croatia', url: 'https://fllcroatia.org/' },
       { label: 'FIRST LEGO League Home', url: 'https://www.firstlegoleague.org' },
     ],
     archive: [
@@ -75,13 +75,13 @@ export const competitions: Competition[] = [
     slug: 'world-robot-olympiad',
     title: 'World Robot Olympiad',
     shortTitle: 'WRO',
-    subtitle: 'Natjecateljski program',
+    subtitle: 'Međunarodni robotski izazov za znatiželjne umove koji vole stvarati i rješavati probleme',
     description:
-      'Najmasovnije svjetsko natjecanje u robotici koje se održava od 2004. Naš tim CroSpec osvojio je srebrnu medalju na WRO 2025 u Singapuru.',
+      'Program World Robot Olympiad (WRO) jedan je od najprestižnijih međunarodnih robotičkih natjecanja na svijetu u kojem svake godine sudjeluje preko 100 zemalja.',
     paragraphs: [
-      'World Robot Olympiad (WRO) je najmasovnije svjetsko natjecanje u robotici koje se održava u svijetu od 2004. Natjecatelji se diljem svijeta natječu koristeći hardver i softver robota po osobnom odabiru. Najbolji dobivaju priliku nastupiti na svjetskoj završnici.',
-      'Natjecatelji rade zajedno u timu od 2-3 natjecatelja i pronalaze vlastita rješenja za potrebe definirane u sezoni natjecanja. Svaki tim ima jednog mentora koji ih usmjerava za vrijeme priprema i samog natjecanja.',
-      'Hrvatski robotički savez u suradnji sa mađarskim organizatorom WRO natjecanja – EDUTUS sveučilištem, organizira i provodi ovo natjecanje u našoj državi od 2019.',
+      'Program World Robot Olympiad (WRO) jedan je od najprestižnijih međunarodnih robotičkih natjecanja na svijetu u kojem svake godine sudjeluje preko 100 zemalja širom svijeta, a tisuće mladih timova se susreću kako bi predstavili svoje inovativne robotske sustave i rješenja.',
+      'Ovaj međunarodni format natjecanja nudi različite kategorije prilagođene vještinama i dobnim skupinama, a iza sebe ima dugogodišnju tradiciju poticanja kreativnosti, inovativnog razmišljanja i rješavanja stvarnih robotskih izazova. U WRO timu djeca rade u malim grupama, razvijaju strateško razmišljanje, savladavaju složene tehničke probleme i uče kako učinkovito surađivati u timu pod stvarnim natjecateljskim uvjetima.',
+      'Sudjelovanje u WRO timu naše udruge ostvaruje se po preporuci predavača nakon završetka programa Svijet LEGO robotike 4, kako bi polaznici koji pokazuju motivaciju i sposobnosti imali priliku okušati se na međunarodnoj pozornici. Program pruža jedinstvenu priliku za primjenu znanja u stvarnom svijetu, razvoj samopouzdanja, timskog duha i suradničkih vještina, dok se polaznici povezuju s globalnom zajednicom mladih inovatora. Ovakvo natjecanje potiče analitičko razmišljanje, kreativnost, preciznost i strateško planiranje te donosi nova iskustva i izazove koji nadilazi standardnu edukaciju robotike.',
     ],
     categories: [],
     externalLinks: [

@@ -66,8 +66,13 @@ export default function ProgramiPage() {
             <span className="text-cyan-500">Svijet LEGO Robotike</span>
           </h1>
           <p className="text-gray-600 text-lg leading-relaxed">
-            Naš jedinstveni kurikulum strukturiran je u četiri razine prilagođene dobi i predznanju djeteta. Od prvih koraka u
-            mehanici do simulacije industrijskih sustava – kontinuirani razvojni put od 6 do 14 godina.
+            Omogućite svom djetetu da ne bude samo korisnik tehnologije, već njezin kreator. Od prvog robota do vlastitih
+            tehnoloških rješenja – kroz igru, kreativnost i praktičan rad gradimo znanje, samopouzdanje i ljubav prema
+            tehnologiji.
+          </p>
+          <p className="text-gray-600 text-lg leading-relaxed mt-4">
+            Zainteresirani ste? Provjerite slobodne termine i osigurajte svom djetetu mjesto u jednom od naših programa –
+            korak bliže zabavi, učenju i stvaranju!
           </p>
         </div>
       </section>

@@ -135,7 +135,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-4">O programu</h2>
               {course.description.split('\n').filter(Boolean).map((para) => (
-                <p key={para} className="text-gray-600 leading-relaxed mb-3 last:mb-0">
+                <p key={para} className="text-gray-600 leading-relaxed text-justify mb-3 last:mb-0">
                   {para}
                 </p>
               ))}
@@ -167,7 +167,11 @@ export default async function CourseDetailPage({ params }: PageProps) {
                         </span>
                         <h3 className="font-semibold text-gray-900 text-sm">{mod.title}</h3>
                       </div>
-                      <p className="text-sm text-gray-500 leading-relaxed">{mod.description}</p>
+                      {mod.description.split('\n').filter(Boolean).map((para) => (
+                        <p key={para.slice(0, 40)} className="text-sm text-gray-500 leading-relaxed text-justify mb-2 last:mb-0">
+                          {para}
+                        </p>
+                      ))}
                     </div>
                   </div>
                 ))}

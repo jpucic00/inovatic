@@ -81,7 +81,7 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
       {/* Content */}
       <section className="py-16 px-4 bg-white">
         <div className="container mx-auto max-w-3xl">
-          <div className="space-y-5 text-gray-600 leading-relaxed text-lg">
+          <div className="space-y-5 text-gray-600 leading-relaxed text-lg text-justify">
             {comp.paragraphs.map((p, i) => (
               <p key={i}>{p}</p>
             ))}
@@ -106,7 +106,7 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
                     </span>
                     <h3 className="font-bold text-gray-900">{cat.name}</h3>
                   </div>
-                  <p className="text-sm text-gray-600 leading-relaxed">{cat.description}</p>
+                  <p className="text-sm text-gray-600 leading-relaxed text-justify">{cat.description}</p>
                 </div>
               ))}
             </div>
@@ -173,7 +173,7 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
           <GearDecor size={80} className={`absolute -bottom-4 right-8 opacity-10 ${isWro ? 'text-white' : 'text-gray-900'}`} />
           <div className="container mx-auto text-center max-w-xl relative">
             <p className={`text-sm font-semibold mb-2 ${isWro ? 'text-cyan-100' : 'text-yellow-900/60'}`}>
-              Pogledaj i drugo natjecanje
+              Pogledaj i drugi natjecateljski program
             </p>
             <h2 className={`text-2xl font-extrabold mb-4 ${isWro ? 'text-white' : 'text-gray-900'}`}>
               {otherComp.title}

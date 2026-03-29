@@ -69,8 +69,9 @@ export default async function NatjecanjaPage() {
             Natjecateljski <span className="text-cyan-500">programi</span>
           </h1>
           <p className="text-gray-600 text-lg leading-relaxed">
-            Naši najnadareniji polaznici nastupaju na najprestižnijim robotičkim natjecanjima u Hrvatskoj i svijetu.
-            Natjecanja razvijaju timski rad, strategiju i samopouzdanje.
+            Naši najmotiviraniji polaznici, koji pokazuju poseban interes i žele dodatne izazove, imaju priliku nastupati
+            na najprestižnijim robotičkim natjecanjima u Hrvatskoj i svijetu. Sudjelovanje na natjecanjima razvija timski
+            rad, strategiju i samopouzdanje, istovremeno pružajući djeci priliku da pokažu svoje znanje i kreativnost.
           </p>
         </div>
       </section>
@@ -102,7 +103,7 @@ export default async function NatjecanjaPage() {
                       {comp.title}
                     </h2>
                     <p className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">{comp.shortTitle}</p>
-                    <p className="text-gray-600 leading-relaxed mb-6 flex-1">{comp.description}</p>
+                    <p className="text-gray-600 leading-relaxed text-justify mb-6 flex-1">{comp.description}</p>
                     {isWro && (
                       <span className="inline-block self-start mb-4 text-xs font-bold text-yellow-800 bg-yellow-200 px-2.5 py-0.5 rounded-full">
                         Srebrna medalja WRO 2025 – Singapur
