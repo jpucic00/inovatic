@@ -43,7 +43,7 @@ export function CoursesPreview() {
               </div>
               <div className="p-5 bg-white">
                 <h3 className="font-bold text-gray-900 mb-1 text-sm">{course.title}</h3>
-                <p className="text-xs text-gray-500 mb-0.5">{course.equipment}</p>
+                <p className="text-xs text-gray-500 mb-0.5">{course.equipment} · {course.tools}</p>
                 <p className="text-xs text-cyan-500 font-semibold mt-3 group-hover:underline flex items-center gap-1">
                   Saznaj više <ArrowRight className="w-3 h-3" />
                 </p>

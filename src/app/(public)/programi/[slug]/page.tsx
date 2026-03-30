@@ -93,7 +93,6 @@ export default async function CourseDetailPage({ params }: PageProps) {
               <h1 className="text-3xl md:text-5xl font-extrabold text-white mt-1 leading-tight">
                 {course.title}
               </h1>
-              <p className="text-white/90 text-lg mt-2">{course.subtitle}</p>
             </div>
           </div>
         </div>
@@ -110,6 +109,10 @@ export default async function CourseDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-2">
               <Wrench className="w-4 h-4 text-cyan-500" />
               <span>Oprema: <strong className="text-gray-800">{course.equipment}</strong></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-cyan-500" />
+              <span>Alati: <strong className="text-gray-800">{course.tools}</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-cyan-500" />
@@ -148,18 +151,28 @@ export default async function CourseDetailPage({ params }: PageProps) {
                 {course.modules.map((mod, i) => (
                   <div
                     key={mod.title}
-                    className="flex gap-4 p-5 rounded-xl border border-gray-100 bg-gray-50 hover:border-cyan-200 transition-colors"
+                    className="flex flex-col sm:flex-row gap-4 p-5 rounded-xl border border-gray-100 bg-gray-50 hover:border-cyan-200 transition-colors"
                   >
-                    <div className="relative w-24 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
-                      <Image
-                        src={mod.image}
-                        alt={mod.title}
-                        fill
-                        className="object-cover"
-                      />
+                    <div className="flex items-center gap-3 sm:flex-col sm:items-start sm:gap-0">
+                      <div className="relative w-24 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
+                        <Image
+                          src={mod.image}
+                          alt={mod.title}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 sm:hidden mt-0">
+                        <span
+                          className={`w-6 h-6 rounded-md bg-gradient-to-br ${course.gradient} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
+                        >
+                          {i + 1}
+                        </span>
+                        <h3 className="font-semibold text-gray-900 text-sm">{mod.title}</h3>
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="hidden sm:flex items-center gap-2 mb-1">
                         <span
                           className={`w-6 h-6 rounded-md bg-gradient-to-br ${course.gradient} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
                         >
@@ -185,9 +198,10 @@ export default async function CourseDetailPage({ params }: PageProps) {
                 {[
                   'Nastava jednom tjedno, 90 minuta',
                   `Korištenje opreme (${course.equipment})`,
+                  `Alati: ${course.tools}`,
                   'Mala grupa (do 8 polaznika)',
                   'Stručni robo treneri',
-                  'Certifikat o završetku',
+                  'Diploma o završetku',
                   'Pristup materijalima',
                 ].map((item) => (
                   <div key={item} className="flex items-center gap-2.5">
@@ -200,9 +214,9 @@ export default async function CourseDetailPage({ params }: PageProps) {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
+          <div className="flex flex-col space-y-6 lg:sticky lg:top-20 lg:self-start">
             {/* Pricing card */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="order-2 lg:order-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <h3 className="font-bold text-gray-900 mb-4">Cijene</h3>
               <div className="space-y-3 mb-5">
                 <div className="flex items-center justify-between py-3 border-b border-gray-50">
@@ -238,21 +252,22 @@ export default async function CourseDetailPage({ params }: PageProps) {
             </div>
 
             {/* Course details */}
-            <div className="bg-gray-50 rounded-2xl p-5 text-sm space-y-3">
+            <div className="order-1 lg:order-2 bg-gray-50 rounded-2xl p-5 text-sm space-y-3">
               <h3 className="font-bold text-gray-900 mb-3">Detalji programa</h3>
               {[
                 ['Dob', `${course.ageMin}–${course.ageMax} god.`],
                 ['Oprema', course.equipment],
+                ['Alati', course.tools],
                 ['Trajanje sata', `${course.sessionDuration} min`],
                 ['Učestalost', course.sessionFrequency],
                 ['Sezona', course.season],
                 ['Broj modula', '4'],
                 ['Ukupno sati', `${course.hours}h`],
-                ['Veličina grupe', `do ${course.groupSize} pol.`],
+                ['Veličina grupe', `do ${course.groupSize} polaznika`],
               ].map(([label, value]) => (
-                <div key={label} className="flex justify-between">
-                  <span className="text-gray-500">{label}</span>
-                  <span className="font-medium text-gray-800">{value}</span>
+                <div key={label} className="flex justify-between gap-4">
+                  <span className="text-gray-500 shrink-0">{label}</span>
+                  <span className="font-medium text-gray-800 text-right">{value}</span>
                 </div>
               ))}
             </div>

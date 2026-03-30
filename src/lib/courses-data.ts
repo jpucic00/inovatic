@@ -15,6 +15,7 @@ interface Course {
   ageMin: number
   ageMax: number
   equipment: string
+  tools: string
   priceYear: number
   priceModule: number
   hours: number
@@ -45,7 +46,8 @@ export const courses: Course[] = [
       'Po završetku programa polaznici mogu nastaviti svoje učenje u naprednijem programu Svijet LEGO robotike 2.',
     ageMin: 6,
     ageMax: 8,
-    equipment: 'LEGO WeDo 2.0 – WeDo ikone',
+    equipment: 'LEGO WeDo 2.0 + laptop',
+    tools: 'WeDo ikone',
     priceYear: 400,
     priceModule: 110,
     hours: 56,
@@ -112,7 +114,8 @@ export const courses: Course[] = [
       'Po završetku programa polaznici mogu nastaviti svoje učenje u naprednijem programu Svijet LEGO robotike 3.',
     ageMin: 9,
     ageMax: 10,
-    equipment: 'LEGO SPIKE Essential – SPIKE Essential ikone',
+    equipment: 'LEGO SPIKE Essential + laptop',
+    tools: 'SPIKE Essential ikone',
     priceYear: 400,
     priceModule: 110,
     hours: 56,
@@ -178,7 +181,8 @@ export const courses: Course[] = [
       'Po završetku programa polaznici mogu nastaviti svoje učenje u naprednijem programu Svijet LEGO robotike 4.',
     ageMin: 11,
     ageMax: 12,
-    equipment: 'LEGO SPIKE Prime + Scratch',
+    equipment: 'LEGO SPIKE Prime + laptop',
+    tools: 'Scratch',
     priceYear: 400,
     priceModule: 110,
     hours: 56,
@@ -237,14 +241,15 @@ export const courses: Course[] = [
     description:
       'Program Svijet LEGO robotike 4 predstavlja završni stupanj našeg edukacijskog kurikuluma robotike i namijenjen je djeci uzrasta od 12 do 14 godina (7. i 8. razred), kao i polaznicima koji su prethodno pohađali program Svijet LEGO robotike 3.\n\n' +
       'U ovom programu polaznici rade na najzahtjevnijim projektima unutar kurikuluma te dodatno razvijaju tehničke, logičke i inženjerske vještine kroz primjenu robotike u stvarnim situacijama.\n\n' +
-      'Korištenjem naprednih LEGO edukacijskih setova i programskog okruženja, djeca izrađuju složene robotičke sustave koji zahtijevaju precizno planiranje, testiranje i optimizaciju. Naglasak je na razumijevanju kako različiti dijelovi sustava međusobno surađuju i kako se mogu unaprijediti.\n\n' +
+      'Korištenjem Spike Prime edukacijskih setova i Scratch programskog okruženja, djeca izrađuju složene robotičke sustave koji zahtijevaju precizno planiranje, testiranje i optimizaciju. Naglasak je na razumijevanju kako različiti dijelovi sustava međusobno surađuju i kako se mogu unaprijediti.\n\n' +
       'Radionice su strukturirane tako da i polaznici bez prethodnog iskustva mogu postupno usvojiti gradivo, dok oni s već razvijenim znanjem dobivaju dodatne izazove kroz kompleksnije zadatke i samostalne projekte.\n\n' +
-      'Program se sastoji od 16 robotičkih projekata podijeljenih u četiri tematska modula, kroz koje polaznici istražuju napredne tehnološke sustave i njihovu primjenu u svakodnevnom životu.\n\n' +
+      'Program se sastoji od četiri tematska modula, kroz koje polaznici istražuju napredne tehnološke sustave i njihovu primjenu u svakodnevnom životu.\n\n' +
       'Kroz rad na projektima djeca razvijaju analitičko razmišljanje, preciznost, samostalnost i sposobnost rješavanja složenih problema – vještine koje su ključne za daljnje obrazovanje i buduće zanimanje u STEM području.\n\n' +
       'Po završetku programa polaznici uz preporuku predavača ostvaruju pravo nastavka svog razvoja kroz natjecateljske programe robotike (FLL, WRO i sl.).',
     ageMin: 13,
     ageMax: 14,
-    equipment: 'LEGO SPIKE Prime + Scratch',
+    equipment: 'LEGO SPIKE Prime + laptop',
+    tools: 'Scratch',
     priceYear: 400,
     priceModule: 110,
     hours: 56,
@@ -258,36 +263,35 @@ export const courses: Course[] = [
         title: 'Zabavni sustavi 4.0',
         description:
           'Kako osmisliti i razviti kompleksne interaktivne sustave?\n\n' +
-          'U ovom modulu polaznici rade na razvoju naprednih interaktivnih modela koji kombiniraju više funkcionalnosti – pokret, reakciju na okolinu i korisničku interakciju.\n\n' +
-          'Kroz složenije projekte djeca uče kako povezati različite senzore i motore u jedinstveni sustav te kako programiranjem postići precizno i koordinirano ponašanje robota.\n\n' +
-          'Poseban fokus stavlja se na razvoj vlastitih ideja i rješenja – od planiranja do realizacije – čime polaznici prelaze iz faze učenja u fazu stvaranja vlastitih tehnoloških rješenja.',
+          'U ovom modulu polaznici istražuju kako se robotika može koristiti u zabavne i interaktivne svrhe te što čini razliku između korisnika tehnologije i njezina kreatora. Kroz rad na naprednim modelima koji kombiniraju pokret, reakciju na okolinu i korisničku interakciju, djeca postupno razvijaju vlastita rješenja.\n\n' +
+          'Kroz projekte poput Sigurnosnog sefa, Zabavne mašine, Robotskog čuvara i projekta po slobodnom izboru, polaznici uče povezivati senzore i motore te programiranjem postići precizno i koordinirano ponašanje robota. Poseban naglasak stavlja se na razumijevanje kako nastaju interaktivni sustavi koji reagiraju na korisnika i stvaraju jedinstveno iskustvo. Time prelaze iz faze učenja u fazu stvaranja i razvijaju se u male inovatore.',
         image: '/images/courses/slr-4/module-1.png',
       },
       {
         title: 'Prometni sustavi 4.0',
         description:
           'Kako izgleda promet budućnosti i koje izazove donosi?\n\n' +
-          'U ovom modulu djeca istražuju napredne koncepte prometnih sustava, uključujući automatizaciju, optimizaciju i sigurnost.\n\n' +
-          'Kroz izradu složenijih modela vozila i prometnih rješenja, polaznici uče kako različiti sustavi međusobno komuniciraju i kako se mogu programirati za učinkovitije upravljanje prometom.\n\n' +
-          'Naglasak je na razumijevanju kompleksnih sustava i donošenju odluka koje utječu na njihovu učinkovitost i sigurnost.',
+          'U ovom modulu djeca istražuju napredne koncepte prometnih sustava, uključujući automatizaciju, optimizaciju i sigurnost, s naglaskom na razumijevanje karakteristika zračnog prometa i vozila.\n\n' +
+          'Kroz izradu složenijih modela letjelica i prometnih rješenja, polaznici uče kako izgraditi i upravljati modelima te kako različiti sustavi međusobno komuniciraju i mogu se programirati za učinkovitije upravljanje prometom.\n\n' +
+          'Cjelina se obrađuje kroz projekte poput helikoptera, nagibnog zrakoplova, simulatora leta i projekta po slobodnom izboru, pri čemu je naglasak na razumijevanju kompleksnih sustava i donošenju odluka koje utječu na njihovu učinkovitost i sigurnost.',
         image: '/images/courses/slr-4/module-2.png',
       },
       {
         title: 'Industrijski sustavi 4.0',
         description:
           'Kako funkcioniraju suvremeni automatizirani proizvodni sustavi?\n\n' +
-          'Ovaj modul uvodi polaznike u napredne industrijske procese i tehnologije koje se koriste u modernim tvornicama.\n\n' +
-          'Kroz izgradnju i programiranje složenih robotičkih sustava, djeca uče kako optimizirati procese, povećati učinkovitost i smanjiti pogreške u radu.\n\n' +
-          'Fokus je na razumijevanju automatizacije, koordinaciji više komponenti te razvoju sustava koji mogu samostalno izvršavati zadatke.',
+          'Industrija je jedan od ključnih faktora razvijenosti modernih država, a posljednjih desetljeća obilježena je sve većom automatizacijom radnih i proizvodnih procesa.\n\n' +
+          'U ovom modulu polaznici upoznaju napredne industrijske procese i tehnologije te kroz izgradnju i programiranje robotičkih sustava uče kako optimizirati procese, povećati učinkovitost i smanjiti pogreške u radu.\n\n' +
+          'Cjelina se obrađuje kroz projekte poput dizala, pokretne trake, višenamjenskog razvrstavača i projekta po slobodnom izboru, pri čemu je fokus na razumijevanju automatizacije, koordinaciji više komponenti i razvoju sustava koji mogu samostalno izvršavati zadatke.',
         image: '/images/courses/slr-4/module-3.png',
       },
       {
-        title: 'Energetski sustavi 3.0',
+        title: 'Robotsko vozilo 1.0',
         description:
-          'Kako razvijati održiva i učinkovita energetska rješenja?\n\n' +
-          'U ovom modulu polaznici istražuju naprednije koncepte proizvodnje i upravljanja energijom, s naglaskom na održivost i buduće tehnologije.\n\n' +
-          'Kroz projekte djeca analiziraju kako se energija prenosi, pohranjuje i koristi u različitim sustavima te kako se mogu razviti učinkovitija i ekološki prihvatljivija rješenja.\n\n' +
-          'Osim tehničkog znanja, potiče se i kritičko razmišljanje o ulozi tehnologije u očuvanju okoliša i razvoju društva.',
+          'Kako funkcioniraju robotska vozila?\n\n' +
+          'Robotsko vozilo je autonomni sustav koji se kreće samostalno, bez izravnog upravljanja čovjeka. Takvi se sustavi koriste u zabavne svrhe, ali i kao zamjena za ljudski rad u okruženjima koja su teško dostupna ili potencijalno opasna.\n\n' +
+          'U ovom modulu polaznici upoznaju ključne komponente robotskih vozila – motore, senzore i upravljačke sustave – te razumiju kako oni međusobno surađuju kako bi vozilo moglo donositi odluke i kretati se u prostoru.\n\n' +
+          'Kroz izradu jednog kompleksnog projekta, djeca uče kako izgraditi i programirati vlastiti model robotskog vozila, razvijajući pritom logičko razmišljanje, preciznost i sposobnost rješavanja problema.',
         image: '/images/courses/slr-4/module-4.jpg',
       },
     ],

@@ -152,7 +152,7 @@ export default function AboutPage() {
             <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Tim</span>
             <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">Tko smo mi</h2>
           </div>
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <div className="grid md:grid-cols-2 gap-6 mb-4">
             {team.map((member) => (
               <div key={member.name} className={`bg-white rounded-2xl p-7 border border-gray-100 shadow-sm border-l-4 ${member.accent}`}>
                 <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg mb-4">
@@ -164,6 +164,12 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
+          <p className="text-center text-xs text-gray-400 mt-2">
+            Osobe ovlaštene za zastupanje: Jozo Pivac, Snježana Pivac
+          </p>
+          <p className="text-center text-xs text-gray-400 mt-1">
+            OIB: 83709136328 | MB: 04562704 | Sjedište: Požeška 9, 21000 Split
+          </p>
         </div>
       </section>
 
@@ -239,7 +245,7 @@ export default function AboutPage() {
             ))}
           </div>
           <p className="text-center text-xs text-gray-400 mt-5">
-            OIB: 83709136328 | MB: 04562704 | Adresa: Požeška 9, 21000 Split
+            OIB: 83709136328 | MB: 04562704 | Sjedište: Požeška 9, 21000 Split
           </p>
         </div>
       </section>

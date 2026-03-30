@@ -135,7 +135,6 @@ export default function ProgramiPage() {
                     <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
                       <div>
                         <h2 className="text-xl font-bold text-gray-900">{course.title}</h2>
-                        <p className="text-cyan-600 font-medium text-sm mt-0.5">{course.subtitle}</p>
                       </div>
                       <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
                         <Euro className="w-3.5 h-3.5" />
@@ -151,6 +150,9 @@ export default function ProgramiPage() {
                     <div className="flex flex-wrap gap-2 mb-5">
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
                         <Wrench className="w-3 h-3" /> {course.equipment}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
+                        {course.tools}
                       </span>
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
                         <Users className="w-3 h-3" /> do {course.groupSize} polaznika
