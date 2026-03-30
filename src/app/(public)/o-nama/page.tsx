@@ -165,10 +165,7 @@ export default function AboutPage() {
             ))}
           </div>
           <p className="text-center text-xs text-gray-400 mt-2">
-            Osobe ovlaštene za zastupanje: Jozo Pivac, Snježana Pivac
-          </p>
-          <p className="text-center text-xs text-gray-400 mt-1">
-            OIB: 83709136328 | MB: 04562704 | Sjedište: Požeška 9, 21000 Split
+            Osobe ovlaštene za zastupanje
           </p>
         </div>
       </section>

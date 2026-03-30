@@ -11,7 +11,7 @@ const locations = [
   {
     name: 'Ruđera Boškovića 33',
     address: 'Ruđera Boškovića 33, 21000 Split',
-    badge: null,
+    badge: 'Prirodoslovno-matematički fakultet',
     description: 'Lokacija namijenjena natjecateljskim programima.',
   },
 ]

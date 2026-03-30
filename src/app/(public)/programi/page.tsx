@@ -70,10 +70,6 @@ export default function ProgramiPage() {
             tehnoloških rješenja – kroz igru, kreativnost i praktičan rad gradimo znanje, samopouzdanje i ljubav prema
             tehnologiji.
           </p>
-          <p className="text-gray-600 text-lg leading-relaxed mt-4">
-            Zainteresirani ste? Provjerite slobodne termine i osigurajte svom djetetu mjesto u jednom od naših programa –
-            korak bliže zabavi, učenju i stvaranju!
-          </p>
         </div>
       </section>
 
@@ -231,7 +227,8 @@ export default function ProgramiPage() {
           />
           <h2 className="text-2xl font-extrabold text-gray-900 mb-4">Nije sigurni koji program odabrati?</h2>
           <p className="text-gray-500 mb-6">
-            Ispunite upit i mi ćemo na temelju dobi i iskustva vašeg djeteta preporučiti odgovarajući razred.
+            Zainteresirani ste? Provjerite slobodne termine i osigurajte svom djetetu mjesto u jednom od naših programa –
+            korak bliže zabavi, učenju i stvaranju!
           </p>
           <Link
             href="/upisi"

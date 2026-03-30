@@ -197,7 +197,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
               <div className="grid sm:grid-cols-2 gap-3">
                 {[
                   'Nastava jednom tjedno, 90 minuta',
-                  `Korištenje opreme (${course.equipment})`,
+                  `Korištenje opreme (${course.equipment} + laptop)`,
                   `Alati: ${course.tools}`,
                   'Mala grupa (do 8 polaznika)',
                   'Stručni robo treneri',

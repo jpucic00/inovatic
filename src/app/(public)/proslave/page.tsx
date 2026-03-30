@@ -27,7 +27,7 @@ const included = [
 ]
 
 const notIncluded = [
-  'Hrana i piće nisu uključeni u cijenu',
+  'Hrana i piće nisu uključeni',
   'Po dogovoru: korištenje dodatne učionice za serviranje hrane i pića te boravak odraslih',
 ]
 
