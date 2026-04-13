@@ -10,6 +10,7 @@ export type ActiveGroup = {
   endTime: string | null
   availableSpots: number
   isFull: boolean
+  currentModuleName?: string
 }
 
 export type ActiveProgram = {
@@ -31,11 +32,8 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
     where: {
       isActive: true,
       OR: [
-        // No enrollment window = always open (follows course.isActive)
         { enrollmentStart: null, enrollmentEnd: null },
-        // Within enrollment window
         { enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
-        // Started but no end date
         { enrollmentStart: { lte: now }, enrollmentEnd: null },
       ],
     },
@@ -47,30 +45,54 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
           title: true,
           level: true,
           isCustom: true,
-          isActive: true,
           ageMin: true,
           ageMax: true,
           price: true,
           sortOrder: true,
+          modules: {
+            where: { endDate: { gte: now } },
+            orderBy: { sortOrder: 'asc' },
+            take: 1,
+            select: { id: true, title: true },
+          },
+        },
+      },
+      enrollments: {
+        where: { status: 'ACTIVE' },
+        select: {
+          id: true,
+          moduleEnrollments: {
+            where: { status: 'ACTIVE' },
+            select: { moduleId: true },
+          },
         },
       },
       _count: {
         select: {
-          enrollments: { where: { status: 'ACTIVE' } },
-          preferredInquiries: { where: { status: { not: 'DECLINED' } } },
+          preferredInquiries: { where: { status: { notIn: ['DECLINED', 'ACCOUNT_CREATED'] } } },
         },
       },
     },
     orderBy: [{ course: { sortOrder: 'asc' } }, { createdAt: 'asc' }],
   })
 
-  // Filter: only active courses (radionice show regardless of enrollment window)
-  const filteredGroups = groups.filter((g) => g.course.isActive)
-
-  // Group by course — include full groups (marked isFull) so they show disabled
   const courseMap = new Map<string, ActiveProgram>()
-  for (const g of filteredGroups) {
-    const available = g.maxStudents - g._count.enrollments - g._count.preferredInquiries
+  for (const g of groups) {
+    const isStandard = !g.course.isCustom
+    const enrollingModule = isStandard ? g.course.modules[0] : null
+
+    let enrolledCount: number
+    if (isStandard && enrollingModule) {
+      // Count enrollments that have an ACTIVE ModuleEnrollment for the enrolling module
+      enrolledCount = g.enrollments.filter((e) =>
+        e.moduleEnrollments.some((me) => me.moduleId === enrollingModule.id),
+      ).length
+    } else {
+      // Radionice: count all active enrollments
+      enrolledCount = g.enrollments.length
+    }
+
+    const available = g.maxStudents - enrolledCount - g._count.preferredInquiries
     const isFull = available <= 0
 
     if (!courseMap.has(g.courseId)) {
@@ -95,6 +117,7 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
       endTime: g.endTime,
       availableSpots: Math.max(0, available),
       isFull,
+      ...(enrollingModule ? { currentModuleName: enrollingModule.title } : {}),
     })
   }
 

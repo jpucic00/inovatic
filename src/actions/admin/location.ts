@@ -34,7 +34,6 @@ export async function createLocation(data: CreateLocationInput): Promise<AdminAc
         email: email || null,
         lat: lat ?? null,
         lng: lng ?? null,
-        isActive: true,
       },
     })
   } catch (err) {
@@ -72,19 +71,15 @@ export async function updateLocation(data: UpdateLocationInput): Promise<AdminAc
   return { success: true }
 }
 
-export async function toggleLocationActive(id: string): Promise<AdminActionResult> {
+export async function deleteLocation(id: string): Promise<AdminActionResult> {
   await requireAdmin()
 
   if (!id) return { success: false, error: 'ID nije pronađen.' }
 
   try {
-    const location = await db.location.findUnique({ where: { id } })
-    if (!location) return { success: false, error: 'Lokacija nije pronađena.' }
-
-    await db.location.update({ where: { id }, data: { isActive: !location.isActive } })
-  } catch (err) {
-    console.error('toggleLocationActive failed:', err)
-    return { success: false, error: 'Greška pri ažuriranju lokacije.' }
+    await db.location.delete({ where: { id } })
+  } catch {
+    return { success: false, error: 'Lokacija se ne može obrisati jer ima pridružene grupe.' }
   }
 
   revalidatePath('/admin/lokacije')

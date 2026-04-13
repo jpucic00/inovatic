@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { Eye } from 'lucide-react'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { InquiryStatusBadge } from './inquiry-status-badge'
-import { COURSE_LEVEL_LABELS } from '@/lib/inquiry-status'
 import { formatChildName } from '@/lib/format'
 
 // Minimal type matching what we pass from the server
@@ -15,7 +14,6 @@ type InquiryRow = {
   childFirstName: string
   childLastName: string
   childDateOfBirth: string | null
-  courseLevelPref: string | null
   locationPref: string | null
   status: string
   createdAt: Date
@@ -29,11 +27,13 @@ const columns: ColumnDef<InquiryRow>[] = [
     sortValue: (row) => row.createdAt,
     cell: (row) => (
       <span className="text-sm text-gray-600 whitespace-nowrap">
-        {row.createdAt.toLocaleDateString('hr-HR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        })}
+        {(() => {
+          const d = new Date(row.createdAt)
+          const dd = String(d.getDate()).padStart(2, '0')
+          const mm = String(d.getMonth() + 1).padStart(2, '0')
+          const yyyy = d.getFullYear()
+          return `${dd}.${mm}.${yyyy}.`
+        })()}
       </span>
     ),
   },
@@ -62,20 +62,6 @@ const columns: ColumnDef<InquiryRow>[] = [
           <p className="text-sm text-gray-900">{name}</p>
           {age && <p className="text-xs text-gray-500">{age}</p>}
         </div>
-      )
-    },
-  },
-  {
-    key: 'courseLevelPref',
-    header: 'Tečaj',
-    cell: (row) => {
-      const levelLabel = row.courseLevelPref
-        ? (COURSE_LEVEL_LABELS[row.courseLevelPref] ?? row.courseLevelPref)
-        : null
-      return (
-        <span className="text-sm text-gray-600">
-          {levelLabel ?? <span className="text-gray-400 italic">—</span>}
-        </span>
       )
     },
   },

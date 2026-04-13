@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { BookOpen, Copy, Check, Link2, Trash2 } from 'lucide-react'
-import { DataTable, type ColumnDef } from '@/components/admin/data-table'
+import { Wrench, Copy, Check, Trash2, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { toggleCourseActive, deleteCourse } from '@/actions/admin/course'
+import { deleteCourse } from '@/actions/admin/course'
+import Link from 'next/link'
 
 type Course = {
   id: string
@@ -20,7 +20,6 @@ type Course = {
   title: string
   level: string | null
   isCustom: boolean
-  isActive: boolean
   ageMin: number
   ageMax: number
   equipment: string | null
@@ -31,6 +30,8 @@ type Course = {
 interface CourseTableProps {
   data: Course[]
 }
+
+const PAGE_SIZE = 5
 
 function CopyUrlButton({ slug }: Readonly<{ slug: string }>) {
   const [copied, setCopied] = useState(false)
@@ -47,42 +48,10 @@ function CopyUrlButton({ slug }: Readonly<{ slug: string }>) {
     <button
       onClick={handleCopy}
       title="Kopiraj URL prijave"
-      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded hover:bg-cyan-100 transition-colors"
+      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded-md hover:bg-cyan-100 transition-colors"
     >
       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
       {copied ? 'Kopirano' : 'Kopiraj URL'}
-    </button>
-  )
-}
-
-function ToggleActiveButton({ course }: Readonly<{ course: Course }>) {
-  const [isPending, startTransition] = useTransition()
-  const router = useRouter()
-
-  const handleToggle = () => {
-    startTransition(async () => {
-      const result = await toggleCourseActive(course.id)
-      if (result.success) {
-        toast.success(course.isActive ? 'Program deaktiviran.' : 'Program aktiviran.')
-        router.refresh()
-      } else {
-        toast.error(result.error ?? 'Greška.')
-      }
-    })
-  }
-
-  return (
-    <button
-      onClick={handleToggle}
-      disabled={isPending}
-      className={[
-        'inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full border transition-colors disabled:opacity-50',
-        course.isActive
-          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-          : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200',
-      ].join(' ')}
-    >
-      {course.isActive ? 'Aktivan' : 'Neaktivan'}
     </button>
   )
 }
@@ -109,7 +78,7 @@ function DeleteCourseButton({ course }: Readonly<{ course: Course }>) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors"
         title="Obriši radionicu"
       >
         <Trash2 className="w-3.5 h-3.5" />
@@ -149,84 +118,126 @@ function DeleteCourseButton({ course }: Readonly<{ course: Course }>) {
   )
 }
 
-const columns: ColumnDef<Course>[] = [
-  {
-    key: 'title',
-    header: 'Naziv',
-    sortable: true,
-    cell: (row) => (
-      <div className="flex items-center gap-2">
-        <BookOpen className="w-4 h-4 text-gray-400 shrink-0" />
-        <div>
-          <p className="font-medium text-gray-900 text-sm">{row.title}</p>
-          {row.isCustom && (
-            <span className="text-xs text-orange-600 font-medium">Radionica</span>
+function CourseCard({ course }: Readonly<{ course: Course }>) {
+  const groupCount = course._count.scheduledGroups
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-5 mb-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Wrench className="w-5 h-5 text-orange-500 shrink-0" />
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">{course.title}</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-gray-400">{course.ageMin}–{course.ageMax} god.</span>
+              {course.price != null && (
+                <>
+                  <span className="text-xs text-gray-300">|</span>
+                  <span className="text-xs text-gray-400">{course.price} EUR</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <CopyUrlButton slug={course.slug} />
+          {groupCount > 0 && (
+            <Link
+              href="/admin/grupe?tab=__radionice__"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-1.5 rounded-md hover:bg-cyan-100 transition-colors"
+            >
+              <Users className="w-3.5 h-3.5" />
+              {groupCount} {groupCount >= 2 && groupCount <= 4 ? 'grupe' : 'grupa'}
+            </Link>
           )}
+          <DeleteCourseButton course={course} />
         </div>
       </div>
-    ),
-  },
-  {
-    key: 'level',
-    header: 'Razina',
-    cell: (row) => (
-      <span className="text-sm text-gray-600">{row.level ?? '–'}</span>
-    ),
-  },
-  {
-    key: 'ageRange',
-    header: 'Dob',
-    cell: (row) => (
-      <span className="text-sm text-gray-600">{row.ageMin}–{row.ageMax} god.</span>
-    ),
-  },
-  {
-    key: 'price',
-    header: 'Cijena',
-    cell: (row) =>
-      row.isCustom ? (
-        <span className="text-sm text-gray-600">{row.price == null ? '–' : `${row.price} €`}</span>
-      ) : (
-        <span className="text-sm text-gray-400 italic">SLR tečaj</span>
-      ),
-  },
-  {
-    key: 'groups',
-    header: 'Grupe',
-    cell: (row) => (
-      <span className="text-sm text-gray-600">{row._count.scheduledGroups}</span>
-    ),
-  },
-  {
-    key: 'url',
-    header: 'URL prijave',
-    cell: (row) =>
-      row.isCustom ? (
-        <CopyUrlButton slug={row.slug} />
-      ) : (
-        <Link2 className="w-4 h-4 text-gray-300" />
-      ),
-  },
-  {
-    key: 'isActive',
-    header: 'Status',
-    cell: (row) => <ToggleActiveButton course={row} />,
-  },
-  {
-    key: 'actions',
-    header: '',
-    cell: (row) =>
-      row.isCustom ? <DeleteCourseButton course={row} /> : null,
-  },
-]
+    </div>
+  )
+}
 
 export function CourseTable({ data }: Readonly<CourseTableProps>) {
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return data
+    const q = search.toLowerCase()
+    return data.filter((c) => c.title.toLowerCase().includes(q))
+  }, [data, search])
+
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
+  const currentPage = Math.min(page, Math.max(1, pageCount))
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  const handleSearch = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
+
   return (
-    <DataTable
-      columns={columns}
-      data={data}
-      getRowKey={(row) => row.id}
-      emptyMessage="Nema programa."
-    />
+    <div>
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Pretraži radionice..."
+          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+        />
+      </div>
+
+      {paginated.length === 0 ? (
+        <p className="text-sm text-gray-400 italic py-4">
+          {search ? 'Nema rezultata.' : 'Nema radionica.'}
+        </p>
+      ) : (
+        paginated.map((course) => (
+          <CourseCard key={course.id} course={course} />
+        ))
+      )}
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-sm text-gray-500">
+            {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} od {filtered.length}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="flex items-center px-2 py-1.5 text-sm rounded-md border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors disabled:text-gray-300 disabled:border-gray-100 disabled:cursor-not-allowed"
+              aria-label="Prethodna stranica"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                className={[
+                  'min-w-[2rem] text-center px-2 py-1.5 text-sm rounded-md border transition-colors',
+                  p === currentPage
+                    ? 'bg-cyan-600 text-white border-cyan-600 font-medium'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-400',
+                ].join(' ')}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              disabled={currentPage >= pageCount}
+              className="flex items-center px-2 py-1.5 text-sm rounded-md border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors disabled:text-gray-300 disabled:border-gray-100 disabled:cursor-not-allowed"
+              aria-label="Sljedeća stranica"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

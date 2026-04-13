@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { GroupTable } from './group-table'
 
 type CourseOption = { id: string; title: string; isCustom: boolean }
@@ -44,7 +45,16 @@ export function GroupTabs({ standardTabs, radioniceTabs, courses, locations }: R
     { id: '__radionice__', label: 'Radionice' },
   ]
 
-  const [activeTab, setActiveTab] = useState(tabs[0]?.id ?? '__radionice__')
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const defaultTab = (tabParam && tabs.some((t) => t.id === tabParam)) ? tabParam : (tabs[0]?.id ?? '__radionice__')
+  const [activeTab, setActiveTab] = useState(defaultTab)
+
+  useEffect(() => {
+    if (tabParam && tabs.some((t) => t.id === tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [tabParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div>

@@ -301,15 +301,6 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       await expect(page.locator(`text=${INQUIRY_MAIN.parentName}`)).toBeVisible()
     })
 
-    test('"Raspored poslan" filter shows empty for test data', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/upiti`)
-      await page.locator('button', { hasText: 'Raspored poslan' }).click()
-      await page.waitForURL(/status=SCHEDULE_SENT/)
-      // None of our test inquiries have this status yet
-      await expect(page.locator(`text=${INQUIRY_MAIN.parentName}`)).not.toBeVisible()
-    })
-
     test('"Odbijene" filter shows empty before any declines', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti`)

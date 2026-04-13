@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
-import { getInquiries } from '@/actions/admin/inquiry'
+import { getInquiries, getInquiryCourses } from '@/actions/admin/inquiry'
 import { InquiryFilters } from '@/components/admin/inquiries/inquiry-filters'
 import { InquiryTable } from '@/components/admin/inquiries/inquiry-table'
 import { Pagination } from '@/components/admin/pagination'
@@ -12,29 +12,34 @@ const VALID_STATUSES = Object.values(InquiryStatus) as string[]
 const PAGE_SIZE = 20
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; page?: string }>
+  searchParams: Promise<{ status?: string; search?: string; course?: string; page?: string }>
 }
 
 export default async function InquiriesPage({ searchParams }: Readonly<PageProps>) {
   await requireAdmin()
 
   const params = await searchParams
-  const { status, search, page: pageParam } = params
+  const { status, search, course, page: pageParam } = params
 
   const statusFilter =
     status && VALID_STATUSES.includes(status) ? (status as InquiryStatus) : undefined
 
   const currentPage = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1)
 
-  const { data: inquiries, total } = await getInquiries({
-    status: statusFilter ?? 'ALL',
-    search: search?.trim() || undefined,
-    page: currentPage,
-    pageSize: PAGE_SIZE,
-  })
+  const [{ data: inquiries, total }, courses] = await Promise.all([
+    getInquiries({
+      status: statusFilter ?? 'ALL',
+      search: search?.trim() || undefined,
+      courseId: course || undefined,
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+    }),
+    getInquiryCourses(),
+  ])
 
   const currentStatus = status && VALID_STATUSES.includes(status) ? status : 'ALL'
   const currentSearch = search?.trim() ?? ''
+  const currentCourse = course ?? ''
 
   return (
     <div>
@@ -48,7 +53,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
         </div>
       </div>
 
-      <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} />
+      <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} currentCourse={currentCourse} courses={courses} />
 
       <InquiryTable data={inquiries} />
 

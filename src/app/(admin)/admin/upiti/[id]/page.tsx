@@ -3,10 +3,12 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Check } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
-import { getInquiry } from '@/actions/admin/inquiry'
+import { getInquiry, getInquiryCourses } from '@/actions/admin/inquiry'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
 import { DeclineDialog } from '@/components/admin/inquiries/decline-dialog'
 import { DeleteDialog } from '@/components/admin/inquiries/delete-dialog'
+import { SendScheduleDialog } from '@/components/admin/inquiries/send-schedule-dialog'
+import { CreateAccountDialog } from '@/components/admin/inquiries/create-account-dialog'
 import {
   INQUIRY_STATUS_LABELS,
   COURSE_LEVEL_LABELS,
@@ -94,6 +96,30 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   const isDeclined = inquiry.status === 'DECLINED'
   const isAccountCreated = inquiry.status === 'ACCOUNT_CREATED'
   const canDecline = !isDeclined && !isAccountCreated
+  const canSendSchedule = !isDeclined && !isAccountCreated
+  const canCreateAccount = !isDeclined && !isAccountCreated
+
+  // Groups for the dropdowns — strip to plain objects (Decimal fields are not serializable)
+  const toGroupOption = (sg: {
+    id: string
+    name: string | null
+    dayOfWeek: string | null
+    startTime: string | null
+    endTime: string | null
+    location: { name: string }
+    course: { title: string; isCustom?: boolean; modules?: { id: string; title: string; sortOrder: number; startDate: Date | null; endDate: Date | null }[] }
+  }) => ({
+    id: sg.id,
+    name: sg.name,
+    dayOfWeek: sg.dayOfWeek,
+    startTime: sg.startTime,
+    endTime: sg.endTime,
+    location: { name: sg.location.name },
+    course: { title: sg.course.title, isCustom: sg.course.isCustom, modules: sg.course.modules },
+  })
+
+  const courseGroups = (inquiry.course?.scheduledGroups ?? []).map(toGroupOption)
+  const allCourses = await getInquiryCourses()
 
   const birthInfo: React.ReactNode = inquiry.childDateOfBirth
     ? new Date(inquiry.childDateOfBirth).toLocaleDateString('hr-HR', {
@@ -260,8 +286,40 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
         </dl>
       </div>
 
+      {/* Student link (shown when account created) */}
+      {isAccountCreated && inquiry.studentId && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+          <h2 className="text-sm font-semibold text-green-800 mb-2">Račun učenika</h2>
+          <Link
+            href={`/admin/ucenici/${inquiry.studentId}`}
+            className="text-sm text-cyan-700 hover:underline font-medium"
+          >
+            Pogledaj profil učenika →
+          </Link>
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        {canSendSchedule && (
+          <SendScheduleDialog
+            inquiryId={inquiry.id}
+            childName={formatChildName(inquiry)}
+            initialGroups={courseGroups}
+            courses={allCourses}
+            preferredCourseId={inquiry.courseId ?? undefined}
+          />
+        )}
+        {canCreateAccount && (
+          <CreateAccountDialog
+            inquiryId={inquiry.id}
+            childName={formatChildName(inquiry)}
+            initialGroups={courseGroups}
+            courses={allCourses}
+            preferredCourseId={inquiry.courseId ?? undefined}
+            preferredGroupId={inquiry.scheduledGroupId ?? undefined}
+          />
+        )}
         {canDecline && (
           <DeclineDialog inquiryId={inquiry.id} childName={formatChildName(inquiry)} />
         )}

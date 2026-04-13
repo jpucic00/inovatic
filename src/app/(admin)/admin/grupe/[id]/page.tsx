@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Users, MapPin, Clock, Calendar } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getGroupDetail } from '@/actions/admin/group'
+import { ModuleEnrollmentPanel } from '@/components/admin/groups/module-enrollment-panel'
 
 export const metadata: Metadata = { title: 'Admin – Detalji grupe' }
 
@@ -176,40 +177,60 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
         </div>
       )}
 
-      {/* Enrolled students */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-700">
-            Polaznici ({enrolledCount})
-          </h2>
-        </div>
-        {group.enrollments.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">Nema upisanih polaznika.</p>
-        ) : (
-          <div className="divide-y">
-            {group.enrollments.map((enrollment) => (
-              <div key={enrollment.id} className="py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {enrollment.user.firstName} {enrollment.user.lastName}
-                  </p>
-                  <p className="text-xs text-gray-500">{enrollment.user.email}</p>
-                </div>
-                <span
-                  className={[
-                    'text-xs font-medium px-2 py-0.5 rounded-full',
-                    enrollment.status === 'ACTIVE'
-                      ? 'bg-green-50 text-green-700'
-                      : 'bg-gray-100 text-gray-500',
-                  ].join(' ')}
-                >
-                  {enrollment.status === 'ACTIVE' ? 'Aktivan' : enrollment.status}
-                </span>
-              </div>
-            ))}
+      {/* Module enrollment panel for standard courses */}
+      {!group.course.isCustom && group.course.modules.length > 0 ? (
+        <div className="bg-white rounded-xl border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-700">
+              Polaznici po modulima ({enrolledCount} u grupi)
+            </h2>
           </div>
-        )}
-      </div>
+          <ModuleEnrollmentPanel
+            groupId={group.id}
+            modules={group.course.modules}
+            enrollments={group.enrollments}
+            maxStudents={group.maxStudents}
+          />
+        </div>
+      ) : (
+        /* Flat student list for radionice */
+        <div className="bg-white rounded-xl border p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-700">
+              Polaznici ({enrolledCount})
+            </h2>
+          </div>
+          {group.enrollments.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">Nema upisanih polaznika.</p>
+          ) : (
+            <div className="divide-y">
+              {group.enrollments.map((enrollment) => (
+                <div key={enrollment.id} className="py-3 flex items-center justify-between">
+                  <div>
+                    <Link
+                      href={`/admin/ucenici/${enrollment.user.id}`}
+                      className="text-sm font-medium text-gray-900 hover:text-cyan-600 transition-colors"
+                    >
+                      {enrollment.user.firstName} {enrollment.user.lastName}
+                    </Link>
+                    <p className="text-xs text-gray-500">{enrollment.user.email}</p>
+                  </div>
+                  <span
+                    className={[
+                      'text-xs font-medium px-2 py-0.5 rounded-full',
+                      enrollment.status === 'ACTIVE'
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-gray-100 text-gray-500',
+                    ].join(' ')}
+                  >
+                    {enrollment.status === 'ACTIVE' ? 'Aktivan' : enrollment.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

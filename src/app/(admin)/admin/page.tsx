@@ -60,16 +60,16 @@ export default async function AdminDashboard() {
           color="amber"
         />
         <StatCard
-          label="Raspored poslan"
-          value={statusCount['SCHEDULE_SENT'] ?? 0}
-          description="Čekaju potvrdu"
+          label="Ukupno upita"
+          value={totalInquiries}
+          description="Svi upiti"
           icon={CalendarDays}
           color="blue"
         />
         <StatCard
-          label="Potvrđeni"
-          value={(statusCount['CONFIRMED'] ?? 0) + (statusCount['ACCOUNT_CREATED'] ?? 0)}
-          description="Potvrđeni + račun stvoren"
+          label="Račun stvoren"
+          value={statusCount['ACCOUNT_CREATED'] ?? 0}
+          description="Upisani učenici"
           icon={GraduationCap}
           color="green"
         />
@@ -132,8 +132,6 @@ export default async function AdminDashboard() {
           <div className="bg-white rounded-xl border p-5 space-y-3">
             {[
               { status: 'NEW', label: 'Novi' },
-              { status: 'SCHEDULE_SENT', label: 'Raspored poslan' },
-              { status: 'CONFIRMED', label: 'Potvrđeni' },
               { status: 'ACCOUNT_CREATED', label: 'Račun stvoren' },
               { status: 'DECLINED', label: 'Odbijeni' },
             ].map(({ status, label }) => (

@@ -27,7 +27,6 @@ async function main() {
   await prisma.article.deleteMany()
   await prisma.material.deleteMany()
   await prisma.enrollment.deleteMany()
-  await prisma.inquiryGroupOption.deleteMany()
   await prisma.inquiry.deleteMany()
   await prisma.teacherAssignment.deleteMany()
   await prisma.scheduledGroup.deleteMany()
@@ -83,7 +82,6 @@ async function main() {
       address: 'Velebitska 32, 21000 Split',
       lat: 43.5111,
       lng: 16.4497,
-      isActive: true,
     },
   })
 
@@ -93,7 +91,6 @@ async function main() {
       address: 'Ruđera Boškovića 33, 21000 Split',
       lat: 43.5089,
       lng: 16.4511,
-      isActive: true,
     },
   })
   console.log('✅ Locations created')
@@ -116,13 +113,12 @@ Godišnji program obuhvaća 4 modula, ukupno 56 školskih sati.`,
       priceYear: 400.0,
       priceModule: 110.0,
       sortOrder: 1,
-      isActive: true,
       modules: {
         create: [
-          { title: 'Modul 1 – Uvod u mehaniku', sortOrder: 1, description: 'Osnove mehanike, zupčanici, poluge i koloture.' },
-          { title: 'Modul 2 – Senzori i motori', sortOrder: 2, description: 'Rad s motorima i senzorima pokreta i nagiba.' },
-          { title: 'Modul 3 – Programiranje', sortOrder: 3, description: 'Uvod u blokovno programiranje u LEGO Education aplikaciji.' },
-          { title: 'Modul 4 – Projekt', sortOrder: 4, description: 'Timski projektni rad: izrada i prezentacija robota.' },
+          { title: 'Modul 1 – Uvod u mehaniku', sortOrder: 1, description: 'Osnove mehanike, zupčanici, poluge i koloture.', startDate: new Date('2025-10-06'), endDate: new Date('2025-12-19') },
+          { title: 'Modul 2 – Senzori i motori', sortOrder: 2, description: 'Rad s motorima i senzorima pokreta i nagiba.', startDate: new Date('2026-01-12'), endDate: new Date('2026-02-27') },
+          { title: 'Modul 3 – Programiranje', sortOrder: 3, description: 'Uvod u blokovno programiranje u LEGO Education aplikaciji.', startDate: new Date('2026-03-02'), endDate: new Date('2026-04-24') },
+          { title: 'Modul 4 – Projekt', sortOrder: 4, description: 'Timski projektni rad: izrada i prezentacija robota.', startDate: new Date('2026-04-27'), endDate: new Date('2026-06-12') },
         ],
       },
     },
@@ -140,17 +136,16 @@ Djeca nadograđuju znanje o mehanici i programiranju koristeći napredniju primj
 Program uključuje složenije konstrukcije i uvod u algoritamsko razmišljanje.`,
       ageMin: 9,
       ageMax: 10,
-      equipment: 'LEGO WeDo 2.0',
+      equipment: 'LEGO Spike Essential',
       priceYear: 400.0,
       priceModule: 110.0,
       sortOrder: 2,
-      isActive: true,
       modules: {
         create: [
-          { title: 'Modul 1 – Složene konstrukcije', sortOrder: 1, description: 'Napredne mehaničke konstrukcije i transmisije.' },
-          { title: 'Modul 2 – Napredni senzori', sortOrder: 2, description: 'Rad s više senzora istovremeno, uvjetni iskazi.' },
-          { title: 'Modul 3 – Algoritmi', sortOrder: 3, description: 'Algoritmičko razmišljanje, petlje i uvjetne grane.' },
-          { title: 'Modul 4 – Timski projekt', sortOrder: 4, description: 'Izrada složenijeg robota s punom programskom logikom.' },
+          { title: 'Modul 1 – Složene konstrukcije', sortOrder: 1, description: 'Napredne mehaničke konstrukcije i transmisije.', startDate: new Date('2025-10-06'), endDate: new Date('2025-12-19') },
+          { title: 'Modul 2 – Napredni senzori', sortOrder: 2, description: 'Rad s više senzora istovremeno, uvjetni iskazi.', startDate: new Date('2026-01-12'), endDate: new Date('2026-02-27') },
+          { title: 'Modul 3 – Algoritmi', sortOrder: 3, description: 'Algoritmičko razmišljanje, petlje i uvjetne grane.', startDate: new Date('2026-03-02'), endDate: new Date('2026-04-24') },
+          { title: 'Modul 4 – Timski projekt', sortOrder: 4, description: 'Izrada složenijeg robota s punom programskom logikom.', startDate: new Date('2026-04-27'), endDate: new Date('2026-06-12') },
         ],
       },
     },
@@ -172,13 +167,12 @@ LEGO Spike Prime omogućuje preciznije motore, više vrsta senzora i programiran
       priceYear: 400.0,
       priceModule: 110.0,
       sortOrder: 3,
-      isActive: true,
       modules: {
         create: [
-          { title: 'Modul 1 – Spike Prime osnove', sortOrder: 1, description: 'Upoznavanje s Spike Prime setom i novim mogućnostima.' },
-          { title: 'Modul 2 – Programiranje u Scratch', sortOrder: 2, description: 'Napredni Scratch za upravljanje robotima.' },
-          { title: 'Modul 3 – Uvod u Python', sortOrder: 3, description: 'Osnove Python programiranja za robotiku.' },
-          { title: 'Modul 4 – Natjecateljski robot', sortOrder: 4, description: 'Izrada robota za natjecanje (FLL/WRO format).' },
+          { title: 'Modul 1 – Spike Prime osnove', sortOrder: 1, description: 'Upoznavanje s Spike Prime setom i novim mogućnostima.', startDate: new Date('2025-10-06'), endDate: new Date('2025-12-19') },
+          { title: 'Modul 2 – Programiranje u Scratch', sortOrder: 2, description: 'Napredni Scratch za upravljanje robotima.', startDate: new Date('2026-01-12'), endDate: new Date('2026-02-27') },
+          { title: 'Modul 3 – Uvod u Python', sortOrder: 3, description: 'Osnove Python programiranja za robotiku.', startDate: new Date('2026-03-02'), endDate: new Date('2026-04-24') },
+          { title: 'Modul 4 – Natjecateljski robot', sortOrder: 4, description: 'Izrada robota za natjecanje (FLL/WRO format).', startDate: new Date('2026-04-27'), endDate: new Date('2026-06-12') },
         ],
       },
     },
@@ -200,28 +194,35 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       priceYear: 400.0,
       priceModule: 110.0,
       sortOrder: 4,
-      isActive: true,
       modules: {
         create: [
           {
             title: 'Zabavni Sustavi 4.0',
             sortOrder: 1,
             description: 'Sigurnosni sef, zabavni stroj, robotski čuvar – interaktivni uređaji koji simuliraju zabavne i sigurnosne sustave.',
+            startDate: new Date('2025-10-06'),
+            endDate: new Date('2025-12-19'),
           },
           {
             title: 'Prometni Sustavi 4.0',
             sortOrder: 2,
             description: 'Helikopter, nagibni avion, simulator leta – modeli koji istražuju prometne tehnologije.',
+            startDate: new Date('2026-01-12'),
+            endDate: new Date('2026-02-27'),
           },
           {
             title: 'Industrijski Sustavi 4.0',
             sortOrder: 3,
             description: 'Lift, transportna traka, sorter – simulacija modernih industrijskih procesa.',
+            startDate: new Date('2026-03-02'),
+            endDate: new Date('2026-04-24'),
           },
           {
             title: 'Robotsko Vozilo 1.0',
             sortOrder: 4,
             description: 'Jedan sveobuhvatni projektni zadatak: izrada i programiranje autonomnog vozila.',
+            startDate: new Date('2026-04-27'),
+            endDate: new Date('2026-06-12'),
           },
         ],
       },

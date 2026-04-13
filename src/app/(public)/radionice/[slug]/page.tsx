@@ -11,7 +11,7 @@ interface Props {
 
 async function getWorkshop(slug: string) {
   return db.course.findFirst({
-    where: { slug, isCustom: true, isActive: true },
+    where: { slug, isCustom: true },
     select: {
       id: true,
       slug: true,

@@ -1,11 +1,18 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { MapPin } from 'lucide-react'
+import { MapPin, Trash2 } from 'lucide-react'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
-import { toggleLocationActive } from '@/actions/admin/location'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { deleteLocation } from '@/actions/admin/location'
 
 type Location = {
   id: string
@@ -13,7 +20,6 @@ type Location = {
   address: string
   phone: string | null
   email: string | null
-  isActive: boolean
   _count: { scheduledGroups: number }
 }
 
@@ -21,15 +27,17 @@ interface LocationTableProps {
   data: Location[]
 }
 
-function ToggleActiveButton({ location }: Readonly<{ location: Location }>) {
+function DeleteLocationButton({ location }: Readonly<{ location: Location }>) {
+  const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
-  const handleToggle = () => {
+  const handleDelete = () => {
     startTransition(async () => {
-      const result = await toggleLocationActive(location.id)
+      const result = await deleteLocation(location.id)
       if (result.success) {
-        toast.success(location.isActive ? 'Lokacija deaktivirana.' : 'Lokacija aktivirana.')
+        toast.success('Lokacija obrisana.')
+        setOpen(false)
         router.refresh()
       } else {
         toast.error(result.error ?? 'Greška.')
@@ -38,18 +46,50 @@ function ToggleActiveButton({ location }: Readonly<{ location: Location }>) {
   }
 
   return (
-    <button
-      onClick={handleToggle}
-      disabled={isPending}
-      className={[
-        'inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full border transition-colors disabled:opacity-50',
-        location.isActive
-          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-          : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200',
-      ].join(' ')}
-    >
-      {location.isActive ? 'Aktivna' : 'Neaktivna'}
-    </button>
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+        title="Obriši lokaciju"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+        Obriši
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Obriši lokaciju</DialogTitle>
+            <DialogDescription>
+              Jeste li sigurni da želite obrisati lokaciju{' '}
+              <span className="font-medium text-gray-900">{location.name}</span>?
+              {location._count.scheduledGroups > 0 && (
+                <span className="block mt-2 text-amber-600">
+                  Lokacija ima {location._count.scheduledGroups} pridruženih grupa i ne može se obrisati dok se grupe ne premjeste.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 mt-2">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              disabled={isPending}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              Odustani
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isPending}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {isPending ? 'Brišem...' : 'Obriši'}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -81,9 +121,9 @@ const columns: ColumnDef<Location>[] = [
     cell: (row) => <span className="text-sm text-gray-600">{row._count.scheduledGroups}</span>,
   },
   {
-    key: 'isActive',
-    header: 'Status',
-    cell: (row) => <ToggleActiveButton location={row} />,
+    key: 'actions',
+    header: '',
+    cell: (row) => <DeleteLocationButton location={row} />,
   },
 ]
 

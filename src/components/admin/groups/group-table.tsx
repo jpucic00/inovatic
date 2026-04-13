@@ -4,17 +4,10 @@ import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog'
-import { toggleGroupActive, deleteGroup } from '@/actions/admin/group'
+import { toggleGroupActive } from '@/actions/admin/group'
 import { EditGroupDialog, type GroupForEdit } from './edit-group-dialog'
+import { cn } from '@/lib/utils'
 
 type CourseOption = { id: string; title: string; isCustom: boolean }
 type LocationOption = { id: string; name: string }
@@ -69,7 +62,7 @@ function EnrollmentWindowBadge({ group }: Readonly<{ group: Group }>) {
   return <span className="text-xs text-amber-600">Uskoro</span>
 }
 
-function ToggleActiveButton({ group }: Readonly<{ group: Group }>) {
+function DeactivateButton({ group }: Readonly<{ group: Group }>) {
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -89,83 +82,19 @@ function ToggleActiveButton({ group }: Readonly<{ group: Group }>) {
     <button
       onClick={handleToggle}
       disabled={isPending}
-      className={[
-        'inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full border transition-colors disabled:opacity-50',
+      className={cn(
+        'inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border transition-colors disabled:opacity-50',
         group.isActive
-          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-          : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200',
-      ].join(' ')}
+          ? 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100'
+          : 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100',
+      )}
     >
-      {group.isActive ? 'Aktivna' : 'Neaktivna'}
+      {isPending ? '...' : group.isActive ? 'Deaktiviraj' : 'Aktiviraj'}
     </button>
   )
 }
 
-function DeleteGroupButton({ group }: Readonly<{ group: Group }>) {
-  const [open, setOpen] = useState(false)
-  const [isPending, startTransition] = useTransition()
-  const router = useRouter()
-
-  const handleDelete = () => {
-    startTransition(async () => {
-      const result = await deleteGroup(group.id)
-      if (result.success) {
-        toast.success('Grupa obrisana.')
-        setOpen(false)
-        router.refresh()
-      } else {
-        toast.error(result.error ?? 'Greška.')
-      }
-    })
-  }
-
-  const label = group.name
-    ? `${group.course.title} – ${group.name}`
-    : group.course.title
-
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
-        title="Obriši grupu"
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-        Obriši
-      </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Obriši grupu</DialogTitle>
-            <DialogDescription>
-              Jeste li sigurni da želite obrisati grupu{' '}
-              <span className="font-medium text-gray-900">{label}</span>?
-              Ova radnja se ne može poništiti.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-3 mt-2">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              disabled={isPending}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              Odustani
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-            >
-              {isPending ? 'Brišem...' : 'Obriši'}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
+type ActiveFilter = 'active' | 'inactive'
 
 function buildColumns(
   courses: CourseOption[],
@@ -247,9 +176,20 @@ function buildColumns(
       cell: (row) => <EnrollmentWindowBadge group={row} />,
     },
     {
-      key: 'isActive',
+      key: 'status',
       header: 'Status',
-      cell: (row) => <ToggleActiveButton group={row} />,
+      cell: (row) => (
+        <span
+          className={cn(
+            'inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full border',
+            row.isActive
+              ? 'bg-green-50 text-green-700 border-green-200'
+              : 'bg-gray-100 text-gray-500 border-gray-200',
+          )}
+        >
+          {row.isActive ? 'Aktivna' : 'Neaktivna'}
+        </span>
+      ),
     },
     {
       key: 'actions',
@@ -257,7 +197,7 @@ function buildColumns(
       cell: (row) => (
         <div className="flex items-center gap-2">
           <EditGroupDialog group={row} courses={courses} locations={locations} />
-          <DeleteGroupButton group={row} />
+          <DeactivateButton group={row} />
         </div>
       ),
     },
@@ -267,13 +207,45 @@ function buildColumns(
 }
 
 export function GroupTable({ data, courses, locations, hideProgram = false }: Readonly<GroupTableProps>) {
+  const [filter, setFilter] = useState<ActiveFilter>('active')
   const columns = buildColumns(courses, locations, hideProgram)
+
+  const filteredData = filter === 'active'
+    ? data.filter((g) => g.isActive)
+    : data.filter((g) => !g.isActive)
+  const activeCount = data.filter((g) => g.isActive).length
+  const inactiveCount = data.length - activeCount
+  const hasInactive = inactiveCount > 0
+
   return (
-    <DataTable
-      columns={columns}
-      data={data}
-      getRowKey={(row) => row.id}
-      emptyMessage="Nema grupa."
-    />
+    <div>
+      {hasInactive && (
+        <div className="flex gap-1 mb-4">
+          {([
+            { value: 'active' as const, label: `Aktivne (${activeCount})` },
+            { value: 'inactive' as const, label: `Neaktivne (${inactiveCount})` },
+          ]).map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={cn(
+                'px-3 py-1.5 text-sm rounded-md border transition-colors',
+                filter === f.value
+                  ? 'bg-cyan-600 text-white border-cyan-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400',
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <DataTable
+        columns={columns}
+        data={filteredData}
+        getRowKey={(row) => row.id}
+        emptyMessage="Nema grupa."
+      />
+    </div>
   )
 }

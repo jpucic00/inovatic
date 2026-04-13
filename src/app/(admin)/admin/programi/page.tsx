@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { getCourses } from '@/actions/admin/course'
 import { CourseTable } from '@/components/admin/courses/course-table'
 import { CreateCourseDialog } from '@/components/admin/courses/create-course-dialog'
+import { ModuleDatesTable } from '@/components/admin/courses/module-dates-table'
 
 export const metadata: Metadata = { title: 'Admin – Programi' }
 
@@ -27,7 +28,21 @@ export default async function CoursesPage() {
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Standardni programi (SLR 1–4)
           </h2>
-          <CourseTable data={standard} />
+          {standard.map((course) => (
+            <ModuleDatesTable
+              key={course.id}
+              course={{
+                id: course.id,
+                title: course.title,
+                level: course.level,
+                ageMin: course.ageMin,
+                ageMax: course.ageMax,
+                equipment: course.equipment,
+                groupCount: course._count.scheduledGroups,
+              }}
+              modules={course.modules}
+            />
+          ))}
         </div>
       )}
 
@@ -44,8 +59,6 @@ export default async function CoursesPage() {
           <p className="text-sm text-gray-400 italic py-4">Nema radionica.</p>
         )}
       </div>
-
-
     </div>
   )
 }

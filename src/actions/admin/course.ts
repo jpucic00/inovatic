@@ -25,10 +25,20 @@ export async function getCourses() {
       imageUrl: true,
       sortOrder: true,
       isCustom: true,
-      isActive: true,
       createdAt: true,
       updatedAt: true,
       _count: { select: { scheduledGroups: true } },
+      modules: {
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          sortOrder: true,
+          startDate: true,
+          endDate: true,
+          _count: { select: { moduleEnrollments: { where: { status: 'ACTIVE' } } } },
+        },
+      },
     },
   })
 }
@@ -64,7 +74,6 @@ export async function createCourse(data: CreateCourseInput): Promise<AdminAction
         price: price ?? null,
         imageUrl: imageUrl || null,
         isCustom: true,
-        isActive: true,
         sortOrder: 99,
       },
     })
@@ -123,21 +132,3 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
   return { success: true }
 }
 
-export async function toggleCourseActive(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
-
-  if (!id) return { success: false, error: 'ID nije pronađen.' }
-
-  try {
-    const course = await db.course.findUnique({ where: { id } })
-    if (!course) return { success: false, error: 'Program nije pronađen.' }
-
-    await db.course.update({ where: { id }, data: { isActive: !course.isActive } })
-  } catch (err) {
-    console.error('course action failed:', err)
-    return { success: false, error: 'Greška pri ažuriranju programa.' }
-  }
-
-  revalidatePath('/admin/programi')
-  return { success: true }
-}

@@ -39,12 +39,24 @@ export async function getGroupDetail(id: string) {
   return db.scheduledGroup.findUnique({
     where: { id },
     include: {
-      course: true,
+      course: {
+        include: {
+          modules: {
+            orderBy: { sortOrder: 'asc' },
+            select: { id: true, title: true, sortOrder: true, startDate: true, endDate: true },
+          },
+        },
+      },
       location: true,
       enrollments: {
         where: { status: 'ACTIVE' },
         include: {
           user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          moduleEnrollments: {
+            include: {
+              module: { select: { id: true, title: true, sortOrder: true } },
+            },
+          },
         },
         orderBy: { createdAt: 'asc' },
       },
@@ -135,22 +147,6 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
 
   revalidatePath('/admin/grupe')
   revalidatePath(`/admin/grupe/${id}`)
-  return { success: true }
-}
-
-export async function deleteGroup(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
-
-  if (!id) return { success: false, error: 'ID nije pronađen.' }
-
-  try {
-    await db.scheduledGroup.delete({ where: { id } })
-  } catch (err) {
-    console.error('deleteGroup failed:', err)
-    return { success: false, error: 'Greška pri brisanju grupe.' }
-  }
-
-  revalidatePath('/admin/grupe')
   return { success: true }
 }
 

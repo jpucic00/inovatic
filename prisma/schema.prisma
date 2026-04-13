@@ -25,10 +25,13 @@ enum CourseLevel {
 
 enum InquiryStatus {
   NEW
-  SCHEDULE_SENT
-  CONFIRMED
   ACCOUNT_CREATED
   DECLINED
+}
+
+enum CommentType {
+  COMMENT
+  MODULE_REVIEW
 }
 
 enum EnrollmentStatus {
@@ -45,6 +48,12 @@ enum MaterialType {
   LINK
 }
 
+enum ModuleEnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
@@ -54,15 +63,21 @@ model User {
   firstName     String
   lastName      String
   phone         String?
+  dateOfBirth   String?
   role          UserRole
+  username      String?   @unique
+  plainPassword String?
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  teacherAssignments TeacherAssignment[]
-  enrollments        Enrollment[]
-  articles           Article[]
-  materials          Material[]
+  teacherAssignments   TeacherAssignment[]
+  enrollments          Enrollment[]
+  articles             Article[]
+  materials            Material[]
+  createdFromInquiries Inquiry[]          @relation("CreatedStudent")
+  authoredComments     StudentComment[]   @relation("CommentAuthor")
+  studentComments      StudentComment[]   @relation("CommentStudent")
 }
 
 model Course {
@@ -81,7 +96,6 @@ model Course {
   imageUrl    String?
   sortOrder   Int          @default(0)
   isCustom    Boolean      @default(false)
-  isActive    Boolean      @default(true)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -91,14 +105,18 @@ model Course {
 }
 
 model CourseModule {
-  id          String  @id @default(cuid())
+  id          String    @id @default(cuid())
   courseId    String
   title       String
-  description String? @db.Text
-  sortOrder   Int     @default(0)
+  description String?   @db.Text
+  sortOrder   Int       @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
 
-  course    Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  materials Material[]
+  course            Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  materials         Material[]
+  studentComments   StudentComment[]
+  moduleEnrollments ModuleEnrollment[]
 }
 
 model Location {
@@ -109,7 +127,6 @@ model Location {
   lng      Float?
   phone    String?
   email    String?
-  isActive Boolean @default(true)
 
   scheduledGroups ScheduledGroup[]
 }
@@ -136,9 +153,9 @@ model ScheduledGroup {
   teacherAssignments   TeacherAssignment[]
   enrollments          Enrollment[]
   materials            Material[]
-  inquiryGroupOptions  InquiryGroupOption[]
   assignedInquiries    Inquiry[]            @relation("AssignedGroup")
   preferredInquiries   Inquiry[]            @relation("PreferredGroup")
+  studentComments      StudentComment[]
 }
 
 model TeacherAssignment {
@@ -170,25 +187,16 @@ model Inquiry {
   consentGivenAt  DateTime?
   status          InquiryStatus @default(NEW)
   assignedGroupId String?
+  studentId       String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  groupOptions     InquiryGroupOption[]
   course           Course?         @relation(fields: [courseId], references: [id])
   scheduledGroup   ScheduledGroup? @relation("PreferredGroup", fields: [scheduledGroupId], references: [id])
   assignedGroup    ScheduledGroup? @relation("AssignedGroup", fields: [assignedGroupId], references: [id])
+  student          User?           @relation("CreatedStudent", fields: [studentId], references: [id])
 }
 
-model InquiryGroupOption {
-  id               String @id @default(cuid())
-  inquiryId        String
-  scheduledGroupId String
-
-  inquiry        Inquiry        @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id])
-
-  @@unique([inquiryId, scheduledGroupId])
-}
 
 model Enrollment {
   id               String           @id @default(cuid())
@@ -199,10 +207,25 @@ model Enrollment {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id])
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduledGroup    ScheduledGroup     @relation(fields: [scheduledGroupId], references: [id])
+  moduleEnrollments ModuleEnrollment[]
 
   @@unique([userId, scheduledGroupId, schoolYear])
+}
+
+model ModuleEnrollment {
+  id           String                 @id @default(cuid())
+  enrollmentId String
+  moduleId     String
+  status       ModuleEnrollmentStatus @default(ACTIVE)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  enrollment Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  module     CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, moduleId])
 }
 
 model Material {
@@ -270,4 +293,21 @@ model ArticleTag {
   tag     Tag     @relation(fields: [tagId], references: [id])
 
   @@id([articleId, tagId])
+}
+
+model StudentComment {
+  id        String      @id @default(cuid())
+  studentId String
+  groupId   String
+  authorId  String
+  content   String      @db.Text
+  type      CommentType @default(COMMENT)
+  moduleId  String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  student User           @relation("CommentStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  group   ScheduledGroup @relation(fields: [groupId], references: [id])
+  author  User           @relation("CommentAuthor", fields: [authorId], references: [id])
+  module  CourseModule?  @relation(fields: [moduleId], references: [id])
 }

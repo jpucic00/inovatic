@@ -16,3 +16,9 @@ export function generatePassword(length = 12): string {
   const bytes = randomBytes(length)
   return Array.from(bytes, (byte) => chars[byte % chars.length]).join('')
 }
+
+export function generateSimplePassword(length = 6): string {
+  const chars = 'abcdefghkmnpqrstuvwxyz23456789'
+  const bytes = randomBytes(length)
+  return Array.from(bytes, (byte) => chars[byte % chars.length]).join('')
+}

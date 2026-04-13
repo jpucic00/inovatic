@@ -14,18 +14,14 @@ export default async function GroupsPage() {
   const [groups, courses, locations] = await Promise.all([
     getGroups(),
     db.course.findMany({
-      where: { isActive: true },
       orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }],
       select: { id: true, title: true, isCustom: true },
     }),
     db.location.findMany({
-      where: { isActive: true },
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     }),
   ])
-
-  const activeGroups = groups.filter((g) => g.isActive).length
 
   const standardCourses = courses.filter((c) => !c.isCustom)
   const standardTabs = standardCourses
@@ -45,8 +41,7 @@ export default async function GroupsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Grupe</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {groups.length === 1 ? '1 grupa' : `${groups.length} grupa`}
-            {activeGroups !== groups.length && ` (${activeGroups} aktivnih)`}
+            {groups.filter((g) => g.isActive).length} aktivnih od {groups.length} {groups.length === 1 ? 'grupe' : 'grupa'}
           </p>
         </div>
         <CreateGroupDialog courses={courseOptions} locations={locations} />

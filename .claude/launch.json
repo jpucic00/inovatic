@@ -3,10 +3,9 @@
   "configurations": [
     {
       "name": "inovatic-dev",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "cd /Users/jpucic/Documents/GitHub/inovatic && /Users/jpucic/.nvm/versions/node/v24.13.1/bin/node /Users/jpucic/Documents/GitHub/inovatic/node_modules/next/dist/bin/next dev --port $PORT"],
-      "port": 3002,
-      "autoPort": true
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
     }
   ]
 }
