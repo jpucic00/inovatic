@@ -197,22 +197,22 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       modules: {
         create: [
           {
-            title: 'Zabavni Sustavi 4.0',
+            title: 'Modul 1 – Zabavni sustavi 4.0',
             sortOrder: 1,
             description: 'Sigurnosni sef, zabavni stroj, robotski čuvar – interaktivni uređaji koji simuliraju zabavne i sigurnosne sustave.',
           },
           {
-            title: 'Prometni Sustavi 4.0',
+            title: 'Modul 2 – Prometni sustavi 4.0',
             sortOrder: 2,
             description: 'Helikopter, nagibni avion, simulator leta – modeli koji istražuju prometne tehnologije.',
           },
           {
-            title: 'Industrijski Sustavi 4.0',
+            title: 'Modul 3 – Industrijski sustavi 4.0',
             sortOrder: 3,
             description: 'Lift, transportna traka, sorter – simulacija modernih industrijskih procesa.',
           },
           {
-            title: 'Robotsko Vozilo 1.0',
+            title: 'Modul 4 – Robotsko vozilo 1.0',
             sortOrder: 4,
             description: 'Jedan sveobuhvatni projektni zadatak: izrada i programiranje autonomnog vozila.',
           },
