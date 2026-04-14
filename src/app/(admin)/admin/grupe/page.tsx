@@ -1,18 +1,29 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
-import { getGroups } from '@/actions/admin/group'
+import { getGroups, getGroupSchoolYears } from '@/actions/admin/group'
+import { computeSchoolYear } from '@/lib/school-year'
 import { db } from '@/lib/db'
 import { GroupTabs } from '@/components/admin/groups/group-tabs'
 import { WeeklySchedule } from '@/components/admin/groups/weekly-schedule'
 import { CreateGroupDialog } from '@/components/admin/groups/create-group-dialog'
+import { SchoolYearSelector } from '@/components/admin/courses/school-year-selector'
 
 export const metadata: Metadata = { title: 'Admin – Grupe' }
 
-export default async function GroupsPage() {
+interface PageProps {
+  searchParams: Promise<{ schoolYear?: string }>
+}
+
+export default async function GroupsPage({ searchParams }: Readonly<PageProps>) {
   await requireAdmin()
 
-  const [groups, courses, locations] = await Promise.all([
-    getGroups(),
+  const { schoolYear: yearParam } = await searchParams
+  const currentYear = computeSchoolYear()
+  const selectedYear = yearParam ?? currentYear
+
+  const [groups, years, courses, locations] = await Promise.all([
+    getGroups({ schoolYear: selectedYear }),
+    getGroupSchoolYears(),
     db.course.findMany({
       orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }],
       select: { id: true, title: true, isCustom: true },
@@ -22,6 +33,9 @@ export default async function GroupsPage() {
       select: { id: true, name: true },
     }),
   ])
+
+  // Ensure current year always appears in the selector
+  const allYears = years.includes(currentYear) ? years : [currentYear, ...years]
 
   const standardCourses = courses.filter((c) => !c.isCustom)
   const standardTabs = standardCourses
@@ -41,10 +55,20 @@ export default async function GroupsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Grupe</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {groups.filter((g) => g.isActive).length} aktivnih od {groups.length} {groups.length === 1 ? 'grupe' : 'grupa'}
+            {groups.length} {groups.length === 1 ? 'grupa' : 'grupa'} u {selectedYear}
           </p>
         </div>
-        <CreateGroupDialog courses={courseOptions} locations={locations} />
+        <CreateGroupDialog courses={courseOptions} locations={locations} currentYear={selectedYear} />
+      </div>
+
+      <div className="mb-6">
+        <SchoolYearSelector
+          years={allYears}
+          currentYear={currentYear}
+          selectedYear={selectedYear}
+          basePath="/admin/grupe"
+          showCreateButton={false}
+        />
       </div>
 
       <div className="mb-8">

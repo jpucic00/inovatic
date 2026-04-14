@@ -4,16 +4,17 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Calendar, Check, X, Pencil, Users } from 'lucide-react'
-import { updateModule } from '@/actions/admin/module'
+import { updateModuleSchedule } from '@/actions/admin/module'
 import Link from 'next/link'
 
 type Module = {
   id: string
   title: string
   sortOrder: number
+  scheduleId: string | null
   startDate: Date | null
   endDate: Date | null
-  _count?: { moduleEnrollments: number }
+  enrollmentCount: number
 }
 
 type CourseInfo = {
@@ -63,9 +64,10 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
   const status = getModuleStatus(mod)
 
   const handleSave = () => {
+    if (!mod.scheduleId) return
     startTransition(async () => {
-      const result = await updateModule({
-        id: mod.id,
+      const result = await updateModuleSchedule({
+        id: mod.scheduleId!,
         startDate: startDate || null,
         endDate: endDate || null,
       })
@@ -120,42 +122,48 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
         </span>
       </td>
       <td className="py-2.5 pr-4">
-        <Link
-          href={`/admin/ucenici?moduleId=${mod.id}`}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-1.5 rounded-md hover:bg-cyan-100 transition-colors"
-        >
-          <Users className="w-3.5 h-3.5" />
-          {mod._count?.moduleEnrollments ?? 0} {(() => { const n = mod._count?.moduleEnrollments ?? 0; return n >= 2 && n <= 4 ? 'polaznika' : n === 1 ? 'polaznik' : 'polaznika' })()}
-        </Link>
+        {mod.scheduleId ? (
+          <Link
+            href={`/admin/ucenici?scheduleId=${mod.scheduleId}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-1.5 rounded-md hover:bg-cyan-100 transition-colors"
+          >
+            <Users className="w-3.5 h-3.5" />
+            {mod.enrollmentCount} {mod.enrollmentCount === 1 ? 'polaznik' : 'polaznika'}
+          </Link>
+        ) : (
+          <span className="text-xs text-gray-400">–</span>
+        )}
       </td>
       <td className="py-2.5 text-right">
-        {editing ? (
-          <div className="flex items-center justify-end gap-1">
+        {mod.scheduleId && (
+          editing ? (
+            <div className="flex items-center justify-end gap-1">
+              <button
+                onClick={handleSave}
+                disabled={isPending}
+                className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                title="Spremi"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={isPending}
+                className="p-1.5 text-gray-400 hover:bg-gray-100 rounded transition-colors"
+                title="Odustani"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={handleSave}
-              disabled={isPending}
-              className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-              title="Spremi"
+              onClick={() => setEditing(true)}
+              className="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded transition-colors"
+              title="Uredi datume"
             >
-              <Check className="w-4 h-4" />
+              <Pencil className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={handleCancel}
-              disabled={isPending}
-              className="p-1.5 text-gray-400 hover:bg-gray-100 rounded transition-colors"
-              title="Odustani"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setEditing(true)}
-            className="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded transition-colors"
-            title="Uredi datume"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
+          )
         )}
       </td>
     </tr>

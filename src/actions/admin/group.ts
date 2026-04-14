@@ -6,20 +6,23 @@ import { revalidatePath } from 'next/cache'
 import { createGroupSchema, updateGroupSchema } from '@/lib/validators/admin/group'
 import type { CreateGroupInput, UpdateGroupInput } from '@/lib/validators/admin/group'
 import type { AdminActionResult } from '@/lib/action-types'
+import { computeSchoolYear } from '@/lib/school-year'
 
 export type GroupFilters = {
   courseId?: string
   locationId?: string
-  isActive?: boolean
+  schoolYear?: string
 }
 
 export async function getGroups(filters: GroupFilters = {}) {
   await requireAdmin()
 
+  const year = filters.schoolYear ?? computeSchoolYear()
+
   const where = {
+    schoolYear: year,
     ...(filters.courseId ? { courseId: filters.courseId } : {}),
     ...(filters.locationId ? { locationId: filters.locationId } : {}),
-    ...(filters.isActive === undefined ? {} : { isActive: filters.isActive }),
   }
 
   return db.scheduledGroup.findMany({
@@ -28,13 +31,28 @@ export async function getGroups(filters: GroupFilters = {}) {
     include: {
       course: { select: { id: true, title: true, level: true, isCustom: true } },
       location: { select: { id: true, name: true } },
-      _count: { select: { enrollments: true, preferredInquiries: true } },
+      _count: {
+        select: {
+          enrollments: true,
+          preferredInquiries: true,
+          assignedInquiries: true,
+          materials: true,
+          studentComments: true,
+        },
+      },
     },
   })
 }
 
 export async function getGroupDetail(id: string) {
   await requireAdmin()
+
+  // First get the group's school year to filter module schedules
+  const groupMeta = await db.scheduledGroup.findUnique({
+    where: { id },
+    select: { schoolYear: true },
+  })
+  const year = groupMeta?.schoolYear ?? computeSchoolYear()
 
   return db.scheduledGroup.findUnique({
     where: { id },
@@ -43,7 +61,15 @@ export async function getGroupDetail(id: string) {
         include: {
           modules: {
             orderBy: { sortOrder: 'asc' },
-            select: { id: true, title: true, sortOrder: true, startDate: true, endDate: true },
+            select: {
+              id: true,
+              title: true,
+              sortOrder: true,
+              schedules: {
+                where: { schoolYear: year },
+                select: { id: true, startDate: true, endDate: true },
+              },
+            },
           },
         },
       },
@@ -54,7 +80,12 @@ export async function getGroupDetail(id: string) {
           user: { select: { id: true, firstName: true, lastName: true, email: true } },
           moduleEnrollments: {
             include: {
-              module: { select: { id: true, title: true, sortOrder: true } },
+              moduleSchedule: {
+                select: {
+                  id: true,
+                  module: { select: { id: true, title: true, sortOrder: true } },
+                },
+              },
             },
           },
         },
@@ -99,11 +130,10 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
         dayOfWeek: dayOfWeek || null,
         startTime,
         endTime,
-        schoolYear: schoolYear || null,
+        schoolYear,
         maxStudents: maxStudents ?? 12,
         enrollmentStart: enrollmentStart ? new Date(enrollmentStart) : null,
         enrollmentEnd: enrollmentEnd ? new Date(enrollmentEnd) : null,
-        isActive: true,
       },
     })
   } catch (err) {
@@ -134,7 +164,7 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
         ...(dayOfWeek !== undefined && { dayOfWeek: dayOfWeek || null }),
         ...(startTime !== undefined && { startTime: startTime || null }),
         ...(endTime !== undefined && { endTime: endTime || null }),
-        ...(schoolYear !== undefined && { schoolYear: schoolYear || null }),
+        ...(schoolYear !== undefined && { schoolYear }),
         ...(maxStudents !== undefined && { maxStudents }),
         ...(enrollmentStart !== undefined && { enrollmentStart: enrollmentStart ? new Date(enrollmentStart) : null }),
         ...(enrollmentEnd !== undefined && { enrollmentEnd: enrollmentEnd ? new Date(enrollmentEnd) : null }),
@@ -150,22 +180,60 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
   return { success: true }
 }
 
-export async function toggleGroupActive(id: string): Promise<AdminActionResult> {
+export async function deleteGroup(id: string): Promise<AdminActionResult> {
   await requireAdmin()
 
   if (!id) return { success: false, error: 'ID nije pronađen.' }
 
   try {
-    const group = await db.scheduledGroup.findUnique({ where: { id } })
+    const group = await db.scheduledGroup.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            enrollments: true,
+            assignedInquiries: true,
+            preferredInquiries: true,
+            materials: true,
+            studentComments: true,
+          },
+        },
+      },
+    })
+
     if (!group) return { success: false, error: 'Grupa nije pronađena.' }
 
-    await db.scheduledGroup.update({ where: { id }, data: { isActive: !group.isActive } })
+    if (group._count.enrollments > 0) {
+      return { success: false, error: 'Grupa ima upisane polaznike i ne može se obrisati.' }
+    }
+    if (group._count.assignedInquiries > 0 || group._count.preferredInquiries > 0) {
+      return { success: false, error: 'Grupa ima povezane upite i ne može se obrisati.' }
+    }
+    if (group._count.materials > 0) {
+      return { success: false, error: 'Grupa ima materijale i ne može se obrisati.' }
+    }
+    if (group._count.studentComments > 0) {
+      return { success: false, error: 'Grupa ima komentare i ne može se obrisati.' }
+    }
+
+    // Teacher assignments cascade-delete automatically
+    await db.scheduledGroup.delete({ where: { id } })
   } catch (err) {
-    console.error('toggleGroupActive failed:', err)
-    return { success: false, error: 'Greška pri ažuriranju grupe.' }
+    console.error('deleteGroup failed:', err)
+    return { success: false, error: 'Greška pri brisanju grupe.' }
   }
 
   revalidatePath('/admin/grupe')
-  revalidatePath(`/admin/grupe/${id}`)
   return { success: true }
+}
+
+/** Returns distinct school years present in ScheduledGroup. */
+export async function getGroupSchoolYears(): Promise<string[]> {
+  await requireAdmin()
+  const result = await db.scheduledGroup.findMany({
+    select: { schoolYear: true },
+    distinct: ['schoolYear'],
+    orderBy: { schoolYear: 'desc' },
+  })
+  return result.map((r) => r.schoolYear)
 }

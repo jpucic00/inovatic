@@ -21,8 +21,7 @@ type ModuleOption = {
   id: string
   title: string
   sortOrder: number
-  startDate: Date | null
-  endDate: Date | null
+  schedules?: { id: string; startDate: Date | null; endDate: Date | null }[]
 }
 
 interface GroupOption {
@@ -49,6 +48,15 @@ interface CreateAccountDialogProps {
   preferredGroupId?: string
 }
 
+function getScheduleId(mod: ModuleOption): string | null {
+  return mod.schedules?.[0]?.id ?? null
+}
+
+function getScheduleDates(mod: ModuleOption): { startDate: Date | null; endDate: Date | null } {
+  const schedule = mod.schedules?.[0]
+  return { startDate: schedule?.startDate ?? null, endDate: schedule?.endDate ?? null }
+}
+
 export function CreateAccountDialog({
   inquiryId,
   childName,
@@ -70,16 +78,21 @@ export function CreateAccountDialog({
   const [selectedCourseId, setSelectedCourseId] = useState(preferredCourseId ?? '')
   const [loadedGroups, setLoadedGroups] = useState<GroupOption[]>(initialGroups)
   const [loadingGroups, setLoadingGroups] = useState(false)
-  const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([])
+  const [selectedScheduleIds, setSelectedScheduleIds] = useState<string[]>([])
 
   const selectedGroup = loadedGroups.find((g) => g.id === selectedGroupId)
   const courseModules = selectedGroup?.course.modules ?? []
   const isStandardCourse = selectedGroup ? !selectedGroup.course.isCustom : false
 
+  // Get schedule IDs for all modules
+  const allScheduleIds = courseModules
+    .map(getScheduleId)
+    .filter((id): id is string => id !== null)
+
   const handleCourseChange = async (courseId: string) => {
     setSelectedCourseId(courseId)
     setSelectedGroupId('')
-    setSelectedModuleIds([])
+    setSelectedScheduleIds([])
     setLoadedGroups([])
     if (!courseId) return
     setLoadingGroups(true)
@@ -107,14 +120,14 @@ export function CreateAccountDialog({
 
   const handleGroupSelect = (groupId: string) => {
     setSelectedGroupId(groupId)
-    setSelectedModuleIds([])
+    setSelectedScheduleIds([])
   }
 
-  const toggleModuleId = (moduleId: string) => {
-    setSelectedModuleIds((prev) =>
-      prev.includes(moduleId)
-        ? prev.filter((id) => id !== moduleId)
-        : [...prev, moduleId],
+  const toggleScheduleId = (scheduleId: string) => {
+    setSelectedScheduleIds((prev) =>
+      prev.includes(scheduleId)
+        ? prev.filter((id) => id !== scheduleId)
+        : [...prev, scheduleId],
     )
   }
 
@@ -123,7 +136,7 @@ export function CreateAccountDialog({
       toast.error('Odaberite grupu za upis.')
       return
     }
-    if (isStandardCourse && selectedModuleIds.length === 0) {
+    if (isStandardCourse && selectedScheduleIds.length === 0) {
       toast.error('Odaberite barem jedan modul.')
       return
     }
@@ -131,7 +144,7 @@ export function CreateAccountDialog({
       const res = await createStudentFromInquiry(
         inquiryId,
         selectedGroupId,
-        isStandardCourse && selectedModuleIds.length > 0 ? selectedModuleIds : undefined,
+        isStandardCourse && selectedScheduleIds.length > 0 ? selectedScheduleIds : undefined,
       )
       if (res.success) {
         setResult(res)
@@ -290,12 +303,12 @@ export function CreateAccountDialog({
                   <label className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-50 cursor-pointer border-b border-gray-100 pb-2 mb-1">
                     <input
                       type="checkbox"
-                      checked={courseModules.length > 0 && selectedModuleIds.length === courseModules.length}
+                      checked={allScheduleIds.length > 0 && selectedScheduleIds.length === allScheduleIds.length}
                       onChange={() => {
-                        if (selectedModuleIds.length === courseModules.length) {
-                          setSelectedModuleIds([])
+                        if (selectedScheduleIds.length === allScheduleIds.length) {
+                          setSelectedScheduleIds([])
                         } else {
-                          setSelectedModuleIds(courseModules.map((m) => m.id))
+                          setSelectedScheduleIds(allScheduleIds)
                         }
                       }}
                       className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
@@ -303,10 +316,13 @@ export function CreateAccountDialog({
                     <span className="text-sm font-medium text-gray-800">Svi moduli</span>
                   </label>
                   {courseModules.map((mod) => {
+                    const scheduleId = getScheduleId(mod)
+                    if (!scheduleId) return null
+                    const { startDate, endDate } = getScheduleDates(mod)
                     let dateRange = ''
-                    if (mod.startDate && mod.endDate) {
-                      const s = new Date(mod.startDate)
-                      const e = new Date(mod.endDate)
+                    if (startDate && endDate) {
+                      const s = new Date(startDate)
+                      const e = new Date(endDate)
                       const sd = `${String(s.getDate()).padStart(2, '0')}.${String(s.getMonth() + 1).padStart(2, '0')}.`
                       const ed = `${String(e.getDate()).padStart(2, '0')}.${String(e.getMonth() + 1).padStart(2, '0')}.${e.getFullYear()}.`
                       dateRange = ` (${sd} – ${ed})`
@@ -318,8 +334,8 @@ export function CreateAccountDialog({
                       >
                         <input
                           type="checkbox"
-                          checked={selectedModuleIds.includes(mod.id)}
-                          onChange={() => toggleModuleId(mod.id)}
+                          checked={selectedScheduleIds.includes(scheduleId)}
+                          onChange={() => toggleScheduleId(scheduleId)}
                           className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
                         />
                         <span className="text-sm text-gray-800">
@@ -343,7 +359,7 @@ export function CreateAccountDialog({
               </button>
               <button
                 onClick={handleCreate}
-                disabled={isPending || !selectedGroupId || (isStandardCourse && selectedModuleIds.length === 0)}
+                disabled={isPending || !selectedGroupId || (isStandardCourse && selectedScheduleIds.length === 0)}
                 className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
               >
                 {isPending ? 'Kreiram...' : 'Kreiraj račun i upiši'}

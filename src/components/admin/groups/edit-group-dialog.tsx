@@ -30,7 +30,7 @@ export type GroupForEdit = {
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null
-  schoolYear: string | null
+  schoolYear: string
   maxStudents: number
   enrollmentStart: Date | null
   enrollmentEnd: Date | null
@@ -67,7 +67,7 @@ export function EditGroupDialog({ group, courses, locations }: Readonly<EditGrou
       dayOfWeek: group.dayOfWeek ?? '',
       startTime: group.startTime ?? '',
       endTime: group.endTime ?? '',
-      schoolYear: group.schoolYear ?? '',
+      schoolYear: group.schoolYear,
       maxStudents: group.maxStudents,
       enrollmentStart: toDateInput(group.enrollmentStart),
       enrollmentEnd: toDateInput(group.enrollmentEnd),
@@ -165,8 +165,9 @@ export function EditGroupDialog({ group, courses, locations }: Readonly<EditGrou
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="edit-schoolYear" className="block text-sm font-medium text-gray-700 mb-1">Školska godina</label>
+              <label htmlFor="edit-schoolYear" className="block text-sm font-medium text-gray-700 mb-1">Školska godina *</label>
               <input id="edit-schoolYear" {...register('schoolYear')} className={adminInputClass} placeholder="2025/2026" />
+              {errors.schoolYear && <p className="text-xs text-red-600 mt-1">{errors.schoolYear.message}</p>}
             </div>
             <div>
               <label htmlFor="edit-maxStudents" className="block text-sm font-medium text-gray-700 mb-1">Max polaznika</label>

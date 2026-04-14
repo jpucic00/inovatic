@@ -23,6 +23,7 @@ type ModuleInfo = {
   id: string
   title: string
   sortOrder: number
+  scheduleId: string | null
   startDate: Date | null
   endDate: Date | null
 }
@@ -30,7 +31,10 @@ type ModuleInfo = {
 type ModuleEnrollmentInfo = {
   id: string
   status: string
-  module: { id: string; title: string; sortOrder: number }
+  moduleSchedule: {
+    id: string
+    module: { id: string; title: string; sortOrder: number }
+  }
 }
 
 type EnrollmentInfo = {
@@ -59,30 +63,36 @@ function ModuleTab({
   groupId,
   enrollments,
   maxStudents,
-  nextModuleId,
+  nextModuleScheduleId,
 }: Readonly<{
   mod: ModuleInfo
   groupId: string
   enrollments: EnrollmentInfo[]
   maxStudents: number
-  nextModuleId: string | null
+  nextModuleScheduleId: string | null
 }>) {
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
-  const enrolledInModule = enrollments.filter((e) =>
-    e.moduleEnrollments.some((me) => me.module.id === mod.id && me.status === 'ACTIVE'),
-  )
-  const notInModule = enrollments.filter(
-    (e) => !e.moduleEnrollments.some((me) => me.module.id === mod.id),
-  )
+  const scheduleId = mod.scheduleId
+  const enrolledInModule = scheduleId
+    ? enrollments.filter((e) =>
+        e.moduleEnrollments.some((me) => me.moduleSchedule.id === scheduleId && me.status === 'ACTIVE'),
+      )
+    : []
+  const notInModule = scheduleId
+    ? enrollments.filter(
+        (e) => !e.moduleEnrollments.some((me) => me.moduleSchedule.id === scheduleId),
+      )
+    : enrollments
   const status = getModuleStatus(mod)
   const spotsUsed = enrolledInModule.length
   const spotsAvailable = maxStudents - spotsUsed
 
   const handleBulkComplete = () => {
+    if (!scheduleId) return
     startTransition(async () => {
-      const res = await bulkCompleteModuleEnrollments(groupId, mod.id)
+      const res = await bulkCompleteModuleEnrollments(groupId, scheduleId)
       if (res.success) {
         toast.success(`Modul "${mod.title}" završen za sve polaznike.`)
         router.refresh()
@@ -93,9 +103,9 @@ function ModuleTab({
   }
 
   const handleAddToNextModule = (enrollmentId: string) => {
-    if (!nextModuleId) return
+    if (!nextModuleScheduleId) return
     startTransition(async () => {
-      const res = await addModuleEnrollment(enrollmentId, nextModuleId)
+      const res = await addModuleEnrollment(enrollmentId, nextModuleScheduleId)
       if (res.success) {
         toast.success('Polaznik dodan u sljedeći modul.')
         router.refresh()
@@ -115,6 +125,14 @@ function ModuleTab({
         toast.error(res.error ?? 'Greška.')
       }
     })
+  }
+
+  if (!scheduleId) {
+    return (
+      <div className="border border-gray-200 rounded-lg p-4">
+        <p className="text-sm text-gray-400 italic">Nema rasporeda za ovaj modul u ovoj školskoj godini.</p>
+      </div>
+    )
   }
 
   return (
@@ -159,11 +177,11 @@ function ModuleTab({
         <div className="divide-y">
           {enrolledInModule.map((enrollment) => {
             const meForModule = enrollment.moduleEnrollments.find(
-              (me) => me.module.id === mod.id && me.status === 'ACTIVE',
+              (me) => me.moduleSchedule.id === scheduleId && me.status === 'ACTIVE',
             )
-            const hasNextModule = nextModuleId
+            const hasNextModule = nextModuleScheduleId
               ? enrollment.moduleEnrollments.some(
-                  (me) => me.module.id === nextModuleId,
+                  (me) => me.moduleSchedule.id === nextModuleScheduleId,
                 )
               : false
 
@@ -176,7 +194,7 @@ function ModuleTab({
                   {enrollment.user.firstName} {enrollment.user.lastName}
                 </Link>
                 <div className="flex items-center gap-1.5">
-                  {nextModuleId && !hasNextModule && (
+                  {nextModuleScheduleId && !hasNextModule && (
                     <button
                       onClick={() => handleAddToNextModule(enrollment.id)}
                       disabled={isPending}
@@ -218,7 +236,7 @@ function ModuleTab({
                 <button
                   onClick={() => {
                     startTransition(async () => {
-                      const res = await addModuleEnrollment(enrollment.id, mod.id)
+                      const res = await addModuleEnrollment(enrollment.id, scheduleId)
                       if (res.success) {
                         toast.success('Polaznik dodan u modul.')
                         router.refresh()
@@ -286,7 +304,7 @@ export function ModuleEnrollmentPanel({
           groupId={groupId}
           enrollments={enrollments}
           maxStudents={maxStudents}
-          nextModuleId={modules[expandedIdx + 1]?.id ?? null}
+          nextModuleScheduleId={modules[expandedIdx + 1]?.scheduleId ?? null}
         />
       )}
     </div>

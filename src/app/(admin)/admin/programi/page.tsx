@@ -1,16 +1,31 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getCourses } from '@/actions/admin/course'
+import { getAvailableSchoolYears } from '@/actions/admin/school-year'
+import { computeSchoolYear } from '@/lib/school-year'
 import { CourseTable } from '@/components/admin/courses/course-table'
 import { CreateCourseDialog } from '@/components/admin/courses/create-course-dialog'
 import { ModuleDatesTable } from '@/components/admin/courses/module-dates-table'
+import { SchoolYearSelector } from '@/components/admin/courses/school-year-selector'
 
 export const metadata: Metadata = { title: 'Admin – Programi' }
 
-export default async function CoursesPage() {
+interface PageProps {
+  searchParams: Promise<{ schoolYear?: string }>
+}
+
+export default async function CoursesPage({ searchParams }: Readonly<PageProps>) {
   await requireAdmin()
 
-  const courses = await getCourses()
+  const { schoolYear: yearParam } = await searchParams
+  const currentYear = computeSchoolYear()
+  const selectedYear = yearParam ?? currentYear
+
+  const [courses, years] = await Promise.all([
+    getCourses(selectedYear),
+    getAvailableSchoolYears(),
+  ])
+
   const standard = courses.filter((c) => !c.isCustom)
   const custom = courses.filter((c) => c.isCustom)
 
@@ -25,9 +40,16 @@ export default async function CoursesPage() {
 
       {standard.length > 0 && (
         <div className="mb-10">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Standardni programi (SLR 1–4)
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+              Standardni programi (SLR 1–4)
+            </h2>
+            <SchoolYearSelector
+              years={years}
+              currentYear={currentYear}
+              selectedYear={selectedYear}
+            />
+          </div>
           {standard.map((course) => (
             <ModuleDatesTable
               key={course.id}
@@ -40,7 +62,18 @@ export default async function CoursesPage() {
                 equipment: course.equipment,
                 groupCount: course._count.scheduledGroups,
               }}
-              modules={course.modules}
+              modules={course.modules.map((mod) => {
+                const schedule = mod.schedules[0] ?? null
+                return {
+                  id: mod.id,
+                  title: mod.title,
+                  sortOrder: mod.sortOrder,
+                  scheduleId: schedule?.id ?? null,
+                  startDate: schedule?.startDate ?? null,
+                  endDate: schedule?.endDate ?? null,
+                  enrollmentCount: schedule?._count.moduleEnrollments ?? 0,
+                }
+              })}
             />
           ))}
         </div>

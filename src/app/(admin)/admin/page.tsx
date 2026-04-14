@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Inbox, Users, CalendarDays, GraduationCap } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
+import { computeSchoolYear } from '@/lib/school-year'
 import { StatCard } from '@/components/admin/stat-card'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
 
@@ -24,7 +25,7 @@ export default async function AdminDashboard() {
       _count: { status: true },
     }),
     db.user.count({ where: { role: 'STUDENT' } }),
-    db.scheduledGroup.count({ where: { isActive: true } }),
+    db.scheduledGroup.count({ where: { schoolYear: computeSchoolYear() } }),
     db.inquiry.findMany({
       orderBy: { createdAt: 'desc' },
       take: 5,

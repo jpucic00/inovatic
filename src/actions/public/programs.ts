@@ -1,6 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
+import { computeSchoolYear } from '@/lib/school-year'
 
 export type ActiveGroup = {
   id: string
@@ -27,10 +28,11 @@ export type ActiveProgram = {
 
 export async function getActivePrograms(): Promise<ActiveProgram[]> {
   const now = new Date()
+  const year = computeSchoolYear()
 
   const groups = await db.scheduledGroup.findMany({
     where: {
-      isActive: true,
+      schoolYear: year,
       OR: [
         { enrollmentStart: null, enrollmentEnd: null },
         { enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
@@ -50,10 +52,24 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
           price: true,
           sortOrder: true,
           modules: {
-            where: { endDate: { gte: now } },
             orderBy: { sortOrder: 'asc' },
-            take: 1,
-            select: { id: true, title: true },
+            select: {
+              id: true,
+              title: true,
+              sortOrder: true,
+              schedules: {
+                where: { schoolYear: year, endDate: { gte: now } },
+                orderBy: { module: { sortOrder: 'asc' } },
+                take: 1,
+                select: {
+                  id: true,
+                  moduleEnrollments: {
+                    where: { status: 'ACTIVE' },
+                    select: { enrollmentId: true },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -63,7 +79,7 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
           id: true,
           moduleEnrollments: {
             where: { status: 'ACTIVE' },
-            select: { moduleId: true },
+            select: { moduleScheduleId: true },
           },
         },
       },
@@ -79,16 +95,26 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
   const courseMap = new Map<string, ActiveProgram>()
   for (const g of groups) {
     const isStandard = !g.course.isCustom
-    const enrollingModule = isStandard ? g.course.modules[0] : null
+
+    // Find the first module that has a schedule with endDate >= now (enrolling module)
+    let enrollingScheduleId: string | null = null
+    let enrollingModuleTitle: string | null = null
+    if (isStandard) {
+      for (const mod of g.course.modules) {
+        if (mod.schedules.length > 0) {
+          enrollingScheduleId = mod.schedules[0].id
+          enrollingModuleTitle = mod.title
+          break
+        }
+      }
+    }
 
     let enrolledCount: number
-    if (isStandard && enrollingModule) {
-      // Count enrollments that have an ACTIVE ModuleEnrollment for the enrolling module
+    if (isStandard && enrollingScheduleId) {
       enrolledCount = g.enrollments.filter((e) =>
-        e.moduleEnrollments.some((me) => me.moduleId === enrollingModule.id),
+        e.moduleEnrollments.some((me) => me.moduleScheduleId === enrollingScheduleId),
       ).length
     } else {
-      // Radionice: count all active enrollments
       enrolledCount = g.enrollments.length
     }
 
@@ -117,7 +143,7 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
       endTime: g.endTime,
       availableSpots: Math.max(0, available),
       isFull,
-      ...(enrollingModule ? { currentModuleName: enrollingModule.title } : {}),
+      ...(enrollingModuleTitle ? { currentModuleName: enrollingModuleTitle } : {}),
     })
   }
 

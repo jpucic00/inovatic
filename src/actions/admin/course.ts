@@ -6,9 +6,12 @@ import { revalidatePath } from 'next/cache'
 import { createCourseSchema, updateCourseSchema } from '@/lib/validators/admin/course'
 import type { CreateCourseInput, UpdateCourseInput } from '@/lib/validators/admin/course'
 import type { AdminActionResult } from '@/lib/action-types'
+import { computeSchoolYear } from '@/lib/school-year'
 
-export async function getCourses() {
+export async function getCourses(schoolYear?: string) {
   await requireAdmin()
+  const year = schoolYear ?? computeSchoolYear()
+
   return db.course.findMany({
     orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
     select: {
@@ -34,9 +37,17 @@ export async function getCourses() {
           id: true,
           title: true,
           sortOrder: true,
-          startDate: true,
-          endDate: true,
-          _count: { select: { moduleEnrollments: { where: { status: 'ACTIVE' } } } },
+          schedules: {
+            where: { schoolYear: year },
+            select: {
+              id: true,
+              startDate: true,
+              endDate: true,
+              _count: {
+                select: { moduleEnrollments: { where: { status: 'ACTIVE' } } },
+              },
+            },
+          },
         },
       },
     },

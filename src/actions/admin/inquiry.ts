@@ -8,6 +8,7 @@ import { updateStatusSchema } from '@/lib/validators/admin/inquiry'
 import type { AdminActionResult } from '@/lib/action-types'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
+import { computeSchoolYear } from '@/lib/school-year'
 
 export type InquiryFilters = {
   status?: InquiryStatus | 'ALL'
@@ -75,6 +76,7 @@ export async function getInquiryCourses() {
 
 export async function getInquiry(id: string) {
   await requireAdmin()
+  const year = computeSchoolYear()
 
   return db.inquiry.findUnique({
     where: { id },
@@ -85,7 +87,7 @@ export async function getInquiry(id: string) {
           title: true,
           level: true,
           scheduledGroups: {
-            where: { isActive: true },
+            where: { schoolYear: year },
             include: {
               location: true,
               course: {
@@ -94,7 +96,15 @@ export async function getInquiry(id: string) {
                   isCustom: true,
                   modules: {
                     orderBy: { sortOrder: 'asc' },
-                    select: { id: true, title: true, sortOrder: true, startDate: true, endDate: true },
+                    select: {
+                      id: true,
+                      title: true,
+                      sortOrder: true,
+                      schedules: {
+                        where: { schoolYear: year },
+                        select: { id: true, startDate: true, endDate: true },
+                      },
+                    },
                   },
                 },
               },
@@ -150,11 +160,12 @@ export async function deleteInquiry(id: string): Promise<AdminActionResult> {
 
 export async function getGroupsForCourse(courseId: string) {
   await requireAdmin()
+  const year = computeSchoolYear()
 
   if (!courseId) return []
 
   return db.scheduledGroup.findMany({
-    where: { courseId, isActive: true },
+    where: { courseId, schoolYear: year },
     include: {
       location: { select: { name: true } },
       course: {
@@ -163,7 +174,15 @@ export async function getGroupsForCourse(courseId: string) {
           isCustom: true,
           modules: {
             orderBy: { sortOrder: 'asc' },
-            select: { id: true, title: true, sortOrder: true, startDate: true, endDate: true },
+            select: {
+              id: true,
+              title: true,
+              sortOrder: true,
+              schedules: {
+                where: { schoolYear: year },
+                select: { id: true, startDate: true, endDate: true },
+              },
+            },
           },
         },
       },

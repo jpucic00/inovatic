@@ -24,9 +24,10 @@ type LocationOption = { id: string; name: string }
 interface CreateGroupDialogProps {
   courses: CourseOption[]
   locations: LocationOption[]
+  currentYear: string
 }
 
-export function CreateGroupDialog({ courses, locations }: Readonly<CreateGroupDialogProps>) {
+export function CreateGroupDialog({ courses, locations, currentYear }: Readonly<CreateGroupDialogProps>) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -39,7 +40,7 @@ export function CreateGroupDialog({ courses, locations }: Readonly<CreateGroupDi
     formState: { errors },
   } = useForm<CreateGroupInput>({
     resolver: zodResolver(createGroupSchema),
-    defaultValues: { maxStudents: 12 },
+    defaultValues: { maxStudents: 12, schoolYear: currentYear },
   })
 
   const selectedCourseId = useWatch({ control, name: 'courseId' })
@@ -131,8 +132,9 @@ export function CreateGroupDialog({ courses, locations }: Readonly<CreateGroupDi
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="create-schoolYear" className="block text-sm font-medium text-gray-700 mb-1">Školska godina</label>
+              <label htmlFor="create-schoolYear" className="block text-sm font-medium text-gray-700 mb-1">Školska godina *</label>
               <input id="create-schoolYear" {...register('schoolYear')} className={adminInputClass} placeholder="2025/2026" />
+              {errors.schoolYear && <p className="text-xs text-red-600 mt-1">{errors.schoolYear.message}</p>}
             </div>
             <div>
               <label htmlFor="create-maxStudents" className="block text-sm font-medium text-gray-700 mb-1">Max polaznika</label>

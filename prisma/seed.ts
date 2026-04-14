@@ -115,10 +115,10 @@ Godišnji program obuhvaća 4 modula, ukupno 56 školskih sati.`,
       sortOrder: 1,
       modules: {
         create: [
-          { title: 'Modul 1 – Uvod u mehaniku', sortOrder: 1, description: 'Osnove mehanike, zupčanici, poluge i koloture.', startDate: new Date('2025-10-06'), endDate: new Date('2025-12-19') },
-          { title: 'Modul 2 – Senzori i motori', sortOrder: 2, description: 'Rad s motorima i senzorima pokreta i nagiba.', startDate: new Date('2026-01-12'), endDate: new Date('2026-02-27') },
-          { title: 'Modul 3 – Programiranje', sortOrder: 3, description: 'Uvod u blokovno programiranje u LEGO Education aplikaciji.', startDate: new Date('2026-03-02'), endDate: new Date('2026-04-24') },
-          { title: 'Modul 4 – Projekt', sortOrder: 4, description: 'Timski projektni rad: izrada i prezentacija robota.', startDate: new Date('2026-04-27'), endDate: new Date('2026-06-12') },
+          { title: 'Modul 1 – Uvod u mehaniku', sortOrder: 1, description: 'Osnove mehanike, zupčanici, poluge i koloture.' },
+          { title: 'Modul 2 – Senzori i motori', sortOrder: 2, description: 'Rad s motorima i senzorima pokreta i nagiba.' },
+          { title: 'Modul 3 – Programiranje', sortOrder: 3, description: 'Uvod u blokovno programiranje u LEGO Education aplikaciji.' },
+          { title: 'Modul 4 – Projekt', sortOrder: 4, description: 'Timski projektni rad: izrada i prezentacija robota.' },
         ],
       },
     },
@@ -142,10 +142,10 @@ Program uključuje složenije konstrukcije i uvod u algoritamsko razmišljanje.`
       sortOrder: 2,
       modules: {
         create: [
-          { title: 'Modul 1 – Složene konstrukcije', sortOrder: 1, description: 'Napredne mehaničke konstrukcije i transmisije.', startDate: new Date('2025-10-06'), endDate: new Date('2025-12-19') },
-          { title: 'Modul 2 – Napredni senzori', sortOrder: 2, description: 'Rad s više senzora istovremeno, uvjetni iskazi.', startDate: new Date('2026-01-12'), endDate: new Date('2026-02-27') },
-          { title: 'Modul 3 – Algoritmi', sortOrder: 3, description: 'Algoritmičko razmišljanje, petlje i uvjetne grane.', startDate: new Date('2026-03-02'), endDate: new Date('2026-04-24') },
-          { title: 'Modul 4 – Timski projekt', sortOrder: 4, description: 'Izrada složenijeg robota s punom programskom logikom.', startDate: new Date('2026-04-27'), endDate: new Date('2026-06-12') },
+          { title: 'Modul 1 – Složene konstrukcije', sortOrder: 1, description: 'Napredne mehaničke konstrukcije i transmisije.' },
+          { title: 'Modul 2 – Napredni senzori', sortOrder: 2, description: 'Rad s više senzora istovremeno, uvjetni iskazi.' },
+          { title: 'Modul 3 – Algoritmi', sortOrder: 3, description: 'Algoritmičko razmišljanje, petlje i uvjetne grane.' },
+          { title: 'Modul 4 – Timski projekt', sortOrder: 4, description: 'Izrada složenijeg robota s punom programskom logikom.' },
         ],
       },
     },
@@ -169,10 +169,10 @@ LEGO Spike Prime omogućuje preciznije motore, više vrsta senzora i programiran
       sortOrder: 3,
       modules: {
         create: [
-          { title: 'Modul 1 – Spike Prime osnove', sortOrder: 1, description: 'Upoznavanje s Spike Prime setom i novim mogućnostima.', startDate: new Date('2025-10-06'), endDate: new Date('2025-12-19') },
-          { title: 'Modul 2 – Programiranje u Scratch', sortOrder: 2, description: 'Napredni Scratch za upravljanje robotima.', startDate: new Date('2026-01-12'), endDate: new Date('2026-02-27') },
-          { title: 'Modul 3 – Uvod u Python', sortOrder: 3, description: 'Osnove Python programiranja za robotiku.', startDate: new Date('2026-03-02'), endDate: new Date('2026-04-24') },
-          { title: 'Modul 4 – Natjecateljski robot', sortOrder: 4, description: 'Izrada robota za natjecanje (FLL/WRO format).', startDate: new Date('2026-04-27'), endDate: new Date('2026-06-12') },
+          { title: 'Modul 1 – Spike Prime osnove', sortOrder: 1, description: 'Upoznavanje s Spike Prime setom i novim mogućnostima.' },
+          { title: 'Modul 2 – Programiranje u Scratch', sortOrder: 2, description: 'Napredni Scratch za upravljanje robotima.' },
+          { title: 'Modul 3 – Uvod u Python', sortOrder: 3, description: 'Osnove Python programiranja za robotiku.' },
+          { title: 'Modul 4 – Natjecateljski robot', sortOrder: 4, description: 'Izrada robota za natjecanje (FLL/WRO format).' },
         ],
       },
     },
@@ -200,36 +200,56 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
             title: 'Zabavni Sustavi 4.0',
             sortOrder: 1,
             description: 'Sigurnosni sef, zabavni stroj, robotski čuvar – interaktivni uređaji koji simuliraju zabavne i sigurnosne sustave.',
-            startDate: new Date('2025-10-06'),
-            endDate: new Date('2025-12-19'),
           },
           {
             title: 'Prometni Sustavi 4.0',
             sortOrder: 2,
             description: 'Helikopter, nagibni avion, simulator leta – modeli koji istražuju prometne tehnologije.',
-            startDate: new Date('2026-01-12'),
-            endDate: new Date('2026-02-27'),
           },
           {
             title: 'Industrijski Sustavi 4.0',
             sortOrder: 3,
             description: 'Lift, transportna traka, sorter – simulacija modernih industrijskih procesa.',
-            startDate: new Date('2026-03-02'),
-            endDate: new Date('2026-04-24'),
           },
           {
             title: 'Robotsko Vozilo 1.0',
             sortOrder: 4,
             description: 'Jedan sveobuhvatni projektni zadatak: izrada i programiranje autonomnog vozila.',
-            startDate: new Date('2026-04-27'),
-            endDate: new Date('2026-06-12'),
           },
         ],
       },
     },
   })
 
-  console.log('✅ Courses and modules created')
+  // Create ModuleSchedule records for 2025/2026
+  const moduleDates: [number, string, string][] = [
+    [1, '2025-10-06', '2025-12-19'],
+    [2, '2026-01-12', '2026-02-27'],
+    [3, '2026-03-02', '2026-04-24'],
+    [4, '2026-04-27', '2026-06-12'],
+  ]
+
+  for (const course of [slr1, slr2, slr3, slr4]) {
+    const modules = await prisma.courseModule.findMany({
+      where: { courseId: course.id },
+      orderBy: { sortOrder: 'asc' },
+    })
+    for (const mod of modules) {
+      const dates = moduleDates.find(([order]) => order === mod.sortOrder)
+      if (dates) {
+        await prisma.moduleSchedule.create({
+          data: {
+            moduleId: mod.id,
+            schoolYear: '2025/2026',
+            startDate: new Date(dates[1]),
+            endDate: new Date(dates[2]),
+          },
+        })
+      }
+    }
+  }
+
+  console.log('✅ Courses, modules and schedules created')
 
   // ── Demo scheduled groups ────────────────────────────────────────────────────
   const group1 = await prisma.scheduledGroup.create({
@@ -242,7 +262,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       endTime: '20:30',
       schoolYear: '2025/2026',
       maxStudents: 8,
-      isActive: true,
+
     },
   })
 
@@ -256,7 +276,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       endTime: '20:00',
       schoolYear: '2025/2026',
       maxStudents: 8,
-      isActive: true,
+
     },
   })
 
@@ -270,7 +290,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       endTime: '19:30',
       schoolYear: '2025/2026',
       maxStudents: 8,
-      isActive: true,
+
     },
   })
 

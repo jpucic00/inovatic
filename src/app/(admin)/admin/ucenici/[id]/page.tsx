@@ -38,6 +38,12 @@ const ENROLLMENT_STATUS_COLORS: Record<string, string> = {
   PENDING: 'bg-amber-100 text-amber-800',
 }
 
+const MODULE_STATUS_COLORS: Record<string, string> = {
+  ACTIVE: 'text-green-700',
+  COMPLETED: 'text-gray-500',
+  CANCELLED: 'text-red-500',
+}
+
 export default async function StudentDetailPage({ params }: Readonly<PageProps>) {
   await requireAdmin()
 
@@ -154,57 +160,101 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
         </div>
       )}
 
-      {/* Enrollments */}
+      {/* Enrollments grouped by school year */}
       <div className="bg-white rounded-xl border p-6 mb-6">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Upisane grupe</h2>
         {student.enrollments.length === 0 ? (
           <p className="text-sm text-gray-400 italic">Nema upisa.</p>
         ) : (
-          <div className="space-y-3">
-            {student.enrollments.map((enrollment) => {
-              const sg = enrollment.scheduledGroup
-              const timeRange = sg.startTime
-                ? `${sg.startTime}–${sg.endTime ?? ''}`
-                : null
-              const schedule = [sg.dayOfWeek, timeRange].filter(Boolean).join(', ')
+          <div className="space-y-5">
+            {(() => {
+              // Group enrollments by school year
+              const byYear = new Map<string, typeof student.enrollments>()
+              for (const enrollment of student.enrollments) {
+                const year = enrollment.schoolYear
+                if (!byYear.has(year)) byYear.set(year, [])
+                byYear.get(year)!.push(enrollment)
+              }
+              return Array.from(byYear.entries()).map(([year, enrollments]) => (
+                <div key={year}>
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    {year}
+                  </h3>
+                  <div className="space-y-3">
+                    {enrollments.map((enrollment) => {
+                      const sg = enrollment.scheduledGroup
+                      const timeRange = sg.startTime
+                        ? `${sg.startTime}–${sg.endTime ?? ''}`
+                        : null
+                      const schedule = [sg.dayOfWeek, timeRange].filter(Boolean).join(', ')
 
-              return (
-                <div
-                  key={enrollment.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {sg.course.title}
-                      {sg.name && (
-                        <span className="text-gray-500"> — {sg.name}</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {[schedule, sg.location.name].filter(Boolean).join(' · ')}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Upisan {enrollment.createdAt.toLocaleDateString('hr-HR')} ·{' '}
-                      {enrollment.schoolYear}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={[
-                        'px-2 py-0.5 text-xs font-medium rounded-full',
-                        ENROLLMENT_STATUS_COLORS[enrollment.status] ?? 'bg-gray-100',
-                      ].join(' ')}
-                    >
-                      {ENROLLMENT_STATUS_LABELS[enrollment.status] ?? enrollment.status}
-                    </span>
-                    <EnrollmentToggle
-                      enrollmentId={enrollment.id}
-                      currentStatus={enrollment.status}
-                    />
+                      return (
+                        <div
+                          key={enrollment.id}
+                          className="p-4 bg-gray-50 rounded-lg border"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {sg.course.title}
+                                {sg.name && (
+                                  <span className="text-gray-500"> — {sg.name}</span>
+                                )}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {[schedule, sg.location.name].filter(Boolean).join(' · ')}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                Upisan {enrollment.createdAt.toLocaleDateString('hr-HR')}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={[
+                                  'px-2 py-0.5 text-xs font-medium rounded-full',
+                                  ENROLLMENT_STATUS_COLORS[enrollment.status] ?? 'bg-gray-100',
+                                ].join(' ')}
+                              >
+                                {ENROLLMENT_STATUS_LABELS[enrollment.status] ?? enrollment.status}
+                              </span>
+                              <EnrollmentToggle
+                                enrollmentId={enrollment.id}
+                                currentStatus={enrollment.status}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Module enrollment statuses */}
+                          {enrollment.moduleEnrollments.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {enrollment.moduleEnrollments.map((me) => (
+                                <span
+                                  key={me.id}
+                                  className={[
+                                    'inline-flex items-center gap-1 text-xs',
+                                    MODULE_STATUS_COLORS[me.status] ?? 'text-gray-500',
+                                  ].join(' ')}
+                                >
+                                  <span className={[
+                                    'w-1.5 h-1.5 rounded-full',
+                                    me.status === 'ACTIVE' ? 'bg-green-500' :
+                                    me.status === 'COMPLETED' ? 'bg-gray-400' : 'bg-red-400',
+                                  ].join(' ')} />
+                                  {me.moduleSchedule.module.title}
+                                  <span className="text-gray-400">
+                                    ({ENROLLMENT_STATUS_LABELS[me.status] ?? me.status})
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-              )
-            })}
+              ))
+            })()}
           </div>
         )}
       </div>

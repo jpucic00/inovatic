@@ -8,19 +8,19 @@ import type { ModuleEnrollmentStatus } from '@prisma/client'
 
 export async function createModuleEnrollments(
   enrollmentId: string,
-  moduleIds: string[],
+  moduleScheduleIds: string[],
 ): Promise<AdminActionResult> {
   await requireAdmin()
 
-  if (!enrollmentId || moduleIds.length === 0) {
+  if (!enrollmentId || moduleScheduleIds.length === 0) {
     return { success: false, error: 'Enrollment ID i moduli su obavezni.' }
   }
 
   try {
     await db.moduleEnrollment.createMany({
-      data: moduleIds.map((moduleId) => ({
+      data: moduleScheduleIds.map((moduleScheduleId) => ({
         enrollmentId,
-        moduleId,
+        moduleScheduleId,
       })),
       skipDuplicates: true,
     })
@@ -45,7 +45,12 @@ export async function updateModuleEnrollmentStatus(
       where: { id },
       include: {
         enrollment: { select: { id: true, scheduledGroupId: true } },
-        module: { select: { courseId: true, sortOrder: true } },
+        moduleSchedule: {
+          select: {
+            module: { select: { courseId: true, sortOrder: true } },
+            schoolYear: true,
+          },
+        },
       },
     })
     if (!moduleEnrollment) return { success: false, error: 'Upis u modul nije pronađen.' }
@@ -54,17 +59,27 @@ export async function updateModuleEnrollmentStatus(
 
     // When cancelling, also cancel future modules for this enrollment
     if (status === 'CANCELLED') {
-      await db.moduleEnrollment.updateMany({
+      const { courseId, sortOrder } = moduleEnrollment.moduleSchedule.module
+
+      // Find all future module schedules for the same course and school year
+      const futureSchedules = await db.moduleSchedule.findMany({
         where: {
-          enrollmentId: moduleEnrollment.enrollmentId,
-          module: {
-            courseId: moduleEnrollment.module.courseId,
-            sortOrder: { gt: moduleEnrollment.module.sortOrder },
-          },
-          status: 'ACTIVE',
+          module: { courseId, sortOrder: { gt: sortOrder } },
+          schoolYear: moduleEnrollment.moduleSchedule.schoolYear,
         },
-        data: { status: 'CANCELLED' },
+        select: { id: true },
       })
+
+      if (futureSchedules.length > 0) {
+        await db.moduleEnrollment.updateMany({
+          where: {
+            enrollmentId: moduleEnrollment.enrollmentId,
+            moduleScheduleId: { in: futureSchedules.map((s) => s.id) },
+            status: 'ACTIVE',
+          },
+          data: { status: 'CANCELLED' },
+        })
+      }
     }
 
     // Check if student has any remaining ACTIVE module enrollments
@@ -94,16 +109,16 @@ export async function updateModuleEnrollmentStatus(
 
 export async function bulkCompleteModuleEnrollments(
   groupId: string,
-  moduleId: string,
+  moduleScheduleId: string,
 ): Promise<AdminActionResult> {
   await requireAdmin()
 
-  if (!groupId || !moduleId) return { success: false, error: 'Grupa i modul su obavezni.' }
+  if (!groupId || !moduleScheduleId) return { success: false, error: 'Grupa i modul su obavezni.' }
 
   try {
     await db.moduleEnrollment.updateMany({
       where: {
-        moduleId,
+        moduleScheduleId,
         status: 'ACTIVE',
         enrollment: { scheduledGroupId: groupId, status: 'ACTIVE' },
       },
@@ -137,17 +152,17 @@ export async function bulkCompleteModuleEnrollments(
 
 export async function addModuleEnrollment(
   enrollmentId: string,
-  moduleId: string,
+  moduleScheduleId: string,
 ): Promise<AdminActionResult> {
   await requireAdmin()
 
-  if (!enrollmentId || !moduleId) {
+  if (!enrollmentId || !moduleScheduleId) {
     return { success: false, error: 'Enrollment ID i modul su obavezni.' }
   }
 
   try {
     await db.moduleEnrollment.create({
-      data: { enrollmentId, moduleId },
+      data: { enrollmentId, moduleScheduleId },
     })
   } catch (err) {
     console.error('addModuleEnrollment failed:', err)

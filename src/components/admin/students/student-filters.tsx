@@ -33,9 +33,9 @@ export function StudentFilters({
 
   const buildParams = (overrides: Record<string, string>) => {
     const sp = new URLSearchParams()
-    // Preserve moduleId if present (coming from module link)
-    const moduleId = searchParams.get('moduleId')
-    if (moduleId) sp.set('moduleId', moduleId)
+    // Preserve scheduleId if present (coming from module link)
+    const scheduleId = searchParams.get('scheduleId')
+    if (scheduleId) sp.set('scheduleId', scheduleId)
 
     const search = overrides.search ?? searchRef.current?.value ?? ''
     if (search) sp.set('search', search)
@@ -68,8 +68,6 @@ export function StudentFilters({
       router.push(`${pathname}?${buildParams({ groupId })}`)
     })
   }
-
-  // Groups are already filtered server-side by courseId
 
   return (
     <div className="flex flex-col gap-3 mb-6">

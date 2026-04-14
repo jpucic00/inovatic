@@ -9,13 +9,12 @@ type LocationOption = { id: string; name: string }
 
 type Group = {
   id: string
-  isActive: boolean
   name: string | null
   date: string | null
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null
-  schoolYear: string | null
+  schoolYear: string
   maxStudents: number
   enrollmentStart: Date | null
   enrollmentEnd: Date | null
@@ -23,7 +22,13 @@ type Group = {
   locationId: string
   course: { id: string; title: string; level: string | null; isCustom: boolean }
   location: { id: string; name: string }
-  _count: { enrollments: number; preferredInquiries: number }
+  _count: {
+    enrollments: number
+    preferredInquiries: number
+    assignedInquiries: number
+    materials: number
+    studentComments: number
+  }
 }
 
 type CourseTab = {

@@ -23,19 +23,29 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
   const search = params.search ?? ''
   const courseId = params.courseId ?? ''
   const groupId = params.groupId ?? ''
-  const moduleId = params.moduleId ?? ''
+  const scheduleId = params.scheduleId ?? ''
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
 
-  const isModuleView = !!moduleId
+  const isModuleView = !!scheduleId
 
-  const [result, courses, groups, moduleInfo] = await Promise.all([
-    getStudents({ search, courseId, groupId, moduleId, page, pageSize: PAGE_SIZE }),
+  const [result, courses, groups, scheduleInfo] = await Promise.all([
+    getStudents({
+      search,
+      courseId,
+      groupId,
+      scheduleId: scheduleId || undefined,
+      page,
+      pageSize: PAGE_SIZE,
+    }),
     isModuleView ? Promise.resolve([]) : getCourses(),
     isModuleView ? Promise.resolve([]) : getGroups(courseId ? { courseId } : {}),
-    isModuleView
-      ? db.courseModule.findUnique({
-          where: { id: moduleId },
-          select: { title: true, course: { select: { title: true } } },
+    scheduleId
+      ? db.moduleSchedule.findUnique({
+          where: { id: scheduleId },
+          select: {
+            schoolYear: true,
+            module: { select: { title: true, course: { select: { title: true } } } },
+          },
         })
       : Promise.resolve(null),
   ])
@@ -46,9 +56,9 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             Učenici
-            {moduleInfo && (
+            {scheduleInfo && (
               <span className="text-lg font-normal text-gray-500">
-                {' '}&mdash; {moduleInfo.course.title}, {moduleInfo.title}
+                {' '}&mdash; {scheduleInfo.module.course.title}, {scheduleInfo.module.title} ({scheduleInfo.schoolYear})
               </span>
             )}
           </h1>

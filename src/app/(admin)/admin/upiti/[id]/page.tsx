@@ -107,7 +107,16 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     startTime: string | null
     endTime: string | null
     location: { name: string }
-    course: { title: string; isCustom?: boolean; modules?: { id: string; title: string; sortOrder: number; startDate: Date | null; endDate: Date | null }[] }
+    course: {
+      title: string
+      isCustom?: boolean
+      modules?: {
+        id: string
+        title: string
+        sortOrder: number
+        schedules: { id: string; startDate: Date | null; endDate: Date | null }[]
+      }[]
+    }
   }) => ({
     id: sg.id,
     name: sg.name,

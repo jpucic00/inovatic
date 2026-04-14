@@ -8,6 +8,7 @@ import { createStudentSchema } from '@/lib/validators/admin/student'
 import { hashPassword, generateSimplePassword } from '@/lib/password'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { AccountCredentialsEmail } from '../../../emails/account-credentials'
+import { computeSchoolYear } from '@/lib/school-year'
 import type { PaginatedResult } from './inquiry'
 
 export type StudentRow = {
@@ -43,13 +44,6 @@ function stripDiacritics(str: string): string {
   return str.replace(/[čćšžđČĆŠŽĐ]/g, (ch) => DIACRITICS_MAP[ch] ?? ch)
 }
 
-function computeSchoolYear(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() + 1
-  return month >= 9 ? `${year}/${year + 1}` : `${year - 1}/${year}`
-}
-
 async function generateUsername(firstName: string, lastName: string): Promise<string> {
   const base = stripDiacritics(`${firstName}${lastName}`)
     .toLowerCase()
@@ -71,7 +65,7 @@ async function generateUsername(firstName: string, lastName: string): Promise<st
 export async function createStudentFromInquiry(
   inquiryId: string,
   groupId: string,
-  moduleIds?: string[],
+  moduleScheduleIds?: string[],
 ): Promise<CreateStudentResult> {
   await requireAdmin()
 
@@ -172,11 +166,11 @@ export async function createStudentFromInquiry(
     }
 
     // Create module enrollments for standard courses
-    if (moduleIds && moduleIds.length > 0) {
+    if (moduleScheduleIds && moduleScheduleIds.length > 0) {
       await db.moduleEnrollment.createMany({
-        data: moduleIds.map((moduleId) => ({
+        data: moduleScheduleIds.map((moduleScheduleId) => ({
           enrollmentId,
-          moduleId,
+          moduleScheduleId,
         })),
         skipDuplicates: true,
       })
@@ -236,7 +230,7 @@ export type StudentFilters = {
   search?: string
   courseId?: string
   groupId?: string
-  moduleId?: string
+  scheduleId?: string
   page?: number
   pageSize?: number
 }
@@ -246,7 +240,7 @@ export async function getStudents(
 ): Promise<PaginatedResult<StudentRow>> {
   await requireAdmin()
 
-  const { search, courseId, groupId, moduleId, page = 1, pageSize = 20 } = filters
+  const { search, courseId, groupId, scheduleId, page = 1, pageSize = 20 } = filters
 
   const where = {
     role: 'STUDENT' as const,
@@ -259,13 +253,13 @@ export async function getStudents(
           ],
         }
       : {}),
-    ...(courseId || groupId || moduleId
+    ...(courseId || groupId || scheduleId
       ? {
           enrollments: {
             some: {
               ...(groupId ? { scheduledGroupId: groupId } : {}),
               ...(courseId ? { scheduledGroup: { courseId } } : {}),
-              ...(moduleId ? { moduleEnrollments: { some: { moduleId, status: 'ACTIVE' as const } } } : {}),
+              ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId, status: 'ACTIVE' as const } } } : {}),
             },
           },
         }
@@ -322,6 +316,18 @@ export async function getStudent(id: string) {
               course: { select: { id: true, title: true, level: true } },
               location: { select: { name: true, address: true } },
             },
+          },
+          moduleEnrollments: {
+            include: {
+              moduleSchedule: {
+                select: {
+                  id: true,
+                  schoolYear: true,
+                  module: { select: { id: true, title: true, sortOrder: true } },
+                },
+              },
+            },
+            orderBy: { moduleSchedule: { module: { sortOrder: 'asc' } } },
           },
         },
         orderBy: { createdAt: 'desc' },
