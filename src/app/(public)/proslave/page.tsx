@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, Users, Clock, Star, Phone, Mail, Euro } from 'lucide-react'
 import { PartyRobotSvg } from '@/components/shared/party-robot-svg'
-import { GearDecor, StarDecor } from '@/components/shared/decorations'
+import { GearDecor } from '@/components/shared/decorations'
+import { HeroCarousel } from '@/components/shared/hero-carousel'
 
 export const metadata: Metadata = {
   title: 'Proslave',
@@ -48,66 +49,40 @@ export default function CelebrationsPage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative bg-gradient-to-br from-yellow-50 via-white to-cyan-50 py-20 px-4 overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-yellow-100 rounded-full opacity-40 blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-cyan-100 rounded-full opacity-40 blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-
-        <div className="container mx-auto max-w-6xl relative">
-          <div className="grid lg:grid-cols-2 gap-10 items-center">
-            {/* Left: text */}
-            <div className="text-center lg:text-left">
-              <span className="inline-block text-xs font-bold uppercase tracking-widest text-yellow-600 mb-4">Proslave rođendana</span>
-              <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4 leading-tight">
-                Robotika ={' '}
-                <span className="text-cyan-500">nezaboravna zabava</span>
-              </h1>
-              <p className="text-gray-600 text-lg leading-relaxed mb-8 max-w-xl mx-auto lg:mx-0">
-                Provedi svoj rođendan zajedno sa svojim prijateljima na kreativan i zabavan način!
-                Djeca grade i programiraju LEGO robote uz iskusnog robo trenera.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <a
-                  href="mailto:info@udruga-inovatic.hr?subject=Proslava%20ro%C4%91endana"
-                  className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-yellow-400 text-gray-900 font-bold rounded-xl hover:bg-yellow-300 transition-colors shadow-md text-base"
-                >
-                  Zatraži ponudu <ArrowRight className="w-4 h-4" />
-                </a>
-                <a
-                  href="tel:+385993936993"
-                  className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-gray-700 font-semibold rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors text-base"
-                >
-                  <Phone className="w-4 h-4" /> Nazovite nas
-                </a>
-              </div>
-            </div>
-
-            {/* Right: party robot */}
-            <div className="flex items-center justify-center relative py-4 lg:py-8">
-              {/* Decorative gears */}
-              <div className="absolute top-6 left-6 text-yellow-400 animate-spin-slow opacity-70">
-                <GearDecor size={48} />
-              </div>
-              <div className="absolute bottom-10 right-4 text-cyan-300 animate-spin-slow-reverse opacity-60">
-                <GearDecor size={30} />
-              </div>
-              {/* Stars */}
-              <div className="absolute top-10 right-16 text-yellow-400 animate-twinkle">
-                <StarDecor size={20} />
-              </div>
-              <div className="absolute bottom-16 left-10 text-pink-400 animate-twinkle" style={{ animationDelay: '0.7s' }}>
-                <StarDecor size={14} />
-              </div>
-              <div className="absolute top-28 left-2 text-cyan-300 animate-twinkle" style={{ animationDelay: '1.4s' }}>
-                <StarDecor size={10} />
-              </div>
-              {/* Confetti dots */}
-              <div className="absolute top-4 right-4 w-3 h-3 rounded-full bg-pink-400 opacity-60 animate-twinkle" style={{ animationDelay: '0.3s' }} />
-              <div className="absolute bottom-8 left-20 w-2 h-2 rounded-full bg-emerald-400 opacity-60 animate-twinkle" style={{ animationDelay: '1.1s' }} />
-              <PartyRobotSvg className="w-44 sm:w-56 lg:w-64 xl:w-72 animate-float drop-shadow-xl" />
-            </div>
+      <HeroCarousel
+        images={[
+          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656838/articles/covers/besplatne-proljetne-radionice-2023.jpg', alt: 'Djeca na robotičkoj proslavi' },
+          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656910/articles/covers/zimska-skola-2024.jpg', alt: 'Zimska škola robotike' },
+          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656904/articles/covers/zavrsetak-cjelogodisnjih-radionica-2022-2023.jpg', alt: 'Završetak radionica' },
+        ]}
+        overlayClassName="from-black/60 via-black/40 to-black/20"
+      >
+        <div className="text-center lg:text-left max-w-2xl">
+          <span className="inline-block text-xs font-bold uppercase tracking-widest text-yellow-400 mb-4">Proslave rođendana</span>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 leading-tight">
+            Robotika ={' '}
+            <span className="text-cyan-400">nezaboravna zabava</span>
+          </h1>
+          <p className="text-white/85 text-lg leading-relaxed mb-8 max-w-xl mx-auto lg:mx-0">
+            Provedi svoj rođendan zajedno sa svojim prijateljima na kreativan i zabavan način!
+            Djeca grade i programiraju LEGO robote uz iskusnog robo trenera.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+            <a
+              href="mailto:info@udruga-inovatic.hr?subject=Proslava%20ro%C4%91endana"
+              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-yellow-400 text-gray-900 font-bold rounded-xl hover:bg-yellow-300 transition-colors shadow-md text-base"
+            >
+              Zatraži ponudu <ArrowRight className="w-4 h-4" />
+            </a>
+            <a
+              href="tel:+385993936993"
+              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white/15 text-white font-semibold rounded-xl border-2 border-white/30 hover:bg-white/25 hover:border-white/50 transition-colors text-base backdrop-blur-sm"
+            >
+              <Phone className="w-4 h-4" /> Nazovite nas
+            </a>
           </div>
         </div>
-      </section>
+      </HeroCarousel>
 
       {/* What's included */}
       <section className="py-16 px-4 bg-white">

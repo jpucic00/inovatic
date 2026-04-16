@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Trophy, ArrowRight } from 'lucide-react'
 import { RobotSvg } from '@/components/shared/robot-svg'
-import { GearDecor, StarDecor } from '@/components/shared/decorations'
+import { GearDecor } from '@/components/shared/decorations'
+import { HeroCarousel } from '@/components/shared/hero-carousel'
 import { db } from '@/lib/db'
 import { StatsSection } from '@/components/public/homepage/StatsSection'
 import { CoursesPreview } from '@/components/public/homepage/CoursesPreview'
@@ -52,66 +53,44 @@ export default async function HomePage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-20 px-4 overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-100 rounded-full opacity-40 blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-100 rounded-full opacity-40 blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+      <HeroCarousel
+        images={[
+          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656903/articles/covers/zavrsetak-cjelogodisnje-aktivnosti-2024-2025.jpg', alt: 'Djeca na radionici LEGO robotike' },
+          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656871/articles/covers/odrzane-zimske-radionice-robotike-2026.jpg', alt: 'Zimske radionice robotike' },
+          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656863/articles/covers/odrzan-prvi-splitski-kamp-robotike.jpg', alt: 'Splitski kamp robotike' },
+          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656909/articles/covers/zavrsetak-slr-2023-2024.jpg', alt: 'Završetak SLR programa' },
+        ]}
+      >
+        <div className="text-center lg:text-left max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-400/25 text-yellow-300 border border-yellow-400/40 rounded-full text-xs sm:text-sm font-semibold mb-8">
+            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400 flex-shrink-0" />
+            <span>Tim CroSpec – srebrna medalja WRO 2025, Singapur</span>
+          </div>
 
-        <div className="container mx-auto max-w-6xl relative">
-          <div className="grid lg:grid-cols-2 gap-10 items-center">
-            <div className="text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-400/20 text-yellow-800 border border-yellow-300 rounded-full text-xs sm:text-sm font-semibold mb-8">
-                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-600 flex-shrink-0" />
-                <span>Tim CroSpec – srebrna medalja WRO 2025, Singapur</span>
-              </div>
-
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 leading-tight tracking-tight">
-                Otkrijte{' '}
-                <span className="text-cyan-500">Svijet LEGO Robotike</span>
-              </h1>
-              <p className="text-xl text-gray-600 mb-10 leading-relaxed max-w-xl mx-auto lg:mx-0">
-                Učimo djecu od 6 do 14 godina STEM vještine kroz igru, kreativnost i programiranje.
-                Splitska udruga za robotiku s tradicijom od 2014. godine.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Link
-                  href="/upisi"
-                  className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-cyan-500 text-white font-semibold rounded-xl hover:bg-cyan-600 transition-colors shadow-md text-base"
-                >
-                  Upiši dijete <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link
-                  href="/programi"
-                  className="inline-flex items-center justify-center px-8 py-3.5 bg-white text-cyan-600 font-semibold rounded-xl border-2 border-cyan-200 hover:border-cyan-400 hover:bg-cyan-50 transition-colors text-base"
-                >
-                  Pogledaj programe
-                </Link>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-center relative py-4 lg:py-8">
-              <div className="absolute top-6 right-6 text-yellow-400 animate-spin-slow opacity-70">
-                <GearDecor size={52} />
-              </div>
-              <div className="absolute bottom-10 left-4 text-cyan-300 animate-spin-slow-reverse opacity-60">
-                <GearDecor size={32} />
-              </div>
-              <div className="absolute top-1/3 left-0 text-yellow-300 animate-spin-slow opacity-40">
-                <GearDecor size={20} />
-              </div>
-              <div className="absolute top-8 left-16 text-yellow-400 animate-twinkle">
-                <StarDecor size={18} />
-              </div>
-              <div className="absolute bottom-14 right-10 text-cyan-400 animate-twinkle" style={{ animationDelay: '0.8s' }}>
-                <StarDecor size={14} />
-              </div>
-              <div className="absolute top-24 right-16 text-yellow-300 animate-twinkle" style={{ animationDelay: '1.6s' }}>
-                <StarDecor size={10} />
-              </div>
-              <RobotSvg className="w-44 sm:w-56 lg:w-64 xl:w-72 animate-float drop-shadow-xl" />
-            </div>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-white mb-6 leading-tight tracking-tight">
+            Otkrijte{' '}
+            <span className="text-cyan-400">Svijet LEGO Robotike</span>
+          </h1>
+          <p className="text-xl text-white/85 mb-10 leading-relaxed max-w-xl mx-auto lg:mx-0">
+            Učimo djecu od 6 do 14 godina STEM vještine kroz igru, kreativnost i programiranje.
+            Splitska udruga za robotiku s tradicijom od 2014. godine.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+            <Link
+              href="/upisi"
+              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-cyan-500 text-white font-semibold rounded-xl hover:bg-cyan-600 transition-colors shadow-md text-base"
+            >
+              Upiši dijete <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/programi"
+              className="inline-flex items-center justify-center px-8 py-3.5 bg-white/15 text-white font-semibold rounded-xl border-2 border-white/30 hover:bg-white/25 hover:border-white/50 transition-colors text-base backdrop-blur-sm"
+            >
+              Pogledaj programe
+            </Link>
           </div>
         </div>
-      </section>
+      </HeroCarousel>
 
       <StatsSection />
       <CoursesPreview />
