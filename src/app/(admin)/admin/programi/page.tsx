@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getCourses } from '@/actions/admin/course'
-import { getAvailableSchoolYears } from '@/actions/admin/school-year'
+import { getAvailableSchoolYears, ensureSchedulesForYear } from '@/actions/admin/school-year'
 import { computeSchoolYear } from '@/lib/school-year'
 import { CourseTable } from '@/components/admin/courses/course-table'
 import { CreateCourseDialog } from '@/components/admin/courses/create-course-dialog'
@@ -20,6 +20,9 @@ export default async function CoursesPage({ searchParams }: Readonly<PageProps>)
   const { schoolYear: yearParam } = await searchParams
   const currentYear = computeSchoolYear()
   const selectedYear = yearParam ?? currentYear
+
+  // Bootstrap current-year module schedules on first visit (fresh DB).
+  await ensureSchedulesForYear(currentYear)
 
   const [courses, years] = await Promise.all([
     getCourses(selectedYear),

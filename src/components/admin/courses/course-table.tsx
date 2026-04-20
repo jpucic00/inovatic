@@ -31,7 +31,7 @@ interface CourseTableProps {
   data: Course[]
 }
 
-const PAGE_SIZE = 5
+const PAGE_SIZE = 10
 
 function CopyUrlButton({ slug }: Readonly<{ slug: string }>) {
   const [copied, setCopied] = useState(false)
