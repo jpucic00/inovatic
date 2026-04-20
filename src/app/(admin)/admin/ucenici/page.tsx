@@ -6,6 +6,7 @@ import { getCourses } from '@/actions/admin/course'
 import { getGroups } from '@/actions/admin/group'
 import { StudentFilters } from '@/components/admin/students/student-filters'
 import { StudentTable } from '@/components/admin/students/student-table'
+import { CreateStudentDialog } from '@/components/admin/students/create-student-dialog'
 import { Pagination } from '@/components/admin/pagination'
 
 export const metadata: Metadata = { title: 'Admin – Učenici' }
@@ -66,6 +67,11 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
             Ukupno {result.total} učenik{result.total === 1 ? '' : 'a'}
           </p>
         </div>
+        {!isModuleView && (
+          <CreateStudentDialog
+            courses={courses.map((c) => ({ id: c.id, title: c.title }))}
+          />
+        )}
       </div>
 
       <StudentFilters

@@ -191,6 +191,57 @@ export async function getGroupsForCourse(courseId: string) {
   })
 }
 
+/**
+ * Returns groups for a course in the current school year and any future ones.
+ * Used by the student detail "add enrollment" and manual create dialogs so
+ * admins can pre-enroll into next year. Each group's modules include only the
+ * schedules for that group's own school year.
+ */
+export async function getGroupsForCourseInYears(courseId: string) {
+  await requireAdmin()
+  if (!courseId) return []
+
+  const currentYear = computeSchoolYear()
+
+  const groups = await db.scheduledGroup.findMany({
+    where: { courseId, schoolYear: { gte: currentYear } },
+    include: {
+      location: { select: { name: true } },
+      course: {
+        select: {
+          title: true,
+          isCustom: true,
+          modules: {
+            orderBy: { sortOrder: 'asc' },
+            select: {
+              id: true,
+              title: true,
+              sortOrder: true,
+              schedules: {
+                select: { id: true, schoolYear: true, startDate: true, endDate: true },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: [{ schoolYear: 'asc' }, { createdAt: 'asc' }],
+  })
+
+  // Filter each group's module schedules down to that group's own school year,
+  // so the dialog can show the right dates per group without an N+1.
+  return groups.map((g) => ({
+    ...g,
+    course: {
+      ...g.course,
+      modules: g.course.modules.map((m) => ({
+        ...m,
+        schedules: m.schedules.filter((s) => s.schoolYear === g.schoolYear),
+      })),
+    },
+  }))
+}
+
 export async function sendScheduleOptions(
   inquiryId: string,
   groupIds: string[],

@@ -1,12 +1,15 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Copy, Mail, Phone } from 'lucide-react'
+import { ArrowLeft, Mail, Phone } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getStudent } from '@/actions/admin/student'
-import { EnrollmentToggle } from '@/components/admin/students/enrollment-toggle'
+import { getCourses } from '@/actions/admin/course'
+import { DeleteEnrollmentButton } from '@/components/admin/students/delete-enrollment-button'
 import { DeleteStudentDialog } from '@/components/admin/students/delete-student-dialog'
 import { AddCommentForm } from '@/components/admin/students/add-comment-form'
+import { AddEnrollmentDialog } from '@/components/admin/students/add-enrollment-dialog'
+import { ManageEnrollmentModules } from '@/components/admin/students/manage-enrollment-modules'
 import { CopyCredentials } from './copy-credentials'
 
 export const metadata: Metadata = { title: 'Admin – Učenik' }
@@ -24,36 +27,27 @@ function DetailRow({ label, value }: Readonly<{ label: string; value: React.Reac
   )
 }
 
-const ENROLLMENT_STATUS_LABELS: Record<string, string> = {
-  ACTIVE: 'Aktivan',
-  CANCELLED: 'Otkazan',
-  COMPLETED: 'Završen',
-  PENDING: 'Na čekanju',
-}
-
-const ENROLLMENT_STATUS_COLORS: Record<string, string> = {
-  ACTIVE: 'bg-green-100 text-green-800',
-  CANCELLED: 'bg-red-100 text-red-800',
-  COMPLETED: 'bg-gray-100 text-gray-800',
-  PENDING: 'bg-amber-100 text-amber-800',
-}
-
-const MODULE_STATUS_COLORS: Record<string, string> = {
-  ACTIVE: 'text-green-700',
-  COMPLETED: 'text-gray-500',
-  CANCELLED: 'text-red-500',
+function formatDate(value: Date | string | null | undefined): string | null {
+  if (!value) return null
+  return new Date(value).toLocaleDateString('hr-HR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
 }
 
 export default async function StudentDetailPage({ params }: Readonly<PageProps>) {
   await requireAdmin()
 
   const { id } = await params
-  const student = await getStudent(id)
+  const [student, courses] = await Promise.all([getStudent(id), getCourses()])
 
   if (!student) notFound()
 
   const fullName = `${student.firstName} ${student.lastName}`
-  const parentInquiry = student.createdFromInquiries[0] ?? null
+  const hasParentInfo =
+    !!student.parentName || !!student.parentEmail || !!student.parentPhone
+  const courseOptions = courses.map((c) => ({ id: c.id, title: c.title }))
 
   const commentGroups = student.enrollments.map((e) => ({
     id: e.scheduledGroup.id,
@@ -117,144 +111,127 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
         )}
       </div>
 
-      {/* Parent info */}
-      {parentInquiry && (
+      {/* Child + parent info */}
+      {(hasParentInfo || student.dateOfBirth || student.childSchool) && (
         <div className="bg-white rounded-xl border p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">Roditelj</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Podaci</h2>
           <dl>
-            <DetailRow label="Ime i prezime" value={parentInquiry.parentName} />
-            <DetailRow
-              label="E-mail"
-              value={
-                <a
-                  href={`mailto:${parentInquiry.parentEmail}`}
-                  className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  {parentInquiry.parentEmail}
-                </a>
-              }
-            />
-            <DetailRow
-              label="Telefon"
-              value={
-                <a
-                  href={`tel:${parentInquiry.parentPhone}`}
-                  className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  {parentInquiry.parentPhone}
-                </a>
-              }
-            />
-            {parentInquiry.childDateOfBirth && (
+            {student.dateOfBirth && (
               <DetailRow
-                label="Datum rođenja djeteta"
-                value={new Date(parentInquiry.childDateOfBirth).toLocaleDateString(
-                  'hr-HR',
-                  { day: '2-digit', month: '2-digit', year: 'numeric' },
-                )}
+                label="Datum rođenja"
+                value={formatDate(student.dateOfBirth)}
+              />
+            )}
+            {student.childSchool && (
+              <DetailRow label="Škola" value={student.childSchool} />
+            )}
+            {student.parentName && (
+              <DetailRow label="Roditelj" value={student.parentName} />
+            )}
+            {student.parentEmail && (
+              <DetailRow
+                label="E-mail roditelja"
+                value={
+                  <a
+                    href={`mailto:${student.parentEmail}`}
+                    className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    {student.parentEmail}
+                  </a>
+                }
+              />
+            )}
+            {student.parentPhone && (
+              <DetailRow
+                label="Telefon roditelja"
+                value={
+                  <a
+                    href={`tel:${student.parentPhone}`}
+                    className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    {student.parentPhone}
+                  </a>
+                }
               />
             )}
           </dl>
         </div>
       )}
 
-      {/* Enrollments grouped by school year */}
+      {/* Enrollments timeline (newest → oldest) */}
       <div className="bg-white rounded-xl border p-6 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Upisane grupe</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-700">Upisane grupe</h2>
+          <AddEnrollmentDialog studentId={student.id} courses={courseOptions} />
+        </div>
         {student.enrollments.length === 0 ? (
           <p className="text-sm text-gray-400 italic">Nema upisa.</p>
         ) : (
-          <div className="space-y-5">
-            {(() => {
-              // Group enrollments by school year
-              const byYear = new Map<string, typeof student.enrollments>()
-              for (const enrollment of student.enrollments) {
-                const year = enrollment.schoolYear
-                if (!byYear.has(year)) byYear.set(year, [])
-                byYear.get(year)!.push(enrollment)
-              }
-              return Array.from(byYear.entries()).map(([year, enrollments]) => (
-                <div key={year}>
-                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                    {year}
-                  </h3>
-                  <div className="space-y-3">
-                    {enrollments.map((enrollment) => {
-                      const sg = enrollment.scheduledGroup
-                      const timeRange = sg.startTime
-                        ? `${sg.startTime}–${sg.endTime ?? ''}`
-                        : null
-                      const schedule = [sg.dayOfWeek, timeRange].filter(Boolean).join(', ')
+          <div className="space-y-3">
+            {student.enrollments.map((enrollment) => {
+              const sg = enrollment.scheduledGroup
+              const timeRange = sg.startTime
+                ? `${sg.startTime}–${sg.endTime ?? ''}`
+                : null
+              const schedule = [sg.dayOfWeek, timeRange].filter(Boolean).join(', ')
 
-                      return (
-                        <div
-                          key={enrollment.id}
-                          className="p-4 bg-gray-50 rounded-lg border"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">
-                                {sg.course.title}
-                                {sg.name && (
-                                  <span className="text-gray-500"> — {sg.name}</span>
-                                )}
-                              </p>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {[schedule, sg.location.name].filter(Boolean).join(' · ')}
-                              </p>
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                Upisan {enrollment.createdAt.toLocaleDateString('hr-HR')}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={[
-                                  'px-2 py-0.5 text-xs font-medium rounded-full',
-                                  ENROLLMENT_STATUS_COLORS[enrollment.status] ?? 'bg-gray-100',
-                                ].join(' ')}
-                              >
-                                {ENROLLMENT_STATUS_LABELS[enrollment.status] ?? enrollment.status}
-                              </span>
-                              <EnrollmentToggle
-                                enrollmentId={enrollment.id}
-                                currentStatus={enrollment.status}
-                              />
-                            </div>
-                          </div>
+              const enrolledScheduleIds = new Set(
+                enrollment.moduleEnrollments.map((me) => me.moduleSchedule.id),
+              )
+              const enrolledModules = enrollment.moduleEnrollments.map((me) => ({
+                id: me.id,
+                moduleTitle: me.moduleSchedule.module.title,
+              }))
 
-                          {/* Module enrollment statuses */}
-                          {enrollment.moduleEnrollments.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {enrollment.moduleEnrollments.map((me) => (
-                                <span
-                                  key={me.id}
-                                  className={[
-                                    'inline-flex items-center gap-1 text-xs',
-                                    MODULE_STATUS_COLORS[me.status] ?? 'text-gray-500',
-                                  ].join(' ')}
-                                >
-                                  <span className={[
-                                    'w-1.5 h-1.5 rounded-full',
-                                    me.status === 'ACTIVE' ? 'bg-green-500' :
-                                    me.status === 'COMPLETED' ? 'bg-gray-400' : 'bg-red-400',
-                                  ].join(' ')} />
-                                  {me.moduleSchedule.module.title}
-                                  <span className="text-gray-400">
-                                    ({ENROLLMENT_STATUS_LABELS[me.status] ?? me.status})
-                                  </span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
+              const availableModules = (sg.course.modules ?? [])
+                .flatMap((mod) => {
+                  const modSchedule = mod.schedules.find(
+                    (s) => s.schoolYear === enrollment.schoolYear,
+                  )
+                  if (!modSchedule) return []
+                  if (enrolledScheduleIds.has(modSchedule.id)) return []
+                  return [{ moduleScheduleId: modSchedule.id, moduleTitle: mod.title }]
+                })
+
+              return (
+                <div
+                  key={enrollment.id}
+                  className="p-4 bg-gray-50 rounded-lg border"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {sg.course.title}
+                        {sg.name && (
+                          <span className="text-gray-500"> — {sg.name}</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {[schedule, sg.location.name].filter(Boolean).join(' · ')}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Upisan {enrollment.createdAt.toLocaleDateString('hr-HR')}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <span className="text-[10px] font-medium text-gray-500 bg-gray-200/60 rounded px-1.5 py-0.5">
+                        {enrollment.schoolYear}
+                      </span>
+                      <DeleteEnrollmentButton enrollmentId={enrollment.id} />
+                    </div>
                   </div>
+
+                  <ManageEnrollmentModules
+                    studentId={student.id}
+                    enrollmentId={enrollment.id}
+                    enrolled={enrolledModules}
+                    available={availableModules}
+                  />
                 </div>
-              ))
-            })()}
+              )
+            })}
           </div>
         )}
       </div>

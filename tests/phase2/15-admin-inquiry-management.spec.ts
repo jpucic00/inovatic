@@ -150,7 +150,8 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       const statLabel = (text: string) =>
         page.locator('p.text-sm.font-medium.opacity-75', { hasText: text })
       await expect(statLabel('Novi upiti')).toBeVisible()
-      await expect(statLabel('Raspored poslan')).toBeVisible()
+      await expect(statLabel('Ukupno upita')).toBeVisible()
+      await expect(statLabel('Račun stvoren')).toBeVisible()
       await expect(statLabel('Učenici')).toBeVisible()
     })
 
@@ -189,7 +190,9 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       // Summary section heading and a status row label (span.text-gray-600 = exact match "Novi")
       await expect(page.locator('h2', { hasText: 'Upiti po statusu' })).toBeVisible()
       await expect(page.locator('span.text-sm.text-gray-600', { hasText: 'Novi' }).first()).toBeVisible()
-      await expect(page.locator('text=Ukupno')).toBeVisible()
+      // Scope "Ukupno" to the status-summary block (stat card "Ukupno upita" also matches bare text=Ukupno)
+      const summaryBlock = page.locator('h2', { hasText: 'Upiti po statusu' }).locator('..')
+      await expect(summaryBlock.getByText('Ukupno', { exact: true })).toBeVisible()
     })
   })
 
@@ -208,7 +211,6 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       await expect(page.locator('th', { hasText: 'Datum' })).toBeVisible()
       await expect(page.locator('th', { hasText: 'Roditelj' })).toBeVisible()
       await expect(page.locator('th', { hasText: 'Dijete' })).toBeVisible()
-      await expect(page.locator('th', { hasText: 'Tečaj' })).toBeVisible()
       await expect(page.locator('th', { hasText: 'Status' })).toBeVisible()
     })
 
@@ -361,9 +363,8 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       const timeline = page.locator('h2', { hasText: 'Tijek upita' }).locator('..')
       await expect(timeline).toBeVisible()
       // Step labels are in <span class="text-xs mt-1 text-center w-20 ...">
+      // STATUS_FLOW was simplified to [NEW, ACCOUNT_CREATED] — only two steps now
       await expect(timeline.locator('span.text-xs.w-20', { hasText: 'Nova' })).toBeVisible()
-      await expect(timeline.locator('span.text-xs.w-20', { hasText: 'Raspored poslan' })).toBeVisible()
-      await expect(timeline.locator('span.text-xs.w-20', { hasText: 'Potvrđena' })).toBeVisible()
       await expect(timeline.locator('span.text-xs.w-20', { hasText: 'Račun stvoren' })).toBeVisible()
     })
 
@@ -541,8 +542,12 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
     test('header shows total inquiry count', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti`)
-      // e.g. "148 upita" or "1 upit"
-      await expect(page.locator('p.text-gray-500', { hasText: /upita?/ })).toBeVisible()
+      // Header caption is a <p> directly under the <h1>Upiti</h1>. Anchor
+      // on a digit-prefix so we don't collide with per-row email cells
+      // like "ivana.upit.712737@test.com" which also contain "upit".
+      await expect(
+        page.locator('p.text-gray-500').filter({ hasText: /^\d+\s+upita?$/ }),
+      ).toBeVisible()
     })
 
     test('pagination nav appears and shows "X–Y od Z" range text', async ({ page }) => {

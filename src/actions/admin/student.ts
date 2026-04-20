@@ -4,11 +4,16 @@ import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
-import { createStudentSchema } from '@/lib/validators/admin/student'
+import {
+  createStudentSchema,
+  createStudentManuallySchema,
+  addEnrollmentSchema,
+  type CreateStudentManuallyInput,
+  type AddEnrollmentInput,
+} from '@/lib/validators/admin/student'
 import { hashPassword, generateSimplePassword } from '@/lib/password'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { AccountCredentialsEmail } from '../../../emails/account-credentials'
-import { computeSchoolYear } from '@/lib/school-year'
 import type { PaginatedResult } from './inquiry'
 
 export type StudentRow = {
@@ -19,7 +24,6 @@ export type StudentRow = {
   createdAt: Date
   enrollments: {
     id: string
-    status: string
     scheduledGroup: {
       id: string
       name: string | null
@@ -62,6 +66,158 @@ async function generateUsername(firstName: string, lastName: string): Promise<st
   }
 }
 
+type CoreInput = {
+  firstName: string
+  lastName: string
+  dateOfBirth?: string | null
+  parentName?: string | null
+  parentEmail?: string | null
+  parentPhone?: string | null
+  childSchool?: string | null
+  gdprConsentAt?: Date | null
+  groupId?: string | null
+  moduleScheduleIds?: string[]
+}
+
+type CoreResult = {
+  user: { id: string; username: string | null }
+  password: string
+  isExisting: boolean
+  enrollmentId: string | null
+  group: {
+    id: string
+    name: string | null
+    dayOfWeek: string | null
+    startTime: string | null
+    endTime: string | null
+    schoolYear: string
+    course: { title: string; isCustom: boolean }
+    location: { name: string }
+  } | null
+}
+
+/**
+ * Shared core for student creation (both inquiry-based and manual).
+ * - Dedupes against existing students by firstName+lastName+dateOfBirth.
+ * - When groupId is given, uses the target group's schoolYear (not
+ *   computeSchoolYear()) so future-year enrollments work.
+ * - Creates ModuleEnrollment rows when moduleScheduleIds is non-empty.
+ */
+async function createStudentCore(input: CoreInput): Promise<CoreResult> {
+  // 1. Dedup on name + DOB (only if DOB is present)
+  const existingStudent = input.dateOfBirth
+    ? await db.user.findFirst({
+        where: {
+          role: 'STUDENT',
+          firstName: { equals: input.firstName, mode: 'insensitive' },
+          lastName: { equals: input.lastName, mode: 'insensitive' },
+          dateOfBirth: input.dateOfBirth,
+        },
+        select: { id: true, username: true, plainPassword: true },
+      })
+    : null
+
+  let user: { id: string; username: string | null }
+  let password = ''
+  const isExisting = !!existingStudent
+
+  if (existingStudent) {
+    user = { id: existingStudent.id, username: existingStudent.username }
+    password = existingStudent.plainPassword ?? ''
+
+    // Backfill parent/school/consent fields on the existing user if they're
+    // currently empty and we have new values to write.
+    const backfill: Record<string, string | Date | null> = {}
+    if (input.parentName) backfill.parentName = input.parentName
+    if (input.parentEmail) backfill.parentEmail = input.parentEmail
+    if (input.parentPhone) backfill.parentPhone = input.parentPhone
+    if (input.childSchool) backfill.childSchool = input.childSchool
+    if (input.gdprConsentAt) backfill.gdprConsentAt = input.gdprConsentAt
+    if (Object.keys(backfill).length > 0) {
+      await db.user.update({
+        where: { id: existingStudent.id },
+        // Prisma typing: we only set fields that are defined above.
+        data: backfill as never,
+      })
+    }
+  } else {
+    const username = await generateUsername(input.firstName, input.lastName)
+    password = generateSimplePassword(6)
+    const passwordHash = await hashPassword(password)
+
+    const created = await db.user.create({
+      data: {
+        email: `${username}@student.inovatic.local`,
+        username,
+        plainPassword: password,
+        passwordHash,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        dateOfBirth: input.dateOfBirth ?? null,
+        role: 'STUDENT',
+        parentName: input.parentName ?? null,
+        parentEmail: input.parentEmail ?? null,
+        parentPhone: input.parentPhone ?? null,
+        childSchool: input.childSchool ?? null,
+        gdprConsentAt: input.gdprConsentAt ?? null,
+      },
+      select: { id: true, username: true },
+    })
+    user = created
+  }
+
+  // 2. Optional enrollment (uses the group's own schoolYear)
+  let enrollmentId: string | null = null
+  let group: CoreResult['group'] = null
+
+  if (input.groupId) {
+    const sg = await db.scheduledGroup.findUnique({
+      where: { id: input.groupId },
+      include: {
+        location: { select: { name: true } },
+        course: { select: { title: true, isCustom: true } },
+      },
+    })
+    if (!sg) throw new Error('Grupa nije pronađena.')
+    group = sg
+
+    const existingEnrollment = await db.enrollment.findUnique({
+      where: {
+        userId_scheduledGroupId_schoolYear: {
+          userId: user.id,
+          scheduledGroupId: sg.id,
+          schoolYear: sg.schoolYear,
+        },
+      },
+    })
+
+    if (existingEnrollment) {
+      enrollmentId = existingEnrollment.id
+    } else {
+      const created = await db.enrollment.create({
+        data: {
+          userId: user.id,
+          scheduledGroupId: sg.id,
+          schoolYear: sg.schoolYear,
+        },
+      })
+      enrollmentId = created.id
+    }
+
+    if (input.moduleScheduleIds && input.moduleScheduleIds.length > 0) {
+      await db.moduleEnrollment.createMany({
+        data: input.moduleScheduleIds.map((moduleScheduleId) => ({
+          enrollmentId: enrollmentId!,
+          moduleScheduleId,
+        })),
+        skipDuplicates: true,
+      })
+    }
+  }
+
+  return { user, password, isExisting, enrollmentId, group }
+}
+
 export async function createStudentFromInquiry(
   inquiryId: string,
   groupId: string,
@@ -75,7 +231,6 @@ export async function createStudentFromInquiry(
   try {
     const inquiry = await db.inquiry.findUnique({
       where: { id: inquiryId },
-      include: { course: true },
     })
 
     if (!inquiry) return { success: false, error: 'Upit nije pronađen.' }
@@ -86,108 +241,41 @@ export async function createStudentFromInquiry(
       return { success: false, error: 'Upit je odbijen.' }
     }
 
-    const group = await db.scheduledGroup.findUnique({
-      where: { id: groupId },
-      include: { location: true, course: true },
+    const core = await createStudentCore({
+      firstName: inquiry.childFirstName,
+      lastName: inquiry.childLastName,
+      dateOfBirth: inquiry.childDateOfBirth,
+      parentName: inquiry.parentName,
+      parentEmail: inquiry.parentEmail,
+      parentPhone: inquiry.parentPhone,
+      childSchool: inquiry.childSchool,
+      gdprConsentAt: inquiry.consentGivenAt,
+      groupId,
+      moduleScheduleIds,
     })
 
-    if (!group) return { success: false, error: 'Grupa nije pronađena.' }
-
-    const childFirst = inquiry.childFirstName
-    const childLast = inquiry.childLastName
-    const childDob = inquiry.childDateOfBirth
-
-    // Dedup: find existing student with same name + DOB
-    const existingStudent = childDob
-      ? await db.user.findFirst({
-          where: {
-            role: 'STUDENT',
-            firstName: { equals: childFirst, mode: 'insensitive' },
-            lastName: { equals: childLast, mode: 'insensitive' },
-            dateOfBirth: childDob,
-          },
-          select: { id: true, username: true, plainPassword: true },
-        })
-      : null
-
-    let user: { id: string; username: string | null; plainPassword: string | null }
-    let password = ''
-    const isExisting = !!existingStudent
-
-    if (existingStudent) {
-      user = existingStudent
-      password = existingStudent.plainPassword ?? ''
-    } else {
-      const username = await generateUsername(childFirst, childLast)
-      password = generateSimplePassword(6)
-      const passwordHash = await hashPassword(password)
-
-      user = await db.user.create({
-        data: {
-          email: `${username}@student.inovatic.local`,
-          username,
-          plainPassword: password,
-          passwordHash,
-          firstName: childFirst,
-          lastName: childLast,
-          dateOfBirth: childDob ?? null,
-          role: 'STUDENT',
-        },
-      })
+    if (!core.group) {
+      // Shouldn't happen — createStudentSchema requires groupId, and
+      // createStudentCore throws if the group isn't found.
+      return { success: false, error: 'Grupa nije pronađena.' }
     }
 
-    const schoolYear = computeSchoolYear()
-
-    // Check if this exact enrollment already exists
-    const existingEnrollment = await db.enrollment.findUnique({
-      where: {
-        userId_scheduledGroupId_schoolYear: {
-          userId: user.id,
-          scheduledGroupId: groupId,
-          schoolYear,
-        },
-      },
-    })
-
-    let enrollmentId: string
-
-    if (existingEnrollment) {
-      enrollmentId = existingEnrollment.id
-    } else {
-      const enrollment = await db.enrollment.create({
-        data: {
-          userId: user.id,
-          scheduledGroupId: groupId,
-          schoolYear,
-          status: 'ACTIVE',
-        },
-      })
-      enrollmentId = enrollment.id
-    }
-
-    // Create module enrollments for standard courses
-    if (moduleScheduleIds && moduleScheduleIds.length > 0) {
-      await db.moduleEnrollment.createMany({
-        data: moduleScheduleIds.map((moduleScheduleId) => ({
-          enrollmentId,
-          moduleScheduleId,
-        })),
-        skipDuplicates: true,
-      })
-    }
-
+    // Mark the inquiry as processed — kept for audit/historization.
     await db.inquiry.update({
       where: { id: inquiryId },
       data: {
         status: 'ACCOUNT_CREATED',
-        studentId: user.id,
+        studentId: core.user.id,
         assignedGroupId: groupId,
       },
     })
 
-    // Send email
-    const childName = `${childFirst} ${childLast}`.trim()
-    const schedule = [group.dayOfWeek, group.startTime ? `${group.startTime}–${group.endTime ?? ''}` : null]
+    // Send credentials email (only when Resend is configured)
+    const childName = `${inquiry.childFirstName} ${inquiry.childLastName}`.trim()
+    const schedule = [
+      core.group.dayOfWeek,
+      core.group.startTime ? `${core.group.startTime}–${core.group.endTime ?? ''}` : null,
+    ]
       .filter(Boolean)
       .join(', ')
 
@@ -200,11 +288,11 @@ export async function createStudentFromInquiry(
         react: AccountCredentialsEmail({
           parentName: inquiry.parentName,
           childName,
-          username: user.username ?? '',
-          password,
-          groupName: group.name ?? group.course.title,
+          username: core.user.username ?? '',
+          password: core.password,
+          groupName: core.group.name ?? core.group.course.title,
           schedule,
-          locationName: group.location.name,
+          locationName: core.group.location.name,
         }),
       })
     }
@@ -215,15 +303,175 @@ export async function createStudentFromInquiry(
 
     return {
       success: true,
-      username: user.username ?? '',
-      password,
-      isExisting,
-      studentId: user.id,
+      username: core.user.username ?? '',
+      password: core.password,
+      isExisting: core.isExisting,
+      studentId: core.user.id,
     }
   } catch (err) {
     console.error('createStudentFromInquiry failed:', err)
     return { success: false, error: 'Greška pri kreiranju računa.' }
   }
+}
+
+export async function createStudentManually(
+  input: CreateStudentManuallyInput,
+): Promise<CreateStudentResult> {
+  await requireAdmin()
+
+  const parsed = createStudentManuallySchema.safeParse(input)
+  if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
+  const data = parsed.data
+
+  try {
+    const core = await createStudentCore({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      dateOfBirth: data.dateOfBirth ?? null,
+      parentName: data.parentName ?? null,
+      parentEmail: data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null,
+      parentPhone: data.parentPhone ?? null,
+      childSchool: data.childSchool ?? null,
+      gdprConsentAt: null,
+      groupId: data.groupId ?? null,
+      moduleScheduleIds: data.moduleScheduleIds,
+    })
+
+    // Send credentials email only when we have both a parent email AND
+    // initial group assignment. For new accounts only (skip deduped existing).
+    const parentEmail = data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null
+    if (
+      !core.isExisting &&
+      parentEmail &&
+      core.group &&
+      process.env.RESEND_API_KEY
+    ) {
+      const childName = `${data.firstName} ${data.lastName}`.trim()
+      const schedule = [
+        core.group.dayOfWeek,
+        core.group.startTime ? `${core.group.startTime}–${core.group.endTime ?? ''}` : null,
+      ]
+        .filter(Boolean)
+        .join(', ')
+
+      await resend.emails.send({
+        from: FROM_EMAIL,
+        replyTo: REPLY_TO,
+        to: parentEmail,
+        subject: `Pristupni podaci za ${childName} – Inovatic`,
+        react: AccountCredentialsEmail({
+          parentName: data.parentName ?? '',
+          childName,
+          username: core.user.username ?? '',
+          password: core.password,
+          groupName: core.group.name ?? core.group.course.title,
+          schedule,
+          locationName: core.group.location.name,
+        }),
+      })
+    }
+
+    revalidatePath('/admin/ucenici')
+    revalidatePath(`/admin/ucenici/${core.user.id}`)
+
+    return {
+      success: true,
+      username: core.user.username ?? '',
+      password: core.password,
+      isExisting: core.isExisting,
+      studentId: core.user.id,
+    }
+  } catch (err) {
+    console.error('createStudentManually failed:', err)
+    return { success: false, error: 'Greška pri kreiranju učenika.' }
+  }
+}
+
+export async function addEnrollment(
+  input: AddEnrollmentInput,
+): Promise<AdminActionResult & { enrollmentId?: string }> {
+  await requireAdmin()
+
+  const parsed = addEnrollmentSchema.safeParse(input)
+  if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
+  const { studentId, groupId, moduleScheduleIds } = parsed.data
+
+  try {
+    const student = await db.user.findUnique({
+      where: { id: studentId, role: 'STUDENT' },
+      select: { id: true },
+    })
+    if (!student) return { success: false, error: 'Učenik nije pronađen.' }
+
+    const group = await db.scheduledGroup.findUnique({
+      where: { id: groupId },
+      select: { id: true, schoolYear: true },
+    })
+    if (!group) return { success: false, error: 'Grupa nije pronađena.' }
+
+    const existing = await db.enrollment.findUnique({
+      where: {
+        userId_scheduledGroupId_schoolYear: {
+          userId: studentId,
+          scheduledGroupId: groupId,
+          schoolYear: group.schoolYear,
+        },
+      },
+    })
+
+    let enrollmentId: string
+    if (existing) {
+      enrollmentId = existing.id
+    } else {
+      const created = await db.enrollment.create({
+        data: {
+          userId: studentId,
+          scheduledGroupId: groupId,
+          schoolYear: group.schoolYear,
+        },
+      })
+      enrollmentId = created.id
+    }
+
+    if (moduleScheduleIds && moduleScheduleIds.length > 0) {
+      await db.moduleEnrollment.createMany({
+        data: moduleScheduleIds.map((moduleScheduleId) => ({
+          enrollmentId,
+          moduleScheduleId,
+        })),
+        skipDuplicates: true,
+      })
+    }
+
+    revalidatePath(`/admin/ucenici/${studentId}`)
+    return { success: true, enrollmentId }
+  } catch (err) {
+    console.error('addEnrollment failed:', err)
+    return { success: false, error: 'Greška pri upisu u grupu.' }
+  }
+}
+
+/**
+ * Hard-delete a module enrollment from the student detail view. The module
+ * schedule then reappears in the "available to add" list. Used for admin
+ * corrections — not the same as the group-view cancellation flow.
+ */
+export async function removeModuleEnrollment(
+  moduleEnrollmentId: string,
+  studentId: string,
+): Promise<AdminActionResult> {
+  await requireAdmin()
+  if (!moduleEnrollmentId) return { success: false, error: 'ID nije pronađen.' }
+
+  try {
+    await db.moduleEnrollment.delete({ where: { id: moduleEnrollmentId } })
+  } catch (err) {
+    console.error('removeModuleEnrollment failed:', err)
+    return { success: false, error: 'Greška pri uklanjanju modula.' }
+  }
+
+  revalidatePath(`/admin/ucenici/${studentId}`)
+  return { success: true }
 }
 
 export type StudentFilters = {
@@ -259,7 +507,7 @@ export async function getStudents(
             some: {
               ...(groupId ? { scheduledGroupId: groupId } : {}),
               ...(courseId ? { scheduledGroup: { courseId } } : {}),
-              ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId, status: 'ACTIVE' as const } } } : {}),
+              ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId } } } : {}),
             },
           },
         }
@@ -276,7 +524,6 @@ export async function getStudents(
         username: true,
         createdAt: true,
         enrollments: {
-          where: { status: 'ACTIVE' },
           include: {
             scheduledGroup: {
               include: {
@@ -313,7 +560,30 @@ export async function getStudent(id: string) {
         include: {
           scheduledGroup: {
             include: {
-              course: { select: { id: true, title: true, level: true } },
+              course: {
+                select: {
+                  id: true,
+                  title: true,
+                  level: true,
+                  isCustom: true,
+                  modules: {
+                    orderBy: { sortOrder: 'asc' },
+                    select: {
+                      id: true,
+                      title: true,
+                      sortOrder: true,
+                      schedules: {
+                        select: {
+                          id: true,
+                          schoolYear: true,
+                          startDate: true,
+                          endDate: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
               location: { select: { name: true, address: true } },
             },
           },
@@ -331,17 +601,6 @@ export async function getStudent(id: string) {
           },
         },
         orderBy: { createdAt: 'desc' },
-      },
-      createdFromInquiries: {
-        select: {
-          id: true,
-          parentName: true,
-          parentEmail: true,
-          parentPhone: true,
-          childDateOfBirth: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 1,
       },
       studentComments: {
         include: {
@@ -361,28 +620,26 @@ export async function getStudent(id: string) {
   })
 }
 
-export async function toggleEnrollment(enrollmentId: string): Promise<AdminActionResult> {
+export async function deleteEnrollment(enrollmentId: string): Promise<AdminActionResult> {
   await requireAdmin()
 
   if (!enrollmentId) return { success: false, error: 'ID nije pronađen.' }
 
   try {
-    const enrollment = await db.enrollment.findUnique({ where: { id: enrollmentId } })
+    const enrollment = await db.enrollment.findUnique({
+      where: { id: enrollmentId },
+      select: { userId: true },
+    })
     if (!enrollment) return { success: false, error: 'Upis nije pronađen.' }
 
-    const newStatus = enrollment.status === 'ACTIVE' ? 'CANCELLED' : 'ACTIVE'
-
-    await db.enrollment.update({
-      where: { id: enrollmentId },
-      data: { status: newStatus },
-    })
+    await db.enrollment.delete({ where: { id: enrollmentId } })
 
     revalidatePath('/admin/ucenici')
     revalidatePath(`/admin/ucenici/${enrollment.userId}`)
     return { success: true }
   } catch (err) {
-    console.error('toggleEnrollment failed:', err)
-    return { success: false, error: 'Greška pri promjeni statusa upisa.' }
+    console.error('deleteEnrollment failed:', err)
+    return { success: false, error: 'Greška pri brisanju upisa.' }
   }
 }
 
