@@ -216,22 +216,27 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await expect(page.locator('h1')).toContainText(RADIONICA_TITLE)
     })
 
-    test('radionica table row shows "Kopiraj URL" button', async ({ page }) => {
+    test('radionica card shows "Kopiraj URL" button', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
-      const row = page.locator('tr', { hasText: RADIONICA_TITLE })
-      await expect(row.locator('button', { hasText: 'Kopiraj URL' })).toBeVisible()
+      // CourseCard (radionica) renders as <div class="...rounded-lg..."> with <h3>{title}</h3>, not a <tr>
+      const card = page.locator('div.rounded-lg').filter({
+        has: page.getByRole('heading', { level: 3, name: RADIONICA_TITLE }),
+      })
+      await expect(card.getByRole('button', { name: 'Kopiraj URL' })).toBeVisible()
     })
 
     test('standard SLR courses cannot be deleted (no delete button)', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
-      // SLR courses are listed in the standard section and have no delete button
-      const slrRows = page.locator('tbody tr').filter({ hasText: 'SLR tečaj' })
-      await expect(slrRows.first()).toBeVisible()
-      // No "Obriši" button appears for standard courses
-      const slrSection = page.locator('h2', { hasText: 'Standardni programi' }).locator('..')
-      await expect(slrSection.locator('button', { hasText: 'Obriši' })).not.toBeVisible()
+      // SLR courses are rendered as ModuleDatesTable cards (div.rounded-lg)
+      // with the course title in an <h3>.
+      const slr1Card = page.locator('div.rounded-lg').filter({
+        has: page.locator('h3', { hasText: 'Robotike 1' }),
+      })
+      await expect(slr1Card).toBeVisible()
+      // No "Obriši" button should appear within a standard course card
+      await expect(slr1Card.getByRole('button', { name: /Obriši/ })).toHaveCount(0)
     })
   })
 
@@ -689,34 +694,72 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
   })
 
   // ── J: Admin can delete a group ─────────────────────────────────────────────
+  //
+  // The radionica and standard groups from earlier tests have reserved inquiries,
+  // so their delete buttons are hidden (isGroupDeletable → false). Create a fresh
+  // empty radionica group dedicated to the delete-dialog tests.
+
+  const EMPTY_GROUP_NAME = `Test Prazna ${RUN_ID}`
 
   test.describe('J — Admin: Delete Group', () => {
+    test.beforeAll(async ({ browser }) => {
+      const ctx = await browser.newContext()
+      const page = await ctx.newPage()
+      await loginAsAdmin(page)
+      await page.goto(`${BASE}/admin/grupe`)
+      await page.locator('button', { hasText: 'Nova grupa' }).click()
+
+      const dialog = page.locator('[role="dialog"]')
+      await expect(dialog).toBeVisible()
+
+      const courseSelect = dialog.locator('select').nth(0)
+      const radOpt = courseSelect.locator('option', { hasText: RADIONICA_TITLE }).first()
+      const radVal = await radOpt.getAttribute('value')
+      await courseSelect.selectOption(radVal!)
+
+      const locationSelect = dialog.locator('select').nth(1)
+      await locationSelect.selectOption({ index: 1 })
+
+      await dialog.locator('input[placeholder*="Grupa"]').fill(EMPTY_GROUP_NAME)
+      await dialog.locator('input[type="date"]').first().fill('2026-08-20')
+      await dialog.locator('input[placeholder="19:00"]').fill('10:00')
+      await dialog.locator('input[placeholder="20:30"]').fill('12:00')
+      await dialog.locator('input[type="number"][min="1"]').fill('2')
+      await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
+      await expect(dialog).not.toBeVisible({ timeout: 10000 })
+
+      await ctx.close()
+    })
+
     test('delete dialog opens with group name and warning', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
       await page.locator('button', { hasText: 'Radionice' }).last().click()
-      const row = page.locator('tr', { hasText: RADIONICA_GROUP_NAME })
+      const row = page.locator('tr', { hasText: EMPTY_GROUP_NAME })
       await row.locator('button', { hasText: 'Obriši' }).click()
 
       const dialog = page.locator('[role="dialog"]')
       await expect(dialog).toBeVisible()
       await expect(dialog.locator('text=Obriši grupu')).toBeVisible()
-      await expect(dialog.locator(`text=${RADIONICA_GROUP_NAME}`).first()).toBeVisible()
+      await expect(dialog.locator(`text=${EMPTY_GROUP_NAME}`).first()).toBeVisible()
     })
 
     test('cancel closes dialog without deleting the group', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
       await page.locator('button', { hasText: 'Radionice' }).last().click()
-      const row = page.locator('tr', { hasText: RADIONICA_GROUP_NAME })
+      const row = page.locator('tr', { hasText: EMPTY_GROUP_NAME })
       await row.locator('button', { hasText: 'Obriši' }).click()
       await page.locator('[role="dialog"] button', { hasText: 'Odustani' }).click()
       await expect(page.locator('[role="dialog"]')).not.toBeVisible()
-      await expect(page.locator(`text=${RADIONICA_GROUP_NAME}`).first()).toBeVisible()
+      await expect(page.locator(`text=${EMPTY_GROUP_NAME}`).first()).toBeVisible()
     })
   })
 
   // ── K: Admin can delete a radionica ─────────────────────────────────────────
+  //
+  // The radionica is now rendered as a CourseCard div (not tbody tr).
+  // Selector scopes match the A-group card-based pattern.
 
   test.describe('K — Admin: Delete Radionica', () => {
     test('delete dialog for radionica shows course title and cascade warning', async ({
@@ -724,8 +767,10 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
-      const row = page.locator('tr', { hasText: RADIONICA_TITLE })
-      await row.locator('button', { hasText: 'Obriši' }).click()
+      const card = page.locator('div.rounded-lg').filter({
+        has: page.locator('h3', { hasText: RADIONICA_TITLE }),
+      })
+      await card.getByRole('button', { name: /Obriši/ }).click()
 
       const dialog = page.locator('[role="dialog"]')
       await expect(dialog).toBeVisible()
@@ -738,11 +783,13 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     test('cancel closes delete dialog without removing the radionica', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
-      const row = page.locator('tr', { hasText: RADIONICA_TITLE })
-      await row.locator('button', { hasText: 'Obriši' }).click()
+      const card = page.locator('div.rounded-lg').filter({
+        has: page.locator('h3', { hasText: RADIONICA_TITLE }),
+      })
+      await card.getByRole('button', { name: /Obriši/ }).click()
       await page.locator('[role="dialog"] button', { hasText: 'Odustani' }).click()
       await expect(page.locator('[role="dialog"]')).not.toBeVisible()
-      await expect(page.locator(`text=${RADIONICA_TITLE}`).first()).toBeVisible()
+      await expect(page.locator(`h3`, { hasText: RADIONICA_TITLE })).toBeVisible()
     })
   })
 })

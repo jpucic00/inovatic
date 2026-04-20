@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Users, MapPin, Clock, Calendar } from 'lucide-react'
+import { ArrowLeft, MapPin, Clock, Calendar } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getGroupDetail } from '@/actions/admin/group'
+import { getAssignableTeachers } from '@/actions/admin/teacher'
 import { ModuleEnrollmentPanel } from '@/components/admin/groups/module-enrollment-panel'
+import { GroupTeachersPanel } from '@/components/admin/groups/group-teachers-panel'
 
 export const metadata: Metadata = { title: 'Admin – Detalji grupe' }
 
@@ -46,9 +48,15 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   await requireAdmin()
 
   const { id } = await params
-  const group = await getGroupDetail(id)
+  const [group, allTeachers] = await Promise.all([
+    getGroupDetail(id),
+    getAssignableTeachers(),
+  ])
 
   if (!group) notFound()
+
+  const assignedUserIds = new Set(group.teacherAssignments.map((ta) => ta.user.id))
+  const assignableTeachers = allTeachers.filter((t) => !assignedUserIds.has(t.id))
 
   const windowStatus = enrollmentWindowStatus(group.enrollmentStart, group.enrollmentEnd)
   const enrolledCount = group.enrollments.length
@@ -157,20 +165,13 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
       </div>
 
       {/* Teachers */}
-      {group.teacherAssignments.length > 0 && (
-        <div className="bg-white rounded-xl border p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Nastavnici</h2>
-          <div className="space-y-2">
-            {group.teacherAssignments.map((ta) => (
-              <div key={ta.id} className="flex items-center gap-2 text-sm text-gray-700">
-                <Users className="w-4 h-4 text-gray-400" />
-                {ta.user.firstName} {ta.user.lastName}
-                <span className="text-gray-400 text-xs">{ta.user.email}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="bg-white rounded-xl border p-6 mb-6">
+        <GroupTeachersPanel
+          groupId={group.id}
+          assignments={group.teacherAssignments}
+          assignableTeachers={assignableTeachers}
+        />
+      </div>
 
       {/* Module enrollment panel for standard courses */}
       {!group.course.isCustom && group.course.modules.length > 0 ? (
@@ -181,7 +182,6 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
             </h2>
           </div>
           <ModuleEnrollmentPanel
-            groupId={group.id}
             modules={group.course.modules.map((mod) => {
               const schedule = mod.schedules[0] ?? null
               return {
@@ -220,16 +220,6 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
                     </Link>
                     <p className="text-xs text-gray-500">{enrollment.user.email}</p>
                   </div>
-                  <span
-                    className={[
-                      'text-xs font-medium px-2 py-0.5 rounded-full',
-                      enrollment.status === 'ACTIVE'
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-gray-100 text-gray-500',
-                    ].join(' ')}
-                  >
-                    {enrollment.status === 'ACTIVE' ? 'Aktivan' : enrollment.status}
-                  </span>
                 </div>
               ))}
             </div>

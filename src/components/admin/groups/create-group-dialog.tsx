@@ -17,6 +17,10 @@ import { createGroupSchema, type CreateGroupInput } from '@/lib/validators/admin
 import { createGroup } from '@/actions/admin/group'
 import { DAYS_HR } from '@/lib/format'
 import { adminInputClass, adminSelectClass } from '@/lib/admin-styles'
+import {
+  TeacherMultiSelect,
+  type TeacherOption,
+} from '@/components/admin/teachers/teacher-multi-select'
 
 type CourseOption = { id: string; title: string; isCustom: boolean }
 type LocationOption = { id: string; name: string }
@@ -25,11 +29,13 @@ interface CreateGroupDialogProps {
   courses: CourseOption[]
   locations: LocationOption[]
   currentYear: string
+  teachers: TeacherOption[]
 }
 
-export function CreateGroupDialog({ courses, locations, currentYear }: Readonly<CreateGroupDialogProps>) {
+export function CreateGroupDialog({ courses, locations, currentYear, teachers }: Readonly<CreateGroupDialogProps>) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [teacherIds, setTeacherIds] = useState<string[]>([])
   const router = useRouter()
 
   const {
@@ -48,10 +54,11 @@ export function CreateGroupDialog({ courses, locations, currentYear }: Readonly<
 
   function onSubmit(data: CreateGroupInput) {
     startTransition(async () => {
-      const result = await createGroup(data)
+      const result = await createGroup({ ...data, teacherIds })
       if (result.success) {
         toast.success('Grupa kreirana.')
         reset()
+        setTeacherIds([])
         setOpen(false)
         router.refresh()
       } else {
@@ -143,21 +150,26 @@ export function CreateGroupDialog({ courses, locations, currentYear }: Readonly<
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Prozor upisa{' '}
-              <span className="text-xs font-normal text-gray-400 ml-1">(ostavite prazno za uvijek otvoreno)</span>
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</label>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="create-enrollmentStart" className="text-xs text-gray-500 mb-1 block">Od</label>
                 <input id="create-enrollmentStart" {...register('enrollmentStart')} type="date" className={adminInputClass} />
+                {errors.enrollmentStart && <p className="text-xs text-red-600 mt-1">{errors.enrollmentStart.message}</p>}
               </div>
               <div>
                 <label htmlFor="create-enrollmentEnd" className="text-xs text-gray-500 mb-1 block">Do</label>
                 <input id="create-enrollmentEnd" {...register('enrollmentEnd')} type="date" className={adminInputClass} />
+                {errors.enrollmentEnd && <p className="text-xs text-red-600 mt-1">{errors.enrollmentEnd.message}</p>}
               </div>
             </div>
           </div>
+          <TeacherMultiSelect
+            teachers={teachers}
+            selectedIds={teacherIds}
+            onChange={setTeacherIds}
+            idPrefix="create-group-teacher"
+          />
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"

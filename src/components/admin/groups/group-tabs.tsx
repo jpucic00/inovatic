@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { GroupTable } from './group-table'
+import type { TeacherOption } from '@/components/admin/teachers/teacher-multi-select'
 
 type CourseOption = { id: string; title: string; isCustom: boolean }
 type LocationOption = { id: string; name: string }
@@ -20,6 +21,7 @@ type Group = {
   enrollmentEnd: Date | null
   courseId: string
   locationId: string
+  teacherIds: string[]
   course: { id: string; title: string; level: string | null; isCustom: boolean }
   location: { id: string; name: string }
   _count: {
@@ -42,9 +44,10 @@ interface GroupTabsProps {
   radioniceTabs: Group[]
   courses: CourseOption[]
   locations: LocationOption[]
+  teachers: TeacherOption[]
 }
 
-export function GroupTabs({ standardTabs, radioniceTabs, courses, locations }: Readonly<GroupTabsProps>) {
+export function GroupTabs({ standardTabs, radioniceTabs, courses, locations, teachers }: Readonly<GroupTabsProps>) {
   const tabs = [
     ...standardTabs.map((t) => ({ id: t.courseId, label: t.title })),
     { id: '__radionice__', label: 'Radionice' },
@@ -81,7 +84,7 @@ export function GroupTabs({ standardTabs, radioniceTabs, courses, locations }: R
       </div>
 
       {activeTab === '__radionice__' ? (
-        <GroupTable data={radioniceTabs} courses={courses} locations={locations} />
+        <GroupTable data={radioniceTabs} courses={courses} locations={locations} teachers={teachers} />
       ) : (
         standardTabs
           .filter((t) => t.courseId === activeTab)
@@ -91,6 +94,7 @@ export function GroupTabs({ standardTabs, radioniceTabs, courses, locations }: R
               data={t.groups}
               courses={courses}
               locations={locations}
+              teachers={teachers}
               hideProgram
             />
           ))

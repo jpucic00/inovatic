@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getGroups, getGroupSchoolYears } from '@/actions/admin/group'
+import { getAssignableTeachers } from '@/actions/admin/teacher'
 import { computeSchoolYear } from '@/lib/school-year'
 import { db } from '@/lib/db'
 import { GroupTabs } from '@/components/admin/groups/group-tabs'
@@ -21,7 +22,7 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
   const currentYear = computeSchoolYear()
   const selectedYear = yearParam ?? currentYear
 
-  const [groups, years, courses, locations] = await Promise.all([
+  const [groups, years, courses, locations, teachers] = await Promise.all([
     getGroups({ schoolYear: selectedYear }),
     getGroupSchoolYears(),
     db.course.findMany({
@@ -32,6 +33,7 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     }),
+    getAssignableTeachers(),
   ])
 
   // Ensure current year always appears in the selector
@@ -58,7 +60,7 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
             {groups.length} {groups.length === 1 ? 'grupa' : 'grupa'} u {selectedYear}
           </p>
         </div>
-        <CreateGroupDialog courses={courseOptions} locations={locations} currentYear={selectedYear} />
+        <CreateGroupDialog courses={courseOptions} locations={locations} currentYear={selectedYear} teachers={teachers} />
       </div>
 
       <div className="mb-6">
@@ -81,6 +83,7 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
         radioniceTabs={radioniceTabs}
         courses={courseOptions}
         locations={locations}
+        teachers={teachers}
       />
     </div>
   )

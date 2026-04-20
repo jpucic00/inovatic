@@ -10,8 +10,9 @@ export const createGroupSchema = z.object({
   endTime: z.string().min(1, 'Unesite vrijeme kraja'),
   schoolYear: z.string().min(1, 'Unesite školsku godinu'),
   maxStudents: z.coerce.number().int().min(1).max(50),
-  enrollmentStart: z.string().optional().or(z.literal('')),
-  enrollmentEnd: z.string().optional().or(z.literal('')),
+  enrollmentStart: z.string().min(1, 'Unesite datum početka upisa'),
+  enrollmentEnd: z.string().min(1, 'Unesite datum kraja upisa'),
+  teacherIds: z.array(z.string().min(1)).optional(),
 })
 
 export const updateGroupSchema = createGroupSchema.partial().extend({

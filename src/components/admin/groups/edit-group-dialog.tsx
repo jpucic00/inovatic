@@ -17,6 +17,10 @@ import { createGroupSchema, type CreateGroupInput } from '@/lib/validators/admin
 import { updateGroup } from '@/actions/admin/group'
 import { DAYS_HR } from '@/lib/format'
 import { adminInputClass, adminSelectClass } from '@/lib/admin-styles'
+import {
+  TeacherMultiSelect,
+  type TeacherOption,
+} from '@/components/admin/teachers/teacher-multi-select'
 
 type CourseOption = { id: string; title: string; isCustom: boolean }
 type LocationOption = { id: string; name: string }
@@ -34,12 +38,14 @@ export type GroupForEdit = {
   maxStudents: number
   enrollmentStart: Date | null
   enrollmentEnd: Date | null
+  teacherIds: string[]
 }
 
 interface EditGroupDialogProps {
   group: GroupForEdit
   courses: CourseOption[]
   locations: LocationOption[]
+  teachers: TeacherOption[]
 }
 
 function toDateInput(date: Date | null): string {
@@ -47,9 +53,10 @@ function toDateInput(date: Date | null): string {
   return date.toISOString().slice(0, 10)
 }
 
-export function EditGroupDialog({ group, courses, locations }: Readonly<EditGroupDialogProps>) {
+export function EditGroupDialog({ group, courses, locations, teachers }: Readonly<EditGroupDialogProps>) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [teacherIds, setTeacherIds] = useState<string[]>(group.teacherIds)
   const router = useRouter()
 
   const {
@@ -79,7 +86,7 @@ export function EditGroupDialog({ group, courses, locations }: Readonly<EditGrou
 
   function onSubmit(data: CreateGroupInput) {
     startTransition(async () => {
-      const result = await updateGroup({ id: group.id, ...data })
+      const result = await updateGroup({ id: group.id, ...data, teacherIds })
       if (result.success) {
         toast.success('Grupa ažurirana.')
         setOpen(false)
@@ -176,21 +183,26 @@ export function EditGroupDialog({ group, courses, locations }: Readonly<EditGrou
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Prozor upisa{' '}
-              <span className="text-xs font-normal text-gray-400 ml-1">(ostavite prazno za uvijek otvoreno)</span>
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</label>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="edit-enrollmentStart" className="text-xs text-gray-500 mb-1 block">Od</label>
                 <input id="edit-enrollmentStart" {...register('enrollmentStart')} type="date" className={adminInputClass} />
+                {errors.enrollmentStart && <p className="text-xs text-red-600 mt-1">{errors.enrollmentStart.message}</p>}
               </div>
               <div>
                 <label htmlFor="edit-enrollmentEnd" className="text-xs text-gray-500 mb-1 block">Do</label>
                 <input id="edit-enrollmentEnd" {...register('enrollmentEnd')} type="date" className={adminInputClass} />
+                {errors.enrollmentEnd && <p className="text-xs text-red-600 mt-1">{errors.enrollmentEnd.message}</p>}
               </div>
             </div>
           </div>
+          <TeacherMultiSelect
+            teachers={teachers}
+            selectedIds={teacherIds}
+            onChange={setTeacherIds}
+            idPrefix={`edit-group-${group.id}-teacher`}
+          />
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"

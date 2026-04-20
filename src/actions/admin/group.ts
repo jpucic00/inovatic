@@ -25,12 +25,13 @@ export async function getGroups(filters: GroupFilters = {}) {
     ...(filters.locationId ? { locationId: filters.locationId } : {}),
   }
 
-  return db.scheduledGroup.findMany({
+  const groups = await db.scheduledGroup.findMany({
     where,
     orderBy: [{ course: { sortOrder: 'asc' } }, { createdAt: 'asc' }],
     include: {
       course: { select: { id: true, title: true, level: true, isCustom: true } },
       location: { select: { id: true, name: true } },
+      teacherAssignments: { select: { userId: true } },
       _count: {
         select: {
           enrollments: true,
@@ -42,6 +43,11 @@ export async function getGroups(filters: GroupFilters = {}) {
       },
     },
   })
+
+  return groups.map((g) => ({
+    ...g,
+    teacherIds: g.teacherAssignments.map((a) => a.userId),
+  }))
 }
 
 export async function getGroupDetail(id: string) {
@@ -117,23 +123,36 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
     maxStudents,
     enrollmentStart,
     enrollmentEnd,
+    teacherIds,
   } = parsed.data
 
   try {
-    await db.scheduledGroup.create({
-      data: {
-        courseId,
-        locationId,
-        name: name || null,
-        date: date || null,
-        dayOfWeek: dayOfWeek || null,
-        startTime,
-        endTime,
-        schoolYear,
-        maxStudents: maxStudents ?? 12,
-        enrollmentStart: enrollmentStart ? new Date(enrollmentStart) : null,
-        enrollmentEnd: enrollmentEnd ? new Date(enrollmentEnd) : null,
-      },
+    await db.$transaction(async (tx) => {
+      const group = await tx.scheduledGroup.create({
+        data: {
+          courseId,
+          locationId,
+          name: name || null,
+          date: date || null,
+          dayOfWeek: dayOfWeek || null,
+          startTime,
+          endTime,
+          schoolYear,
+          maxStudents: maxStudents ?? 12,
+          enrollmentStart: new Date(enrollmentStart),
+          enrollmentEnd: new Date(enrollmentEnd),
+        },
+      })
+
+      if (teacherIds && teacherIds.length > 0) {
+        await tx.teacherAssignment.createMany({
+          data: teacherIds.map((userId) => ({
+            userId,
+            scheduledGroupId: group.id,
+          })),
+          skipDuplicates: true,
+        })
+      }
     })
   } catch (err) {
     console.error('createGroup failed:', err)
@@ -150,24 +169,58 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
   const parsed = updateGroupSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
-  const { id, courseId, locationId, name, date, dayOfWeek, startTime, endTime, schoolYear, maxStudents, enrollmentStart, enrollmentEnd } = parsed.data
+  const { id, courseId, locationId, name, date, dayOfWeek, startTime, endTime, schoolYear, maxStudents, enrollmentStart, enrollmentEnd, teacherIds } = parsed.data
 
   try {
-    await db.scheduledGroup.update({
-      where: { id },
-      data: {
-        ...(courseId !== undefined && { courseId }),
-        ...(locationId !== undefined && { locationId }),
-        ...(name !== undefined && { name: name || null }),
-        ...(date !== undefined && { date: date || null }),
-        ...(dayOfWeek !== undefined && { dayOfWeek: dayOfWeek || null }),
-        ...(startTime !== undefined && { startTime: startTime || null }),
-        ...(endTime !== undefined && { endTime: endTime || null }),
-        ...(schoolYear !== undefined && { schoolYear }),
-        ...(maxStudents !== undefined && { maxStudents }),
-        ...(enrollmentStart !== undefined && { enrollmentStart: enrollmentStart ? new Date(enrollmentStart) : null }),
-        ...(enrollmentEnd !== undefined && { enrollmentEnd: enrollmentEnd ? new Date(enrollmentEnd) : null }),
-      },
+    await db.$transaction(async (tx) => {
+      await tx.scheduledGroup.update({
+        where: { id },
+        data: {
+          ...(courseId !== undefined && { courseId }),
+          ...(locationId !== undefined && { locationId }),
+          ...(name !== undefined && { name: name || null }),
+          ...(date !== undefined && { date: date || null }),
+          ...(dayOfWeek !== undefined && { dayOfWeek: dayOfWeek || null }),
+          ...(startTime !== undefined && { startTime: startTime || null }),
+          ...(endTime !== undefined && { endTime: endTime || null }),
+          ...(schoolYear !== undefined && { schoolYear }),
+          ...(maxStudents !== undefined && { maxStudents }),
+          ...(enrollmentStart !== undefined && { enrollmentStart: new Date(enrollmentStart) }),
+          ...(enrollmentEnd !== undefined && { enrollmentEnd: new Date(enrollmentEnd) }),
+        },
+      })
+
+      // If teacherIds is explicitly provided, replace the full set of
+      // assignments for this group. (Not provided = don't touch them.)
+      if (teacherIds !== undefined) {
+        const current = await tx.teacherAssignment.findMany({
+          where: { scheduledGroupId: id },
+          select: { userId: true },
+        })
+        const currentIds = new Set(current.map((a) => a.userId))
+        const nextIds = new Set(teacherIds)
+
+        const toRemove = [...currentIds].filter((uid) => !nextIds.has(uid))
+        const toAdd = [...nextIds].filter((uid) => !currentIds.has(uid))
+
+        if (toRemove.length > 0) {
+          await tx.teacherAssignment.deleteMany({
+            where: {
+              scheduledGroupId: id,
+              userId: { in: toRemove },
+            },
+          })
+        }
+        if (toAdd.length > 0) {
+          await tx.teacherAssignment.createMany({
+            data: toAdd.map((userId) => ({
+              userId,
+              scheduledGroupId: id,
+            })),
+            skipDuplicates: true,
+          })
+        }
+      }
     })
   } catch (err) {
     console.error('updateGroup failed:', err)

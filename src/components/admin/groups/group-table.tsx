@@ -15,6 +15,7 @@ import {
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { deleteGroup } from '@/actions/admin/group'
 import { EditGroupDialog, type GroupForEdit } from './edit-group-dialog'
+import type { TeacherOption } from '@/components/admin/teachers/teacher-multi-select'
 
 type CourseOption = { id: string; title: string; isCustom: boolean }
 type LocationOption = { id: string; name: string }
@@ -114,6 +115,7 @@ interface GroupTableProps {
   data: Group[]
   courses: CourseOption[]
   locations: LocationOption[]
+  teachers: TeacherOption[]
   hideProgram?: boolean
 }
 
@@ -151,6 +153,7 @@ function EnrollmentWindowBadge({ group }: Readonly<{ group: Group }>) {
 function buildColumns(
   courses: CourseOption[],
   locations: LocationOption[],
+  teachers: TeacherOption[],
   hideProgram: boolean,
 ): ColumnDef<Group>[] {
   const cols: ColumnDef<Group>[] = []
@@ -232,7 +235,7 @@ function buildColumns(
       header: '',
       cell: (row) => (
         <div className="flex items-center gap-2">
-          <EditGroupDialog group={row} courses={courses} locations={locations} />
+          <EditGroupDialog group={row} courses={courses} locations={locations} teachers={teachers} />
           {isGroupDeletable(row) && <DeleteGroupButton group={row} />}
         </div>
       ),
@@ -242,8 +245,8 @@ function buildColumns(
   return cols
 }
 
-export function GroupTable({ data, courses, locations, hideProgram = false }: Readonly<GroupTableProps>) {
-  const columns = buildColumns(courses, locations, hideProgram)
+export function GroupTable({ data, courses, locations, teachers, hideProgram = false }: Readonly<GroupTableProps>) {
+  const columns = buildColumns(courses, locations, teachers, hideProgram)
 
   return (
     <DataTable
