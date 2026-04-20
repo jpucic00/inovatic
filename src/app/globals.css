@@ -267,3 +267,16 @@ body {
 .animate-marquee:hover {
   animation-play-state: paused;
 }
+
+/* ---------------------------------------------------------------------------
+ * BlockNote admin editor — per-image selection outline. The Replace/Delete
+ * action bar for selected image/file blocks is rendered by
+ * src/components/admin/articles/image-block-actions.tsx (DOM overlay pinned
+ * to the selected block) rather than relying on BlockNote's floating
+ * FormattingToolbar, which dismissed on hover-out under Mantine.
+ * ------------------------------------------------------------------------- */
+[data-file-block].ProseMirror-selectednode .bn-file-block-content-wrapper {
+  outline: 2px solid rgb(100, 160, 255);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
