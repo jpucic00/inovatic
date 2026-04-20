@@ -221,111 +221,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
     },
   })
 
-  // Create ModuleSchedule records for 2025/2026
-  const moduleDates: [number, string, string][] = [
-    [1, '2025-10-06', '2025-12-19'],
-    [2, '2026-01-12', '2026-02-27'],
-    [3, '2026-03-02', '2026-04-24'],
-    [4, '2026-04-27', '2026-06-12'],
-  ]
-
-  for (const course of [slr1, slr2, slr3, slr4]) {
-    const modules = await prisma.courseModule.findMany({
-      where: { courseId: course.id },
-      orderBy: { sortOrder: 'asc' },
-    })
-    for (const mod of modules) {
-      const dates = moduleDates.find(([order]) => order === mod.sortOrder)
-      if (dates) {
-        await prisma.moduleSchedule.create({
-          data: {
-            moduleId: mod.id,
-            schoolYear: '2025/2026',
-            startDate: new Date(dates[1]),
-            endDate: new Date(dates[2]),
-          },
-        })
-      }
-    }
-  }
-
-  console.log('✅ Courses, modules and schedules created')
-
-  // ── Demo scheduled groups ────────────────────────────────────────────────────
-  const group1 = await prisma.scheduledGroup.create({
-    data: {
-      courseId: slr1.id,
-      locationId: velebitska.id,
-      name: 'Grupa 1',
-      dayOfWeek: 'Ponedjeljak',
-      startTime: '19:00',
-      endTime: '20:30',
-      schoolYear: '2025/2026',
-      maxStudents: 8,
-
-    },
-  })
-
-  const group2 = await prisma.scheduledGroup.create({
-    data: {
-      courseId: slr1.id,
-      locationId: boskovica.id,
-      name: 'Grupa 2',
-      dayOfWeek: 'Srijeda',
-      startTime: '18:30',
-      endTime: '20:00',
-      schoolYear: '2025/2026',
-      maxStudents: 8,
-
-    },
-  })
-
-  const group3 = await prisma.scheduledGroup.create({
-    data: {
-      courseId: slr4.id,
-      locationId: velebitska.id,
-      name: 'Grupa 1',
-      dayOfWeek: 'Utorak',
-      startTime: '18:00',
-      endTime: '19:30',
-      schoolYear: '2025/2026',
-      maxStudents: 8,
-
-    },
-  })
-
-  // Assign teacher to groups
-  await prisma.teacherAssignment.createMany({
-    data: [
-      { userId: teacher.id, scheduledGroupId: group1.id },
-      { userId: teacher.id, scheduledGroupId: group2.id },
-      { userId: teacher.id, scheduledGroupId: group3.id },
-    ],
-  })
-
-  console.log('✅ Scheduled groups and teacher assignments created')
-
-  // ── Demo student ─────────────────────────────────────────────────────────────
-  const studentPassword = await bcrypt.hash('student123', 12)
-  const student = await prisma.user.create({
-    data: {
-      email: 'ucenik@udruga-inovatic.hr',
-      passwordHash: studentPassword,
-      firstName: 'Marko',
-      lastName: 'Primjer',
-      role: UserRole.STUDENT,
-    },
-  })
-
-  await prisma.enrollment.create({
-    data: {
-      userId: student.id,
-      scheduledGroupId: group1.id,
-      schoolYear: '2025/2026',
-    },
-  })
-
-  console.log(`✅ Demo student created: ${student.email}`)
+  console.log('✅ Courses and modules created')
 
   // ── Tags ─────────────────────────────────────────────────────────────────────
   const [tagNatjecanja, tagRadionice, tagRezultati, tagObavijesti, tagEuProjekt] =
@@ -6742,8 +6638,12 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
 
 
   // Suppress unused variable warnings
+  void slr1
   void slr2
   void slr3
+  void slr4
+  void velebitska
+  void boskovica
 
   console.log('✅ Articles and tags seeded (69 articles)')
 
@@ -6753,7 +6653,6 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
   console.log('Demo accounts:')
   console.log('  Admin:   jozo@udruga-inovatic.hr    / admin123')
   console.log('  Teacher: snjezana@udruga-inovatic.hr / teacher123')
-  console.log('  Student: ucenik@udruga-inovatic.hr  / student123')
   console.log('')
   console.log('📸 Run npm run db:seed-images to set cover images from public/images/articles/')
 }

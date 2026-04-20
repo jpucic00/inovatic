@@ -28,7 +28,7 @@ export async function getModulesForCourse(courseId: string, schoolYear?: string)
           endDate: true,
           schoolYear: true,
           _count: {
-            select: { moduleEnrollments: { where: { status: 'ACTIVE' } } },
+            select: { moduleEnrollments: true },
           },
         },
       },

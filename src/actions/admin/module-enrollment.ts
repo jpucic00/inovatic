@@ -4,7 +4,6 @@ import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
-import type { ModuleEnrollmentStatus } from '@prisma/client'
 
 export async function createModuleEnrollments(
   enrollmentId: string,
@@ -32,10 +31,7 @@ export async function createModuleEnrollments(
   return { success: true }
 }
 
-export async function updateModuleEnrollmentStatus(
-  id: string,
-  status: ModuleEnrollmentStatus,
-): Promise<AdminActionResult> {
+export async function deleteModuleEnrollment(id: string): Promise<AdminActionResult> {
   await requireAdmin()
 
   if (!id) return { success: false, error: 'ID nije pronađen.' }
@@ -43,110 +39,58 @@ export async function updateModuleEnrollmentStatus(
   try {
     const moduleEnrollment = await db.moduleEnrollment.findUnique({
       where: { id },
-      include: {
-        enrollment: { select: { id: true, scheduledGroupId: true } },
-        moduleSchedule: {
-          select: {
-            module: { select: { courseId: true, sortOrder: true } },
-            schoolYear: true,
-          },
-        },
-      },
+      select: { enrollment: { select: { scheduledGroupId: true } } },
     })
     if (!moduleEnrollment) return { success: false, error: 'Upis u modul nije pronađen.' }
 
-    await db.moduleEnrollment.update({ where: { id }, data: { status } })
-
-    // When cancelling, also cancel future modules for this enrollment
-    if (status === 'CANCELLED') {
-      const { courseId, sortOrder } = moduleEnrollment.moduleSchedule.module
-
-      // Find all future module schedules for the same course and school year
-      const futureSchedules = await db.moduleSchedule.findMany({
-        where: {
-          module: { courseId, sortOrder: { gt: sortOrder } },
-          schoolYear: moduleEnrollment.moduleSchedule.schoolYear,
-        },
-        select: { id: true },
-      })
-
-      if (futureSchedules.length > 0) {
-        await db.moduleEnrollment.updateMany({
-          where: {
-            enrollmentId: moduleEnrollment.enrollmentId,
-            moduleScheduleId: { in: futureSchedules.map((s) => s.id) },
-            status: 'ACTIVE',
-          },
-          data: { status: 'CANCELLED' },
-        })
-      }
-    }
-
-    // Check if student has any remaining ACTIVE module enrollments
-    const activeCount = await db.moduleEnrollment.count({
-      where: {
-        enrollmentId: moduleEnrollment.enrollmentId,
-        status: 'ACTIVE',
-      },
-    })
-
-    // If no active modules remain, mark the enrollment as COMPLETED
-    if (activeCount === 0 && (status === 'COMPLETED' || status === 'CANCELLED')) {
-      await db.enrollment.update({
-        where: { id: moduleEnrollment.enrollmentId },
-        data: { status: 'COMPLETED' },
-      })
-    }
+    await db.moduleEnrollment.delete({ where: { id } })
 
     revalidatePath(`/admin/grupe/${moduleEnrollment.enrollment.scheduledGroupId}`)
   } catch (err) {
-    console.error('updateModuleEnrollmentStatus failed:', err)
-    return { success: false, error: 'Greška pri ažuriranju statusa.' }
+    console.error('deleteModuleEnrollment failed:', err)
+    return { success: false, error: 'Greška pri uklanjanju iz modula.' }
   }
 
   return { success: true }
 }
 
-export async function bulkCompleteModuleEnrollments(
-  groupId: string,
+export async function closeModuleSchedule(
   moduleScheduleId: string,
 ): Promise<AdminActionResult> {
   await requireAdmin()
 
-  if (!groupId || !moduleScheduleId) return { success: false, error: 'Grupa i modul su obavezni.' }
+  if (!moduleScheduleId) return { success: false, error: 'Modul nije pronađen.' }
 
   try {
-    await db.moduleEnrollment.updateMany({
-      where: {
-        moduleScheduleId,
-        status: 'ACTIVE',
-        enrollment: { scheduledGroupId: groupId, status: 'ACTIVE' },
+    const schedule = await db.moduleSchedule.findUnique({
+      where: { id: moduleScheduleId },
+      select: {
+        module: {
+          select: {
+            course: {
+              select: {
+                scheduledGroups: { select: { id: true } },
+              },
+            },
+          },
+        },
       },
-      data: { status: 'COMPLETED' },
+    })
+    if (!schedule) return { success: false, error: 'Modul nije pronađen.' }
+
+    await db.moduleSchedule.update({
+      where: { id: moduleScheduleId },
+      data: { endDate: new Date() },
     })
 
-    // For enrollments with no remaining ACTIVE modules, mark as COMPLETED
-    const enrollments = await db.enrollment.findMany({
-      where: { scheduledGroupId: groupId, status: 'ACTIVE' },
-      include: { moduleEnrollments: { where: { status: 'ACTIVE' } } },
-    })
-
-    const toComplete = enrollments
-      .filter((e) => e.moduleEnrollments.length === 0)
-      .map((e) => e.id)
-
-    if (toComplete.length > 0) {
-      await db.enrollment.updateMany({
-        where: { id: { in: toComplete } },
-        data: { status: 'COMPLETED' },
-      })
+    for (const g of schedule.module.course.scheduledGroups) {
+      revalidatePath(`/admin/grupe/${g.id}`)
     }
   } catch (err) {
-    console.error('bulkCompleteModuleEnrollments failed:', err)
-    return { success: false, error: 'Greška pri završavanju modula.' }
+    console.error('closeModuleSchedule failed:', err)
+    return { success: false, error: 'Greška pri zatvaranju modula.' }
   }
 
-  revalidatePath(`/admin/grupe/${groupId}`)
   return { success: true }
 }
 

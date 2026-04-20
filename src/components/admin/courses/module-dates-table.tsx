@@ -3,8 +3,9 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Check, X, Pencil, Users } from 'lucide-react'
+import { Calendar, Check, X, Pencil, Users, CheckCircle } from 'lucide-react'
 import { updateModuleSchedule } from '@/actions/admin/module'
+import { closeModuleSchedule } from '@/actions/admin/module-enrollment'
 import Link from 'next/link'
 
 type Module = {
@@ -74,6 +75,19 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
       if (result.success) {
         toast.success('Datumi modula ažurirani.')
         setEditing(false)
+        router.refresh()
+      } else {
+        toast.error(result.error ?? 'Greška.')
+      }
+    })
+  }
+
+  const handleCloseModule = () => {
+    if (!mod.scheduleId) return
+    startTransition(async () => {
+      const result = await closeModuleSchedule(mod.scheduleId!)
+      if (result.success) {
+        toast.success(`Modul "${mod.title}" završen.`)
         router.refresh()
       } else {
         toast.error(result.error ?? 'Greška.')
@@ -156,13 +170,26 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => setEditing(true)}
-              className="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded transition-colors"
-              title="Uredi datume"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center justify-end gap-1">
+              {status.label === 'Aktivan' && (
+                <button
+                  onClick={handleCloseModule}
+                  disabled={isPending}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50"
+                  title="Završi modul za sve grupe (postavi krajnji datum na danas)"
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  Završi
+                </button>
+              )}
+              <button
+                onClick={() => setEditing(true)}
+                className="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded transition-colors"
+                title="Uredi datume"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )
         )}
       </td>

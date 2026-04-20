@@ -3,10 +3,9 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CheckCircle, Plus, XCircle, Users } from 'lucide-react'
+import { Plus, XCircle, Users } from 'lucide-react'
 import {
-  bulkCompleteModuleEnrollments,
-  updateModuleEnrollmentStatus,
+  deleteModuleEnrollment,
   addModuleEnrollment,
 } from '@/actions/admin/module-enrollment'
 import Link from 'next/link'
@@ -30,7 +29,6 @@ type ModuleInfo = {
 
 type ModuleEnrollmentInfo = {
   id: string
-  status: string
   moduleSchedule: {
     id: string
     module: { id: string; title: string; sortOrder: number }
@@ -44,7 +42,6 @@ type EnrollmentInfo = {
 }
 
 interface ModuleEnrollmentPanelProps {
-  groupId: string
   modules: ModuleInfo[]
   enrollments: EnrollmentInfo[]
   maxStudents: number
@@ -60,13 +57,11 @@ function getModuleStatus(mod: ModuleInfo): { label: string; className: string } 
 
 function ModuleTab({
   mod,
-  groupId,
   enrollments,
   maxStudents,
   nextModuleScheduleId,
 }: Readonly<{
   mod: ModuleInfo
-  groupId: string
   enrollments: EnrollmentInfo[]
   maxStudents: number
   nextModuleScheduleId: string | null
@@ -77,7 +72,7 @@ function ModuleTab({
   const scheduleId = mod.scheduleId
   const enrolledInModule = scheduleId
     ? enrollments.filter((e) =>
-        e.moduleEnrollments.some((me) => me.moduleSchedule.id === scheduleId && me.status === 'ACTIVE'),
+        e.moduleEnrollments.some((me) => me.moduleSchedule.id === scheduleId),
       )
     : []
   const notInModule = scheduleId
@@ -88,19 +83,6 @@ function ModuleTab({
   const status = getModuleStatus(mod)
   const spotsUsed = enrolledInModule.length
   const spotsAvailable = maxStudents - spotsUsed
-
-  const handleBulkComplete = () => {
-    if (!scheduleId) return
-    startTransition(async () => {
-      const res = await bulkCompleteModuleEnrollments(groupId, scheduleId)
-      if (res.success) {
-        toast.success(`Modul "${mod.title}" završen za sve polaznike.`)
-        router.refresh()
-      } else {
-        toast.error(res.error ?? 'Greška.')
-      }
-    })
-  }
 
   const handleAddToNextModule = (enrollmentId: string) => {
     if (!nextModuleScheduleId) return
@@ -115,11 +97,11 @@ function ModuleTab({
     })
   }
 
-  const handleCancelModuleEnrollment = (moduleEnrollmentId: string) => {
+  const handleRemoveFromModule = (moduleEnrollmentId: string) => {
     startTransition(async () => {
-      const res = await updateModuleEnrollmentStatus(moduleEnrollmentId, 'CANCELLED')
+      const res = await deleteModuleEnrollment(moduleEnrollmentId)
       if (res.success) {
-        toast.success('Upis u modul otkazan.')
+        toast.success('Polaznik uklonjen iz modula.')
         router.refresh()
       } else {
         toast.error(res.error ?? 'Greška.')
@@ -144,25 +126,13 @@ function ModuleTab({
             {status.label}
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500">
-            <Users className="w-3.5 h-3.5 inline mr-1" />
-            {spotsUsed}/{maxStudents}
-            {spotsAvailable > 0 && (
-              <span className="text-green-600 ml-1">({spotsAvailable} slobodnih)</span>
-            )}
-          </span>
-          {enrolledInModule.length > 0 && (
-            <button
-              onClick={handleBulkComplete}
-              disabled={isPending}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50"
-            >
-              <CheckCircle className="w-3.5 h-3.5" />
-              Završi modul
-            </button>
+        <span className="text-xs text-gray-500">
+          <Users className="w-3.5 h-3.5 inline mr-1" />
+          {spotsUsed}/{maxStudents}
+          {spotsAvailable > 0 && (
+            <span className="text-green-600 ml-1">({spotsAvailable} slobodnih)</span>
           )}
-        </div>
+        </span>
       </div>
 
       {mod.startDate && mod.endDate && (
@@ -177,7 +147,7 @@ function ModuleTab({
         <div className="divide-y">
           {enrolledInModule.map((enrollment) => {
             const meForModule = enrollment.moduleEnrollments.find(
-              (me) => me.moduleSchedule.id === scheduleId && me.status === 'ACTIVE',
+              (me) => me.moduleSchedule.id === scheduleId,
             )
             const hasNextModule = nextModuleScheduleId
               ? enrollment.moduleEnrollments.some(
@@ -207,10 +177,10 @@ function ModuleTab({
                   )}
                   {meForModule && (
                     <button
-                      onClick={() => handleCancelModuleEnrollment(meForModule.id)}
+                      onClick={() => handleRemoveFromModule(meForModule.id)}
                       disabled={isPending}
                       className="p-1 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                      title="Otkaži upis u modul"
+                      title="Ukloni iz modula"
                     >
                       <XCircle className="w-4 h-4" />
                     </button>
@@ -261,7 +231,6 @@ function ModuleTab({
 }
 
 export function ModuleEnrollmentPanel({
-  groupId,
   modules,
   enrollments,
   maxStudents,
@@ -301,7 +270,6 @@ export function ModuleEnrollmentPanel({
       {modules[expandedIdx] && (
         <ModuleTab
           mod={modules[expandedIdx]}
-          groupId={groupId}
           enrollments={enrollments}
           maxStudents={maxStudents}
           nextModuleScheduleId={modules[expandedIdx + 1]?.scheduleId ?? null}

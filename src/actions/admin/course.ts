@@ -13,7 +13,7 @@ export async function getCourses(schoolYear?: string) {
   const year = schoolYear ?? computeSchoolYear()
 
   return db.course.findMany({
-    orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+    orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
     select: {
       id: true,
       slug: true,
@@ -44,7 +44,7 @@ export async function getCourses(schoolYear?: string) {
               startDate: true,
               endDate: true,
               _count: {
-                select: { moduleEnrollments: { where: { status: 'ACTIVE' } } },
+                select: { moduleEnrollments: true },
               },
             },
           },

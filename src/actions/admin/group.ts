@@ -75,7 +75,6 @@ export async function getGroupDetail(id: string) {
       },
       location: true,
       enrollments: {
-        where: { status: 'ACTIVE' },
         include: {
           user: { select: { id: true, firstName: true, lastName: true, email: true } },
           moduleEnrollments: {

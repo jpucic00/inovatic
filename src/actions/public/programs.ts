@@ -28,15 +28,23 @@ export type ActiveProgram = {
 
 export async function getActivePrograms(): Promise<ActiveProgram[]> {
   const now = new Date()
-  const year = computeSchoolYear()
+  const yearFloor = computeSchoolYear()
 
   const groups = await db.scheduledGroup.findMany({
     where: {
-      schoolYear: year,
-      OR: [
-        { enrollmentStart: null, enrollmentEnd: null },
-        { enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
-        { enrollmentStart: { lte: now }, enrollmentEnd: null },
+      AND: [
+        {
+          OR: [
+            { enrollmentStart: null },
+            { enrollmentStart: { lte: now } },
+          ],
+        },
+        {
+          OR: [
+            { enrollmentEnd: null },
+            { enrollmentEnd: { gte: now } },
+          ],
+        },
       ],
     },
     include: {
@@ -58,15 +66,11 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
               title: true,
               sortOrder: true,
               schedules: {
-                where: { schoolYear: year, endDate: { gte: now } },
-                orderBy: { module: { sortOrder: 'asc' } },
-                take: 1,
+                where: { schoolYear: { gte: yearFloor } },
                 select: {
                   id: true,
-                  moduleEnrollments: {
-                    where: { status: 'ACTIVE' },
-                    select: { enrollmentId: true },
-                  },
+                  schoolYear: true,
+                  startDate: true,
                 },
               },
             },
@@ -74,11 +78,9 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
         },
       },
       enrollments: {
-        where: { status: 'ACTIVE' },
         select: {
           id: true,
           moduleEnrollments: {
-            where: { status: 'ACTIVE' },
             select: { moduleScheduleId: true },
           },
         },
@@ -96,27 +98,27 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
   for (const g of groups) {
     const isStandard = !g.course.isCustom
 
-    // Find the first module that has a schedule with endDate >= now (enrolling module)
     let enrollingScheduleId: string | null = null
     let enrollingModuleTitle: string | null = null
     if (isStandard) {
       for (const mod of g.course.modules) {
-        if (mod.schedules.length > 0) {
-          enrollingScheduleId = mod.schedules[0].id
+        const schedule = mod.schedules.find(
+          (s) => s.schoolYear === g.schoolYear && s.startDate !== null && s.startDate > now,
+        )
+        if (schedule) {
+          enrollingScheduleId = schedule.id
           enrollingModuleTitle = mod.title
           break
         }
       }
+      if (!enrollingScheduleId) continue
     }
 
-    let enrolledCount: number
-    if (isStandard && enrollingScheduleId) {
-      enrolledCount = g.enrollments.filter((e) =>
-        e.moduleEnrollments.some((me) => me.moduleScheduleId === enrollingScheduleId),
-      ).length
-    } else {
-      enrolledCount = g.enrollments.length
-    }
+    const enrolledCount = isStandard
+      ? g.enrollments.filter((e) =>
+          e.moduleEnrollments.some((me) => me.moduleScheduleId === enrollingScheduleId),
+        ).length
+      : g.enrollments.length
 
     const available = g.maxStudents - enrolledCount - g._count.preferredInquiries
     const isFull = available <= 0

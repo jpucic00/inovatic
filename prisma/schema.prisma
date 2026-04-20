@@ -34,24 +34,11 @@ enum CommentType {
   MODULE_REVIEW
 }
 
-enum EnrollmentStatus {
-  PENDING
-  ACTIVE
-  COMPLETED
-  CANCELLED
-}
-
 enum MaterialType {
   DOCUMENT
   PRESENTATION
   VIDEO
   LINK
-}
-
-enum ModuleEnrollmentStatus {
-  ACTIVE
-  COMPLETED
-  CANCELLED
 }
 
 // ─── Models ──────────────────────────────────────────────────────────────────
@@ -68,6 +55,11 @@ model User {
   username      String?   @unique
   plainPassword String?
   emailVerified DateTime?
+  parentName    String?
+  parentEmail   String?
+  parentPhone   String?
+  childSchool   String?
+  gdprConsentAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -211,13 +203,12 @@ model Inquiry {
 
 
 model Enrollment {
-  id               String           @id @default(cuid())
+  id               String   @id @default(cuid())
   userId           String
   scheduledGroupId String
   schoolYear       String
-  status           EnrollmentStatus @default(ACTIVE)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   scheduledGroup    ScheduledGroup     @relation(fields: [scheduledGroupId], references: [id])
@@ -227,12 +218,11 @@ model Enrollment {
 }
 
 model ModuleEnrollment {
-  id               String                 @id @default(cuid())
+  id               String   @id @default(cuid())
   enrollmentId     String
   moduleScheduleId String
-  status           ModuleEnrollmentStatus @default(ACTIVE)
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   enrollment     Enrollment     @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   moduleSchedule ModuleSchedule @relation(fields: [moduleScheduleId], references: [id], onDelete: Cascade)

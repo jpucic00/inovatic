@@ -1,5 +1,5 @@
 import type { CourseLevel } from '@prisma/client'
-export type { UserRole, CourseLevel, InquiryStatus, EnrollmentStatus, MaterialType } from '@prisma/client'
+export type { UserRole, CourseLevel, InquiryStatus, MaterialType } from '@prisma/client'
 
 export type CourseLevelLabel = Record<CourseLevel, string>
 
