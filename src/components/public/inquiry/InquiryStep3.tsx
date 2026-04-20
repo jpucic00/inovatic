@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import type { UseFormRegister, FieldErrors, UseFormSetValue } from 'react-hook-form'
+import type { UseFormRegister, FieldErrors, UseFormSetValue, UseFormGetValues } from 'react-hook-form'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import type { ActiveProgram } from '@/actions/public/programs'
 import { FieldError } from './FieldError'
@@ -11,6 +11,7 @@ interface Props {
   register: UseFormRegister<InquiryFormData>
   errors: FieldErrors<InquiryFormData>
   setValue: UseFormSetValue<InquiryFormData>
+  getValues: UseFormGetValues<InquiryFormData>
   programs: ActiveProgram[]
   preselectedCourseId?: string
 }
@@ -57,9 +58,25 @@ function formatGroupLabel(g: ActiveProgram['groups'][number]): string {
   return parts.join(' · ')
 }
 
-export function InquiryStep3({ register, errors, setValue, programs, preselectedCourseId }: Readonly<Props>) {
-  const [selectedGroupKey, setSelectedGroupKey] = useState('')
-  const [selectedGrade, setSelectedGrade] = useState('')
+export function InquiryStep3({ register, errors, setValue, getValues, programs, preselectedCourseId }: Readonly<Props>) {
+  const [selectedGroupKey, setSelectedGroupKey] = useState(() => {
+    const courseId = getValues('courseId')
+    const groupId = getValues('scheduledGroupId')
+    return courseId && groupId ? `${courseId}|${groupId}` : ''
+  })
+  const [selectedGrade, setSelectedGrade] = useState(() => getValues('grade') ?? '')
+
+  useEffect(() => {
+    if (!selectedGroupKey) return
+    const [courseId, groupId] = selectedGroupKey.split('|')
+    const program = programs.find((p) => p.id === courseId)
+    const group = program?.groups.find((g) => g.id === groupId)
+    if (!group || group.isFull) {
+      setSelectedGroupKey('')
+      setValue('scheduledGroupId', undefined)
+      setValue('courseId', preselectedCourseId || undefined)
+    }
+  }, [programs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const gradeReg = register('grade')
   const gradeSelected = preselectedCourseId || !!selectedGrade

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { UseFormRegister, FieldErrors, UseFormSetValue } from 'react-hook-form'
+import type { UseFormRegister, FieldErrors, UseFormSetValue, UseFormGetValues } from 'react-hook-form'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import { FieldError } from './FieldError'
 
@@ -9,6 +9,7 @@ interface Props {
   register: UseFormRegister<InquiryFormData>
   errors: FieldErrors<InquiryFormData>
   setValue: UseFormSetValue<InquiryFormData>
+  getValues: UseFormGetValues<InquiryFormData>
 }
 
 const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition'
@@ -32,10 +33,15 @@ const MONTHS_HR = [
 const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = Array.from({ length: 17 }, (_, i) => CURRENT_YEAR - 4 - i)
 
-export function InquiryStep2({ register, errors, setValue }: Readonly<Props>) {
-  const [day, setDay] = useState('')
-  const [month, setMonth] = useState('')
-  const [year, setYear] = useState('')
+export function InquiryStep2({ register, errors, setValue, getValues }: Readonly<Props>) {
+  const existingDOB = getValues('childDateOfBirth')
+  const [day, setDay] = useState(() => {
+    if (!existingDOB) return ''
+    const d = existingDOB.split('-')[2]
+    return d ? String(parseInt(d, 10)) : ''
+  })
+  const [month, setMonth] = useState(() => existingDOB?.split('-')[1] ?? '')
+  const [year, setYear] = useState(() => existingDOB?.split('-')[0] ?? '')
 
   function updateDOB(d: string, m: string, y: string) {
     if (d && m && y) {

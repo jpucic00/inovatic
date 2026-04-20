@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
@@ -37,6 +37,25 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
   const [submittedCount, setSubmittedCount] = useState(0)
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [livePrograms, setLivePrograms] = useState<ActiveProgram[]>(programs)
+
+  useEffect(() => {
+    if (step !== 3) return
+
+    let cancelled = false
+    async function refresh() {
+      try {
+        const res = await fetch('/api/group-availability')
+        if (!res.ok) return
+        const fresh: ActiveProgram[] = await res.json()
+        if (!cancelled) setLivePrograms(fresh)
+      } catch { /* stale data is acceptable briefly */ }
+    }
+
+    void refresh()
+    const interval = setInterval(refresh, 30_000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [step])
 
   const {
     register,
@@ -81,6 +100,9 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
       if (result.success) {
         setSubmittedCount((c) => c + 1)
         setDone(true)
+      } else if ('code' in result && result.code === 'GROUP_FULL') {
+        setLivePrograms(result.programs)
+        setServerError(result.error)
       } else {
         setServerError(result.error)
       }
@@ -149,9 +171,9 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
 
       <form onSubmit={handleSubmit(onSubmit)} onKeyDown={handleKeyDown} noValidate>
         {step === 1 && <InquiryStep1 register={register} errors={errors} />}
-        {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} />}
+        {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} getValues={getValues} />}
         {step === 3 && (
-          <InquiryStep3 register={register} errors={errors} setValue={setValue} programs={programs} preselectedCourseId={preselectedCourseId} />
+          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} programs={livePrograms} preselectedCourseId={preselectedCourseId} />
         )}
 
         {serverError && (
