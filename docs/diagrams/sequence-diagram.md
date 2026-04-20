@@ -12,7 +12,8 @@ sequenceDiagram
 
     Parent->>Web: Visits /upisi or /programi/slug/prijava
     Web->>Server: getActivePrograms()
-    Server-->>Web: Programs with groups, spots, enrollment windows
+    Note right of Server: Filters by active enrollment window only - schoolYear ignored. Standard courses also require a next-starting ModuleSchedule.
+    Server-->>Web: Programs with groups, spots (next-starting module for standards), enrollment windows
 
     Note over Parent, Web: Step 1: parentName, parentEmail, parentPhone
     Note over Parent, Web: Step 2: childFirstName, childLastName, childDateOfBirth, childSchool
@@ -57,7 +58,12 @@ sequenceDiagram
 
     Note over Parent, Admin: PHASE 3 — Admin Creates Account and Enrolls
 
-    Admin->>Server: createStudentFromInquiry inquiryId groupId
+    Admin->>Server: Opens CreateAccountDialog for inquiry
+    Server-->>Admin: Course modules and ModuleSchedules for group.schoolYear
+
+    Note right of Admin: For standard courses admin must pick at least one ModuleSchedule. For radionice the step is skipped.
+
+    Admin->>Server: createStudentFromInquiry inquiryId groupId moduleScheduleIds
 
     Server->>Server: Guard: status not ACCOUNT_CREATED or DECLINED
 
@@ -73,11 +79,16 @@ sequenceDiagram
         Server->>Server: hashPassword bcrypt 12 rounds
         Server->>Server: Create User role STUDENT email username at student.inovatic.local
         Server->>Server: Store plainPassword on User for admin reference
+        Server->>Server: Copy parentName parentEmail parentPhone childSchool gdprConsentAt from Inquiry to User
     end
 
     Server->>Server: Check for existing Enrollment userId + groupId + schoolYear
     alt No existing enrollment
-        Server->>Server: Create Enrollment status ACTIVE schoolYear computed
+        Server->>Server: Create Enrollment (no status column, row presence is the signal)
+    end
+
+    alt moduleScheduleIds non-empty
+        Server->>Server: moduleEnrollment.createMany skipDuplicates - one row per schedule
     end
 
     Server->>Server: Update Inquiry status ACCOUNT_CREATED studentId assignedGroupId
@@ -87,7 +98,22 @@ sequenceDiagram
 
     Server-->>Admin: Success with username password studentId
 
-    Note over Parent, Admin: ALTERNATE PATHS
+    Note over Parent, Admin: ALTERNATE ENTRY PATHS
+
+    alt Manual student creation via CreateStudentDialog
+        Admin->>Server: getGroupsForCourseInYears courseId
+        Server-->>Admin: Groups across current and future school years
+        Admin->>Server: createStudentManually firstName lastName dob group moduleScheduleIds
+        Server->>Server: Same dedup flow plus createStudentCore enrollment path
+        Note right of Server: No Inquiry row involved. Admin can pre-enroll into a future-year group without any parent form.
+    end
+
+    alt Add existing student to a new group
+        Admin->>Server: Opens student detail then addEnrollment studentId groupId
+        Server->>Server: Reuses createStudentCore enrollment path - no user creation
+    end
+
+    Note over Parent, Admin: ALTERNATE EXITS
 
     alt Admin declines inquiry
         Admin->>Server: updateInquiryStatus id DECLINED
@@ -98,4 +124,21 @@ sequenceDiagram
         Admin->>Server: deleteInquiry id
         Server->>Server: Delete Inquiry record spot freed
     end
+
+    alt Admin removes a module from an enrolled student
+        Admin->>Server: deleteModuleEnrollment moduleEnrollmentId
+        Server->>Server: Hard delete single row - later modules for same student untouched
+    end
+
+    alt Admin closes a running module early
+        Admin->>Server: closeModuleSchedule moduleScheduleId
+        Server->>Server: Set ModuleSchedule.endDate to now - group advances to next module
+    end
+
+    alt Admin removes a whole enrollment
+        Admin->>Server: deleteEnrollment enrollmentId
+        Server->>Server: Hard delete Enrollment - onDelete Cascade removes ModuleEnrollment rows
+    end
 ```
+
+> The "available spots" number surfaced in the public form for standard courses comes from the **next-starting** module (first module by `sortOrder` whose schedule for that group's `schoolYear` has `startDate > now`), not the currently-running module. A module that's already running is past the point of new enrolments; the group's public capacity reflects the next one in line.

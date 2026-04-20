@@ -46,5 +46,5 @@ npx prisma migrate dev --name <description>
 - **Images**: Cloudinary (cloud: dgc2tp4f8, EU)
 
 ## Important
-- Never use `preview_*` tools — they fail with EPERM due to macOS sandbox restriction. Use `npm run dev` + Playwright or manual browser checks instead.
+- `preview_*` tools work — requires macOS Privacy & Security → Files and Folders → Documents Folder access granted to the terminal app. Dev server config is in `.claude/launch.json` (name: `inovatic-dev`, port 3000).
 - SonarQube available locally: `npm run sonar:start`, scan with `npm run sonar:scan`
