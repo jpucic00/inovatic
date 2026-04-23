@@ -8,11 +8,11 @@ import { Logo } from '@/components/shared/logo'
 const sidebarLinks = [
   { href: '/admin', label: 'Nadzorna ploča', icon: LayoutDashboard },
   { href: '/admin/upiti', label: 'Upiti', icon: Inbox },
+  { href: '/admin/ucenici', label: 'Učenici', icon: GraduationCap },
   { href: '/admin/grupe', label: 'Grupe', icon: Users2 },
+  { href: '/admin/nastavnici', label: 'Nastavnici', icon: Users },
   { href: '/admin/programi', label: 'Programi', icon: BookOpen },
   { href: '/admin/lokacije', label: 'Lokacije', icon: MapPin },
-  { href: '/admin/ucenici', label: 'Učenici', icon: GraduationCap },
-  { href: '/admin/nastavnici', label: 'Nastavnici', icon: Users },
   { href: '/admin/novosti', label: 'Novosti', icon: Newspaper },
 ]
 
