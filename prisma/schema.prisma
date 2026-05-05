@@ -182,6 +182,7 @@ model Inquiry {
   childLastName       String
   childDateOfBirth    String?
   childSchool         String?
+  childGrade          String?
   courseLevelPref CourseLevel?
   locationPref    String?
   courseId        String?

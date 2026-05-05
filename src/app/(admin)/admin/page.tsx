@@ -19,6 +19,7 @@ export default async function AdminDashboard() {
     totalStudents,
     totalActiveGroups,
     recentInquiries,
+    referralStats,
   ] = await Promise.all([
     db.inquiry.groupBy({
       by: ['status'],
@@ -38,7 +39,19 @@ export default async function AdminDashboard() {
         createdAt: true,
       },
     }),
+    db.inquiry.groupBy({
+      by: ['referralSource'],
+      _count: { referralSource: true },
+      where: { referralSource: { not: null } },
+      orderBy: { _count: { referralSource: 'desc' } },
+      take: 5,
+    }),
   ])
+
+  const totalReferrals = referralStats.reduce(
+    (sum, s) => sum + s._count.referralSource,
+    0,
+  )
 
   const statusCount = Object.fromEntries(
     inquiryStats.map((s) => [s.status, s._count.status]),
@@ -127,27 +140,45 @@ export default async function AdminDashboard() {
           </div>
         </div>
 
-        {/* Summary by status */}
-        <div>
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Upiti po statusu</h2>
-          <div className="bg-white rounded-xl border p-5 space-y-3">
-            {[
-              { status: 'NEW', label: 'Novi' },
-              { status: 'ACCOUNT_CREATED', label: 'Račun stvoren' },
-              { status: 'DECLINED', label: 'Odbijeni' },
-            ].map(({ status, label }) => (
-              <div key={status} className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">{label}</span>
-                <span className="text-sm font-semibold text-gray-900 tabular-nums">
-                  {statusCount[status] ?? 0}
-                </span>
+        {/* Summary by status + referral sources */}
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 mb-4">Upiti po statusu</h2>
+            <div className="bg-white rounded-xl border p-5 space-y-3">
+              {[
+                { status: 'NEW', label: 'Novi' },
+                { status: 'ACCOUNT_CREATED', label: 'Račun stvoren' },
+                { status: 'DECLINED', label: 'Odbijeni' },
+              ].map(({ status, label }) => (
+                <div key={status} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">{label}</span>
+                  <span className="text-sm font-semibold text-gray-900 tabular-nums">
+                    {statusCount[status] ?? 0}
+                  </span>
+                </div>
+              ))}
+              <div className="pt-2 mt-2 border-t flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Ukupno</span>
+                <span className="text-sm font-bold text-gray-900 tabular-nums">{totalInquiries}</span>
               </div>
-            ))}
-            <div className="pt-2 mt-2 border-t flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Ukupno</span>
-              <span className="text-sm font-bold text-gray-900 tabular-nums">{totalInquiries}</span>
             </div>
           </div>
+
+          {totalReferrals > 0 && (
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 mb-4">Izvor upita</h2>
+              <div className="bg-white rounded-xl border p-5 space-y-3">
+                {referralStats.map((s) => (
+                  <div key={s.referralSource} className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-gray-600 truncate">{s.referralSource}</span>
+                    <span className="text-sm font-semibold text-gray-900 tabular-nums shrink-0">
+                      {s._count.referralSource}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

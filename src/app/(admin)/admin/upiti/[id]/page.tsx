@@ -18,6 +18,18 @@ import { formatChildName } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Admin – Upit' }
 
+const GRADE_LABELS: Record<string, string> = {
+  predskolci: 'Predškolci',
+  '1': '1. razred',
+  '2': '2. razred',
+  '3': '3. razred',
+  '4': '4. razred',
+  '5': '5. razred',
+  '6': '6. razred',
+  '7': '7. razred',
+  '8': '8. razred',
+}
+
 interface PageProps {
   params: Promise<{ id: string }>
 }
@@ -233,6 +245,12 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
           {inquiry.childSchool && (
             <DetailRow label="Škola" value={inquiry.childSchool} />
           )}
+          {inquiry.childGrade && (
+            <DetailRow
+              label="Razred"
+              value={GRADE_LABELS[inquiry.childGrade] ?? inquiry.childGrade}
+            />
+          )}
         </dl>
       </div>
 
@@ -268,6 +286,12 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
             label="Poruka"
             value={
               inquiry.message || <span className="text-gray-400 italic">Nije navedena</span>
+            }
+          />
+          <DetailRow
+            label="Izvor saznanja"
+            value={
+              inquiry.referralSource || <span className="text-gray-400 italic">Nije navedeno</span>
             }
           />
           <DetailRow
