@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
@@ -17,6 +17,7 @@ import { createGroupSchema, type CreateGroupInput } from '@/lib/validators/admin
 import { createGroup } from '@/actions/admin/group'
 import { DAYS_HR } from '@/lib/format'
 import { adminInputClass, adminSelectClass } from '@/lib/admin-styles'
+import { DateInput } from '@/components/ui/date-input'
 import {
   TeacherMultiSelect,
   type TeacherOption,
@@ -110,7 +111,7 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
               {isRadionica ? (
                 <>
                   <label htmlFor="create-date" className="block text-sm font-medium text-gray-700 mb-1">Datum *</label>
-                  <input id="create-date" {...register('date')} type="date" className={adminInputClass} />
+                  <Controller name="date" control={control} render={({ field }) => <DateInput id="create-date" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
                   {errors.date && <p className="text-xs text-red-600 mt-1">{errors.date.message}</p>}
                 </>
               ) : (
@@ -154,12 +155,12 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="create-enrollmentStart" className="text-xs text-gray-500 mb-1 block">Od</label>
-                <input id="create-enrollmentStart" {...register('enrollmentStart')} type="date" className={adminInputClass} />
+                <Controller name="enrollmentStart" control={control} render={({ field }) => <DateInput id="create-enrollmentStart" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
                 {errors.enrollmentStart && <p className="text-xs text-red-600 mt-1">{errors.enrollmentStart.message}</p>}
               </div>
               <div>
                 <label htmlFor="create-enrollmentEnd" className="text-xs text-gray-500 mb-1 block">Do</label>
-                <input id="create-enrollmentEnd" {...register('enrollmentEnd')} type="date" className={adminInputClass} />
+                <Controller name="enrollmentEnd" control={control} render={({ field }) => <DateInput id="create-enrollmentEnd" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
                 {errors.enrollmentEnd && <p className="text-xs text-red-600 mt-1">{errors.enrollmentEnd.message}</p>}
               </div>
             </div>

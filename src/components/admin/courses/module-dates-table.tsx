@@ -3,9 +3,10 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Calendar, Check, X, Pencil, Users, CheckCircle } from 'lucide-react'
+import { Check, X, Pencil, Users, CheckCircle, Calendar } from 'lucide-react'
 import { updateModuleSchedule } from '@/actions/admin/module'
 import { closeModuleSchedule } from '@/actions/admin/module-enrollment'
+import { DateInput } from '@/components/ui/date-input'
 import Link from 'next/link'
 
 type Module = {
@@ -42,10 +43,13 @@ function formatDate(d: Date | null): string {
   return `${dd}.${mm}.${yyyy}.`
 }
 
-function toInputDate(d: Date | null): string {
+function toIsoString(d: Date | null): string {
   if (!d) return ''
   const date = new Date(d)
-  return date.toISOString().split('T')[0]
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
 }
 
 function getModuleStatus(mod: Module): { label: string; className: string } {
@@ -58,8 +62,8 @@ function getModuleStatus(mod: Module): { label: string; className: string } {
 
 function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
   const [editing, setEditing] = useState(false)
-  const [startDate, setStartDate] = useState(toInputDate(mod.startDate))
-  const [endDate, setEndDate] = useState(toInputDate(mod.endDate))
+  const [startDate, setStartDate] = useState(toIsoString(mod.startDate))
+  const [endDate, setEndDate] = useState(toIsoString(mod.endDate))
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const status = getModuleStatus(mod)
@@ -96,8 +100,8 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
   }
 
   const handleCancel = () => {
-    setStartDate(toInputDate(mod.startDate))
-    setEndDate(toInputDate(mod.endDate))
+    setStartDate(toIsoString(mod.startDate))
+    setEndDate(toIsoString(mod.endDate))
     setEditing(false)
   }
 
@@ -108,10 +112,9 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
       </td>
       <td className="py-2.5 pr-4">
         {editing ? (
-          <input
-            type="date"
+          <DateInput
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={setStartDate}
             className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
           />
         ) : (
@@ -120,10 +123,9 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
       </td>
       <td className="py-2.5 pr-4">
         {editing ? (
-          <input
-            type="date"
+          <DateInput
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={setEndDate}
             className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
           />
         ) : (

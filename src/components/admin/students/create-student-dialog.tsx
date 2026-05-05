@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { UserPlus, Copy, ExternalLink } from 'lucide-react'
+import { DateInput } from '@/components/ui/date-input'
 import { createStudentManually } from '@/actions/admin/student'
 import { getGroupsForCourseInYears } from '@/actions/admin/inquiry'
 import { toast } from 'sonner'
@@ -318,11 +319,10 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
                   >
                     Datum rođenja
                   </label>
-                  <input
+                  <DateInput
                     id="create-student-dob"
-                    type="date"
                     value={dateOfBirth}
-                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    onChange={setDateOfBirth}
                     className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                   />
                 </div>
