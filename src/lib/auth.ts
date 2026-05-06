@@ -10,22 +10,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        identifier: { label: 'Korisničko ime ili e-mail', type: 'text' },
         password: { label: 'Lozinka', type: 'password' },
       },
       authorize: async (credentials) => {
         const parsed = z
           .object({
-            email: z.string().email(),
+            identifier: z.string().min(1),
             password: z.string().min(1),
           })
           .safeParse(credentials)
 
         if (!parsed.success) return null
 
-        const user = await db.user.findUnique({
-          where: { email: parsed.data.email },
-        })
+        const { identifier } = parsed.data
+        const user = identifier.includes('@')
+          ? await db.user.findUnique({ where: { email: identifier } })
+          : await db.user.findUnique({ where: { username: identifier } })
 
         if (!user) return null
 

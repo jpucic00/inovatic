@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { LogOut, BookOpen, User } from 'lucide-react'
-import { requireAuth } from '@/lib/auth-guard'
+import { requireStudent } from '@/lib/auth-guard'
 import { logoutAction } from '@/actions/logout'
 import { Logo } from '@/components/shared/logo'
 
 export default async function PortalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const session = await requireAuth()
+  const session = await requireStudent()
   const userName = session.user.name ?? session.user.email ?? 'Korisnik'
 
   return (
@@ -18,7 +18,7 @@ export default async function PortalLayout({ children }: Readonly<{ children: Re
             <span className="text-xs text-gray-400">{userName}</span>
             <Link href="/portal" className="text-sm text-gray-500 hover:text-cyan-500 flex items-center gap-1.5">
               <BookOpen className="w-4 h-4" />
-              Materijali
+              Moje grupe
             </Link>
             <Link href="/portal/profil" className="text-sm text-gray-500 hover:text-cyan-500 flex items-center gap-1.5">
               <User className="w-4 h-4" />

@@ -44,6 +44,10 @@ export function DateInput({
   const [display, setDisplay] = useState(() => isoToDisplay(value))
   const inputRef = useRef<HTMLInputElement>(null)
   const cursorTargetRef = useRef<number | null>(null)
+
+  const layoutRe = /\b(flex-[01]|flex-auto|flex-none|flex-grow(?:-0)?|flex-shrink(?:-0)?|min-w-0)\b/g
+  const layoutClasses = (className.match(layoutRe) || []).join(' ')
+  const inputClasses = className.replace(layoutRe, '').replace(/\s{2,}/g, ' ').trim()
   const isFullWidth = /\bw-full\b/.test(className)
 
   useEffect(() => {
@@ -122,7 +126,7 @@ export function DateInput({
   }
 
   return (
-    <div className={`relative ${isFullWidth ? 'block w-full' : 'inline-block'}`}>
+    <div className={`relative ${isFullWidth ? 'block w-full' : 'inline-block'} ${layoutClasses}`}>
       <input
         ref={inputRef}
         id={id}
@@ -135,7 +139,7 @@ export function DateInput({
         placeholder={placeholder}
         disabled={disabled}
         maxLength={10}
-        className={`pr-8 ${className}`}
+        className={`pr-8 ${inputClasses}`}
       />
       <Calendar className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
       <input

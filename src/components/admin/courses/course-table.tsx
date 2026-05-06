@@ -123,8 +123,8 @@ function CourseCard({ course }: Readonly<{ course: Course }>) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5 mb-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Wrench className="w-5 h-5 text-orange-500 shrink-0" />
           <div>
             <h3 className="text-sm font-semibold text-gray-900">{course.title}</h3>
@@ -139,7 +139,7 @@ function CourseCard({ course }: Readonly<{ course: Course }>) {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
           <CopyUrlButton slug={course.slug} />
           {groupCount > 0 && (
             <Link

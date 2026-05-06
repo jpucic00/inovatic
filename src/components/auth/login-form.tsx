@@ -32,7 +32,11 @@ export function LoginForm() {
     startTransition(async () => {
       const result = await loginAction(data)
       if (result.success) {
-        router.push('/admin')
+        const destination =
+          result.role === 'ADMIN' ? '/admin'
+          : result.role === 'TEACHER' ? '/nastavnik'
+          : '/portal'
+        router.push(destination)
         router.refresh()
       } else {
         setServerError(result.error)
@@ -43,18 +47,20 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-          E-mail adresa
+        <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-1.5">
+          Korisničko ime ili e-mail
         </label>
         <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          placeholder="ime@primjer.hr"
-          className={errors.email ? errorInputClass : inputClass}
-          {...register('email')}
+          id="identifier"
+          type="text"
+          autoComplete="username"
+          placeholder="korisnickoime ili email@primjer.hr"
+          className={errors.identifier ? errorInputClass : inputClass}
+          {...register('identifier')}
         />
-        {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
+        {errors.identifier && (
+          <p className="mt-1 text-xs text-red-600">{errors.identifier.message}</p>
+        )}
       </div>
       <div>
         <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">

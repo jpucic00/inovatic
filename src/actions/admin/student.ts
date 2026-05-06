@@ -604,12 +604,13 @@ export async function getStudent(id: string) {
       },
       studentComments: {
         include: {
-          author: { select: { firstName: true, lastName: true } },
+          author: { select: { id: true, firstName: true, lastName: true, role: true } },
           module: { select: { id: true, title: true } },
           group: {
             select: {
               id: true,
               name: true,
+              schoolYear: true,
               course: { select: { title: true } },
             },
           },

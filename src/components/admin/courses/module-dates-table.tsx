@@ -204,12 +204,12 @@ export function ModuleDatesTable({ course, modules }: Readonly<ModuleDatesTableP
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5 mb-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
           <Calendar className="w-5 h-5 text-cyan-600 shrink-0" />
-          <div>
+          <div className="min-w-0">
             <h3 className="text-sm font-semibold text-gray-900">{course.title}</h3>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {course.level && (
                 <span className="text-xs text-gray-500">{course.level.replace('_', ' ')}</span>
               )}
@@ -225,12 +225,13 @@ export function ModuleDatesTable({ course, modules }: Readonly<ModuleDatesTableP
         </div>
         <Link
           href={`/admin/grupe?tab=${course.id}`}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-1.5 rounded-full hover:bg-cyan-100 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-1.5 rounded-full hover:bg-cyan-100 transition-colors shrink-0"
         >
           <Users className="w-3.5 h-3.5" />
           {course.groupCount} {course.groupCount >= 2 && course.groupCount <= 4 ? 'grupe' : 'grupa'}
         </Link>
       </div>
+      <div className="overflow-x-auto -mx-5 px-5">
       <table className="w-full">
         <thead>
           <tr className="border-b border-gray-200">
@@ -248,6 +249,7 @@ export function ModuleDatesTable({ course, modules }: Readonly<ModuleDatesTableP
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

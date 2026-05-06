@@ -92,10 +92,12 @@ const RAD_PARENT_2 = {
 
 async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
-  await page.locator('input[type="email"]').fill(ADMIN_EMAIL)
+  await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
   await page.locator('button[type="submit"]').click()
-  await page.waitForURL(`${BASE}/admin`, { timeout: 10000 })
+  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
+  // multiple workers hit the login flow simultaneously.
+  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
   await page.waitForLoadState('networkidle')
 }
 
@@ -284,6 +286,11 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       const maxInput = dialog.locator('input[type="number"][min="1"]')
       await maxInput.fill(String(MAX_SPOTS))
 
+      // Enrollment window is required by the schema; leave it wide open so
+      // public-form submissions downstream all land inside the window.
+      await dialog.locator('#create-enrollmentStart').fill('2025-06-01')
+      await dialog.locator('#create-enrollmentEnd').fill('2027-06-30')
+
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
       await expect(page.locator(`text=${STD_GROUP_NAME}`).first()).toBeVisible({ timeout: 10000 })
@@ -312,8 +319,10 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       // Group name
       await dialog.locator('input[placeholder*="Grupa"]').fill(RADIONICA_GROUP_NAME)
 
-      // Radionica course: date input appears instead of day select
-      await dialog.locator('input[type="date"]').first().fill('2026-07-15')
+      // Radionica course: date input appears instead of day select. The
+      // radionica-date input is the first input[type="date"] in the dialog.
+      const dateInputs = dialog.locator('input[type="date"]')
+      await dateInputs.nth(0).fill('2026-07-15')
 
       await dialog.locator('input[placeholder="19:00"]').fill('10:00')
       await dialog.locator('input[placeholder="20:30"]').fill('12:00')
@@ -321,6 +330,10 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       // Max students = 2
       const maxInput = dialog.locator('input[type="number"][min="1"]')
       await maxInput.fill(String(MAX_SPOTS))
+
+      // Enrollment window (required)
+      await dialog.locator('#create-enrollmentStart').fill('2025-06-01')
+      await dialog.locator('#create-enrollmentEnd').fill('2027-06-30')
 
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
@@ -333,9 +346,10 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       // Both groups created above should be visible
       await expect(page.locator(`text=${STD_GROUP_NAME}`).first()).toBeVisible()
       await expect(page.locator(`text=${RADIONICA_GROUP_NAME}`).first()).toBeVisible()
-      // Standard group (no enrollment window) should show "Uvijek"
+      // The enrollment window configured above (2025-06-01 → 2027-06-30) is
+      // currently open, so the badge should read "Otvoreno".
       const stdRow = page.locator('tr', { hasText: STD_GROUP_NAME })
-      await expect(stdRow.locator('text=Uvijek')).toBeVisible()
+      await expect(stdRow.locator('text=Otvoreno')).toBeVisible()
     })
   })
 
@@ -669,26 +683,30 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
   // ── I: Admin can edit a group ────────────────────────────────────────────────
 
   test.describe('I — Admin: Edit Group', () => {
-    test('edit dialog opens with pre-filled fields', async ({ page }) => {
+    test('edit form opens with pre-filled fields on detail page', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
       const row = page.locator('tr', { hasText: STD_GROUP_NAME })
-      await row.locator('button', { hasText: 'Uredi' }).click()
+      await row.locator('a', { hasText: STD_GROUP_NAME }).click()
 
-      const dialog = page.locator('[role="dialog"]')
-      await expect(dialog).toBeVisible()
-      // Name field should be pre-filled
-      const nameInput = dialog.locator('input[placeholder*="Grupa"]')
+      await expect(page).toHaveURL(/\/admin\/grupe\/[^/]+$/)
+      await page.locator('button', { hasText: 'Uredi' }).first().click()
+
+      const nameInput = page.locator('#info-name')
+      await expect(nameInput).toBeVisible()
       await expect(nameInput).toHaveValue(STD_GROUP_NAME)
     })
 
-    test('closing edit dialog without saving leaves group unchanged', async ({ page }) => {
+    test('cancelling edit leaves group unchanged', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
       const row = page.locator('tr', { hasText: STD_GROUP_NAME })
-      await row.locator('button', { hasText: 'Uredi' }).click()
-      await page.locator('[role="dialog"] button', { hasText: 'Odustani' }).click()
-      await expect(page.locator('[role="dialog"]')).not.toBeVisible()
+      await row.locator('a', { hasText: STD_GROUP_NAME }).click()
+
+      await page.locator('button', { hasText: 'Uredi' }).first().click()
+      await expect(page.locator('#info-name')).toBeVisible()
+      await page.locator('button', { hasText: 'Odustani' }).click()
+      await expect(page.locator('#info-name')).not.toBeVisible()
       await expect(page.locator(`text=${STD_GROUP_NAME}`).first()).toBeVisible()
     })
   })
@@ -721,10 +739,14 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await locationSelect.selectOption({ index: 1 })
 
       await dialog.locator('input[placeholder*="Grupa"]').fill(EMPTY_GROUP_NAME)
+      // The radionica-date input is the first date input; enrollment-window
+      // inputs are addressed by id so the order can't drift.
       await dialog.locator('input[type="date"]').first().fill('2026-08-20')
       await dialog.locator('input[placeholder="19:00"]').fill('10:00')
       await dialog.locator('input[placeholder="20:30"]').fill('12:00')
       await dialog.locator('input[type="number"][min="1"]').fill('2')
+      await dialog.locator('#create-enrollmentStart').fill('2025-06-01')
+      await dialog.locator('#create-enrollmentEnd').fill('2027-06-30')
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
 

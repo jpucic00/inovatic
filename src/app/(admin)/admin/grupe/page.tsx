@@ -81,9 +81,6 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
       <GroupTabs
         standardTabs={standardTabs}
         radioniceTabs={radioniceTabs}
-        courses={courseOptions}
-        locations={locations}
-        teachers={teachers}
       />
     </div>
   )

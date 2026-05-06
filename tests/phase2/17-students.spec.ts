@@ -58,10 +58,12 @@ const DEDUP_DOB = '2015-09-03'
 
 async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
-  await page.locator('input[type="email"]').fill(ADMIN_EMAIL)
+  await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
   await page.locator('button[type="submit"]').click()
-  await page.waitForURL(`${BASE}/admin`, { timeout: 10000 })
+  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
+  // multiple workers hit the login flow simultaneously.
+  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
   await page.waitForLoadState('networkidle')
 }
 

@@ -23,10 +23,12 @@ const TEACHER = {
 
 async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
-  await page.locator('input[type="email"]').fill(ADMIN_EMAIL)
+  await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
   await page.locator('button[type="submit"]').click()
-  await page.waitForURL(`${BASE}/admin`, { timeout: 10000 })
+  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
+  // multiple workers hit the login flow simultaneously.
+  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
   await page.waitForLoadState('networkidle')
 }
 
@@ -46,9 +48,12 @@ test.describe('Admin — Teachers', () => {
     await page.locator('#teacher-phone').fill(TEACHER.phone)
     await page.getByRole('button', { name: /Kreiraj nastavnika/ }).click()
 
-    // Success state renders credentials
-    await expect(page.getByText('Pristupni podaci')).toBeVisible()
-    await expect(page.getByText(TEACHER.email, { exact: false })).toBeVisible()
+    // Success state renders credentials. Exact matches avoid strict-mode
+    // violations: "Pristupni podaci" also appears inside a longer
+    // DialogDescription sentence, and the email shows up twice (inside a
+    // <strong> on its own, and as part of "E-mail: {email}").
+    await expect(page.getByText('Pristupni podaci', { exact: true })).toBeVisible()
+    await expect(page.getByText(TEACHER.email, { exact: true }).first()).toBeVisible()
 
     await page.getByRole('button', { name: 'Zatvori' }).click()
 

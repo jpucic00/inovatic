@@ -26,10 +26,12 @@ const ARTICLE = {
 
 async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
-  await page.locator('input[type="email"]').fill(ADMIN_EMAIL)
+  await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
   await page.locator('button[type="submit"]').click()
-  await page.waitForURL(`${BASE}/admin`, { timeout: 10000 })
+  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
+  // multiple workers hit the login flow simultaneously.
+  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
   await page.waitForLoadState('networkidle')
 }
 
@@ -146,14 +148,17 @@ test.describe('Admin — Articles', () => {
     await loginAsAdmin(page)
     await page.goto(`${BASE}/admin/novosti?search=${encodeURIComponent(ARTICLE.editedTitle)}`)
     await page.getByRole('link', { name: ARTICLE.editedTitle }).click()
+    await page.waitForURL(/\/admin\/novosti\/[^/]+\/uredi/)
 
     // Delete button at the top of the edit page
     await page.getByRole('button', { name: 'Obriši' }).first().click()
     await page.getByRole('button', { name: 'Obriši trajno' }).click()
 
-    // The client-side redirect into /admin/novosti can race with the dialog
-    // close; rather than waitForURL here, re-navigate and assert the row is
-    // gone (either works — this just avoids a flaky URL race).
+    // Wait for the edit page's router.push('/admin/novosti') to fire. If we
+    // navigate away before the server action completes, the browser cancels
+    // the in-flight fetch and the article row survives the test.
+    await page.waitForURL(/\/admin\/novosti(?:\?|$)/, { timeout: 15000 })
+    // Re-navigate with the search filter to assert the row is gone.
     await page.goto(`${BASE}/admin/novosti?search=${encodeURIComponent(ARTICLE.editedTitle)}`)
     await expect(page.getByText(ARTICLE.editedTitle)).toHaveCount(0)
   })

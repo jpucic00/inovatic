@@ -14,13 +14,20 @@ import {
 } from '@/components/ui/dialog'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { deleteGroup } from '@/actions/admin/group'
-import { EditGroupDialog, type GroupForEdit } from './edit-group-dialog'
-import type { TeacherOption } from '@/components/admin/teachers/teacher-multi-select'
 
-type CourseOption = { id: string; title: string; isCustom: boolean }
-type LocationOption = { id: string; name: string }
-
-type Group = GroupForEdit & {
+type Group = {
+  id: string
+  name: string | null
+  date: string | null
+  dayOfWeek: string | null
+  startTime: string | null
+  endTime: string | null
+  schoolYear: string
+  maxStudents: number
+  enrollmentStart: Date | null
+  enrollmentEnd: Date | null
+  courseId: string
+  locationId: string
   course: { id: string; title: string; level: string | null; isCustom: boolean }
   location: { id: string; name: string }
   _count: {
@@ -113,9 +120,6 @@ function formatDate(dateStr: string): string {
 
 interface GroupTableProps {
   data: Group[]
-  courses: CourseOption[]
-  locations: LocationOption[]
-  teachers: TeacherOption[]
   hideProgram?: boolean
 }
 
@@ -150,12 +154,7 @@ function EnrollmentWindowBadge({ group }: Readonly<{ group: Group }>) {
   return <span className="text-xs text-amber-600">Uskoro</span>
 }
 
-function buildColumns(
-  courses: CourseOption[],
-  locations: LocationOption[],
-  teachers: TeacherOption[],
-  hideProgram: boolean,
-): ColumnDef<Group>[] {
+function buildColumns(hideProgram: boolean): ColumnDef<Group>[] {
   const cols: ColumnDef<Group>[] = []
 
   cols.push({
@@ -235,7 +234,6 @@ function buildColumns(
       header: '',
       cell: (row) => (
         <div className="flex items-center gap-2">
-          <EditGroupDialog group={row} courses={courses} locations={locations} teachers={teachers} />
           {isGroupDeletable(row) && <DeleteGroupButton group={row} />}
         </div>
       ),
@@ -245,8 +243,8 @@ function buildColumns(
   return cols
 }
 
-export function GroupTable({ data, courses, locations, teachers, hideProgram = false }: Readonly<GroupTableProps>) {
-  const columns = buildColumns(courses, locations, teachers, hideProgram)
+export function GroupTable({ data, hideProgram = false }: Readonly<GroupTableProps>) {
+  const columns = buildColumns(hideProgram)
 
   return (
     <DataTable

@@ -41,6 +41,12 @@ enum MaterialType {
   LINK
 }
 
+enum MaterialScope {
+  MODULE
+  COURSE
+  GROUP
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
@@ -70,6 +76,7 @@ model User {
   createdFromInquiries Inquiry[]          @relation("CreatedStudent")
   authoredComments     StudentComment[]   @relation("CommentAuthor")
   studentComments      StudentComment[]   @relation("CommentStudent")
+  recordedAttendances  Attendance[]       @relation("AttendanceRecorder")
 }
 
 model Course {
@@ -94,6 +101,7 @@ model Course {
   modules         CourseModule[]
   scheduledGroups ScheduledGroup[]
   inquiries       Inquiry[]
+  materials       Material[]
 }
 
 model CourseModule {
@@ -157,6 +165,7 @@ model ScheduledGroup {
   teacherAssignments   TeacherAssignment[]
   enrollments          Enrollment[]
   materials            Material[]
+  materialHides        MaterialGroupHide[]
   assignedInquiries    Inquiry[]            @relation("AssignedGroup")
   preferredInquiries   Inquiry[]            @relation("PreferredGroup")
   studentComments      StudentComment[]
@@ -214,6 +223,7 @@ model Enrollment {
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   scheduledGroup    ScheduledGroup     @relation(fields: [scheduledGroupId], references: [id])
   moduleEnrollments ModuleEnrollment[]
+  attendances       Attendance[]
 
   @@unique([userId, scheduledGroupId, schoolYear])
 }
@@ -232,24 +242,61 @@ model ModuleEnrollment {
 }
 
 model Material {
-  id               String       @id @default(cuid())
-  scheduledGroupId String
+  id               String        @id @default(cuid())
+  scope            MaterialScope
+  scheduledGroupId String?
+  courseId         String?
   moduleId         String?
   title            String
-  description      String?      @db.Text
+  description      String?       @db.Text
   type             MaterialType
   fileUrl          String?
+  externalUrl      String?
   fileSize         Int?
   mimeType         String?
-  sortOrder        Int          @default(0)
-  isPublished      Boolean      @default(false)
+  sortOrder        Int           @default(0)
   uploadedById     String
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id])
-  module         CourseModule?  @relation(fields: [moduleId], references: [id])
-  uploadedBy     User           @relation(fields: [uploadedById], references: [id])
+  scheduledGroup ScheduledGroup? @relation(fields: [scheduledGroupId], references: [id])
+  course         Course?         @relation(fields: [courseId], references: [id])
+  module         CourseModule?   @relation(fields: [moduleId], references: [id])
+  uploadedBy     User            @relation(fields: [uploadedById], references: [id])
+  hiddenInGroups MaterialGroupHide[]
+
+  @@index([scope, moduleId])
+  @@index([scope, courseId])
+  @@index([scope, scheduledGroupId])
+}
+
+model MaterialGroupHide {
+  id               String   @id @default(cuid())
+  materialId       String
+  scheduledGroupId String
+  createdAt        DateTime @default(now())
+
+  material       Material       @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([materialId, scheduledGroupId])
+}
+
+model Attendance {
+  id           String   @id @default(cuid())
+  enrollmentId String
+  sessionDate  DateTime @db.Date
+  present      Boolean
+  note         String?  @db.Text
+  recordedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  recordedBy User       @relation("AttendanceRecorder", fields: [recordedById], references: [id])
+
+  @@unique([enrollmentId, sessionDate])
+  @@index([sessionDate])
 }
 
 model Article {

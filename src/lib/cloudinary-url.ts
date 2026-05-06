@@ -53,3 +53,86 @@ export async function destroyCloudinaryAssets(urls: string[]): Promise<void> {
     ),
   )
 }
+
+/** Recognised Cloudinary resource types for `uploader.destroy`. */
+export type CloudinaryResourceType = 'image' | 'raw' | 'video'
+
+/**
+ * Infer the resource_type from a Cloudinary delivery URL based on the path
+ * segment after the cloud name:
+ *   /<cloud>/image/upload/... → image
+ *   /<cloud>/raw/upload/...   → raw
+ *   /<cloud>/video/upload/... → video
+ * Returns null if the URL is not a recognisable Cloudinary URL.
+ */
+export function resourceTypeFromUrl(url: string): CloudinaryResourceType | null {
+  if (!url) return null
+  try {
+    const parsed = new URL(url)
+    if (!parsed.hostname.includes('res.cloudinary.com')) return null
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    const uploadIdx = parts.indexOf('upload')
+    if (uploadIdx <= 0) return null
+    const kind = parts[uploadIdx - 1]
+    if (kind === 'image' || kind === 'raw' || kind === 'video') return kind
+    return null
+  } catch {
+    return null
+  }
+}
+
+export const MIME_TO_EXT: Record<string, string> = {
+  'application/pdf': '.pdf',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.ms-powerpoint': '.ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+  'text/plain': '.txt',
+  'text/markdown': '.md',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/svg+xml': '.svg',
+  'video/mp4': '.mp4',
+  'video/webm': '.webm',
+  'video/quicktime': '.mov',
+}
+
+export function sanitiseFilename(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 120) || 'file'
+}
+
+/**
+ * Cleanup variant that accepts resource_type per URL. Materials upload to
+ * `raw/upload/` (PDF/DOCX/PPT) and `video/upload/` (MP4/WEBM) in addition to
+ * images, and the plain `destroyCloudinaryAssets` wouldn't pass the right
+ * resource_type to the destroy call.
+ */
+export async function destroyCloudinaryMaterialUrls(urls: string[]): Promise<void> {
+  const tasks = urls
+    .map((url) => {
+      const publicId = publicIdFromUrl(url)
+      const resourceType = resourceTypeFromUrl(url)
+      return publicId && resourceType ? { publicId, resourceType } : null
+    })
+    .filter((v): v is { publicId: string; resourceType: CloudinaryResourceType } => v !== null)
+
+  if (tasks.length === 0) return
+
+  await Promise.allSettled(
+    tasks.map(({ publicId, resourceType }) =>
+      cloudinary.uploader
+        .destroy(publicId, { resource_type: resourceType })
+        .catch((err: unknown) => {
+          console.error(`Cloudinary destroy failed for ${resourceType}:${publicId}:`, err)
+        }),
+    ),
+  )
+}

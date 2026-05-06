@@ -80,7 +80,7 @@ export function DataTable<TData>({
       : data
 
   return (
-    <div className="rounded-lg border bg-white overflow-hidden">
+    <div className="rounded-lg border bg-white overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50 hover:bg-gray-50">

@@ -16,10 +16,18 @@ Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + Postgr
 - Server Actions for all mutations (no REST API)
 - Server Components for SEO-critical public pages
 - Croatian locale: date format `dd.MM.yyyy.`, currency EUR, primary language Croatian
-- Auth guards: `requireAdmin()`, `requireTeacher()`, `requireAuth()` from `src/lib/auth-guard.ts`
+- Auth guards: `requireAdmin()`, `requireTeacher()`, `requireStudent()`, `requireAuth()` from `src/lib/auth-guard.ts`
 - Roles: ADMIN, TEACHER, STUDENT (future: PARENT)
 - Inquiry status flow: NEW -> ACCOUNT_CREATED (or DECLINED at any point)
 - Enrollment workflow: Public inquiry -> Admin reviews -> Creates student account + enrollment
+
+## Phase 3 (student portal + teacher panel) conventions
+- **Student portal** at `/portal` is gated by `requireStudent()`. Students with exactly ONE active enrollment land directly on that group's current-module materials (no extra click); 2+ → grid of group cards; 0 → empty state.
+- **Teacher panel** at `/nastavnik` is gated by `requireTeacher()` (admins pass through for support). Group-scoped routes use `assertTeacherOwnsGroup(groupId)` from `src/lib/teacher-guard.ts` — teachers 404 on colleagues' groups.
+- **Material scope model** (`MaterialScope` enum): MODULE → visible on every group of that course+module; COURSE → visible on every group of a radionica (`isCustom=true`); GROUP → visible only in that one ScheduledGroup. Per-group exceptions via `MaterialGroupHide`. No publish/draft — attached = visible. Videos support Cloudinary upload OR an embedded YouTube/Vimeo URL.
+- **Attendance** is `(Enrollment, sessionDate)` — no separate `ClassSession`. Teacher marks weekly from the Dolazak tab; admin reads `getStudentAttendance(studentId)` on the student page.
+- **Comments/reviews/grades** live in `StudentComment` with `type` = COMMENT or MODULE_REVIEW. **Staff-only — never rendered in `/portal/*`.** Teachers can delete only their own; admins delete anything (`canDeleteComment` in `src/lib/teacher-guard.ts`).
+- **Role-based login redirect**: `src/actions/login.ts` routes ADMIN → `/admin`, TEACHER → `/nastavnik`, STUDENT → `/portal`.
 
 ## Common Commands
 ```bash

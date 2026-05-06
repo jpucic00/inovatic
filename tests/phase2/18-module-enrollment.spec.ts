@@ -47,10 +47,12 @@ const SHIFT_DATES = [
 
 async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
-  await page.locator('input[type="email"]').fill(ADMIN_EMAIL)
+  await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
   await page.locator('button[type="submit"]').click()
-  await page.waitForURL(`${BASE}/admin`, { timeout: 10000 })
+  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
+  // multiple workers hit the login flow simultaneously.
+  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
   await page.waitForLoadState('networkidle')
 }
 
@@ -93,6 +95,10 @@ async function createStandardGroup(page: Page, groupName: string): Promise<strin
 
   const maxInput = dialog.locator('input[type="number"][min="1"]')
   await maxInput.fill(String(MAX_CAPACITY))
+
+  // Enrollment window is required by the createGroup schema.
+  await dialog.locator('#create-enrollmentStart').fill('2025-06-01')
+  await dialog.locator('#create-enrollmentEnd').fill('2027-06-30')
 
   await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
   await expect(dialog).not.toBeVisible({ timeout: 10000 })
@@ -368,23 +374,27 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       await expect(page.getByText(/2 slobodnih/).first()).toBeVisible()
     })
 
-    test('E10 — "Završi modul" button visible only when a module is Aktivan', async ({
+    test('E10 — "Završi" button visible only on the Aktivan module row (programi page)', async ({
       page,
     }) => {
+      // The "Završi modul" bulk action moved from the group detail
+      // ModuleEnrollmentPanel to the ModuleDatesTable on /admin/programi,
+      // and was renamed to just "Završi". It only shows on rows whose
+      // status is Aktivan.
       await loginAsAdmin(page)
-      await page.goto(groupDetailUrl)
+      await page.goto(`${BASE}/admin/programi`)
+      const table = slrTable(page)
+      await expect(table).toBeVisible()
 
-      // M2 (Aktivan) shows "Završi modul"
-      await page.getByRole('button', { name: /^M2/ }).click()
-      await expect(page.getByRole('button', { name: 'Završi modul' })).toBeVisible()
-
-      // M3 (Nadolazi) does not
-      await page.getByRole('button', { name: /^M3/ }).click()
-      await expect(page.getByRole('button', { name: 'Završi modul' })).toHaveCount(0)
-
-      // M1 (Završen) does not either
-      await page.getByRole('button', { name: /^M1/ }).click()
-      await expect(page.getByRole('button', { name: 'Završi modul' })).toHaveCount(0)
+      const rows = table.locator('tbody tr')
+      // M1 (Završen) — no "Završi" button on the row
+      await expect(rows.nth(0).getByRole('button', { name: 'Završi' })).toHaveCount(0)
+      // M2 (Aktivan) — button present
+      await expect(rows.nth(1).getByRole('button', { name: 'Završi' })).toBeVisible()
+      // M3 (Nadolazi) — no button
+      await expect(rows.nth(2).getByRole('button', { name: 'Završi' })).toHaveCount(0)
+      // M4 (Nadolazi) — no button
+      await expect(rows.nth(3).getByRole('button', { name: 'Završi' })).toHaveCount(0)
     })
 
     test('E11 — "Sljedeći" button available on active tab promotes to next module', async ({

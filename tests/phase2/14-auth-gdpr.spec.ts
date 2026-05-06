@@ -9,10 +9,10 @@ const BASE = 'http://localhost:3000'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 test.describe('Login Page', () => {
-  test('renders login form with email, password, and submit button', async ({ page }) => {
+  test('renders login form with identifier, password, and submit button', async ({ page }) => {
     await page.goto(`${BASE}/prijava`)
     await expect(page.locator('h1')).toHaveText('Prijava')
-    await expect(page.locator('input[type="email"]')).toBeVisible()
+    await expect(page.locator('#identifier')).toBeVisible()
     await expect(page.locator('input[type="password"]')).toBeVisible()
     await expect(page.locator('button[type="submit"]')).toBeVisible()
     await expect(page.locator('button[type="submit"]')).toHaveText('Prijavi se')
@@ -20,26 +20,19 @@ test.describe('Login Page', () => {
 
   test('shows validation errors on empty submission', async ({ page }) => {
     await page.goto(`${BASE}/prijava`)
-    await page.locator('input[type="email"]').click()
+    await page.locator('#identifier').click()
     await page.locator('input[type="password"]').click()
     await page.locator('button[type="submit"]').click()
-    await expect(page.getByText('Unesite email adresu')).toBeVisible()
+    await expect(page.getByText('Unesite korisničko ime ili e-mail')).toBeVisible()
     await expect(page.getByText('Unesite lozinku')).toBeVisible()
-  })
-
-  test('shows validation error for invalid email format', async ({ page }) => {
-    await page.goto(`${BASE}/prijava`)
-    await page.locator('input[type="email"]').fill('not-an-email')
-    await page.locator('input[type="password"]').click()
-    await expect(page.locator('text=Unesite valjanu email adresu')).toBeVisible()
   })
 
   test('shows error message on wrong credentials', async ({ page }) => {
     await page.goto(`${BASE}/prijava`)
-    await page.locator('input[type="email"]').fill('wrong@example.com')
+    await page.locator('#identifier').fill('wrong@example.com')
     await page.locator('input[type="password"]').fill('wrongpassword')
     await page.locator('button[type="submit"]').click()
-    await expect(page.locator('text=Pogrešan email ili lozinka')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('text=Pogrešno korisničko ime ili lozinka')).toBeVisible({ timeout: 10000 })
   })
 
   test('uses shared Logo component', async ({ page }) => {

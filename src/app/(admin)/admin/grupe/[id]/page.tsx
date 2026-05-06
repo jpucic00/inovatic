@@ -1,12 +1,14 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, MapPin, Clock, Calendar } from 'lucide-react'
+import { ArrowLeft, MapPin } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getGroupDetail } from '@/actions/admin/group'
 import { getAssignableTeachers } from '@/actions/admin/teacher'
+import { db } from '@/lib/db'
 import { ModuleEnrollmentPanel } from '@/components/admin/groups/module-enrollment-panel'
 import { GroupTeachersPanel } from '@/components/admin/groups/group-teachers-panel'
+import { GroupInfoPanel } from '@/components/admin/groups/group-info-panel'
 
 export const metadata: Metadata = { title: 'Admin – Detalji grupe' }
 
@@ -14,43 +16,21 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
-function DetailRow({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 py-3 border-b last:border-b-0">
-      <dt className="text-sm font-medium text-gray-500 sm:w-44 shrink-0">{label}</dt>
-      <dd className="text-sm text-gray-900">{value}</dd>
-    </div>
-  )
-}
-
-function enrollmentWindowStatus(
-  start: Date | null,
-  end: Date | null,
-): { label: string; color: string } {
-  if (!start && !end) return { label: 'Uvijek otvoreno', color: 'text-green-600' }
-  const now = new Date()
-  if (end && end < now) return { label: 'Zatvoreno', color: 'text-gray-500' }
-  if (start && start > now)
-    return {
-      label: `Otvara se ${start.toLocaleDateString('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`,
-      color: 'text-amber-600',
-    }
-  return { label: 'Otvoreno', color: 'text-green-600' }
-}
-
-function getCapacityColor(pct: number): string {
-  if (pct >= 1) return 'text-red-600'
-  if (pct >= 0.75) return 'text-amber-600'
-  return 'text-green-600'
-}
-
 export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   await requireAdmin()
 
   const { id } = await params
-  const [group, allTeachers] = await Promise.all([
+  const [group, allTeachers, courses, locations] = await Promise.all([
     getGroupDetail(id),
     getAssignableTeachers(),
+    db.course.findMany({
+      orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }],
+      select: { id: true, title: true, isCustom: true },
+    }),
+    db.location.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    }),
   ])
 
   if (!group) notFound()
@@ -58,11 +38,30 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   const assignedUserIds = new Set(group.teacherAssignments.map((ta) => ta.user.id))
   const assignableTeachers = allTeachers.filter((t) => !assignedUserIds.has(t.id))
 
-  const windowStatus = enrollmentWindowStatus(group.enrollmentStart, group.enrollmentEnd)
   const enrolledCount = group.enrollments.length
-  const availableSpots = group.maxStudents - enrolledCount
-  const pct = group.maxStudents > 0 ? enrolledCount / group.maxStudents : 0
-  const capacityColor = getCapacityColor(pct)
+
+  const groupForEdit = {
+    id: group.id,
+    courseId: group.courseId,
+    locationId: group.locationId,
+    name: group.name,
+    date: group.date,
+    dayOfWeek: group.dayOfWeek,
+    startTime: group.startTime,
+    endTime: group.endTime,
+    schoolYear: group.schoolYear,
+    maxStudents: group.maxStudents,
+    enrollmentStart: group.enrollmentStart,
+    enrollmentEnd: group.enrollmentEnd,
+    course: {
+      id: group.course.id,
+      title: group.course.title,
+      level: group.course.level,
+      isCustom: group.course.isCustom,
+    },
+    location: { id: group.location.id, name: group.location.name },
+    enrolledCount,
+  }
 
   return (
     <div className="max-w-3xl">
@@ -96,72 +95,7 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
 
       {/* Group info */}
       <div className="bg-white rounded-xl border p-6 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-2">Informacije o grupi</h2>
-        <dl>
-          <DetailRow
-            label="Program"
-            value={
-              <span>
-                {group.course.title}
-                {group.course.level && (
-                  <span className="text-gray-400 ml-1">({group.course.level})</span>
-                )}
-              </span>
-            }
-          />
-          <DetailRow label="Lokacija" value={group.location.name} />
-          <DetailRow
-            label="Termin"
-            value={
-              group.dayOfWeek ? (
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                  {group.dayOfWeek}
-                  {group.startTime && (
-                    <span className="flex items-center gap-1 ml-1">
-                      <Clock className="w-3.5 h-3.5 text-gray-400" />
-                      {group.startTime}
-                      {group.endTime && `–${group.endTime}`}
-                    </span>
-                  )}
-                </span>
-              ) : (
-                <span className="text-gray-400 italic">Nije određen</span>
-              )
-            }
-          />
-          {group.schoolYear && (
-            <DetailRow label="Školska godina" value={group.schoolYear} />
-          )}
-          <DetailRow
-            label="Kapacitet"
-            value={
-              <span className={capacityColor}>
-                {enrolledCount}/{group.maxStudents} polaznika
-                {availableSpots > 0 && (
-                  <span className="text-gray-400 font-normal"> ({availableSpots} slobodnih)</span>
-                )}
-              </span>
-            }
-          />
-          <DetailRow
-            label="Prozor upisa"
-            value={
-              <div>
-                <span className={windowStatus.color}>{windowStatus.label}</span>
-                {(group.enrollmentStart || group.enrollmentEnd) && (
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {group.enrollmentStart &&
-                      `Od: ${group.enrollmentStart.toLocaleDateString('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`}
-                    {group.enrollmentStart && group.enrollmentEnd && ' – '}
-                    {group.enrollmentEnd &&
-                      `Do: ${group.enrollmentEnd.toLocaleDateString('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`}
-                  </p>
-                )}
-              </div>
-            }
-          />
-        </dl>
+        <GroupInfoPanel group={groupForEdit} courses={courses} locations={locations} />
       </div>
 
       {/* Teachers */}

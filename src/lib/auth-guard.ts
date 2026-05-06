@@ -18,3 +18,9 @@ export async function requireTeacher() {
   if (session.user.role !== 'TEACHER' && session.user.role !== 'ADMIN') redirect('/prijava')
   return session
 }
+
+export async function requireStudent() {
+  const session = await requireAuth()
+  if (session.user.role !== 'STUDENT') redirect('/prijava')
+  return session
+}

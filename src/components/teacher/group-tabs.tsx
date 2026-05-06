@@ -3,25 +3,18 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-export type TeacherTabId = 'polaznici' | 'moduli' | 'materijali' | 'dolazak' | 'komentari'
+type TeacherTabId = 'polaznici' | 'materijali' | 'dolazak'
 
 const TAB_DEFS: { id: TeacherTabId; label: string; path: string }[] = [
   { id: 'polaznici', label: 'Polaznici', path: '' },
   { id: 'dolazak', label: 'Dolazak', path: '/dolazak' },
-  { id: 'moduli', label: 'Moduli', path: '/moduli' },
   { id: 'materijali', label: 'Materijali', path: '/materijali' },
-  { id: 'komentari', label: 'Komentari', path: '/komentari' },
 ]
 
-interface Props {
-  groupId: string
-  hideModuli?: boolean
-}
-
-export function GroupTabs({ groupId, hideModuli = false }: Readonly<Props>) {
+export function GroupTabs({ groupId }: Readonly<{ groupId: string }>) {
   const pathname = usePathname()
   const base = `/nastavnik/grupa/${groupId}`
-  const tabs = hideModuli ? TAB_DEFS.filter((t) => t.id !== 'moduli') : TAB_DEFS
+  const tabs = TAB_DEFS
 
   const activeId: TeacherTabId =
     tabs.find((t) => {
