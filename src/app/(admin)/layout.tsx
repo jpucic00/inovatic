@@ -1,4 +1,4 @@
-import { Toaster } from 'sonner'
+import { Toaster } from '@/components/ui/toaster'
 import { requireAdmin } from '@/lib/auth-guard'
 import { AdminDesktopSidebar, AdminMobileNav } from '@/components/admin/admin-mobile-nav'
 
@@ -13,12 +13,12 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
       <div className="flex">
         <AdminDesktopSidebar userName={userName} />
 
-        <div className="flex-1 flex flex-col">
-          <main className="flex-1 p-4 pt-18 lg:p-8 lg:pt-8">{children}</main>
+        <div className="flex-1 flex flex-col min-w-0">
+          <main className="flex-1 p-4 pt-18 lg:p-8 lg:pt-8 overflow-x-hidden">{children}</main>
         </div>
       </div>
 
-      <Toaster richColors position="top-right" />
+      <Toaster />
     </div>
   )
 }
