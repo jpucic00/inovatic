@@ -24,7 +24,8 @@ async function handler(
   const { path } = await params
   const targetPath = path.join('/')
   const query = req.nextUrl.searchParams.toString()
-  const targetUrl = `${ALLOWED_ORIGIN}/${targetPath}${query ? `?${query}` : ''}`
+  const queryString = query ? `?${query}` : ''
+  const targetUrl = `${ALLOWED_ORIGIN}/${targetPath}${queryString}`
 
   const parsed = new URL(targetUrl)
   if (parsed.origin !== ALLOWED_ORIGIN) {
@@ -60,7 +61,7 @@ async function handler(
     contentType.includes('text/css')
   if (isText) {
     const text = await upstream.text()
-    const patched = text.replace(
+    const patched = text.replaceAll(
       /(["'`,;])\/(?!\/)/g,
       '$1/api/proxy/elearning/',
     )

@@ -141,35 +141,7 @@ function GroupInfoView({
         />
         <DetailRow
           label="Termin"
-          value={
-            group.course.isCustom && group.date ? (
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                {formatDate(group.date)}
-                {group.startTime && (
-                  <span className="flex items-center gap-1 ml-1">
-                    <Clock className="w-3.5 h-3.5 text-gray-400" />
-                    {group.startTime}
-                    {group.endTime && `–${group.endTime}`}
-                  </span>
-                )}
-              </span>
-            ) : group.dayOfWeek ? (
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                {group.dayOfWeek}
-                {group.startTime && (
-                  <span className="flex items-center gap-1 ml-1">
-                    <Clock className="w-3.5 h-3.5 text-gray-400" />
-                    {group.startTime}
-                    {group.endTime && `–${group.endTime}`}
-                  </span>
-                )}
-              </span>
-            ) : (
-              <span className="text-gray-400 italic">Nije određen</span>
-            )
-          }
+          value={<TerminValue group={group} />}
         />
         {group.schoolYear && (
           <DetailRow label="Školska godina" value={group.schoolYear} />
@@ -210,6 +182,39 @@ function GroupInfoView({
 function formatDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-')
   return `${d}.${m}.${y}.`
+}
+
+function TimeSlot({ startTime, endTime }: Readonly<{ startTime: string | null; endTime: string | null }>) {
+  if (!startTime) return null
+  return (
+    <span className="flex items-center gap-1 ml-1">
+      <Clock className="w-3.5 h-3.5 text-gray-400" />
+      {startTime}
+      {endTime && `–${endTime}`}
+    </span>
+  )
+}
+
+function TerminValue({ group }: Readonly<{ group: GroupForEdit }>) {
+  if (group.course.isCustom && group.date) {
+    return (
+      <span className="flex items-center gap-1">
+        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+        {formatDate(group.date)}
+        <TimeSlot startTime={group.startTime} endTime={group.endTime} />
+      </span>
+    )
+  }
+  if (group.dayOfWeek) {
+    return (
+      <span className="flex items-center gap-1">
+        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+        {group.dayOfWeek}
+        <TimeSlot startTime={group.startTime} endTime={group.endTime} />
+      </span>
+    )
+  }
+  return <span className="text-gray-400 italic">Nije određen</span>
 }
 
 function GroupInfoEdit({
@@ -342,7 +347,7 @@ function GroupInfoEdit({
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</label>
+          <span className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</span>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="info-enrollmentStart" className="text-xs text-gray-500 mb-1 block">Od</label>

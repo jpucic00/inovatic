@@ -82,7 +82,7 @@ export async function ensureSchedulesForYear(year: string): Promise<void> {
   if (modules.length === 0) return
 
   // Derive start year from "YYYY/YYYY" format (e.g. "2025/2026" → 2025)
-  const startYear = parseInt(year.split('/')[0], 10)
+  const startYear = Number.parseInt(year.split('/')[0], 10)
 
   // Default date ranges for modules 1–4 within a school year
   const dateRanges = [

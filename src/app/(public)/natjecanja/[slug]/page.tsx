@@ -82,8 +82,8 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
       <section className="py-16 px-4 bg-white">
         <div className="container mx-auto max-w-3xl">
           <div className="space-y-5 text-gray-600 leading-relaxed text-lg text-justify">
-            {comp.paragraphs.map((p, i) => (
-              <p key={i}>{p}</p>
+            {comp.paragraphs.map((p) => (
+              <p key={p.slice(0, 40)}>{p}</p>
             ))}
           </div>
         </div>
@@ -99,7 +99,7 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               {comp.categories.map((cat, i) => (
-                <div key={i} className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                <div key={cat.name} className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 font-extrabold text-sm">
                       {i + 1}

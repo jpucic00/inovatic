@@ -56,7 +56,7 @@ export function CommentList({
   }
 
   const handleDelete = (id: string) => {
-    if (!window.confirm('Izbrisati bilješku?')) return
+    if (!globalThis.confirm('Izbrisati bilješku?')) return
     startTransition(async () => {
       const result = await onDelete(id)
       if (result.success) {
@@ -108,11 +108,10 @@ export function CommentList({
                         : 'bg-cyan-50 text-cyan-700 border border-cyan-200'
                     }
                   >
-                    {isReview
-                      ? c.moduleTitle
-                        ? `Ocjena modula: ${c.moduleTitle}`
-                        : 'Ocjena modula'
-                      : 'Komentar'}
+                    {(() => {
+                      if (!isReview) return 'Komentar'
+                      return c.moduleTitle ? `Ocjena modula: ${c.moduleTitle}` : 'Ocjena modula'
+                    })()}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

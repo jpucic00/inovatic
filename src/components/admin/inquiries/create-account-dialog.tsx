@@ -57,6 +57,40 @@ function getScheduleDates(mod: ModuleOption): { startDate: Date | null; endDate:
   return { startDate: schedule?.startDate ?? null, endDate: schedule?.endDate ?? null }
 }
 
+function mapGroupOption(sg: {
+  id: string
+  name: string | null
+  dayOfWeek: string | null
+  startTime: string | null
+  endTime: string | null
+  location: { name: string }
+  course: { title: string; isCustom: boolean; modules?: ModuleOption[] }
+}): GroupOption {
+  return {
+    id: sg.id,
+    name: sg.name,
+    dayOfWeek: sg.dayOfWeek,
+    startTime: sg.startTime,
+    endTime: sg.endTime,
+    location: { name: sg.location.name },
+    course: {
+      title: sg.course.title,
+      isCustom: sg.course.isCustom,
+      modules: sg.course.modules,
+    },
+  }
+}
+
+function formatModuleDateRange(mod: ModuleOption): string {
+  const { startDate, endDate } = getScheduleDates(mod)
+  if (!startDate || !endDate) return ''
+  const s = new Date(startDate)
+  const e = new Date(endDate)
+  const sd = `${String(s.getDate()).padStart(2, '0')}.${String(s.getMonth() + 1).padStart(2, '0')}.`
+  const ed = `${String(e.getDate()).padStart(2, '0')}.${String(e.getMonth() + 1).padStart(2, '0')}.${e.getFullYear()}.`
+  return ` (${sd} – ${ed})`
+}
+
 export function CreateAccountDialog({
   inquiryId,
   childName,
@@ -98,21 +132,7 @@ export function CreateAccountDialog({
     setLoadingGroups(true)
     try {
       const groups = await getGroupsForCourse(courseId)
-      setLoadedGroups(
-        groups.map((sg) => ({
-          id: sg.id,
-          name: sg.name,
-          dayOfWeek: sg.dayOfWeek,
-          startTime: sg.startTime,
-          endTime: sg.endTime,
-          location: { name: sg.location.name },
-          course: {
-            title: sg.course.title,
-            isCustom: sg.course.isCustom,
-            modules: sg.course.modules,
-          },
-        })),
-      )
+      setLoadedGroups(groups.map(mapGroupOption))
     } finally {
       setLoadingGroups(false)
     }
@@ -181,11 +201,12 @@ export function CreateAccountDialog({
             {result ? 'Račun kreiran' : 'Kreiraj račun i upiši dijete'}
           </DialogTitle>
           <DialogDescription>
-            {result
-              ? result.isExisting
+            {(() => {
+              if (!result) return `Odaberite grupu u koju želite upisati ${childName}.`
+              return result.isExisting
                 ? `${childName} je upisano u novu grupu s postojećim računom.`
                 : `Račun za ${childName} je uspješno kreiran.`
-              : `Odaberite grupu u koju želite upisati ${childName}.`}
+            })()}
           </DialogDescription>
         </DialogHeader>
 
@@ -251,17 +272,19 @@ export function CreateAccountDialog({
             </div>
 
             <div className="space-y-2 max-h-64 overflow-y-auto py-2">
-              {loadingGroups ? (
+              {loadingGroups && (
                 <p className="text-sm text-gray-400 italic py-4 text-center">
                   Učitavam grupe...
                 </p>
-              ) : loadedGroups.length === 0 ? (
+              )}
+              {!loadingGroups && loadedGroups.length === 0 && (
                 <p className="text-sm text-gray-400 italic py-4 text-center">
-                  {!selectedCourseId
-                    ? 'Najprije odaberite program.'
-                    : 'Nema dostupnih grupa za ovaj program.'}
+                  {selectedCourseId
+                    ? 'Nema dostupnih grupa za ovaj program.'
+                    : 'Najprije odaberite program.'}
                 </p>
-              ) : (
+              )}
+              {!loadingGroups && loadedGroups.length > 0 && (
                 loadedGroups.map((g) => {
                   const timeRange = g.startTime
                     ? `${g.startTime}–${g.endTime ?? ''}`
@@ -296,9 +319,9 @@ export function CreateAccountDialog({
 
             {isStandardCourse && courseModules.length > 0 && (
               <div className="py-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <span className="block text-sm font-medium text-gray-700 mb-1.5">
                   Moduli
-                </label>
+                </span>
                 <div className="space-y-1.5">
                   <label className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-50 cursor-pointer border-b border-gray-100 pb-2 mb-1">
                     <input
@@ -318,15 +341,7 @@ export function CreateAccountDialog({
                   {courseModules.map((mod) => {
                     const scheduleId = getScheduleId(mod)
                     if (!scheduleId) return null
-                    const { startDate, endDate } = getScheduleDates(mod)
-                    let dateRange = ''
-                    if (startDate && endDate) {
-                      const s = new Date(startDate)
-                      const e = new Date(endDate)
-                      const sd = `${String(s.getDate()).padStart(2, '0')}.${String(s.getMonth() + 1).padStart(2, '0')}.`
-                      const ed = `${String(e.getDate()).padStart(2, '0')}.${String(e.getMonth() + 1).padStart(2, '0')}.${e.getFullYear()}.`
-                      dateRange = ` (${sd} – ${ed})`
-                    }
+                    const dateRange = formatModuleDateRange(mod)
                     return (
                       <label
                         key={mod.id}

@@ -25,10 +25,11 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
   const courseId = params.courseId ?? ''
   const groupId = params.groupId ?? ''
   const scheduleId = params.scheduleId ?? ''
-  const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1)
 
   const isModuleView = !!scheduleId
 
+  const groupFilter = courseId ? { courseId } : {}
   const [result, courses, groups, scheduleInfo] = await Promise.all([
     getStudents({
       search,
@@ -39,7 +40,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
       pageSize: PAGE_SIZE,
     }),
     isModuleView ? Promise.resolve([]) : getCourses(),
-    isModuleView ? Promise.resolve([]) : getGroups(courseId ? { courseId } : {}),
+    isModuleView ? Promise.resolve([]) : getGroups(groupFilter),
     scheduleId
       ? db.moduleSchedule.findUnique({
           where: { id: scheduleId },

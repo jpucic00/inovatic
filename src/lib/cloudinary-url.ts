@@ -25,7 +25,7 @@ export function publicIdFromUrl(url: string): string | null {
     if (rest.length === 0) return null
 
     // Strip extension from the final segment.
-    const last = rest[rest.length - 1]
+    const last = rest.at(-1)!
     const dot = last.lastIndexOf('.')
     rest[rest.length - 1] = dot > 0 ? last.slice(0, dot) : last
 
@@ -102,11 +102,31 @@ export const MIME_TO_EXT: Record<string, string> = {
 export function sanitiseFilename(name: string): string {
   return name
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '')
+    .replaceAll(/[̀-ͯ]/g, '')
+    .replaceAll(/[^a-zA-Z0-9._-]/g, '_')
+    .replaceAll(/_+/g, '_')
+    .replaceAll(/(?:^_|_$)/g, '')
     .slice(0, 120) || 'file'
+}
+
+/**
+ * Cleanup variant that takes Cloudinary public IDs directly — used when we
+ * stored the public_id at upload time (galleries do this). Defaults to
+ * `image` resource type since gallery uploads are image-only.
+ */
+export async function destroyCloudinaryAssetsByPublicId(
+  publicIds: string[],
+): Promise<void> {
+  const ids = Array.from(new Set(publicIds.filter((id): id is string => Boolean(id))))
+  if (ids.length === 0) return
+
+  await Promise.allSettled(
+    ids.map((publicId) =>
+      cloudinary.uploader.destroy(publicId).catch((err: unknown) => {
+        console.error(`Cloudinary destroy failed for ${publicId}:`, err)
+      }),
+    ),
+  )
 }
 
 /**

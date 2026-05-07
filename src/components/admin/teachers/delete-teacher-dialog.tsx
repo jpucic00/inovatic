@@ -59,7 +59,7 @@ export function DeleteTeacherDialog({
               <>
                 {' '}
                 i njegove dodjele ({assignmentCount}{' '}
-                {assignmentCount === 1 ? 'grupa' : 'grupa'}).
+                grupa).
               </>
             )}{' '}
             Ovo se ne može poništiti.

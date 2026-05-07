@@ -224,11 +224,12 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
             {result ? 'Učenik kreiran' : 'Kreiraj učenika'}
           </DialogTitle>
           <DialogDescription>
-            {result
-              ? result.isExisting
+            {(() => {
+              if (!result) return 'Unesite podatke djeteta. Upis u grupu i roditeljski podaci su neobavezni.'
+              return result.isExisting
                 ? 'Pronađen je postojeći račun za ovo dijete.'
                 : 'Novi račun je uspješno kreiran.'
-              : 'Unesite podatke djeteta. Upis u grupu i roditeljski podaci su neobavezni.'}
+            })()}
           </DialogDescription>
         </DialogHeader>
 
@@ -432,15 +433,17 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
 
               {selectedCourseId && (
                 <div className="mt-3 space-y-2 max-h-56 overflow-y-auto">
-                  {loadingGroups ? (
+                  {loadingGroups && (
                     <p className="text-sm text-gray-400 italic py-3 text-center">
                       Učitavam grupe...
                     </p>
-                  ) : groups.length === 0 ? (
+                  )}
+                  {!loadingGroups && groups.length === 0 && (
                     <p className="text-sm text-gray-400 italic py-3 text-center">
                       Nema dostupnih grupa za ovaj program.
                     </p>
-                  ) : (
+                  )}
+                  {!loadingGroups && groups.length > 0 && (
                     groups.map((g) => {
                       const timeRange = g.startTime
                         ? `${g.startTime}–${g.endTime ?? ''}`

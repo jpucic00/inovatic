@@ -6,9 +6,9 @@ export default function AdminStudentLoading() {
       <Skeleton className="h-4 w-40 mb-6" />
       <Skeleton className="h-8 w-64 mb-2" />
       <Skeleton className="h-3 w-40 mb-8" />
-      {Array.from({ length: 4 }).map((_, i) => (
+      {Array.from({ length: 4 }, (_, i) => `skeleton-${i}`).map(key => (
         <div
-          key={i}
+          key={key}
           className="bg-white rounded-xl border p-6 mb-6 space-y-3"
         >
           <Skeleton className="h-4 w-40" />

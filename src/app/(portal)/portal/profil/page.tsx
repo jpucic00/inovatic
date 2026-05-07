@@ -5,11 +5,11 @@ export const metadata: Metadata = {
   title: 'Moj profil',
 }
 
-function Row({ label, value }: { label: string; value: string | null }) {
+function Row({ label, value }: Readonly<{ label: string; value: string | null }>) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-6 py-3 border-b border-gray-100">
       <dt className="text-sm font-medium text-gray-500 sm:w-48">{label}</dt>
-      <dd className="text-sm text-gray-900">{value && value.trim() ? value : <span className="text-gray-400">—</span>}</dd>
+      <dd className="text-sm text-gray-900">{value?.trim() ? value : <span className="text-gray-400">—</span>}</dd>
     </div>
   )
 }

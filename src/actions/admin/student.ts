@@ -45,14 +45,14 @@ const DIACRITICS_MAP: Record<string, string> = {
 }
 
 function stripDiacritics(str: string): string {
-  return str.replace(/[čćšžđČĆŠŽĐ]/g, (ch) => DIACRITICS_MAP[ch] ?? ch)
+  return str.replaceAll(/[čćšžđČĆŠŽĐ]/g, (ch) => DIACRITICS_MAP[ch] ?? ch)
 }
 
 async function generateUsername(firstName: string, lastName: string): Promise<string> {
   const base = stripDiacritics(`${firstName}${lastName}`)
     .toLowerCase()
-    .replace(/\s+/g, '')
-    .replace(/[^a-z0-9]/g, '')
+    .replaceAll(/\s+/g, '')
+    .replaceAll(/[^a-z0-9]/g, '')
 
   const existing = await db.user.findUnique({ where: { username: base } })
   if (!existing) return base
@@ -96,15 +96,9 @@ type CoreResult = {
   } | null
 }
 
-/**
- * Shared core for student creation (both inquiry-based and manual).
- * - Dedupes against existing students by firstName+lastName+dateOfBirth.
- * - When groupId is given, uses the target group's schoolYear (not
- *   computeSchoolYear()) so future-year enrollments work.
- * - Creates ModuleEnrollment rows when moduleScheduleIds is non-empty.
- */
-async function createStudentCore(input: CoreInput): Promise<CoreResult> {
-  // 1. Dedup on name + DOB (only if DOB is present)
+async function findOrCreateStudent(
+  input: CoreInput,
+): Promise<{ user: { id: string; username: string | null }; password: string; isExisting: boolean }> {
   const existingStudent = input.dateOfBirth
     ? await db.user.findFirst({
         where: {
@@ -117,16 +111,7 @@ async function createStudentCore(input: CoreInput): Promise<CoreResult> {
       })
     : null
 
-  let user: { id: string; username: string | null }
-  let password = ''
-  const isExisting = !!existingStudent
-
   if (existingStudent) {
-    user = { id: existingStudent.id, username: existingStudent.username }
-    password = existingStudent.plainPassword ?? ''
-
-    // Backfill parent/school/consent fields on the existing user if they're
-    // currently empty and we have new values to write.
     const backfill: Record<string, string | Date | null> = {}
     if (input.parentName) backfill.parentName = input.parentName
     if (input.parentEmail) backfill.parentEmail = input.parentEmail
@@ -136,85 +121,103 @@ async function createStudentCore(input: CoreInput): Promise<CoreResult> {
     if (Object.keys(backfill).length > 0) {
       await db.user.update({
         where: { id: existingStudent.id },
-        // Prisma typing: we only set fields that are defined above.
         data: backfill as never,
       })
     }
-  } else {
-    const username = await generateUsername(input.firstName, input.lastName)
-    password = generateSimplePassword(6)
-    const passwordHash = await hashPassword(password)
-
-    const created = await db.user.create({
-      data: {
-        email: `${username}@student.inovatic.local`,
-        username,
-        plainPassword: password,
-        passwordHash,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        dateOfBirth: input.dateOfBirth ?? null,
-        role: 'STUDENT',
-        parentName: input.parentName ?? null,
-        parentEmail: input.parentEmail ?? null,
-        parentPhone: input.parentPhone ?? null,
-        childSchool: input.childSchool ?? null,
-        gdprConsentAt: input.gdprConsentAt ?? null,
-      },
-      select: { id: true, username: true },
-    })
-    user = created
-  }
-
-  // 2. Optional enrollment (uses the group's own schoolYear)
-  let enrollmentId: string | null = null
-  let group: CoreResult['group'] = null
-
-  if (input.groupId) {
-    const sg = await db.scheduledGroup.findUnique({
-      where: { id: input.groupId },
-      include: {
-        location: { select: { name: true } },
-        course: { select: { title: true, isCustom: true } },
-      },
-    })
-    if (!sg) throw new Error('Grupa nije pronađena.')
-    group = sg
-
-    const existingEnrollment = await db.enrollment.findUnique({
-      where: {
-        userId_scheduledGroupId_schoolYear: {
-          userId: user.id,
-          scheduledGroupId: sg.id,
-          schoolYear: sg.schoolYear,
-        },
-      },
-    })
-
-    if (existingEnrollment) {
-      enrollmentId = existingEnrollment.id
-    } else {
-      const created = await db.enrollment.create({
-        data: {
-          userId: user.id,
-          scheduledGroupId: sg.id,
-          schoolYear: sg.schoolYear,
-        },
-      })
-      enrollmentId = created.id
-    }
-
-    if (input.moduleScheduleIds && input.moduleScheduleIds.length > 0) {
-      await db.moduleEnrollment.createMany({
-        data: input.moduleScheduleIds.map((moduleScheduleId) => ({
-          enrollmentId: enrollmentId!,
-          moduleScheduleId,
-        })),
-        skipDuplicates: true,
-      })
+    return {
+      user: { id: existingStudent.id, username: existingStudent.username },
+      password: existingStudent.plainPassword ?? '',
+      isExisting: true,
     }
   }
 
+  const username = await generateUsername(input.firstName, input.lastName)
+  const password = generateSimplePassword(6)
+  const passwordHash = await hashPassword(password)
+
+  const created = await db.user.create({
+    data: {
+      email: `${username}@student.inovatic.local`,
+      username,
+      plainPassword: password,
+      passwordHash,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      dateOfBirth: input.dateOfBirth ?? null,
+      role: 'STUDENT',
+      parentName: input.parentName ?? null,
+      parentEmail: input.parentEmail ?? null,
+      parentPhone: input.parentPhone ?? null,
+      childSchool: input.childSchool ?? null,
+      gdprConsentAt: input.gdprConsentAt ?? null,
+    },
+    select: { id: true, username: true },
+  })
+  return { user: created, password, isExisting: false }
+}
+
+async function ensureEnrollment(
+  userId: string,
+  groupId: string,
+  moduleScheduleIds: string[] | undefined,
+): Promise<{ enrollmentId: string; group: CoreResult['group'] }> {
+  const sg = await db.scheduledGroup.findUnique({
+    where: { id: groupId },
+    include: {
+      location: { select: { name: true } },
+      course: { select: { title: true, isCustom: true } },
+    },
+  })
+  if (!sg) throw new Error('Grupa nije pronađena.')
+
+  const existingEnrollment = await db.enrollment.findUnique({
+    where: {
+      userId_scheduledGroupId_schoolYear: {
+        userId,
+        scheduledGroupId: sg.id,
+        schoolYear: sg.schoolYear,
+      },
+    },
+  })
+
+  const enrollmentId = existingEnrollment
+    ? existingEnrollment.id
+    : (await db.enrollment.create({
+        data: { userId, scheduledGroupId: sg.id, schoolYear: sg.schoolYear },
+      })).id
+
+  if (moduleScheduleIds && moduleScheduleIds.length > 0) {
+    await db.moduleEnrollment.createMany({
+      data: moduleScheduleIds.map((moduleScheduleId) => ({
+        enrollmentId,
+        moduleScheduleId,
+      })),
+      skipDuplicates: true,
+    })
+  }
+
+  return { enrollmentId, group: sg }
+}
+
+/**
+ * Shared core for student creation (both inquiry-based and manual).
+ * - Dedupes against existing students by firstName+lastName+dateOfBirth.
+ * - When groupId is given, uses the target group's schoolYear (not
+ *   computeSchoolYear()) so future-year enrollments work.
+ * - Creates ModuleEnrollment rows when moduleScheduleIds is non-empty.
+ */
+async function createStudentCore(input: CoreInput): Promise<CoreResult> {
+  const { user, password, isExisting } = await findOrCreateStudent(input)
+
+  if (!input.groupId) {
+    return { user, password, isExisting, enrollmentId: null, group: null }
+  }
+
+  const { enrollmentId, group } = await ensureEnrollment(
+    user.id,
+    input.groupId,
+    input.moduleScheduleIds,
+  )
   return { user, password, isExisting, enrollmentId, group }
 }
 

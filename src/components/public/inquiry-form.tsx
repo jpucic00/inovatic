@@ -82,9 +82,7 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
     setStep((s) => s - 1)
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
-    if (e.key !== 'Enter') return
-    if ((e.target as HTMLElement).tagName === 'TEXTAREA') return
+  function onFormSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     if (step < 3) {
       void handleNext()
@@ -169,7 +167,7 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
         ))}
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} onKeyDown={handleKeyDown} noValidate>
+      <form onSubmit={onFormSubmit} noValidate>
         {step === 1 && <InquiryStep1 register={register} errors={errors} />}
         {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} getValues={getValues} />}
         {step === 3 && (

@@ -10,8 +10,8 @@ export default function AdminMaterialsLoading() {
         <Skeleton className="h-9 w-32" />
       </div>
       <div className="space-y-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-14 w-full" />
+        {Array.from({ length: 6 }, (_, i) => `skeleton-${i}`).map(key => (
+          <Skeleton key={key} className="h-14 w-full" />
         ))}
       </div>
     </div>

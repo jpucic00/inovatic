@@ -57,10 +57,10 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
       {rows.map((row) => {
         const href = resolveHref(row)
         const size = formatBytes(row.fileSize)
-        const scopeDetail =
-          row.scope === 'MODULE' ? row.moduleTitle
-          : row.scope === 'COURSE' ? row.courseTitle
-          : row.groupName
+        let scopeDetail: string | null | undefined
+        if (row.scope === 'MODULE') scopeDetail = row.moduleTitle
+        else if (row.scope === 'COURSE') scopeDetail = row.courseTitle
+        else scopeDetail = row.groupName
 
         const isDimmed = row.hiddenInThisGroup === true
 

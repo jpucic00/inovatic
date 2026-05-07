@@ -92,11 +92,12 @@ export function CreateTeacherDialog() {
             {result ? 'Nastavnik kreiran' : 'Kreiraj nastavnika'}
           </DialogTitle>
           <DialogDescription>
-            {result
-              ? result.emailSent
+            {(() => {
+              if (!result) return 'Kreiranjem računa generira se privremena lozinka koja se šalje na e-mail.'
+              return result.emailSent
                 ? 'Pristupni podaci poslani su na unesenu e-mail adresu.'
                 : 'Račun je kreiran. E-mail nije poslan — podijelite pristupne podatke ručno.'
-              : 'Kreiranjem računa generira se privremena lozinka koja se šalje na e-mail.'}
+            })()}
           </DialogDescription>
         </DialogHeader>
 

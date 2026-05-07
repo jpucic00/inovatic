@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { MapPin, Clock, Users } from 'lucide-react'
+import { MapPin, Clock, Users, Image as ImageIcon } from 'lucide-react'
 import { getMyCurrentEnrollments, type StudentEnrollmentSummary } from '@/actions/student/dashboard'
 import { getEffectiveMaterialsForStudent } from '@/actions/student/materials'
 import { MaterialList } from '@/components/portal/material-list'
@@ -34,7 +34,7 @@ function EmptyState() {
   )
 }
 
-async function SingleEnrollmentView({ enrollment }: { enrollment: StudentEnrollmentSummary }) {
+async function SingleEnrollmentView({ enrollment }: Readonly<{ enrollment: StudentEnrollmentSummary }>) {
   const view = await getEffectiveMaterialsForStudent(enrollment.group.id)
   const { group } = view
 
@@ -64,12 +64,21 @@ async function SingleEnrollmentView({ enrollment }: { enrollment: StudentEnrollm
           ) : null}
         </div>
       </div>
+      <div className="mb-6">
+        <Link
+          href={`/portal/grupa/${group.id}/galerija`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded-md transition-colors"
+        >
+          <ImageIcon className="w-4 h-4" />
+          Galerija
+        </Link>
+      </div>
       <MaterialList view={view} />
     </div>
   )
 }
 
-function MultiEnrollmentGrid({ enrollments }: { enrollments: StudentEnrollmentSummary[] }) {
+function MultiEnrollmentGrid({ enrollments }: Readonly<{ enrollments: StudentEnrollmentSummary[] }>) {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Moje grupe</h1>

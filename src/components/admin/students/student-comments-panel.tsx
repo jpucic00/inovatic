@@ -86,12 +86,8 @@ export function StudentCommentsPanel({
       <div className="flex flex-wrap items-center gap-2 mb-4 text-xs">
         <span className="text-gray-500">Filter:</span>
         {(['ALL', 'COMMENT', 'MODULE_REVIEW'] as const).map((value) => {
-          const label =
-            value === 'ALL'
-              ? 'Sve'
-              : value === 'COMMENT'
-                ? 'Komentari'
-                : 'Ocjene modula'
+          const labelMap = { ALL: 'Sve', COMMENT: 'Komentari', MODULE_REVIEW: 'Ocjene modula' } as const
+          const label = labelMap[value]
           const isActive = typeFilter === value
           return (
             <button
@@ -130,11 +126,11 @@ export function StudentCommentsPanel({
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900">
                       {section.groupLabel}
-                      {!section.currentlyEnrolled ? (
+                      {section.currentlyEnrolled ? null : (
                         <span className="ml-2 text-[10px] uppercase tracking-wide rounded-full px-1.5 py-0.5 bg-gray-200 text-gray-500">
                           Bivša grupa
                         </span>
-                      ) : null}
+                      )}
                     </p>
                     {section.attendance ? (
                       <AttendanceSummary

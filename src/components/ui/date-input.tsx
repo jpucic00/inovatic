@@ -21,12 +21,12 @@ function isoToDisplay(iso: string): string {
 
 function displayToIso(display: string): string {
   if (!display || display.length < 10) return ''
-  const match = display.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(display)
   if (!match) return ''
   const [, dd, mm, yyyy] = match
-  const day = parseInt(dd, 10)
-  const month = parseInt(mm, 10)
-  const year = parseInt(yyyy, 10)
+  const day = Number.parseInt(dd, 10)
+  const month = Number.parseInt(mm, 10)
+  const year = Number.parseInt(yyyy, 10)
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return ''
   const date = new Date(year, month - 1, day)
   if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return ''
@@ -40,14 +40,14 @@ export function DateInput({
   disabled = false,
   id,
   placeholder = 'dd.MM.yyyy',
-}: DateInputProps) {
+}: Readonly<DateInputProps>) {
   const [display, setDisplay] = useState(() => isoToDisplay(value))
   const inputRef = useRef<HTMLInputElement>(null)
   const cursorTargetRef = useRef<number | null>(null)
 
   const layoutRe = /\b(flex-[01]|flex-auto|flex-none|flex-grow(?:-0)?|flex-shrink(?:-0)?|min-w-0)\b/g
-  const layoutClasses = (className.match(layoutRe) || []).join(' ')
-  const inputClasses = className.replace(layoutRe, '').replace(/\s{2,}/g, ' ').trim()
+  const layoutClasses = Array.from(className.matchAll(layoutRe), (m) => m[0]).join(' ')
+  const inputClasses = className.replaceAll(layoutRe, '').replaceAll(/\s{2,}/g, ' ').trim()
   const isFullWidth = /\bw-full\b/.test(className)
 
   useEffect(() => {
@@ -66,12 +66,12 @@ export function DateInput({
     const raw = e.target.value
     const cursorBefore = e.target.selectionStart ?? raw.length
 
-    let cleaned = raw.replace(/[^\d.]/g, '').slice(0, 10)
+    let cleaned = raw.replaceAll(/[^\d.]/g, '').slice(0, 10)
     let cursorAfter = cursorBefore - (raw.length - cleaned.length)
 
     const isAppendingAtEnd =
       cleaned.length === display.length + 1 && cursorBefore === cleaned.length
-    if (isAppendingAtEnd && /\d/.test(cleaned[cleaned.length - 1])) {
+    if (isAppendingAtEnd && /\d/.test(cleaned.at(-1)!)) {
       if (cleaned.length === 3 && /^\d{3}$/.test(cleaned)) {
         cleaned = cleaned.slice(0, 2) + '.' + cleaned.slice(2)
         cursorAfter += 1
@@ -107,7 +107,7 @@ export function DateInput({
       onChange(text)
       return
     }
-    const digits = text.replace(/\D/g, '')
+    const digits = text.replaceAll(/\D/g, '')
     if (digits.length === 8) {
       e.preventDefault()
       const formatted = `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`

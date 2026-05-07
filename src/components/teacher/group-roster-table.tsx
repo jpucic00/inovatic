@@ -5,7 +5,7 @@ function formatDob(iso: string | null): string {
   if (!iso) return '—'
   // childDateOfBirth is stored as "YYYY-MM-DD" string in the DB; render as
   // Croatian dd.MM.yyyy. Graceful fallback for any legacy non-ISO strings.
-  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
   if (!m) return iso
   return `${m[3]}.${m[2]}.${m[1]}.`
 }
@@ -69,7 +69,7 @@ export function GroupRosterTable({ rows }: Readonly<Props>) {
                     ) : null}
                     {r.parentPhone ? (
                       <a
-                        href={`tel:${r.parentPhone.replace(/\s+/g, '')}`}
+                        href={`tel:${r.parentPhone.replaceAll(/\s+/g, '')}`}
                         className="text-cyan-700 hover:underline"
                       >
                         {r.parentPhone}

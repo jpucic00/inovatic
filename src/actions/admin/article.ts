@@ -1,6 +1,6 @@
 'use server'
 
-import { randomBytes } from 'crypto'
+import { randomBytes } from 'node:crypto'
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'

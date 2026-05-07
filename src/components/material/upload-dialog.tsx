@@ -128,11 +128,14 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
       sortOrder: 0,
     }
 
-    const input = target.scope === 'MODULE'
-      ? { ...common, scope: 'MODULE' as const, moduleId: target.moduleId }
-      : target.scope === 'COURSE'
-      ? { ...common, scope: 'COURSE' as const, courseId: target.courseId }
-      : { ...common, scope: 'GROUP' as const, scheduledGroupId: target.scheduledGroupId }
+    let input
+    if (target.scope === 'MODULE') {
+      input = { ...common, scope: 'MODULE' as const, moduleId: target.moduleId }
+    } else if (target.scope === 'COURSE') {
+      input = { ...common, scope: 'COURSE' as const, courseId: target.courseId }
+    } else {
+      input = { ...common, scope: 'GROUP' as const, scheduledGroupId: target.scheduledGroupId }
+    }
 
     startTransition(async () => {
       const res = await createMaterial(input)
@@ -223,7 +226,7 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
             </div>
           </Field>
 
-          {type === 'VIDEO' ? (
+          {type === 'VIDEO' && (
             <Field label="Izvor videa">
               <div className="flex gap-1 border-b border-gray-200 mb-3">
                 {(['upload', 'url'] as const).map((m) => (
@@ -260,7 +263,8 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
                 />
               )}
             </Field>
-          ) : type === 'LINK' ? (
+          )}
+          {type === 'LINK' && (
             <Field label="URL">
               <input
                 id="material-external-url"
@@ -271,7 +275,8 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
                 className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
               />
             </Field>
-          ) : (
+          )}
+          {type !== 'VIDEO' && type !== 'LINK' && (
             <Field label="Datoteka">
               <FileInput
                 uploading={uploading}
@@ -338,16 +343,17 @@ function FileInput({
         }}
         className="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100"
       />
-      {uploading ? (
+      {uploading && (
         <p className="mt-2 text-xs text-gray-500 inline-flex items-center gap-1.5">
           <Loader2 className="w-3 h-3 animate-spin" /> Uploadam…
         </p>
-      ) : fileName ? (
+      )}
+      {!uploading && fileName && (
         <p className="mt-2 text-xs text-emerald-700">
           ✓ {fileName}
-          {fileBytes != null ? ` · ${formatBytes(fileBytes)}` : ''}
+          {fileBytes == null ? '' : ` · ${formatBytes(fileBytes)}`}
         </p>
-      ) : null}
+      )}
     </div>
   )
 }

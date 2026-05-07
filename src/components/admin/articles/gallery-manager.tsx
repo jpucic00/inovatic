@@ -92,19 +92,21 @@ export function GalleryManager({
     if (files && files.length > 0) void handleFiles(files)
   }
 
+  const executeRemove = async (image: GalleryImage) => {
+    const res = await removeGalleryImage(image.id)
+    setPendingId(null)
+    if (res.success) {
+      setImages((prev) => prev.filter((i) => i.id !== image.id))
+      toast.success('Slika uklonjena.')
+      router.refresh()
+    } else {
+      toast.error(res.error)
+    }
+  }
+
   const handleRemove = (image: GalleryImage) => {
     setPendingId(image.id)
-    startTransition(async () => {
-      const res = await removeGalleryImage(image.id)
-      setPendingId(null)
-      if (res.success) {
-        setImages((prev) => prev.filter((i) => i.id !== image.id))
-        toast.success('Slika uklonjena.')
-        router.refresh()
-      } else {
-        toast.error(res.error)
-      }
-    })
+    startTransition(() => executeRemove(image))
   }
 
   const handleMove = (image: GalleryImage, direction: 'up' | 'down') => {
@@ -125,14 +127,14 @@ export function GalleryManager({
     startTransition(async () => {
       const res = await reorderGalleryImage(image.id, direction)
       setPendingId(null)
-      if (!res.success) {
+      if (res.success) {
+        router.refresh()
+      } else {
         toast.error(res.error)
         // Revert
         setImages(
           [...initialImages].sort((a, b) => a.sortOrder - b.sortOrder),
         )
-      } else {
-        router.refresh()
       }
     })
   }

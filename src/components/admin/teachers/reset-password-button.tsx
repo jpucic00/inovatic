@@ -65,11 +65,12 @@ export function ResetPasswordButton({ teacherId, teacherEmail }: Readonly<Props>
             {result ? 'Nova lozinka' : 'Resetiraj lozinku'}
           </DialogTitle>
           <DialogDescription>
-            {result
-              ? result.emailSent
+            {(() => {
+              if (!result) return 'Ovo će generirati novu privremenu lozinku. Postojeća lozinka prestaje vrijediti.'
+              return result.emailSent
                 ? 'Nova lozinka poslana je na e-mail nastavnika.'
                 : 'Nova lozinka je postavljena. E-mail nije poslan — podijelite podatke ručno.'
-              : 'Ovo će generirati novu privremenu lozinku. Postojeća lozinka prestaje vrijediti.'}
+            })()}
           </DialogDescription>
         </DialogHeader>
 

@@ -66,8 +66,9 @@ export function EditMaterialDialog({ id, title: initialTitle, description: initi
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Naslov</label>
+            <label htmlFor="edit-material-title" className="block text-sm font-medium text-gray-700 mb-1.5">Naslov</label>
             <input
+              id="edit-material-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -75,8 +76,9 @@ export function EditMaterialDialog({ id, title: initialTitle, description: initi
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Opis</label>
+            <label htmlFor="edit-material-description" className="block text-sm font-medium text-gray-700 mb-1.5">Opis</label>
             <textarea
+              id="edit-material-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -84,11 +86,12 @@ export function EditMaterialDialog({ id, title: initialTitle, description: initi
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Redoslijed</label>
+            <label htmlFor="edit-material-sort-order" className="block text-sm font-medium text-gray-700 mb-1.5">Redoslijed</label>
             <input
+              id="edit-material-sort-order"
               type="number"
               value={sortOrder}
-              onChange={(e) => setSortOrder(parseInt(e.target.value, 10) || 0)}
+              onChange={(e) => setSortOrder(Number.parseInt(e.target.value, 10) || 0)}
               className="w-32 px-3 py-2 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
             />
           </div>

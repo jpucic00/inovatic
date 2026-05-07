@@ -128,9 +128,9 @@ export function AddCommentForm({
           onClick={() => setType('COMMENT')}
           className={[
             'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-            !isReview
-              ? 'bg-white text-cyan-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700',
+            isReview
+              ? 'text-gray-500 hover:text-gray-700'
+              : 'bg-white text-cyan-700 shadow-sm',
           ].join(' ')}
         >
           <MessageSquareText className="w-4 h-4" />
@@ -200,11 +200,10 @@ export function AddCommentForm({
             : 'bg-cyan-600 hover:bg-cyan-700',
         ].join(' ')}
       >
-        {isPending
-          ? 'Dodajem...'
-          : isReview
-            ? 'Dodaj ocjenu'
-            : 'Dodaj komentar'}
+        {(() => {
+          if (isPending) return 'Dodajem...'
+          return isReview ? 'Dodaj ocjenu' : 'Dodaj komentar'
+        })()}
       </button>
     </form>
   )

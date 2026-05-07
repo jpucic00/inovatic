@@ -246,14 +246,15 @@ export function StudentDetailView({
                     </div>
                   </div>
 
-                  {isAdmin ? (
+                  {isAdmin && (
                     <ManageEnrollmentModules
                       studentId={student.id}
                       enrollmentId={enrollment.id}
                       enrolled={enrolledModules}
                       available={availableModules}
                     />
-                  ) : enrolledModules.length > 0 ? (
+                  )}
+                  {!isAdmin && enrolledModules.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-gray-200">
                       <p className="text-xs font-medium text-gray-500 mb-1.5">
                         Upisani moduli
@@ -264,7 +265,7 @@ export function StudentDetailView({
                         ))}
                       </ul>
                     </div>
-                  ) : null}
+                  )}
                 </div>
               )
             })}
@@ -392,10 +393,10 @@ export function buildCommentsPanelTabs(
   }
 
   return Array.from(byYear.entries())
-    .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
+    .sort(([a], [b]) => b.localeCompare(a))
     .map(([schoolYear, sections]) => ({
       schoolYear,
-      sections: sections.sort((a, b) =>
+      sections: [...sections].sort((a, b) =>
         a.groupLabel.localeCompare(b.groupLabel, 'hr'),
       ),
     }))

@@ -126,7 +126,7 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
     startTime: group.startTime,
     endTime: group.endTime,
     expectedSessions,
-    extraSessions: Array.from(extraSet).sort(),
+    extraSessions: Array.from(extraSet).sort((a, b) => a.localeCompare(b)),
     roster,
     records,
   }

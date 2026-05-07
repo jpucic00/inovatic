@@ -19,7 +19,7 @@ export function toEmbedUrl(url: string): string | null {
         const v = u.searchParams.get('v')
         return v ? `https://www.youtube.com/embed/${v}` : null
       }
-      const match = u.pathname.match(/^\/(?:embed|shorts)\/([^/?#]+)/)
+      const match = /^\/(?:embed|shorts)\/([^/?#]+)/.exec(u.pathname)
       if (match) return `https://www.youtube.com/embed/${match[1]}`
       return null
     }
@@ -36,7 +36,7 @@ export function toEmbedUrl(url: string): string | null {
   }
 }
 
-export function VideoEmbed({ url, title }: { url: string; title?: string }) {
+export function VideoEmbed({ url, title }: Readonly<{ url: string; title?: string }>) {
   const embed = toEmbedUrl(url)
   if (!embed) {
     return (

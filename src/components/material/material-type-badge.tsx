@@ -27,7 +27,7 @@ export function MaterialTypeIcon({ type, className }: Readonly<Props>) {
   }
 }
 
-export function MaterialTypeBadge({ type }: { type: MaterialType }) {
+export function MaterialTypeBadge({ type }: Readonly<{ type: MaterialType }>) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-0.5 text-xs font-medium text-cyan-700">
       <MaterialTypeIcon type={type} className="w-3 h-3" />

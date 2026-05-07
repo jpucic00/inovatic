@@ -26,6 +26,61 @@ export type ActiveProgram = {
   groups: ActiveGroup[]
 }
 
+type GroupRow = Awaited<ReturnType<typeof db.scheduledGroup.findMany>>[number] & {
+  course: {
+    id: string; slug: string; title: string; level: string | null;
+    isCustom: boolean; ageMin: number; ageMax: number; price: number | null;
+    sortOrder: number;
+    modules: {
+      id: string; title: string; sortOrder: number;
+      schedules: { id: string; schoolYear: string; startDate: Date | null }[];
+    }[];
+  };
+  enrollments: { id: string; moduleEnrollments: { moduleScheduleId: string }[] }[];
+  _count: { preferredInquiries: number };
+}
+
+function toActiveGroup(g: GroupRow, now: Date): ActiveGroup | null {
+  const isStandard = !g.course.isCustom
+
+  let enrollingScheduleId: string | null = null
+  let enrollingModuleTitle: string | null = null
+
+  if (isStandard) {
+    for (const mod of g.course.modules) {
+      const schedule = mod.schedules.find(
+        (s) => s.schoolYear === g.schoolYear && s.startDate !== null && s.startDate > now,
+      )
+      if (schedule) {
+        enrollingScheduleId = schedule.id
+        enrollingModuleTitle = mod.title
+        break
+      }
+    }
+    if (!enrollingScheduleId) return null
+  }
+
+  const enrolledCount = isStandard
+    ? g.enrollments.filter((e) =>
+        e.moduleEnrollments.some((me) => me.moduleScheduleId === enrollingScheduleId),
+      ).length
+    : g.enrollments.length
+
+  const available = g.maxStudents - enrolledCount - g._count.preferredInquiries
+  const isFull = available <= 0
+
+  return {
+    id: g.id,
+    name: g.name,
+    dayOfWeek: g.dayOfWeek,
+    startTime: g.startTime,
+    endTime: g.endTime,
+    availableSpots: Math.max(0, available),
+    isFull,
+    ...(enrollingModuleTitle ? { currentModuleName: enrollingModuleTitle } : {}),
+  }
+}
+
 export async function getActivePrograms(): Promise<ActiveProgram[]> {
   const now = new Date()
   const yearFloor = computeSchoolYear()
@@ -96,32 +151,8 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
 
   const courseMap = new Map<string, ActiveProgram>()
   for (const g of groups) {
-    const isStandard = !g.course.isCustom
-
-    let enrollingScheduleId: string | null = null
-    let enrollingModuleTitle: string | null = null
-    if (isStandard) {
-      for (const mod of g.course.modules) {
-        const schedule = mod.schedules.find(
-          (s) => s.schoolYear === g.schoolYear && s.startDate !== null && s.startDate > now,
-        )
-        if (schedule) {
-          enrollingScheduleId = schedule.id
-          enrollingModuleTitle = mod.title
-          break
-        }
-      }
-      if (!enrollingScheduleId) continue
-    }
-
-    const enrolledCount = isStandard
-      ? g.enrollments.filter((e) =>
-          e.moduleEnrollments.some((me) => me.moduleScheduleId === enrollingScheduleId),
-        ).length
-      : g.enrollments.length
-
-    const available = g.maxStudents - enrolledCount - g._count.preferredInquiries
-    const isFull = available <= 0
+    const activeGroup = toActiveGroup(g, now)
+    if (!activeGroup) continue
 
     if (!courseMap.has(g.courseId)) {
       courseMap.set(g.courseId, {
@@ -137,16 +168,7 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
       })
     }
 
-    courseMap.get(g.courseId)!.groups.push({
-      id: g.id,
-      name: g.name,
-      dayOfWeek: g.dayOfWeek,
-      startTime: g.startTime,
-      endTime: g.endTime,
-      availableSpots: Math.max(0, available),
-      isFull,
-      ...(enrollingModuleTitle ? { currentModuleName: enrollingModuleTitle } : {}),
-    })
+    courseMap.get(g.courseId)!.groups.push(activeGroup)
   }
 
   return Array.from(courseMap.values())

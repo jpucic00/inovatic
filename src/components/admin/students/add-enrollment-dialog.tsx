@@ -199,17 +199,19 @@ export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
         </div>
 
         <div className="space-y-2 max-h-64 overflow-y-auto py-2">
-          {loadingGroups ? (
+          {loadingGroups && (
             <p className="text-sm text-gray-400 italic py-4 text-center">
               Učitavam grupe...
             </p>
-          ) : groups.length === 0 ? (
+          )}
+          {!loadingGroups && groups.length === 0 && (
             <p className="text-sm text-gray-400 italic py-4 text-center">
-              {!selectedCourseId
-                ? 'Najprije odaberite program.'
-                : 'Nema dostupnih grupa za ovaj program.'}
+              {selectedCourseId
+                ? 'Nema dostupnih grupa za ovaj program.'
+                : 'Najprije odaberite program.'}
             </p>
-          ) : (
+          )}
+          {!loadingGroups && groups.length > 0 && (
             groups.map((g) => {
               const timeRange = g.startTime
                 ? `${g.startTime}–${g.endTime ?? ''}`

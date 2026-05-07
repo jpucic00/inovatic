@@ -360,7 +360,7 @@ export function ArticleForm({ initial, availableTags }: Readonly<Props>) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Sadržaj</label>
+            <span className="block text-xs font-medium text-gray-600 mb-1">Sadržaj</span>
             <BlockNoteEditor
               initialContent={initialContent}
               onChange={setContent}

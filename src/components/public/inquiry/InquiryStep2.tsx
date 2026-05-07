@@ -38,7 +38,7 @@ export function InquiryStep2({ register, errors, setValue, getValues }: Readonly
   const [day, setDay] = useState(() => {
     if (!existingDOB) return ''
     const d = existingDOB.split('-')[2]
-    return d ? String(parseInt(d, 10)) : ''
+    return d ? String(Number.parseInt(d, 10)) : ''
   })
   const [month, setMonth] = useState(() => existingDOB?.split('-')[1] ?? '')
   const [year, setYear] = useState(() => existingDOB?.split('-')[0] ?? '')

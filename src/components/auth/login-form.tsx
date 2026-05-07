@@ -32,10 +32,9 @@ export function LoginForm() {
     startTransition(async () => {
       const result = await loginAction(data)
       if (result.success) {
-        const destination =
-          result.role === 'ADMIN' ? '/admin'
-          : result.role === 'TEACHER' ? '/nastavnik'
-          : '/portal'
+        let destination = '/portal'
+        if (result.role === 'ADMIN') destination = '/admin'
+        else if (result.role === 'TEACHER') destination = '/nastavnik'
         router.push(destination)
         router.refresh()
       } else {

@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     const upload = cloudinary.uploader.upload_stream(
       { folder: monthFolder(), resource_type: 'image' },
       (err: UploadApiErrorResponse | undefined, res: UploadApiResponse | undefined) => {
-        if (err) reject(err)
+        if (err) reject(new Error(err.message ?? 'Cloudinary upload error'))
         else if (res) resolve(res)
         else reject(new Error('Cloudinary returned no result'))
       },

@@ -14,13 +14,13 @@ export default function TeacherGroupLoading() {
         </div>
       </div>
       <div className="flex gap-2 border-b border-gray-200 mb-6">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-8 w-24" />
+        {Array.from({ length: 5 }, (_, i) => `tab-${i}`).map(key => (
+          <Skeleton key={key} className="h-8 w-24" />
         ))}
       </div>
       <div className="space-y-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
+        {Array.from({ length: 4 }, (_, i) => `row-${i}`).map(key => (
+          <Skeleton key={key} className="h-12 w-full" />
         ))}
       </div>
     </div>

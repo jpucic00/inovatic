@@ -45,7 +45,7 @@ export function toDateKey(date: Date): string {
 
 /** Parse "YYYY-MM-DD" into a UTC-midnight Date. */
 export function fromDateKey(key: string): Date {
-  const m = key.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key)
   if (!m) throw new Error(`Invalid date key: ${key}`)
   return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
 }

@@ -28,14 +28,14 @@ type Draft = Record<string, { present: boolean; note: string }>
 
 function pickDefaultDate(expected: string[], extras: string[]): string {
   const today = toDateKey(todayUtc())
-  const all = [...new Set([...expected, ...extras])].sort()
+  const all = [...new Set([...expected, ...extras])].sort((a, b) => a.localeCompare(b))
   if (all.length === 0) return today
 
   // Prefer today if it's an expected session; else the nearest past session;
   // else the nearest upcoming session.
   if (all.includes(today)) return today
   const past = all.filter((d) => d <= today)
-  if (past.length > 0) return past[past.length - 1]
+  if (past.length > 0) return past.at(-1)!
   return all[0]
 }
 
@@ -78,7 +78,7 @@ export function AttendanceMarker({
   const [adhocDates, setAdhocDates] = useState<string[]>([])
   const allDates = useMemo(() => {
     const merged = [...new Set([...expectedSessions, ...extraSessions, ...adhocDates])]
-    merged.sort()
+    merged.sort((a, b) => a.localeCompare(b))
     return merged
   }, [expectedSessions, extraSessions, adhocDates])
 
@@ -159,9 +159,9 @@ export function AttendanceMarker({
     )
   }
 
-  const scheduleHint = dayOfWeek
-    ? `${dayOfWeek}${startTime ? ` · ${startTime}${endTime ? `–${endTime}` : ''}` : ''}`
-    : null
+  const endSuffix = endTime ? `–${endTime}` : ''
+  const timeRange = startTime ? ` · ${startTime}${endSuffix}` : ''
+  const scheduleHint = dayOfWeek ? `${dayOfWeek}${timeRange}` : null
 
   return (
     <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
@@ -208,11 +208,11 @@ export function AttendanceMarker({
                     <span
                       className={[
                         'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                        marked === 0
-                          ? 'bg-gray-100 text-gray-500'
-                          : marked === total
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-amber-100 text-amber-700',
+                        (() => {
+                          if (marked === 0) return 'bg-gray-100 text-gray-500'
+                          if (marked === total) return 'bg-emerald-100 text-emerald-700'
+                          return 'bg-amber-100 text-amber-700'
+                        })(),
                       ].join(' ')}
                     >
                       {marked}/{total}
@@ -225,11 +225,12 @@ export function AttendanceMarker({
         )}
 
         <div className="rounded-lg border border-gray-200 bg-white p-3">
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">
+          <label htmlFor="adhoc-date" className="block text-xs font-medium text-gray-600 mb-1.5">
             Dodaj datum ručno
           </label>
           <div className="flex gap-2">
             <DateInput
+              id="adhoc-date"
               value={newDateInput}
               onChange={setNewDateInput}
               className="flex-1 min-w-0 w-full px-2 py-1.5 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"

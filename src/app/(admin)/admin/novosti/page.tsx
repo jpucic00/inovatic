@@ -27,7 +27,7 @@ export default async function ArticlesAdminPage({ searchParams }: Readonly<PageP
   const params = await searchParams
   const search = params.search ?? ''
   const status = parseStatus(params.status)
-  const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1)
 
   const result = await getArticles({ search, status, page, pageSize: PAGE_SIZE })
 
@@ -59,10 +59,12 @@ export default async function ArticlesAdminPage({ searchParams }: Readonly<PageP
       <div className="flex gap-1 border-b border-gray-200 mb-4">
         {statusTabs.map((tab) => {
           const isActive = status === tab.key
-          const href =
-            tab.key === 'ALL'
-              ? `/admin/novosti${search ? `?search=${encodeURIComponent(search)}` : ''}`
-              : `/admin/novosti?status=${tab.key}${search ? `&search=${encodeURIComponent(search)}` : ''}`
+          const searchParam = search ? `search=${encodeURIComponent(search)}` : ''
+          const searchQuery = searchParam ? `?${searchParam}` : ''
+          const searchSuffix = searchParam ? `&${searchParam}` : ''
+          const href = tab.key === 'ALL'
+            ? `/admin/novosti${searchQuery}`
+            : `/admin/novosti?status=${tab.key}${searchSuffix}`
           return (
             <Link
               key={tab.key}

@@ -47,13 +47,9 @@ export function HideInGroupToggle({ materialId, scheduledGroupId, hidden }: Read
       aria-label={hidden ? 'Prikaži u ovoj grupi' : 'Sakrij u ovoj grupi'}
       title={hidden ? 'Prikaži u ovoj grupi' : 'Sakrij u ovoj grupi'}
     >
-      {isPending ? (
-        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-      ) : hidden ? (
-        <Eye className="w-3.5 h-3.5" />
-      ) : (
-        <EyeOff className="w-3.5 h-3.5" />
-      )}
+      {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+      {!isPending && hidden && <Eye className="w-3.5 h-3.5" />}
+      {!isPending && !hidden && <EyeOff className="w-3.5 h-3.5" />}
     </button>
   )
 }

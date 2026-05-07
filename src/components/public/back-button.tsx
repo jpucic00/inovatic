@@ -10,11 +10,11 @@ interface BackButtonProps {
   className?: string
 }
 
-export function BackButton({ fallbackHref, label, className }: BackButtonProps) {
+export function BackButton({ fallbackHref, label, className }: Readonly<BackButtonProps>) {
   const router = useRouter()
 
   const handleClick = (e: React.MouseEvent) => {
-    if (window.history.length > 1) {
+    if (globalThis.history.length > 1) {
       e.preventDefault()
       router.back()
     }

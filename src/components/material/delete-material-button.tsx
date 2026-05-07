@@ -16,7 +16,7 @@ export function DeleteMaterialButton({ id, title }: Readonly<Props>) {
   const [isPending, startTransition] = useTransition()
 
   const handleClick = () => {
-    const ok = window.confirm(`Obrisati materijal "${title}"? Ova radnja je nepovratna.`)
+    const ok = globalThis.confirm(`Obrisati materijal "${title}"? Ova radnja je nepovratna.`)
     if (!ok) return
     startTransition(async () => {
       const res = await deleteMaterial(id)

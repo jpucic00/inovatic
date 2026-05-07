@@ -19,7 +19,7 @@ export default async function TeachersPage({ searchParams }: Readonly<PageProps>
 
   const params = await searchParams
   const search = params.search ?? ''
-  const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1)
 
   const result = await getTeachers({ search, page, pageSize: PAGE_SIZE })
 

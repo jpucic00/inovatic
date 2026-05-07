@@ -44,8 +44,9 @@ export default async function AdminMaterialsPage({ searchParams }: Readonly<Page
 
       <form className="mb-6 flex flex-wrap gap-2 items-end" action="/admin/materijali">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Pretraži</label>
+          <label htmlFor="mat-filter-q" className="block text-xs font-medium text-gray-500 mb-1">Pretraži</label>
           <input
+            id="mat-filter-q"
             type="text"
             name="q"
             defaultValue={q}
@@ -54,8 +55,9 @@ export default async function AdminMaterialsPage({ searchParams }: Readonly<Page
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Razina</label>
+          <label htmlFor="mat-filter-scope" className="block text-xs font-medium text-gray-500 mb-1">Razina</label>
           <select
+            id="mat-filter-scope"
             name="scope"
             defaultValue={params.scope ?? ''}
             className="px-3 py-2 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
@@ -67,8 +69,9 @@ export default async function AdminMaterialsPage({ searchParams }: Readonly<Page
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Tip</label>
+          <label htmlFor="mat-filter-type" className="block text-xs font-medium text-gray-500 mb-1">Tip</label>
           <select
+            id="mat-filter-type"
             name="type"
             defaultValue={params.type ?? ''}
             className="px-3 py-2 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"

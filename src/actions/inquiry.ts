@@ -12,6 +12,68 @@ class GroupFullError extends Error {
   constructor() { super('Group is full') }
 }
 
+type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
+
+async function assertGroupHasAvailableSpot(tx: TxClient, scheduledGroupId: string): Promise<void> {
+  const group = await tx.scheduledGroup.findUnique({
+    where: { id: scheduledGroupId },
+    include: {
+      enrollments: {
+        select: {
+          id: true,
+          moduleEnrollments: { select: { moduleScheduleId: true } },
+        },
+      },
+      _count: {
+        select: {
+          preferredInquiries: {
+            where: { status: { notIn: ['DECLINED', 'ACCOUNT_CREATED'] } },
+          },
+        },
+      },
+      course: {
+        select: {
+          isCustom: true,
+          modules: {
+            orderBy: { sortOrder: 'asc' },
+            select: {
+              schedules: {
+                where: { schoolYear: { gte: computeSchoolYear() } },
+                select: { id: true, schoolYear: true, startDate: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!group) throw new GroupFullError()
+
+  const now = new Date()
+  let enrolledCount: number
+
+  if (group.course.isCustom) {
+    enrolledCount = group.enrollments.length
+  } else {
+    let enrollingScheduleId: string | null = null
+    for (const mod of group.course.modules) {
+      const schedule = mod.schedules.find(
+        (s) => s.schoolYear === group.schoolYear && s.startDate && s.startDate > now,
+      )
+      if (schedule) { enrollingScheduleId = schedule.id; break }
+    }
+    enrolledCount = enrollingScheduleId
+      ? group.enrollments.filter((e) =>
+          e.moduleEnrollments.some((me) => me.moduleScheduleId === enrollingScheduleId),
+        ).length
+      : group.enrollments.length
+  }
+
+  const available = group.maxStudents - enrolledCount - group._count.preferredInquiries
+  if (available <= 0) throw new GroupFullError()
+}
+
 export type InquiryActionResult =
   | { success: true }
   | { success: false; error: string }
@@ -41,62 +103,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
   try {
     await db.$transaction(async (tx) => {
       if (scheduledGroupId) {
-        const group = await tx.scheduledGroup.findUnique({
-          where: { id: scheduledGroupId },
-          include: {
-            enrollments: {
-              select: {
-                id: true,
-                moduleEnrollments: { select: { moduleScheduleId: true } },
-              },
-            },
-            _count: {
-              select: {
-                preferredInquiries: {
-                  where: { status: { notIn: ['DECLINED', 'ACCOUNT_CREATED'] } },
-                },
-              },
-            },
-            course: {
-              select: {
-                isCustom: true,
-                modules: {
-                  orderBy: { sortOrder: 'asc' },
-                  select: {
-                    schedules: {
-                      where: { schoolYear: { gte: computeSchoolYear() } },
-                      select: { id: true, schoolYear: true, startDate: true },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        })
-
-        if (!group) throw new GroupFullError()
-
-        const now = new Date()
-        let enrolledCount: number
-        if (!group.course.isCustom) {
-          let enrollingScheduleId: string | null = null
-          for (const mod of group.course.modules) {
-            const schedule = mod.schedules.find(
-              (s) => s.schoolYear === group.schoolYear && s.startDate && s.startDate > now,
-            )
-            if (schedule) { enrollingScheduleId = schedule.id; break }
-          }
-          enrolledCount = enrollingScheduleId
-            ? group.enrollments.filter((e) =>
-                e.moduleEnrollments.some((me) => me.moduleScheduleId === enrollingScheduleId),
-              ).length
-            : group.enrollments.length
-        } else {
-          enrolledCount = group.enrollments.length
-        }
-
-        const available = group.maxStudents - enrolledCount - group._count.preferredInquiries
-        if (available <= 0) throw new GroupFullError()
+        await assertGroupHasAvailableSpot(tx, scheduledGroupId)
       }
 
       return tx.inquiry.create({

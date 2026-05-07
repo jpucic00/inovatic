@@ -17,7 +17,7 @@ export function DeleteEnrollmentButton({
   const router = useRouter()
 
   const handleDelete = () => {
-    if (!window.confirm('Izbrisati upis? Svi moduli ovog upisa bit će uklonjeni.')) {
+    if (!globalThis.confirm('Izbrisati upis? Svi moduli ovog upisa bit će uklonjeni.')) {
       return
     }
     startTransition(async () => {

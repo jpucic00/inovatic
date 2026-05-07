@@ -2,7 +2,7 @@
 
 import { toProxyUrl } from '@/lib/robocamp-proxy'
 
-export function RobocampEmbed({ url, title }: { url: string; title?: string }) {
+export function RobocampEmbed({ url, title }: Readonly<{ url: string; title?: string }>) {
   const proxied = toProxyUrl(url)
   if (!proxied) return null
 

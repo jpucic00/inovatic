@@ -13,7 +13,7 @@ import { computeSchoolYear } from '@/lib/school-year'
 export type InquiryFilters = {
   status?: InquiryStatus | 'ALL'
   search?: string
-  courseId?: string | 'NONE'
+  courseId?: string
   page?: number
   pageSize?: number
 }
@@ -26,6 +26,12 @@ export type PaginatedResult<T> = {
   pageCount: number
 }
 
+function courseIdFilter(courseId: string | undefined) {
+  if (courseId === 'NONE') return { courseId: null }
+  if (courseId) return { courseId }
+  return {}
+}
+
 export async function getInquiries(
   filters: InquiryFilters = {},
 ): Promise<PaginatedResult<Awaited<ReturnType<typeof db.inquiry.findMany>>[number]>> {
@@ -35,11 +41,7 @@ export async function getInquiries(
 
   const where = {
     ...(status && status !== 'ALL' ? { status } : {}),
-    ...(courseId === 'NONE'
-      ? { courseId: null }
-      : courseId
-        ? { courseId }
-        : {}),
+    ...(courseIdFilter(courseId)),
     ...(search
       ? {
           OR: [

@@ -26,7 +26,7 @@ export function HeroCarousel({
   images,
   overlayClassName,
   children,
-}: HeroCarouselProps) {
+}: Readonly<HeroCarouselProps>) {
   const [api, setApi] = useState<CarouselApi>()
   const [current, setCurrent] = useState(0)
   const [count, setCount] = useState(0)
@@ -65,7 +65,7 @@ export function HeroCarousel({
       >
         <CarouselContent className="-ml-0 h-full">
           {images.map((image, index) => (
-            <CarouselItem key={index} className="pl-0 relative">
+            <CarouselItem key={image.src} className="pl-0 relative">
               <Image
                 src={image.src}
                 alt={image.alt}
@@ -95,9 +95,9 @@ export function HeroCarousel({
       {/* Dot indicators */}
       {count > 1 && (
         <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
-          {Array.from({ length: count }).map((_, index) => (
+          {Array.from({ length: count }, (_, i) => `dot-${i}`).map((key, index) => (
             <button
-              key={index}
+              key={key}
               onClick={() => api?.scrollTo(index)}
               className={cn(
                 'h-2 rounded-full transition-all duration-300',

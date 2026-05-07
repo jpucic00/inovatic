@@ -20,7 +20,7 @@ const TYPE_LABEL: Record<MaterialType, string> = {
   LINK: 'Poveznica',
 }
 
-function TypeIcon({ type, className }: { type: MaterialType; className?: string }) {
+function TypeIcon({ type, className }: Readonly<{ type: MaterialType; className?: string }>) {
   const common = className ?? 'w-6 h-6'
   switch (type) {
     case 'DOCUMENT':
@@ -40,7 +40,7 @@ function resolveHref(item: MaterialItem): string | null {
   return null
 }
 
-function MaterialTile({ item }: { item: MaterialItem }) {
+function MaterialTile({ item }: Readonly<{ item: MaterialItem }>) {
   const href = resolveHref(item)
   const size = formatBytes(item.fileSize)
 
@@ -71,18 +71,23 @@ function MaterialTile({ item }: { item: MaterialItem }) {
   }
 
   if (item.type === 'VIDEO') {
-    const videoContent = item.externalUrl ? (
-      <VideoEmbed url={item.externalUrl} title={item.title} />
-    ) : item.fileUrl ? (
-      <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ paddingTop: '56.25%' }}>
-        <video
-          controls
-          preload="metadata"
-          className="absolute inset-0 w-full h-full"
-          src={item.fileUrl}
-        />
-      </div>
-    ) : null
+    let videoContent: React.ReactNode = null
+    if (item.externalUrl) {
+      videoContent = <VideoEmbed url={item.externalUrl} title={item.title} />
+    } else if (item.fileUrl) {
+      videoContent = (
+        <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ paddingTop: '56.25%' }}>
+          <video
+            controls
+            preload="metadata"
+            className="absolute inset-0 w-full h-full"
+            src={item.fileUrl}
+          >
+            <track kind="captions" />
+          </video>
+        </div>
+      )
+    }
 
     if (!videoContent) {
       return <div aria-disabled className="opacity-70">{header}</div>
@@ -111,11 +116,11 @@ function ModuleSection({
   title,
   isActive,
   materials,
-}: {
+}: Readonly<{
   title: string
   isActive: boolean
   materials: MaterialItem[]
-}) {
+}>) {
   if (materials.length === 0) return null
 
   return (
@@ -135,7 +140,7 @@ function ModuleSection({
   )
 }
 
-export function MaterialList({ view }: { view: GroupMaterialsView }) {
+export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
   const hasAnyModuleMaterial = view.moduleSections.some((s) => s.materials.length > 0)
   const hasGroupMaterials = view.groupMaterials.length > 0
 

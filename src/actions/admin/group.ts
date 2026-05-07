@@ -163,6 +163,36 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
   return { success: true }
 }
 
+type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
+
+async function syncTeacherAssignments(
+  tx: TxClient,
+  groupId: string,
+  teacherIds: string[],
+): Promise<void> {
+  const current = await tx.teacherAssignment.findMany({
+    where: { scheduledGroupId: groupId },
+    select: { userId: true },
+  })
+  const currentIds = new Set(current.map((a) => a.userId))
+  const nextIds = new Set(teacherIds)
+
+  const toRemove = [...currentIds].filter((uid) => !nextIds.has(uid))
+  const toAdd = [...nextIds].filter((uid) => !currentIds.has(uid))
+
+  if (toRemove.length > 0) {
+    await tx.teacherAssignment.deleteMany({
+      where: { scheduledGroupId: groupId, userId: { in: toRemove } },
+    })
+  }
+  if (toAdd.length > 0) {
+    await tx.teacherAssignment.createMany({
+      data: toAdd.map((userId) => ({ userId, scheduledGroupId: groupId })),
+      skipDuplicates: true,
+    })
+  }
+}
+
 export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionResult> {
   await requireAdmin()
 
@@ -190,36 +220,8 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
         },
       })
 
-      // If teacherIds is explicitly provided, replace the full set of
-      // assignments for this group. (Not provided = don't touch them.)
       if (teacherIds !== undefined) {
-        const current = await tx.teacherAssignment.findMany({
-          where: { scheduledGroupId: id },
-          select: { userId: true },
-        })
-        const currentIds = new Set(current.map((a) => a.userId))
-        const nextIds = new Set(teacherIds)
-
-        const toRemove = [...currentIds].filter((uid) => !nextIds.has(uid))
-        const toAdd = [...nextIds].filter((uid) => !currentIds.has(uid))
-
-        if (toRemove.length > 0) {
-          await tx.teacherAssignment.deleteMany({
-            where: {
-              scheduledGroupId: id,
-              userId: { in: toRemove },
-            },
-          })
-        }
-        if (toAdd.length > 0) {
-          await tx.teacherAssignment.createMany({
-            data: toAdd.map((userId) => ({
-              userId,
-              scheduledGroupId: id,
-            })),
-            skipDuplicates: true,
-          })
-        }
+        await syncTeacherAssignments(tx, id, teacherIds)
       }
     })
   } catch (err) {

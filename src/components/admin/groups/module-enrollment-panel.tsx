@@ -240,7 +240,7 @@ export function ModuleEnrollmentPanel({
     const activeIdx = modules.findIndex(
       (m) => m.startDate && m.endDate && new Date(m.startDate) <= now && now <= new Date(m.endDate),
     )
-    return activeIdx >= 0 ? activeIdx : 0
+    return Math.max(activeIdx, 0)
   })
 
   return (

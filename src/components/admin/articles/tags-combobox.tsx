@@ -72,7 +72,7 @@ export function TagsCombobox({
       )
       add(exact?.name ?? query)
     } else if (e.key === 'Backspace' && !query && selectedNames.length > 0) {
-      remove(selectedNames[selectedNames.length - 1])
+      remove(selectedNames.at(-1)!)
     }
   }
 

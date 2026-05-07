@@ -20,7 +20,7 @@ const sidebarLinks = [
   { href: '/admin/novosti', label: 'Novosti', icon: Newspaper },
 ]
 
-function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function NavLinks({ pathname, onNavigate }: Readonly<{ pathname: string; onNavigate?: () => void }>) {
   return (
     <>
       {sidebarLinks.map(({ href, label, icon: Icon }) => {
@@ -46,7 +46,7 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
   )
 }
 
-function UserFooter({ userName }: { userName: string }) {
+function UserFooter({ userName }: Readonly<{ userName: string }>) {
   return (
     <div className="px-3 py-3 border-t border-gray-800">
       <div className="px-2 mb-3">
@@ -70,7 +70,7 @@ interface AdminNavProps {
   userName: string
 }
 
-export function AdminDesktopSidebar({ userName }: AdminNavProps) {
+export function AdminDesktopSidebar({ userName }: Readonly<AdminNavProps>) {
   const pathname = usePathname()
 
   return (
@@ -86,7 +86,7 @@ export function AdminDesktopSidebar({ userName }: AdminNavProps) {
   )
 }
 
-export function AdminMobileNav({ userName }: AdminNavProps) {
+export function AdminMobileNav({ userName }: Readonly<AdminNavProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
 
@@ -105,10 +105,9 @@ export function AdminMobileNav({ userName }: AdminNavProps) {
       </header>
 
       {isOpen && (
-        <nav
-          className="fixed inset-0 z-50 bg-gray-900 text-gray-300 flex flex-col lg:hidden"
-          role="dialog"
-          aria-modal="true"
+        <dialog
+          open
+          className="fixed inset-0 z-50 bg-gray-900 text-gray-300 flex flex-col lg:hidden w-full h-full max-w-full max-h-full m-0 p-0 border-none"
           aria-label="Navigacija"
         >
           <div className="h-14 px-4 border-b border-gray-800 flex items-center justify-between flex-shrink-0">
@@ -126,7 +125,7 @@ export function AdminMobileNav({ userName }: AdminNavProps) {
             <NavLinks pathname={pathname} onNavigate={() => setIsOpen(false)} />
           </div>
           <UserFooter userName={userName} />
-        </nav>
+        </dialog>
       )}
     </>
   )

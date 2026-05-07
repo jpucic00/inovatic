@@ -70,25 +70,11 @@ async function canManageMaterial(session: Session, target: CanManageTarget): Pro
   return assigned !== null
 }
 
-// ─── Create ─────────────────────────────────────────────────────────────────
+// ─── Scope helpers ─────────────────────────────────────────────────────────
 
-export async function createMaterial(
-  input: CreateMaterialInput,
-): Promise<AdminActionResult> {
-  const session = await requireTeacher()
-
-  const parsed = createMaterialSchema.safeParse(input)
-  if (!parsed.success) {
-    const firstIssue = parsed.error.issues[0]
-    return {
-      success: false,
-      error: firstIssue?.message ?? 'Nevažeći podaci.',
-    }
-  }
-  const data = parsed.data
-
-  // Scope + course.isCustom consistency (MODULE impossible for radionice;
-  // COURSE only for radionice).
+async function validateScopeConsistency(
+  data: CreateMaterialInput,
+): Promise<AdminActionResult | null> {
   if (data.scope === 'MODULE') {
     const mod = await db.courseModule.findUnique({
       where: { id: data.moduleId },
@@ -111,11 +97,36 @@ export async function createMaterial(
       }
     }
   }
+  return null
+}
 
-  const target: CanManageTarget =
-    data.scope === 'MODULE' ? { scope: 'MODULE', moduleId: data.moduleId }
-    : data.scope === 'COURSE' ? { scope: 'COURSE', courseId: data.courseId }
-    : { scope: 'GROUP', scheduledGroupId: data.scheduledGroupId }
+function scopeToTarget(data: CreateMaterialInput): CanManageTarget {
+  if (data.scope === 'MODULE') return { scope: 'MODULE', moduleId: data.moduleId }
+  if (data.scope === 'COURSE') return { scope: 'COURSE', courseId: data.courseId }
+  return { scope: 'GROUP', scheduledGroupId: data.scheduledGroupId }
+}
+
+// ─── Create ─────────────────────────────────────────────────────────────────
+
+export async function createMaterial(
+  input: CreateMaterialInput,
+): Promise<AdminActionResult> {
+  const session = await requireTeacher()
+
+  const parsed = createMaterialSchema.safeParse(input)
+  if (!parsed.success) {
+    const firstIssue = parsed.error.issues[0]
+    return {
+      success: false,
+      error: firstIssue?.message ?? 'Nevažeći podaci.',
+    }
+  }
+  const data = parsed.data
+
+  const scopeError = await validateScopeConsistency(data)
+  if (scopeError) return scopeError
+
+  const target = scopeToTarget(data)
 
   if (!(await canManageMaterial(session, target))) {
     return { success: false, error: 'Nemate dopuštenje za dodavanje ovog materijala.' }

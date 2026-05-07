@@ -151,7 +151,7 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</label>
+            <span className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</span>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="create-enrollmentStart" className="text-xs text-gray-500 mb-1 block">Od</label>
