@@ -223,3 +223,73 @@ flowchart TD
 ```
 
 > Note: sendScheduleOptions is a pure email action — no database writes. It can be called multiple times. The inquiry's preferred group from the original submission is preserved and preselected when creating an account.
+
+---
+
+## 6. Material Scope — Visibility Resolution
+
+Materials use a three-scope model (`MaterialScope`: MODULE, COURSE, GROUP). The effective set for a student viewing a group combines all applicable scopes, minus per-group hide overrides.
+
+### Student material resolution
+
+```mermaid
+flowchart TD
+    A[Student views materials for a ScheduledGroup] --> B[Collect union of three scope branches]
+
+    B --> C1["GROUP scope: scheduledGroupId = thisGroup"]
+    B --> C2{"course.isCustom?"}
+    B --> C3{"moduleIds.length > 0?"}
+
+    C2 -->|Yes - radionica| D1["COURSE scope: courseId = course.id"]
+    C2 -->|No - standard| SKIP1[COURSE branch skipped]
+    C3 -->|Yes - standard| D2["MODULE scope: moduleId IN course.moduleIds"]
+    C3 -->|No - radionica| SKIP2[MODULE branch skipped]
+
+    C1 --> UNION[OR union of matched branches]
+    D1 --> UNION
+    D2 --> UNION
+    SKIP1 --> UNION
+    SKIP2 --> UNION
+
+    UNION --> E["Subtract: MaterialGroupHide rows where scheduledGroupId = thisGroup"]
+    E --> F[Effective material set]
+
+    F --> G1["moduleSections: grouped by moduleId, for MODULE-scoped"]
+    F --> G2["groupMaterials: flat list, for GROUP + COURSE-scoped"]
+
+    style C1 fill:#dbeafe
+    style D1 fill:#e0e7ff
+    style D2 fill:#ede9fe
+    style E fill:#fee2e2
+    style F fill:#d1fae5
+```
+
+> Note: Staff (teacher/admin) see hidden materials rendered as dimmed with a toggle to unhide. Students never see hidden materials — the `NOT { hiddenInGroups }` filter runs server-side.
+
+### Scope validation on create
+
+```mermaid
+flowchart TD
+    A[Create or edit material] --> B{scope?}
+
+    B -->|MODULE| C1[moduleId required]
+    C1 --> C2{course.isCustom?}
+    C2 -->|Yes| ERR1[Error: MODULE scope not allowed on radionice]
+    C2 -->|No| OK1[Valid]
+
+    B -->|COURSE| D1[courseId required]
+    D1 --> D2{course.isCustom?}
+    D2 -->|No| ERR2[Error: COURSE scope only for radionice]
+    D2 -->|Yes| OK2[Valid]
+
+    B -->|GROUP| E1[scheduledGroupId required]
+    E1 --> OK3[Valid - no course-type constraint]
+
+    style ERR1 fill:#fee2e2
+    style ERR2 fill:#fee2e2
+    style OK1 fill:#d1fae5
+    style OK2 fill:#d1fae5
+    style OK3 fill:#d1fae5
+```
+
+> Note: Scope validation lives in `validateScopeConsistency()` in `src/actions/material/crud.ts`. The rule is: MODULE is for standard programs only, COURSE is for radionice only, GROUP works on any course type.

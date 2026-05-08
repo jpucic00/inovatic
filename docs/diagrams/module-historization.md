@@ -6,7 +6,10 @@ Every standard SLR course is split into four modules (M1 – M4). The same four 
 erDiagram
     Course ||--o{ CourseModule : "template modules"
     CourseModule ||--o{ ModuleSchedule : "year instances"
-    CourseModule ||--o{ Material : "template content (inherited)"
+    CourseModule ||--o{ Material : "MODULE scope content (inherited)"
+    Course ||--o{ Material : "COURSE scope (radionice)"
+    ScheduledGroup ||--o{ Material : "GROUP scope content"
+    Material ||--o{ MaterialGroupHide : "per-group hide"
     CourseModule ||--o{ StudentComment : "template reviews"
     ModuleSchedule ||--o{ ModuleEnrollment : "enrolled students"
     Enrollment ||--o{ ModuleEnrollment : "per-group membership"
@@ -41,7 +44,9 @@ erDiagram
 | Module title, description, `sortOrder` | `CourseModule` | No — one template, many year instances |
 | Start / end dates | `ModuleSchedule` | Yes — new row per `schoolYear` |
 | Roster (which students took this module) | `ModuleEnrollment` → `ModuleSchedule` | Yes — scoped to a single year |
-| Materials (PDFs, slides, videos) | `Material.moduleId` → `CourseModule` | No — one library, inherited forward |
+| Material (MODULE scope) | `Material.moduleId` → `CourseModule` | No — inherited forward, shared by all cohorts |
+| Material (COURSE scope) | `Material.courseId` → `Course` | No — radionice only, course-wide |
+| Material (GROUP scope) | `Material.scheduledGroupId` → `ScheduledGroup` | Yes — specific to one cohort/group |
 | Student feedback / module reviews | `StudentComment.moduleId` → `CourseModule` | Stays on the template |
 
 ## Unique constraint
@@ -84,7 +89,7 @@ flowchart LR
 
 ## Why split at all?
 
-- **Materials inherit automatically.** A slide deck uploaded for "SLR 1 / M1" is available to every cohort that ever takes it. No copy-paste between years.
+- **MODULE-scoped materials inherit automatically.** A slide deck uploaded for "SLR 1 / M1" (scope = MODULE) is available to every cohort that ever takes it. No copy-paste between years. COURSE-scoped materials (radionice only) apply course-wide. GROUP-scoped materials are specific to a single cohort. Any MODULE or COURSE material can be hidden from individual groups via `MaterialGroupHide`.
 - **History survives rollover.** Past cohorts are queryable via `ModuleSchedule.schoolYear`. Deleting a `Course` or `CourseModule` is still the "delete everything about this module" nuclear option; deleting a `ModuleSchedule` only wipes one year.
 - **`schoolYear` is just metadata.** Because the public form no longer filters groups by `computeSchoolYear()`, admins don't have to worry about when a year "flips". The year is a label on the schedule row, used for grouping history — not a gate on visibility.
 - **Early closure is a date edit.** To end a module before its scheduled `endDate`, `closeModuleSchedule` sets `endDate = now` on the `ModuleSchedule`. No per-enrolment status update, no cascade to future modules, no schema churn — the historical record reads as "this cohort ran from X to the day it was closed."

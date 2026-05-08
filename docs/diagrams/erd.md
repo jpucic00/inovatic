@@ -1,4 +1,4 @@
-# Entity-Relationship Diagram — Enrollment Flow
+# Entity-Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -76,6 +76,7 @@ erDiagram
         string childLastName
         string childDateOfBirth "nullable"
         string childSchool "nullable"
+        string childGrade "nullable"
         CourseLevel courseLevelPref "nullable"
         string locationPref "nullable"
         string courseId FK "nullable"
@@ -122,17 +123,78 @@ erDiagram
 
     Material {
         string id PK
-        string scheduledGroupId FK
-        string moduleId FK "nullable - null for group-wide"
+        MaterialScope scope "MODULE - COURSE - GROUP"
+        string scheduledGroupId FK "nullable - set for GROUP scope"
+        string courseId FK "nullable - set for COURSE scope"
+        string moduleId FK "nullable - set for MODULE scope"
         string title
         string description "nullable"
         MaterialType type "DOCUMENT - PRESENTATION - VIDEO - LINK"
         string fileUrl "nullable"
+        string externalUrl "nullable - YouTube or Vimeo URL"
         int fileSize "nullable"
         string mimeType "nullable"
         int sortOrder "default 0"
-        boolean isPublished "default false"
         string uploadedById FK
+    }
+
+    MaterialGroupHide {
+        string id PK
+        string materialId FK
+        string scheduledGroupId FK
+    }
+
+    GalleryImage {
+        string id PK
+        string scheduledGroupId FK
+        string moduleId FK "nullable - null for radionice"
+        string url
+        string publicId
+        int width "nullable"
+        int height "nullable"
+        string caption "nullable"
+        int sortOrder "default 0"
+        string uploadedById FK
+    }
+
+    Attendance {
+        string id PK
+        string enrollmentId FK
+        datetime sessionDate "db.Date - YYYY-MM-DD"
+        boolean present
+        string note "nullable"
+        string recordedById FK
+    }
+
+    Article {
+        string id PK
+        string slug UK
+        string title
+        string excerpt "nullable"
+        json content "default [] - BlockNote blocks"
+        string coverImage "nullable"
+        string authorId FK
+        boolean isPublished "default false"
+        datetime publishedAt "nullable"
+    }
+
+    ArticleImage {
+        string id PK
+        string articleId FK
+        string url
+        string caption "nullable"
+        int sortOrder "default 0"
+    }
+
+    Tag {
+        string id PK
+        string name UK
+        string slug UK
+    }
+
+    ArticleTag {
+        string articleId PK "composite PK + FK to Article"
+        string tagId PK "composite PK + FK to Tag"
     }
 
     StudentComment {
@@ -150,15 +212,25 @@ erDiagram
     Location ||--o{ ScheduledGroup : "hosts"
 
     CourseModule ||--o{ ModuleSchedule : "year instances"
-    CourseModule ||--o{ Material : "template content"
+    CourseModule ||--o{ Material : "MODULE scope content"
+    CourseModule ||--o{ GalleryImage : "module gallery"
     CourseModule ||--o{ StudentComment : "template reviews"
 
     ScheduledGroup ||--o{ TeacherAssignment : "assigned teachers"
     ScheduledGroup ||--o{ Enrollment : "students enrolled"
-    ScheduledGroup ||--o{ Material : "group materials"
+    ScheduledGroup ||--o{ Material : "GROUP scope materials"
+    ScheduledGroup ||--o{ MaterialGroupHide : "hides materials"
+    ScheduledGroup ||--o{ GalleryImage : "gallery photos"
     ScheduledGroup ||--o{ StudentComment : "group notes"
+
+    Course ||--o{ Material : "COURSE scope materials"
+    Material ||--o{ MaterialGroupHide : "hidden in groups"
+
     User ||--o{ TeacherAssignment : "teaches"
     User ||--o{ Material : "uploaded"
+    User ||--o{ GalleryImage : "uploaded"
+    User ||--o{ Article : "author"
+    User ||--o{ Attendance : "recordedBy"
     User ||--o{ StudentComment : "authored"
     User ||--o{ StudentComment : "about student"
 
@@ -169,7 +241,12 @@ erDiagram
 
     User ||--o{ Enrollment : "enrolled in"
     Enrollment ||--o{ ModuleEnrollment : "modules taken"
+    Enrollment ||--o{ Attendance : "attendance records"
     ModuleSchedule ||--o{ ModuleEnrollment : "enrolled students"
+
+    Article ||--o{ ArticleImage : "inline images"
+    Article ||--o{ ArticleTag : "tagged with"
+    Tag ||--o{ ArticleTag : "articles"
 ```
 
 ## Enums
@@ -181,6 +258,7 @@ erDiagram
 | InquiryStatus | `NEW`, `ACCOUNT_CREATED`, `DECLINED` |
 | CommentType | `COMMENT`, `MODULE_REVIEW` |
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK` |
+| MaterialScope | `MODULE`, `COURSE`, `GROUP` |
 
 > There are no `EnrollmentStatus` / `ModuleEnrollmentStatus` enums. Presence of a row means the student is in the group/module; deletion is the only way out.
 
@@ -199,8 +277,11 @@ erDiagram
 | Inquiry → User | Student account created from this inquiry |
 | User → Enrollment → ScheduledGroup | Student enrolled in group for a school year |
 | Enrollment → ModuleEnrollment → ModuleSchedule | Per-module opt-in within a group enrollment |
-| CourseModule → Material | Template-level material (inherited across years) |
-| ScheduledGroup → Material | Group-level material (one cohort only) |
+| Material.scope → MODULE / COURSE / GROUP | Discriminated union - exactly one FK populated per scope |
+| Material → MaterialGroupHide → ScheduledGroup | Per-group visibility override for MODULE/COURSE-scoped materials |
+| ScheduledGroup → GalleryImage → CourseModule | Images scoped to group; `moduleId` required for standard programs, null for radionice |
+| Enrollment → Attendance | One attendance record per session date per enrollment. Session dates are derived, not stored. |
+| User → Article | Author relation for news articles |
 
 ## Unique Constraints
 
@@ -209,10 +290,16 @@ erDiagram
 | User.email | unique |
 | User.username | unique (nullable) |
 | Course.slug | unique |
+| Article.slug | unique |
+| Tag.name | unique |
+| Tag.slug | unique |
 | ModuleSchedule | `(moduleId, schoolYear)` |
 | Enrollment | `(userId, scheduledGroupId, schoolYear)` |
 | ModuleEnrollment | `(enrollmentId, moduleScheduleId)` |
 | TeacherAssignment | `(userId, scheduledGroupId)` |
+| MaterialGroupHide | `(materialId, scheduledGroupId)` |
+| Attendance | `(enrollmentId, sessionDate)` |
+| ArticleTag | `(articleId, tagId)` composite PK |
 
 ## Schedule Pattern
 
