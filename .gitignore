@@ -48,3 +48,6 @@ next-env.d.ts
 
 # Claude Code
 .claude/worktrees/
+
+# Test fixtures (generated at runtime)
+tests/fixtures/phase3-state.json

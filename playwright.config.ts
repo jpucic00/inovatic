@@ -7,6 +7,7 @@ export default defineConfig({
   // assertions. Individual tests may override via test.setTimeout().
   timeout: 60000,
   retries: 0,
+  workers: 1,
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:3000',

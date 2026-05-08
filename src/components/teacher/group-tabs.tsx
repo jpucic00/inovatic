@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-type TeacherTabId = 'polaznici' | 'materijali' | 'dolazak'
+type TeacherTabId = 'polaznici' | 'materijali' | 'dolazak' | 'galerija'
 
 const TAB_DEFS: { id: TeacherTabId; label: string; path: string }[] = [
   { id: 'polaznici', label: 'Polaznici', path: '' },
   { id: 'dolazak', label: 'Dolazak', path: '/dolazak' },
   { id: 'materijali', label: 'Materijali', path: '/materijali' },
+  { id: 'galerija', label: 'Galerija', path: '/galerija' },
 ]
 
 export function GroupTabs({ groupId }: Readonly<{ groupId: string }>) {

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowLeft, MapPin, Clock, Users } from 'lucide-react'
+import { ArrowLeft, MapPin, Clock, Users, Image as ImageIcon } from 'lucide-react'
 import { getEffectiveMaterialsForStudent } from '@/actions/student/materials'
 import { MaterialList } from '@/components/portal/material-list'
 
@@ -47,6 +47,16 @@ export default async function GroupMaterialsPage({
           ) : null}
         </div>
       </header>
+
+      <div className="mb-6">
+        <Link
+          href={`/portal/grupa/${group.id}/galerija`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded-md transition-colors"
+        >
+          <ImageIcon className="w-4 h-4" />
+          Galerija
+        </Link>
+      </div>
 
       <MaterialList view={view} />
     </div>

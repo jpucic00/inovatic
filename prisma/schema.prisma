@@ -73,6 +73,7 @@ model User {
   enrollments          Enrollment[]
   articles             Article[]
   materials            Material[]
+  galleryImages        GalleryImage[]
   createdFromInquiries Inquiry[]          @relation("CreatedStudent")
   authoredComments     StudentComment[]   @relation("CommentAuthor")
   studentComments      StudentComment[]   @relation("CommentStudent")
@@ -114,6 +115,7 @@ model CourseModule {
   course          Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   schedules       ModuleSchedule[]
   materials       Material[]
+  galleryImages   GalleryImage[]
   studentComments StudentComment[]
 }
 
@@ -166,6 +168,7 @@ model ScheduledGroup {
   enrollments          Enrollment[]
   materials            Material[]
   materialHides        MaterialGroupHide[]
+  galleryImages        GalleryImage[]
   assignedInquiries    Inquiry[]            @relation("AssignedGroup")
   preferredInquiries   Inquiry[]            @relation("PreferredGroup")
   studentComments      StudentComment[]
@@ -280,6 +283,27 @@ model MaterialGroupHide {
   scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id], onDelete: Cascade)
 
   @@unique([materialId, scheduledGroupId])
+}
+
+model GalleryImage {
+  id               String   @id @default(cuid())
+  scheduledGroupId String
+  moduleId         String?
+  url              String
+  publicId         String
+  width            Int?
+  height           Int?
+  caption          String?
+  sortOrder        Int      @default(0)
+  uploadedById     String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id], onDelete: Cascade)
+  module         CourseModule?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  uploadedBy     User           @relation(fields: [uploadedById], references: [id])
+
+  @@index([scheduledGroupId, moduleId, sortOrder])
 }
 
 model Attendance {

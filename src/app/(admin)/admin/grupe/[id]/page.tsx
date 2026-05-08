@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { ModuleEnrollmentPanel } from '@/components/admin/groups/module-enrollment-panel'
 import { GroupTeachersPanel } from '@/components/admin/groups/group-teachers-panel'
 import { GroupInfoPanel } from '@/components/admin/groups/group-info-panel'
+import { GroupGalleryPanel } from '@/components/admin/groups/group-gallery-panel'
 
 export const metadata: Metadata = { title: 'Admin – Detalji grupe' }
 
@@ -160,6 +161,8 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
           )}
         </div>
       )}
+
+      <GroupGalleryPanel groupId={group.id} />
     </div>
   )
 }

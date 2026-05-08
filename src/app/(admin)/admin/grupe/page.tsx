@@ -57,7 +57,7 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Grupe</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {groups.length} {groups.length === 1 ? 'grupa' : 'grupa'} u {selectedYear}
+            {groups.length} grupa u {selectedYear}
           </p>
         </div>
         <CreateGroupDialog courses={courseOptions} locations={locations} currentYear={selectedYear} teachers={teachers} />
