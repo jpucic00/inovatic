@@ -19,7 +19,7 @@ import { test, expect, type Page } from '@playwright/test'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const BASE = 'http://localhost:3000'
-const ADMIN_EMAIL = 'jozo@udruga-inovatic.hr'
+const ADMIN_EMAIL = 'jpucic00@gmail.com'
 const ADMIN_PASSWORD = 'admin123'
 
 // Unique per run so test data is identifiable and doesn't collide between runs

@@ -8,7 +8,7 @@ import { test, expect, type Page } from '@playwright/test'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const BASE = 'http://localhost:3000'
-const ADMIN_EMAIL = 'jozo@udruga-inovatic.hr'
+const ADMIN_EMAIL = 'jpucic00@gmail.com'
 const ADMIN_PASSWORD = 'admin123'
 
 // Unique per test run so each run's data is identifiable even if old data exists

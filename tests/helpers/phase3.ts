@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 export const BASE = 'http://localhost:3000'
-export const ADMIN_EMAIL = 'jozo@udruga-inovatic.hr'
+export const ADMIN_EMAIL = 'jpucic00@gmail.com'
 export const ADMIN_PASSWORD = 'admin123'
 
 const STATE_FILE = path.resolve(__dirname, '../fixtures/phase3-state.json')

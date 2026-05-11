@@ -41,35 +41,22 @@ async function main() {
   const adminPassword = await bcrypt.hash('admin123', 12)
   const admin = await prisma.user.create({
     data: {
-      email: 'jozo@udruga-inovatic.hr',
+      email: 'jpucic00@gmail.com',
       passwordHash: adminPassword,
-      firstName: 'Jozo',
-      lastName: 'Pivac',
+      firstName: 'Josip',
+      lastName: 'Pučić',
       role: UserRole.ADMIN,
     },
   })
   console.log(`✅ Admin created: ${admin.email}`)
 
-  // ── Dev admin (generic login) ──────────────────────────────────────────────
-  const devAdmin = await prisma.user.create({
-    data: {
-      email: 'admin@inovatic.hr',
-      passwordHash: adminPassword,
-      firstName: 'Admin',
-      lastName: 'Inovatic',
-      role: UserRole.ADMIN,
-    },
-  })
-  console.log(`✅ Dev admin created: ${devAdmin.email}`)
-
   // ── Demo teacher ─────────────────────────────────────────────────────────────
-  const teacherPassword = await bcrypt.hash('teacher123', 12)
   const teacher = await prisma.user.create({
     data: {
-      email: 'snjezana@udruga-inovatic.hr',
-      passwordHash: teacherPassword,
-      firstName: 'Snježana',
-      lastName: 'Pivac',
+      email: 'slava.jurcevic@gmail.com',
+      passwordHash: adminPassword,
+      firstName: 'Slavica',
+      lastName: 'Jurčević',
       role: UserRole.TEACHER,
     },
   })
@@ -6651,8 +6638,8 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
   console.log('🎉 Seed complete!')
   console.log('')
   console.log('Demo accounts:')
-  console.log('  Admin:   jozo@udruga-inovatic.hr    / admin123')
-  console.log('  Teacher: snjezana@udruga-inovatic.hr / teacher123')
+  console.log('  Admin:   jpucic00@gmail.com       / admin123')
+  console.log('  Teacher: slava.jurcevic@gmail.com / admin123')
   console.log('')
   console.log('📸 Run npm run db:seed-images to set cover images from public/images/articles/')
 }
