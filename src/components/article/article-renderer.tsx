@@ -81,7 +81,7 @@ function renderBlock(block: PartialBlock, index: number): React.ReactNode | null
     return (
       <video key={index} controls>
         <source src={url} />
-        <track kind="captions" src="" label="Titlovi" default />
+        <track kind="captions" />
       </video>
     )
   }

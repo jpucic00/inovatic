@@ -6,6 +6,7 @@ import { GearDecor } from '@/components/shared/decorations'
 import { competitions } from '@/lib/competitions-data'
 import { db } from '@/lib/db'
 import { formatDate } from '@/lib/format'
+import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
 
 export const revalidate = 3600
 
@@ -138,11 +139,12 @@ export default async function NatjecanjaPage() {
                   <div className="relative h-48 overflow-hidden bg-gray-100">
                     {article.coverImage ? (
                       <Image
-                        src={article.coverImage}
+                        src={cloudinaryThumbUrl(article.coverImage, 800, 400)}
                         alt={article.title}
                         fill
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        unoptimized
                       />
                     ) : (
                       <div className={`w-full h-full bg-gradient-to-br ${gradients[idx % gradients.length]} flex items-center justify-center`}>

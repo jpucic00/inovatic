@@ -11,7 +11,7 @@ import {
   type CreateMaterialInput,
   type UpdateMaterialInput,
 } from '@/lib/validators/material'
-import { destroyCloudinaryMaterialUrls } from '@/lib/cloudinary-url'
+import { destroyCloudinaryMaterialUrls } from '@/lib/cloudinary-cleanup'
 
 // ─── Authorization ──────────────────────────────────────────────────────────
 

@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getArticles } from '@/actions/admin/article'
 import { Pagination } from '@/components/admin/pagination'
-import { Plus, ExternalLink } from 'lucide-react'
+import { Plus, ExternalLink, ImageIcon } from 'lucide-react'
 import { DeleteArticleButton } from '@/components/admin/articles/delete-article-button'
+import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
 
 export const metadata: Metadata = { title: 'Admin – Novosti' }
 
@@ -104,6 +106,9 @@ export default async function ArticlesAdminPage({ searchParams }: Readonly<PageP
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 w-24">
+                  Slika
+                </th>
                 <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">
                   Naslov
                 </th>
@@ -127,6 +132,25 @@ export default async function ArticlesAdminPage({ searchParams }: Readonly<PageP
             <tbody className="divide-y divide-gray-100">
               {result.data.map((a) => (
                 <tr key={a.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    {a.coverImage ? (
+                      <div className="w-20 h-12 rounded overflow-hidden bg-gray-100">
+                        <Image
+                          src={cloudinaryThumbUrl(a.coverImage, 160, 96)}
+                          alt={a.title}
+                          width={80}
+                          height={48}
+                          sizes="80px"
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-20 h-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center">
+                        <ImageIcon className="w-4 h-4 text-gray-300" />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/admin/novosti/${a.id}/uredi`}

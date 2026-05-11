@@ -49,7 +49,7 @@ export async function getGroupGalleryForStudent(
 
   const images = await db.galleryImage.findMany({
     where: { scheduledGroupId: groupId },
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    orderBy: [{ sortOrder: 'desc' }, { createdAt: 'desc' }],
     select: {
       id: true,
       url: true,

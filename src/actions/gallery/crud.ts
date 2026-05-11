@@ -11,7 +11,7 @@ import {
   type AddGalleryImagesInput,
   type UpdateGalleryCaptionInput,
 } from '@/lib/validators/gallery'
-import { destroyCloudinaryAssetsByPublicId } from '@/lib/cloudinary-url'
+import { destroyCloudinaryAssetsByPublicId } from '@/lib/cloudinary-cleanup'
 
 export type CreatedGalleryImage = {
   id: string

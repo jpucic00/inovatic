@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/format'
 import { ArticleContent } from '@/components/article/article-content'
 import { ArticleGallery } from '@/components/article/article-gallery'
 import { BackButton } from '@/components/public/back-button'
+import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
 import type { PartialBlock } from '@blocknote/core'
 
 export const revalidate = 3600
@@ -218,7 +219,7 @@ export default async function ArticlePage({ params }: PageProps) {
                   >
                     {rel.coverImage ? (
                       <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                        <Image src={rel.coverImage} alt={rel.title} fill className="object-cover" sizes="64px" />
+                        <Image src={cloudinaryThumbUrl(rel.coverImage, 128, 128)} alt={rel.title} fill className="object-cover" sizes="64px" unoptimized />
                       </div>
                     ) : (
                       <div className="w-16 h-16 rounded-lg bg-cyan-100 flex-shrink-0" />

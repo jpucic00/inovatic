@@ -11,11 +11,14 @@ import {
   reorderGalleryImage,
   type GalleryImage,
 } from '@/actions/admin/article-gallery'
+import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
 
 interface Props {
   articleId: string
   initialImages: GalleryImage[]
 }
+
+const PAGE_SIZE = 12
 
 export function GalleryManager({
   articleId,
@@ -24,6 +27,9 @@ export function GalleryManager({
   const router = useRouter()
   const [images, setImages] = useState<GalleryImage[]>(
     [...initialImages].sort((a, b) => a.sortOrder - b.sortOrder),
+  )
+  const [visibleCount, setVisibleCount] = useState(() =>
+    Math.min(PAGE_SIZE, initialImages.length),
   )
   const [dragOver, setDragOver] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -63,6 +69,7 @@ export function GalleryManager({
         setImages((prev) =>
           [...prev, ...result.images!].sort((a, b) => a.sortOrder - b.sortOrder),
         )
+        setVisibleCount((prev) => prev + result.images!.length)
         toast.success(
           result.images.length === 1
             ? 'Slika dodana u galeriju.'
@@ -122,6 +129,12 @@ export function GalleryManager({
     next[neighborIdx] = { ...next[neighborIdx], sortOrder: tmpOrder }
     next.sort((a, b) => a.sortOrder - b.sortOrder)
     setImages(next)
+
+    // Moving an image past the visible cap would hide it; expand the window
+    // so the user keeps seeing what they just moved.
+    if (direction === 'down' && neighborIdx >= visibleCount) {
+      setVisibleCount(neighborIdx + 1)
+    }
 
     setPendingId(image.id)
     startTransition(async () => {
@@ -186,7 +199,7 @@ export function GalleryManager({
         </p>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-          {images.map((img, idx) => {
+          {images.slice(0, visibleCount).map((img, idx) => {
             const isFirst = idx === 0
             const isLast = idx === images.length - 1
             const isBusy = pendingId === img.id
@@ -196,7 +209,7 @@ export function GalleryManager({
                 className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50"
               >
                 <Image
-                  src={img.url}
+                  src={cloudinaryThumbUrl(img.url, 400, 400)}
                   alt=""
                   fill
                   className="object-cover"
@@ -238,6 +251,23 @@ export function GalleryManager({
               </div>
             )
           })}
+        </div>
+      )}
+
+      {visibleCount < images.length && (
+        <div className="flex flex-col items-center gap-2 pt-2">
+          <p className="text-xs text-gray-500">
+            Prikazano {visibleCount} od {images.length} slika
+          </p>
+          <button
+            type="button"
+            onClick={() =>
+              setVisibleCount((c) => Math.min(c + PAGE_SIZE, images.length))
+            }
+            className="px-4 py-2 text-sm font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 rounded-lg transition-colors"
+          >
+            Prikaži još {Math.min(PAGE_SIZE, images.length - visibleCount)} slika
+          </button>
         </div>
       )}
     </div>

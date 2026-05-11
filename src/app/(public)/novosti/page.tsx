@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { ArrowRight, Calendar, Newspaper } from 'lucide-react'
 import { db } from '@/lib/db'
 import { formatDate } from '@/lib/format'
+import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
 
 export const metadata: Metadata = {
   title: 'Novosti',
@@ -101,11 +102,12 @@ export default async function NewsPage({ searchParams }: PageProps) {
                     <div className="relative h-48 overflow-hidden bg-gray-100">
                       {article.coverImage ? (
                         <Image
-                          src={article.coverImage}
+                          src={cloudinaryThumbUrl(article.coverImage, 800, 400)}
                           alt={article.title}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                           className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          unoptimized
                         />
                       ) : (
                         <div

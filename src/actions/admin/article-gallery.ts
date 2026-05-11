@@ -3,7 +3,7 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
-import { destroyCloudinaryAssets } from '@/lib/cloudinary-url'
+import { destroyCloudinaryAssets } from '@/lib/cloudinary-cleanup'
 import type { AdminActionResult } from '@/lib/action-types'
 
 export type GalleryImage = {

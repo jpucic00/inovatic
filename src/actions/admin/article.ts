@@ -13,7 +13,7 @@ import {
 } from '@/lib/validators/admin/article'
 import { upsertTagByName } from './tag'
 import { extractImageUrls } from '@/lib/blocknote-images'
-import { destroyCloudinaryAssets } from '@/lib/cloudinary-url'
+import { destroyCloudinaryAssets } from '@/lib/cloudinary-cleanup'
 import type { PaginatedResult } from './inquiry'
 
 export type ArticleRow = {

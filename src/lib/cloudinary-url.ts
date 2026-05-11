@@ -1,5 +1,3 @@
-import cloudinary from '@/lib/cloudinary'
-
 /**
  * Extract the publicId from a Cloudinary delivery URL.
  * Example:
@@ -33,25 +31,6 @@ export function publicIdFromUrl(url: string): string | null {
   } catch {
     return null
   }
-}
-
-/**
- * Best-effort cleanup of Cloudinary assets. Logs and swallows individual
- * failures — the caller should not block on image cleanup.
- */
-export async function destroyCloudinaryAssets(urls: string[]): Promise<void> {
-  const publicIds = Array.from(
-    new Set(urls.map(publicIdFromUrl).filter((id): id is string => id !== null)),
-  )
-  if (publicIds.length === 0) return
-
-  await Promise.allSettled(
-    publicIds.map((publicId) =>
-      cloudinary.uploader.destroy(publicId).catch((err: unknown) => {
-        console.error(`Cloudinary destroy failed for ${publicId}:`, err)
-      }),
-    ),
-  )
 }
 
 /** Recognised Cloudinary resource types for `uploader.destroy`. */
@@ -110,49 +89,46 @@ export function sanitiseFilename(name: string): string {
 }
 
 /**
- * Cleanup variant that takes Cloudinary public IDs directly — used when we
- * stored the public_id at upload time (galleries do this). Defaults to
- * `image` resource type since gallery uploads are image-only.
+ * Inject a Cloudinary delivery transformation into an /upload/ URL so the
+ * CDN serves a resized, auto-format, auto-quality variant instead of the
+ * original. Used at thumbnail call sites where we set `unoptimized` on the
+ * `<Image>` (bypassing Next.js Image Optimization) — the browser receives
+ * the rewritten URL verbatim and Cloudinary's edge does the resize.
+ *
+ *   cloudinaryThumbUrl(url, 400)          → c_limit, w_400         (preserves aspect)
+ *   cloudinaryThumbUrl(url, 400, 400)     → c_fill, g_auto, 400×400 (center-crop)
+ *
+ * Returns the input unchanged when not a recognisable Cloudinary upload URL
+ * or when transformations are already present (we don't try to merge).
  */
-export async function destroyCloudinaryAssetsByPublicId(
-  publicIds: string[],
-): Promise<void> {
-  const ids = Array.from(new Set(publicIds.filter((id): id is string => Boolean(id))))
-  if (ids.length === 0) return
+export function cloudinaryThumbUrl(
+  url: string,
+  width: number,
+  height?: number,
+): string {
+  if (!url) return url
+  try {
+    const parsed = new URL(url)
+    if (!parsed.hostname.includes('res.cloudinary.com')) return url
 
-  await Promise.allSettled(
-    ids.map((publicId) =>
-      cloudinary.uploader.destroy(publicId).catch((err: unknown) => {
-        console.error(`Cloudinary destroy failed for ${publicId}:`, err)
-      }),
-    ),
-  )
-}
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    const uploadIdx = parts.indexOf('upload')
+    if (uploadIdx === -1 || uploadIdx >= parts.length - 1) return url
 
-/**
- * Cleanup variant that accepts resource_type per URL. Materials upload to
- * `raw/upload/` (PDF/DOCX/PPT) and `video/upload/` (MP4/WEBM) in addition to
- * images, and the plain `destroyCloudinaryAssets` wouldn't pass the right
- * resource_type to the destroy call.
- */
-export async function destroyCloudinaryMaterialUrls(urls: string[]): Promise<void> {
-  const tasks = urls
-    .map((url) => {
-      const publicId = publicIdFromUrl(url)
-      const resourceType = resourceTypeFromUrl(url)
-      return publicId && resourceType ? { publicId, resourceType } : null
-    })
-    .filter((v): v is { publicId: string; resourceType: CloudinaryResourceType } => v !== null)
+    // Skip if a transformation segment is already present (segment immediately
+    // after `upload` is not a version like `v1234567890`).
+    const nextSeg = parts[uploadIdx + 1]
+    if (!/^v\d+$/.test(nextSeg)) return url
 
-  if (tasks.length === 0) return
+    const transform =
+      height === undefined
+        ? `c_limit,f_auto,q_auto,w_${width}`
+        : `c_fill,g_auto,f_auto,q_auto,w_${width},h_${height}`
 
-  await Promise.allSettled(
-    tasks.map(({ publicId, resourceType }) =>
-      cloudinary.uploader
-        .destroy(publicId, { resource_type: resourceType })
-        .catch((err: unknown) => {
-          console.error(`Cloudinary destroy failed for ${resourceType}:${publicId}:`, err)
-        }),
-    ),
-  )
+    parts.splice(uploadIdx + 1, 0, transform)
+    parsed.pathname = '/' + parts.join('/')
+    return parsed.toString()
+  } catch {
+    return url
+  }
 }
