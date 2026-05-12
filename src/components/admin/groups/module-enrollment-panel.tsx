@@ -245,24 +245,27 @@ export function ModuleEnrollmentPanel({
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 mb-2">
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto mb-2">
         {modules.map((mod, idx) => {
-          const status = getModuleStatus(mod)
+          const enrolledCount = mod.scheduleId
+            ? enrollments.filter((e) =>
+                e.moduleEnrollments.some((me) => me.moduleSchedule.id === mod.scheduleId),
+              ).length
+            : 0
+          const isActive = expandedIdx === idx
           return (
             <button
               key={mod.id}
+              type="button"
               onClick={() => setExpandedIdx(idx)}
               className={[
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                expandedIdx === idx
-                  ? 'bg-cyan-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                'px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 -mb-px whitespace-nowrap transition-colors',
+                isActive
+                  ? 'border-cyan-600 text-cyan-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
               ].join(' ')}
             >
-              M{mod.sortOrder}
-              {status.label === 'Aktivan' && (
-                <span className="ml-1 w-1.5 h-1.5 bg-green-400 rounded-full inline-block" />
-              )}
+              {mod.title} ({enrolledCount})
             </button>
           )
         })}
