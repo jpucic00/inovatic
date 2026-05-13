@@ -100,41 +100,43 @@ export async function addGalleryImages(
   }
 
   try {
-    const last = await db.galleryImage.findFirst({
-      where: { scheduledGroupId: data.scheduledGroupId, moduleId: data.moduleId },
-      orderBy: { sortOrder: 'desc' },
-      select: { sortOrder: true },
-    })
-    const startOrder = (last?.sortOrder ?? -1) + 1
+    const created = await db.$transaction(async (tx) => {
+      const last = await tx.galleryImage.findFirst({
+        where: { scheduledGroupId: data.scheduledGroupId, moduleId: data.moduleId },
+        orderBy: { sortOrder: 'desc' },
+        select: { sortOrder: true },
+      })
+      const startOrder = (last?.sortOrder ?? -1) + 1
 
-    const created = await db.$transaction(
-      data.images.map((img, i) =>
-        db.galleryImage.create({
-          data: {
-            scheduledGroupId: data.scheduledGroupId,
-            moduleId: data.moduleId,
-            url: img.url,
-            publicId: img.publicId,
-            width: img.width ?? null,
-            height: img.height ?? null,
-            caption: img.caption ? img.caption : null,
-            sortOrder: startOrder + i,
-            uploadedById: session.user.id,
-          },
-          select: {
-            id: true,
-            url: true,
-            publicId: true,
-            width: true,
-            height: true,
-            caption: true,
-            sortOrder: true,
-            moduleId: true,
-            createdAt: true,
-          },
-        }),
-      ),
-    )
+      return Promise.all(
+        data.images.map((img, i) =>
+          tx.galleryImage.create({
+            data: {
+              scheduledGroupId: data.scheduledGroupId,
+              moduleId: data.moduleId,
+              url: img.url,
+              publicId: img.publicId,
+              width: img.width ?? null,
+              height: img.height ?? null,
+              caption: img.caption ? img.caption : null,
+              sortOrder: startOrder + i,
+              uploadedById: session.user.id,
+            },
+            select: {
+              id: true,
+              url: true,
+              publicId: true,
+              width: true,
+              height: true,
+              caption: true,
+              sortOrder: true,
+              moduleId: true,
+              createdAt: true,
+            },
+          }),
+        ),
+      )
+    })
 
     revalidateGalleryPaths(data.scheduledGroupId)
     return { success: true, images: created }
