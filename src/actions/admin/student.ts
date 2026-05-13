@@ -1,5 +1,6 @@
 'use server'
 
+import type { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
@@ -112,7 +113,7 @@ async function findOrCreateStudent(
     : null
 
   if (existingStudent) {
-    const backfill: Record<string, string | Date | null> = {}
+    const backfill: Prisma.UserUpdateInput = {}
     if (input.parentName) backfill.parentName = input.parentName
     if (input.parentEmail) backfill.parentEmail = input.parentEmail
     if (input.parentPhone) backfill.parentPhone = input.parentPhone
@@ -121,7 +122,7 @@ async function findOrCreateStudent(
     if (Object.keys(backfill).length > 0) {
       await db.user.update({
         where: { id: existingStudent.id },
-        data: backfill as never,
+        data: backfill,
       })
     }
     return {
