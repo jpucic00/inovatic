@@ -1,5 +1,6 @@
 'use server'
 
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
@@ -100,30 +101,41 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     referralSource,
   } = parsed.data
 
-  try {
-    await db.$transaction(async (tx) => {
-      if (scheduledGroupId) {
-        await assertGroupHasAvailableSpot(tx, scheduledGroupId)
-      }
+  const runTx = () =>
+    db.$transaction(
+      async (tx) => {
+        if (scheduledGroupId) await assertGroupHasAvailableSpot(tx, scheduledGroupId)
+        return tx.inquiry.create({
+          data: {
+            parentName,
+            parentEmail,
+            parentPhone,
+            childFirstName,
+            childLastName,
+            childDateOfBirth,
+            childSchool: childSchool || null,
+            childGrade: grade || null,
+            courseId: courseId || null,
+            scheduledGroupId: scheduledGroupId || null,
+            message: message || null,
+            referralSource: referralSource || null,
+            consentGivenAt: new Date(),
+          },
+        })
+      },
+      { isolationLevel: 'Serializable' },
+    )
 
-      return tx.inquiry.create({
-        data: {
-          parentName,
-          parentEmail,
-          parentPhone,
-          childFirstName,
-          childLastName,
-          childDateOfBirth,
-          childSchool: childSchool || null,
-          childGrade: grade || null,
-          courseId: courseId || null,
-          scheduledGroupId: scheduledGroupId || null,
-          message: message || null,
-          referralSource: referralSource || null,
-          consentGivenAt: new Date(),
-        },
-      })
-    })
+  try {
+    try {
+      await runTx()
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {
+        await runTx() // retry once on write conflict
+      } else {
+        throw err
+      }
+    }
   } catch (err) {
     if (err instanceof GroupFullError) {
       const freshPrograms = await getActivePrograms()
@@ -133,6 +145,9 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
         code: 'GROUP_FULL' as const,
         programs: freshPrograms,
       }
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {
+      return { success: false, error: 'Pokušajte ponovno.' }
     }
     console.error('submitInquiry failed:', err)
     return { success: false, error: 'Greška pri slanju upita. Pokušajte ponovo.' }
