@@ -3,6 +3,7 @@
 import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
 import type { UserRole } from '@prisma/client'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { loginSchema, type LoginFormData } from '@/lib/validators/login'
 
@@ -30,7 +31,8 @@ export async function loginAction(data: LoginFormData): Promise<LoginActionResul
   }
 
   const { identifier } = parsed.data
-  const user = identifier.includes('@')
+  const isEmail = z.string().email().safeParse(identifier).success
+  const user = isEmail
     ? await db.user.findUnique({ where: { email: identifier }, select: { role: true } })
     : await db.user.findUnique({ where: { username: identifier }, select: { role: true } })
   if (!user) return { success: false, error: 'Pogrešno korisničko ime ili lozinka.' }

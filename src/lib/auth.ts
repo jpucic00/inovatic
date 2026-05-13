@@ -24,7 +24,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!parsed.success) return null
 
         const { identifier } = parsed.data
-        const user = identifier.includes('@')
+        const isEmail = z.string().email().safeParse(identifier).success
+        const user = isEmail
           ? await db.user.findUnique({ where: { email: identifier } })
           : await db.user.findUnique({ where: { username: identifier } })
 
