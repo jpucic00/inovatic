@@ -1,5 +1,7 @@
 import { PrismaClient, CourseLevel, UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import fs from 'fs'
+import path from 'path'
 
 // ── BlockNote JSON helpers ────────────────────────────────────────────────────
 // Produces PartialBlock-compatible JSON that BlockNote can load directly.
@@ -18,6 +20,95 @@ const video = (url: string): BNBlock    => ({ type: 'video', props: { url } })
 
 const prisma = new PrismaClient()
 
+// ── Article image seeding (covers + galleries from public/images/articles/) ──
+
+const IMAGES_DIR = path.join(process.cwd(), 'public', 'images', 'articles')
+const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.avif']
+
+function isImage(filename: string) {
+  return SUPPORTED_EXTENSIONS.includes(path.extname(filename).toLowerCase())
+}
+
+async function seedCoverImages() {
+  const files = fs.readdirSync(IMAGES_DIR).filter((f) => {
+    const fullPath = path.join(IMAGES_DIR, f)
+    return fs.statSync(fullPath).isFile() && isImage(f)
+  })
+
+  if (files.length === 0) {
+    console.log('ℹ️  No cover image files found.')
+  }
+
+  let updated = 0
+  let notFound = 0
+
+  for (const file of files) {
+    const slug = path.basename(file, path.extname(file))
+    const imageUrl = `/images/articles/${file}`
+    const article = await prisma.article.findUnique({ where: { slug } })
+
+    if (!article) {
+      console.log(`⚠️  Cover: no article for slug "${slug}" (${file})`)
+      notFound++
+      continue
+    }
+
+    await prisma.article.update({ where: { slug }, data: { coverImage: imageUrl } })
+    console.log(`✅ Cover updated: ${slug}`)
+    updated++
+  }
+
+  console.log(`   Covers: ${updated} updated, ${notFound} unmatched\n`)
+}
+
+async function seedGalleryImages() {
+  const entries = fs.readdirSync(IMAGES_DIR).filter((f) => {
+    return fs.statSync(path.join(IMAGES_DIR, f)).isDirectory()
+  })
+
+  if (entries.length === 0) {
+    console.log('ℹ️  No gallery subfolders found.')
+    return
+  }
+
+  let totalAdded = 0
+
+  for (const slug of entries) {
+    const article = await prisma.article.findUnique({ where: { slug } })
+
+    if (!article) {
+      console.log(`⚠️  Gallery: no article for slug "${slug}"`)
+      continue
+    }
+
+    const folder = path.join(IMAGES_DIR, slug)
+    const imageFiles = fs.readdirSync(folder)
+      .filter(isImage)
+      .sort()
+
+    if (imageFiles.length === 0) {
+      console.log(`ℹ️  Gallery folder "${slug}" is empty`)
+      continue
+    }
+
+    // Clear existing gallery images and re-insert (clean re-seed)
+    await prisma.articleImage.deleteMany({ where: { articleId: article.id } })
+
+    const records = imageFiles.map((file, index) => ({
+      articleId: article.id,
+      url: `/images/articles/${slug}/${file}`,
+      caption: null,
+      sortOrder: index,
+    }))
+
+    await prisma.articleImage.createMany({ data: records })
+    console.log(`✅ Gallery updated: ${slug} (${records.length} image${records.length !== 1 ? 's' : ''})`)
+    totalAdded += records.length
+  }
+
+  console.log(`   Gallery: ${totalAdded} image(s) seeded across ${entries.length} article(s)`)
+}
+
 async function main() {
   console.log('🌱 Starting seed...')
 
@@ -29,6 +120,7 @@ async function main() {
   await prisma.enrollment.deleteMany()
   await prisma.inquiry.deleteMany()
   await prisma.teacherAssignment.deleteMany()
+  await prisma.studentComment.deleteMany()
   await prisma.scheduledGroup.deleteMany()
   await prisma.courseModule.deleteMany()
   await prisma.course.deleteMany()
@@ -224,7 +316,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
 
 
   // Content is stored as BlockNote JSON (PartialBlock[]).
-  // Cover images set separately via: npm run db:seed-images
+  // Cover images + gallery records are populated below from public/images/articles/
 
   // [1/69] regionalno-fll-2026
   const a1 = await prisma.article.create({
@@ -6634,14 +6726,24 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
 
   console.log('✅ Articles and tags seeded (69 articles)')
 
+  // ── Article images (covers + galleries from public/images/articles/) ────
+  if (fs.existsSync(IMAGES_DIR)) {
+    console.log('')
+    console.log('📸 Seeding article images...')
+    console.log(`   Directory: ${IMAGES_DIR}\n`)
+    await seedCoverImages()
+    await seedGalleryImages()
+  } else {
+    console.log('')
+    console.log(`ℹ️  Skipping article images — directory not found: ${IMAGES_DIR}`)
+  }
+
   console.log('')
   console.log('🎉 Seed complete!')
   console.log('')
   console.log('Demo accounts:')
   console.log('  Admin:   jpucic00@gmail.com       / admin123')
   console.log('  Teacher: slava.jurcevic@gmail.com / admin123')
-  console.log('')
-  console.log('📸 Run npm run db:seed-images to set cover images from public/images/articles/')
 }
 
 main()

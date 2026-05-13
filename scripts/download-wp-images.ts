@@ -9,7 +9,7 @@
  *   npm run download-wp-images
  *
  * After running, seed the DB with:
- *   npm run db:seed-images
+ *   npm run db:seed
  */
 
 import fs from 'fs'
@@ -198,7 +198,7 @@ async function main() {
   }
 
   console.log('\n✅ Done! Now run:')
-  console.log('   npm run db:seed-images')
+  console.log('   npm run db:seed')
   console.log('   (This updates the database with the downloaded image paths)')
 }
 
