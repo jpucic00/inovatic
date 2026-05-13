@@ -77,7 +77,38 @@ test.describe('Phase 3 — Gallery', () => {
 
     const fileInput = page.locator('input[type="file"][id^="gallery-upload-"]').first()
     await fileInput.waitFor({ state: 'attached', timeout: 5000 })
+
+    // Wait until React has hydrated the input — without this, setInputFiles fires
+    // a native change event that no handler catches yet. We check for React's
+    // internal __reactProps$ key on the DOM node, which only appears post-hydration.
+    await fileInput.evaluate((el) =>
+      new Promise<void>((resolve) => {
+        const check = () => {
+          if (Object.keys(el).some((k) => k.startsWith('__reactProps$'))) resolve()
+          else setTimeout(check, 50)
+        }
+        check()
+      }),
+    )
+
+    // Decouple Cloudinary upload latency from the visibility assertion: wait for
+    // /api/upload/gallery to return before checking the DOM. Under /validate's
+    // back-to-back-suite environment Cloudinary EU can take 15-25s, eating the
+    // 30s budget before router.refresh() repaints the grid.
+    const uploadDone = page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/upload/gallery') &&
+        resp.request().method() === 'POST',
+      { timeout: 60000 },
+    )
     await fileInput.setInputFiles(SAMPLE_PNG)
+    // Belt-and-braces: re-dispatch change in case Playwright's native event
+    // arrived during a hydration micro-task window. Mirrors helpers/phase3.ts:236.
+    await fileInput.evaluate((el) =>
+      el.dispatchEvent(new Event('change', { bubbles: true })),
+    )
+    const uploadResp = await uploadDone
+    expect(uploadResp.status(), 'gallery upload route returned non-200').toBe(200)
 
     await expect(
       page.locator('button[aria-label="Otvori sliku"]').first(),
