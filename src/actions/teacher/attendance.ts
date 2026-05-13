@@ -150,58 +150,66 @@ export async function bulkMarkSession(
 
   const { session } = await assertTeacherOwnsGroup(data.groupId)
 
-  const group = await db.scheduledGroup.findUniqueOrThrow({
-    where: { id: data.groupId },
-    select: { schoolYear: true },
-  })
-
   const enrollmentIds = data.entries.map((e) => e.enrollmentId)
-  const enrollments = await db.enrollment.findMany({
-    where: {
-      id: { in: enrollmentIds },
-      scheduledGroupId: data.groupId,
-      schoolYear: group.schoolYear,
-    },
-    select: { id: true, userId: true },
-  })
-  if (enrollments.length !== enrollmentIds.length) {
-    return {
-      success: false,
-      error: 'Neki upisi ne pripadaju ovoj grupi ili školskoj godini.',
-    }
-  }
-
   const sessionDate = fromDateKey(data.sessionDate)
   const recorderId = session.user.id
 
+  const ENROLLMENT_MISMATCH = 'ENROLLMENT_MISMATCH'
+  let enrolledUserIds: string[] = []
+
   try {
     await db.$transaction(
-      data.entries.map((e) =>
-        db.attendance.upsert({
+      async (tx) => {
+        const group = await tx.scheduledGroup.findUniqueOrThrow({
+          where: { id: data.groupId },
+          select: { schoolYear: true },
+        })
+
+        const enrollments = await tx.enrollment.findMany({
           where: {
-            enrollmentId_sessionDate: {
+            id: { in: enrollmentIds },
+            scheduledGroupId: data.groupId,
+            schoolYear: group.schoolYear,
+          },
+          select: { id: true, userId: true },
+        })
+        if (enrollments.length !== enrollmentIds.length) {
+          throw new Error(ENROLLMENT_MISMATCH)
+        }
+
+        enrolledUserIds = enrollments.map((e) => e.userId)
+
+        for (const e of data.entries) {
+          await tx.attendance.upsert({
+            where: {
+              enrollmentId_sessionDate: {
+                enrollmentId: e.enrollmentId,
+                sessionDate,
+              },
+            },
+            create: {
               enrollmentId: e.enrollmentId,
               sessionDate,
+              present: e.present,
+              note: e.note || null,
+              recordedById: recorderId,
             },
-          },
-          create: {
-            enrollmentId: e.enrollmentId,
-            sessionDate,
-            present: e.present,
-            note: e.note || null,
-            recordedById: recorderId,
-          },
-          update: {
-            present: e.present,
-            note: e.note || null,
-            recordedById: recorderId,
-          },
-        }),
-      ),
+            update: {
+              present: e.present,
+              note: e.note || null,
+              recordedById: recorderId,
+            },
+          })
+        }
+      },
+      { isolationLevel: 'Serializable' },
     )
-    revalidateAttendancePaths(data.groupId, enrollments.map((e) => e.userId))
+    revalidateAttendancePaths(data.groupId, enrolledUserIds)
     return { success: true }
   } catch (err) {
+    if (err instanceof Error && err.message === ENROLLMENT_MISMATCH) {
+      return { success: false, error: 'Neki upisi ne pripadaju ovoj grupi ili školskoj godini.' }
+    }
     console.error('bulkMarkSession failed:', err)
     return { success: false, error: 'Greška pri spremanju evidencije.' }
   }
