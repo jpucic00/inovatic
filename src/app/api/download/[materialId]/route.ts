@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { MIME_TO_EXT, sanitiseFilename } from '@/lib/cloudinary-url'
+import { canManageMaterial, materialTarget } from '@/lib/material-access'
+import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
 
 export const runtime = 'nodejs'
 
@@ -18,10 +20,68 @@ export async function GET(
 
   const material = await db.material.findUnique({
     where: { id: materialId },
-    select: { fileUrl: true, title: true, mimeType: true },
+    select: {
+      fileUrl: true,
+      title: true,
+      mimeType: true,
+      scope: true,
+      moduleId: true,
+      courseId: true,
+      scheduledGroupId: true,
+    },
   })
 
   if (!material?.fileUrl) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  const role = session.user.role
+  let allowed = false
+
+  if (role === 'ADMIN') {
+    allowed = true
+  } else if (role === 'TEACHER') {
+    const target = materialTarget(material)
+    allowed = target !== null && (await canManageMaterial(session, target))
+  } else if (role === 'STUDENT') {
+    const enrollments = await db.enrollment.findMany({
+      where: { userId: session.user.id },
+      select: {
+        scheduledGroup: {
+          select: {
+            id: true,
+            course: {
+              select: {
+                id: true,
+                isCustom: true,
+                modules: { select: { id: true } },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (enrollments.length > 0) {
+      const whereClauses = enrollments.map((e) =>
+        buildEffectiveMaterialsWhere({
+          scheduledGroupId: e.scheduledGroup.id,
+          courseId: e.scheduledGroup.course.id,
+          courseIsCustom: e.scheduledGroup.course.isCustom,
+          moduleIds: e.scheduledGroup.course.modules.map((m) => m.id),
+        }),
+      )
+
+      const visible = await db.material.findFirst({
+        where: { AND: [{ id: materialId }, { OR: whereClauses }] },
+        select: { id: true },
+      })
+
+      allowed = visible !== null
+    }
+  }
+
+  if (!allowed) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
