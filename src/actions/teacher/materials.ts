@@ -35,7 +35,7 @@ export async function getStaffGroupMaterials(groupId: string): Promise<StaffMate
     },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     include: {
-      uploadedBy: { select: { firstName: true, lastName: true } },
+      uploadedBy: { select: { firstName: true, lastName: true, deletedAt: true } },
       hiddenInGroups: {
         where: { scheduledGroupId: group.id },
         select: { id: true },
@@ -60,6 +60,7 @@ export async function getStaffGroupMaterials(groupId: string): Promise<StaffMate
     groupName: m.scope === 'GROUP' ? (group.name ?? 'Ova grupa') : null,
     hiddenInThisGroup: m.hiddenInGroups.length > 0,
     uploadedBy: m.uploadedBy ? `${m.uploadedBy.firstName} ${m.uploadedBy.lastName}` : null,
+    uploadedByDeleted: m.uploadedBy?.deletedAt != null,
   }))
 }
 

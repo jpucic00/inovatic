@@ -23,6 +23,7 @@ export type AttendanceRecord = {
   present: boolean
   note: string | null
   recordedBy: string | null
+  recordedByDeleted: boolean
 }
 
 type GroupAttendance = {
@@ -87,7 +88,7 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
       attendances: {
         orderBy: { sessionDate: 'asc' },
         include: {
-          recordedBy: { select: { firstName: true, lastName: true } },
+          recordedBy: { select: { firstName: true, lastName: true, deletedAt: true } },
         },
       },
     },
@@ -114,6 +115,7 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
         recordedBy: a.recordedBy
           ? `${a.recordedBy.firstName} ${a.recordedBy.lastName}`
           : null,
+        recordedByDeleted: a.recordedBy?.deletedAt != null,
       })
       if (!expectedSet.has(key)) extraSet.add(key)
     }

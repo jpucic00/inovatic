@@ -367,6 +367,7 @@ export function buildCommentsPanelTabs(
       createdAt: c.createdAt,
       authorName: `${c.author.firstName} ${c.author.lastName}`.trim(),
       authorRole: c.author.role,
+      authorDeleted: c.author.deletedAt != null,
       moduleTitle: c.module?.title ?? null,
       groupLabel: null,
       canDelete: canDelete(c.author.id),

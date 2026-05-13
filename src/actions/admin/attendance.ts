@@ -9,6 +9,7 @@ export type StudentAttendanceRow = {
   present: boolean
   note: string | null
   recordedBy: string | null
+  recordedByDeleted: boolean
 }
 
 export type StudentAttendanceEnrollment = {
@@ -46,7 +47,7 @@ export async function getStudentAttendance(
       attendances: {
         orderBy: { sessionDate: 'desc' },
         include: {
-          recordedBy: { select: { firstName: true, lastName: true } },
+          recordedBy: { select: { firstName: true, lastName: true, deletedAt: true } },
         },
       },
     },
@@ -60,6 +61,7 @@ export async function getStudentAttendance(
       recordedBy: a.recordedBy
         ? `${a.recordedBy.firstName} ${a.recordedBy.lastName}`
         : null,
+      recordedByDeleted: a.recordedBy?.deletedAt != null,
     }))
     const presentCount = rows.filter((r) => r.present).length
     return {

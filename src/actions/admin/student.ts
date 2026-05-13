@@ -607,7 +607,7 @@ export async function getStudent(id: string) {
       },
       studentComments: {
         include: {
-          author: { select: { id: true, firstName: true, lastName: true, role: true } },
+          author: { select: { id: true, firstName: true, lastName: true, role: true, deletedAt: true } },
           module: { select: { id: true, title: true } },
           group: {
             select: {

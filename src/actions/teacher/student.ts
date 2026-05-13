@@ -68,7 +68,7 @@ export async function getStudentForTeacher(studentId: string) {
       },
       studentComments: {
         include: {
-          author: { select: { id: true, firstName: true, lastName: true, role: true } },
+          author: { select: { id: true, firstName: true, lastName: true, role: true, deletedAt: true } },
           module: { select: { id: true, title: true } },
           group: {
             select: {
@@ -108,7 +108,7 @@ export async function getStudentAttendanceForTeacher(
       attendances: {
         orderBy: { sessionDate: 'desc' },
         include: {
-          recordedBy: { select: { firstName: true, lastName: true } },
+          recordedBy: { select: { firstName: true, lastName: true, deletedAt: true } },
         },
       },
     },
@@ -122,6 +122,7 @@ export async function getStudentAttendanceForTeacher(
       recordedBy: a.recordedBy
         ? `${a.recordedBy.firstName} ${a.recordedBy.lastName}`
         : null,
+      recordedByDeleted: a.recordedBy?.deletedAt != null,
     }))
     const presentCount = rows.filter((r) => r.present).length
     return {

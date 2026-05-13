@@ -22,6 +22,7 @@ export type StaffMaterialRow = {
   groupName?: string | null
   hiddenInThisGroup?: boolean
   uploadedBy?: string | null
+  uploadedByDeleted?: boolean
 }
 
 interface Props {
@@ -104,7 +105,14 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
                 <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{row.description}</p>
               ) : null}
               {row.uploadedBy ? (
-                <p className="text-[11px] text-gray-400 mt-1">Dodao: {row.uploadedBy}</p>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Dodao: {row.uploadedBy}
+                  {row.uploadedByDeleted ? (
+                    <span className="ml-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
+                      Bivši nastavnik
+                    </span>
+                  ) : null}
+                </p>
               ) : null}
             </div>
 

@@ -77,7 +77,7 @@ export async function getMyManageableMaterials(): Promise<StaffMaterialRow[]> {
     },
     orderBy: [{ createdAt: 'desc' }],
     include: {
-      uploadedBy: { select: { firstName: true, lastName: true } },
+      uploadedBy: { select: { firstName: true, lastName: true, deletedAt: true } },
     },
   })
 
@@ -98,6 +98,7 @@ export async function getMyManageableMaterials(): Promise<StaffMaterialRow[]> {
       courseTitle: m.scope === 'COURSE' && m.courseId ? courseTitleById.get(m.courseId) ?? null : null,
       groupName: m.scope === 'GROUP' && m.scheduledGroupId ? groupLabelById.get(m.scheduledGroupId) ?? null : null,
       uploadedBy: m.uploadedBy ? `${m.uploadedBy.firstName} ${m.uploadedBy.lastName}` : null,
+      uploadedByDeleted: m.uploadedBy?.deletedAt != null,
     }
   })
 }

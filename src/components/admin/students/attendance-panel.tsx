@@ -80,7 +80,18 @@ export function AttendancePanel({ enrollments }: Readonly<Props>) {
                           {r.note ?? <span className="text-gray-400">—</span>}
                         </td>
                         <td className="px-3 py-1.5 text-gray-500">
-                          {r.recordedBy ?? <span className="text-gray-400">—</span>}
+                          {r.recordedBy ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              {r.recordedBy}
+                              {r.recordedByDeleted ? (
+                                <span className="rounded-full bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
+                                  Bivši nastavnik
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                       </tr>
                     ))}

@@ -297,6 +297,11 @@ export function AttendanceMarker({
                           title="Zapisao"
                         >
                           {existing.recordedBy}
+                          {existing.recordedByDeleted ? (
+                            <span className="ml-1 rounded-full bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 text-[9px] uppercase tracking-wide">
+                              Bivši nastavnik
+                            </span>
+                          ) : null}
                         </span>
                       ) : null}
                     </td>

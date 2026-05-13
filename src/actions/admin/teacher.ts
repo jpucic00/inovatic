@@ -58,6 +58,7 @@ export async function getTeachers(
 
   const where = {
     role: 'TEACHER' as const,
+    deletedAt: null,
     ...(search
       ? {
           OR: [
@@ -112,7 +113,7 @@ export async function getTeachers(
 export async function getTeacher(id: string) {
   await requireAdmin()
   return db.user.findUnique({
-    where: { id, role: 'TEACHER' },
+    where: { id, role: 'TEACHER', deletedAt: null },
     include: {
       teacherAssignments: {
         include: {
@@ -157,7 +158,7 @@ export async function getAssignableGroupsForTeacher(teacherId: string) {
 export async function getAssignableTeachers() {
   await requireAdmin()
   return db.user.findMany({
-    where: { role: 'TEACHER' },
+    where: { role: 'TEACHER', deletedAt: null },
     select: { id: true, firstName: true, lastName: true, email: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   })
@@ -330,12 +331,17 @@ export async function deleteTeacher(id: string): Promise<AdminActionResult> {
   try {
     const teacher = await db.user.findUnique({
       where: { id, role: 'TEACHER' },
-      select: { id: true },
+      select: { id: true, deletedAt: true },
     })
     if (!teacher) return { success: false, error: 'Nastavnik nije pronađen.' }
+    if (teacher.deletedAt) {
+      return { success: false, error: 'Nastavnik je već obrisan.' }
+    }
 
-    // Cascades teacherAssignments automatically (onDelete: Cascade on the join table).
-    await db.user.delete({ where: { id } })
+    await db.$transaction([
+      db.teacherAssignment.deleteMany({ where: { userId: id } }),
+      db.user.update({ where: { id }, data: { deletedAt: new Date() } }),
+    ])
 
     revalidatePath('/admin/nastavnici')
     return { success: true }

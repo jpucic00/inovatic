@@ -15,6 +15,7 @@ export type CommentListItem = {
   createdAt: Date | string
   authorName: string
   authorRole?: UserRole
+  authorDeleted?: boolean
   moduleTitle: string | null
   studentName?: string | null
   groupLabel?: string | null
@@ -98,6 +99,14 @@ export function CommentList({
                       className="text-[10px] uppercase tracking-wide"
                     >
                       {role}
+                    </Badge>
+                  ) : null}
+                  {c.authorDeleted ? (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] uppercase tracking-wide bg-gray-100 text-gray-500 border border-gray-200"
+                    >
+                      Bivši nastavnik
                     </Badge>
                   ) : null}
                   <Badge

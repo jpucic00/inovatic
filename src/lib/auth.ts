@@ -29,6 +29,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           : await db.user.findUnique({ where: { username: identifier } })
 
         if (!user) return null
+        if (user.deletedAt) return null
 
         const valid = await bcrypt.compare(parsed.data.password, user.passwordHash)
         if (!valid) return null
