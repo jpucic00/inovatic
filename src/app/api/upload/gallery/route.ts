@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import cloudinary from '@/lib/cloudinary'
 import type { UploadApiResponse, UploadApiErrorResponse } from 'cloudinary'
+import { mimeMatchesBytes } from '@/lib/mime-guard'
 
 export const runtime = 'nodejs'
 
@@ -53,6 +54,12 @@ export async function POST(req: Request) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer())
+  if (!mimeMatchesBytes(file.type, bytes)) {
+    return NextResponse.json(
+      { error: `File content does not match declared type: ${file.type}` },
+      { status: 415 },
+    )
+  }
 
   const result = await new Promise<UploadApiResponse>((resolve, reject) => {
     const upload = cloudinary.uploader.upload_stream(

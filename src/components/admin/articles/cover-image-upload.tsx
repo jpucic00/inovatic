@@ -106,7 +106,7 @@ export function CoverImageUpload({ value, onChange }: Readonly<Props>) {
       <input
         id="cover-image-input"
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/gif"
         onChange={onInputChange}
         className="hidden"
         disabled={isPending}
