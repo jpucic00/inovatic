@@ -8,6 +8,7 @@ import {
   assignTeacherToGroup,
   createStudentInGroup,
   addLinkMaterial,
+  croatianDateRegex,
   type TeacherData,
   type StudentData,
 } from '../helpers/phase3'
@@ -98,6 +99,11 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     const addBtn = page.getByRole('button', { name: 'Dodaj' })
     await expect(addBtn).toBeEnabled({ timeout: 10000 })
     await addBtn.click()
+    // Wait for React to commit setSelected(SESSION_DATE) before Spremi reads it;
+    // see markSession in tests/helpers/phase3.ts for the same workaround.
+    await expect(
+      page.getByRole('heading', { level: 3, name: croatianDateRegex(SESSION_DATE) }),
+    ).toBeVisible({ timeout: 5000 })
     await page.getByRole('button', { name: 'Spremi' }).click()
     await expect(page.getByText('Evidencija spremljena.')).toBeVisible({ timeout: 30000 })
 

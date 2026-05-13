@@ -237,8 +237,21 @@ export async function markSession(page: Page, groupId: string, date: string) {
   const addBtn = page.getByRole('button', { name: 'Dodaj' })
   await expect(addBtn).toBeEnabled({ timeout: 10000 })
   await addBtn.click()
+  // Wait for React to commit setSelected(date) before clicking Spremi —
+  // otherwise handleSave can read the previous `selected` and persist the
+  // attendance against the wrong date. The right-column <h3> in
+  // attendance-marker.tsx renders the active session in Croatian format.
+  await expect(
+    page.getByRole('heading', { level: 3, name: croatianDateRegex(date) }),
+  ).toBeVisible({ timeout: 5000 })
   await page.getByRole('button', { name: 'Spremi' }).click()
   await expect(page.getByText('Evidencija spremljena.')).toBeVisible({ timeout: 15000 })
+}
+
+/** Match Croatian `dd.MM.yyyy.` / `dd. MM. yyyy.` rendering of an ISO date. */
+export function croatianDateRegex(isoDate: string): RegExp {
+  const [yyyy, mm, dd] = isoDate.split('-')
+  return new RegExp(`${dd}\\.\\s?${mm}\\.\\s?${yyyy}\\.`)
 }
 
 export async function addEnrollmentToStudent(
