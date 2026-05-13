@@ -61,9 +61,13 @@ export async function POST(req: Request) {
         resource_type: 'image',
       },
       (err: UploadApiErrorResponse | undefined, res: UploadApiResponse | undefined) => {
-        if (err) reject(err instanceof Error ? err : new Error(String(err)))
-        else if (res) resolve(res)
-        else reject(new Error('Cloudinary returned no result'))
+        if (err) {
+          reject(err instanceof Error ? err : new Error(err.message ?? 'Cloudinary upload failed'))
+        } else if (res) {
+          resolve(res)
+        } else {
+          reject(new Error('Cloudinary returned no result'))
+        }
       },
     )
     upload.end(bytes)
