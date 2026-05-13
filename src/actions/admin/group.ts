@@ -39,6 +39,7 @@ export async function getGroups(filters: GroupFilters = {}) {
           assignedInquiries: true,
           materials: true,
           studentComments: true,
+          galleryImages: true,
         },
       },
     },
@@ -250,6 +251,7 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
             preferredInquiries: true,
             materials: true,
             studentComments: true,
+            galleryImages: true,
           },
         },
       },
@@ -268,6 +270,9 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
     }
     if (group._count.studentComments > 0) {
       return { success: false, error: 'Grupa ima komentare i ne može se obrisati.' }
+    }
+    if (group._count.galleryImages > 0) {
+      return { success: false, error: 'Grupa ima slike u galeriji i ne može se obrisati.' }
     }
 
     // Teacher assignments cascade-delete automatically

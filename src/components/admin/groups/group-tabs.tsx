@@ -25,6 +25,7 @@ type Group = {
     assignedInquiries: number
     materials: number
     studentComments: number
+    galleryImages: number
   }
 }
 

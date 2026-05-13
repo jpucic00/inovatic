@@ -36,6 +36,7 @@ type Group = {
     assignedInquiries: number
     materials: number
     studentComments: number
+    galleryImages: number
   }
 }
 
@@ -45,7 +46,8 @@ function isGroupDeletable(group: Group): boolean {
     group._count.preferredInquiries === 0 &&
     group._count.assignedInquiries === 0 &&
     group._count.materials === 0 &&
-    group._count.studentComments === 0
+    group._count.studentComments === 0 &&
+    group._count.galleryImages === 0
   )
 }
 
