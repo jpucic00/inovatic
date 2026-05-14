@@ -353,3 +353,176 @@ test.describe('Phase 3 Step 13 — Materials', () => {
     await expect(row).toBeHidden({ timeout: 10000 })
   })
 })
+
+// ─── I9: COURSE-scope material flow on a radionica ────────────────────────────
+//
+// Covers the canManageMaterial COURSE branch (src/lib/material-access.ts:33-42)
+// and the cross-group visibility/cleanup invariant: a COURSE-scope material
+// on a radionica is visible on every ScheduledGroup of that course, and
+// deleting it removes it from every group.
+//
+// The teacher is assigned to only ONE of the two radionica groups, so the
+// COURSE-scope action must resolve authz via the shared courseId (not via
+// direct group ownership).
+
+test.describe('Phase 3 Step 13 — COURSE-scope material on a radionica', () => {
+  const RADIONICA_TITLE = `Test Radionica ${RUN_ID}`
+  const COURSE_MATERIAL_TITLE = `Radionica COURSE LINK ${RUN_ID}`
+  const RADIONICA_TEACHER: TeacherData = {
+    firstName: 'Tara',
+    lastName: `RadNast${RUN_ID}`,
+    email: `tara.radnast.${RUN_ID}@test.com`,
+    phone: '0919222222',
+  }
+
+  type RadionicaSeeded = {
+    teacher: { email: string; password: string }
+    courseId: string
+    groupA: string
+    groupB: string
+  }
+  let radionicaSeeded: RadionicaSeeded | null = null
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(240000)
+    const page = await browser.newPage()
+    await loginAsAdmin(page)
+
+    // 1) Create the radionica (Course.isCustom = true) via the admin UI.
+    await page.goto(`${BASE}/admin/programi`)
+    await page.getByRole('button', { name: 'Nova radionica' }).click()
+    const cDialog = page.locator('[role="dialog"]')
+    await cDialog.locator('#course-title').fill(RADIONICA_TITLE)
+    await cDialog
+      .locator('#course-description')
+      .fill(`Radionica seed for COURSE-scope test ${RUN_ID}`)
+    // Schema coerces empty price to 0, then .positive() fails before .optional()
+    // can short-circuit. Fill a positive value to side-step the validator quirk.
+    await cDialog.locator('#course-price').fill('50')
+    await cDialog.getByRole('button', { name: 'Kreiraj radionicu' }).click()
+    // The toast races with router.refresh() — assert on dialog close instead.
+    await expect(cDialog).toBeHidden({ timeout: 15000 })
+
+    // 2) Create two ScheduledGroups under the radionica via the admin UI.
+    const groupNames = [
+      `Test Radionica Grupa A ${RUN_ID}`,
+      `Test Radionica Grupa B ${RUN_ID}`,
+    ]
+    for (let i = 0; i < 2; i++) {
+      await page.goto(`${BASE}/admin/grupe`)
+      await page.getByRole('button', { name: 'Nova grupa' }).click()
+      const gDialog = page.locator('[role="dialog"]')
+      await gDialog.waitFor({ state: 'visible', timeout: 10000 })
+      await gDialog.locator('#create-courseId').selectOption({ label: RADIONICA_TITLE })
+      await gDialog.locator('#create-locationId').selectOption({ index: 1 })
+      await gDialog.locator('#create-name').fill(groupNames[i])
+
+      // Radionica form uses #create-date (DateInput) instead of #create-dayOfWeek.
+      const dateInput = gDialog.locator('#create-date')
+      await dateInput.fill(`0${i + 1}.04.2026`)
+      await dateInput.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+      await gDialog.locator('#create-startTime').fill('17:00')
+      await gDialog.locator('#create-endTime').fill('18:30')
+
+      const enrollStart = gDialog.locator('#create-enrollmentStart')
+      await enrollStart.fill('01.01.2026')
+      await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+      const enrollEnd = gDialog.locator('#create-enrollmentEnd')
+      await enrollEnd.fill('30.06.2026')
+      await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+
+      await gDialog.getByRole('button', { name: 'Kreiraj grupu' }).click()
+      await expect(page.getByText('Grupa kreirana.')).toBeVisible({ timeout: 15000 })
+    }
+
+    // 3) Look up the two radionica group IDs on the Radionice tab.
+    await page.goto(`${BASE}/admin/grupe?tab=__radionice__`)
+    const ids: string[] = []
+    for (const name of groupNames) {
+      const link = page
+        .locator(`a[href^="/admin/grupe/"]`, { hasText: name })
+        .first()
+      const href = await link.getAttribute('href')
+      const m = href?.match(/^\/admin\/grupe\/([^/?#]+)/)
+      if (!m) throw new Error(`Could not find group id for "${name}"`)
+      ids.push(m[1])
+    }
+
+    // 4) Read the radionica's courseId off the Nova grupa dialog dropdown.
+    await page.getByRole('button', { name: 'Nova grupa' }).click()
+    const gDialog2 = page.locator('[role="dialog"]')
+    await gDialog2.waitFor({ state: 'visible', timeout: 10000 })
+    const courseOption = gDialog2.locator('#create-courseId option', {
+      hasText: RADIONICA_TITLE,
+    })
+    const courseId = await courseOption.getAttribute('value')
+    if (!courseId) throw new Error(`Could not find courseId for "${RADIONICA_TITLE}"`)
+    await page.keyboard.press('Escape')
+
+    // 5) Create a teacher and assign to groupA ONLY — canManageMaterial's
+    //    COURSE branch must succeed via the shared courseId, not via direct
+    //    group ownership.
+    const t = await createTeacher(page, RADIONICA_TEACHER)
+    await assignTeacherToGroup(page, t.teacherId, ids[0])
+
+    radionicaSeeded = {
+      teacher: { email: RADIONICA_TEACHER.email, password: t.password },
+      courseId,
+      groupA: ids[0],
+      groupB: ids[1],
+    }
+    await page.close()
+  })
+
+  test('teacher creates a COURSE-scope material on a radionica (covers canManageMaterial COURSE branch)', async ({
+    page,
+  }) => {
+    if (!radionicaSeeded) throw new Error('not seeded')
+    await loginWithEmail(page, radionicaSeeded.teacher.email, radionicaSeeded.teacher.password)
+    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+    await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupA}/materijali`)
+
+    await addLinkMaterial(
+      page,
+      /Dodaj u cijelu radionicu/,
+      COURSE_MATERIAL_TITLE,
+      'https://example.com/radionica-course-resource',
+    )
+    await expect(page.getByText(COURSE_MATERIAL_TITLE)).toBeVisible()
+  })
+
+  test('COURSE material is visible on every group of the radionica', async ({ page }) => {
+    if (!radionicaSeeded) throw new Error('not seeded')
+    // Admin reads the teacher route via the ADMIN bypass on assertTeacherOwnsGroup.
+    await loginAsAdmin(page)
+
+    await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupA}/materijali`)
+    await expect(page.getByText(COURSE_MATERIAL_TITLE)).toBeVisible()
+
+    await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupB}/materijali`)
+    await expect(page.getByText(COURSE_MATERIAL_TITLE)).toBeVisible()
+  })
+
+  test('teacher deletes the COURSE material — gone from every group of the radionica', async ({
+    page,
+  }) => {
+    if (!radionicaSeeded) throw new Error('not seeded')
+
+    page.on('dialog', (d) => d.accept())
+
+    await loginWithEmail(page, radionicaSeeded.teacher.email, radionicaSeeded.teacher.password)
+    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+    await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupA}/materijali`)
+
+    const row = page.locator('li', { has: page.getByText(COURSE_MATERIAL_TITLE) })
+    await row.getByRole('button', { name: 'Obriši materijal' }).click()
+    await expect(row).toBeHidden({ timeout: 10000 })
+
+    // Admin re-checks both groups — material is gone from both.
+    await loginAsAdmin(page)
+    await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupA}/materijali`)
+    await expect(page.getByText(COURSE_MATERIAL_TITLE)).toHaveCount(0)
+    await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupB}/materijali`)
+    await expect(page.getByText(COURSE_MATERIAL_TITLE)).toHaveCount(0)
+  })
+})
