@@ -7,13 +7,11 @@ import { requireTeacher } from '@/lib/auth-guard'
 import type { AdminActionResult } from '@/lib/action-types'
 import {
   addGalleryImagesSchema,
-  updateGalleryCaptionSchema,
   type AddGalleryImagesInput,
-  type UpdateGalleryCaptionInput,
 } from '@/lib/validators/gallery'
 import { destroyCloudinaryAssetsByPublicId } from '@/lib/cloudinary-cleanup'
 
-export type CreatedGalleryImage = {
+type CreatedGalleryImage = {
   id: string
   url: string
   publicId: string
@@ -173,94 +171,3 @@ export async function removeGalleryImage(id: string): Promise<AdminActionResult>
   }
 }
 
-export async function reorderGalleryImage(
-  id: string,
-  direction: 'up' | 'down',
-): Promise<AdminActionResult> {
-  const session = await requireTeacher()
-  if (!id) return { success: false, error: 'Nedostaje ID.' }
-
-  const current = await db.galleryImage.findUnique({
-    where: { id },
-    select: {
-      scheduledGroupId: true,
-      moduleId: true,
-      sortOrder: true,
-    },
-  })
-  if (!current) return { success: false, error: 'Slika nije pronađena.' }
-
-  if (!(await canManageGroupImages(session, current.scheduledGroupId))) {
-    return { success: false, error: 'Nemate dopuštenje za ovu grupu.' }
-  }
-
-  try {
-    const neighbor = await db.galleryImage.findFirst({
-      where: {
-        scheduledGroupId: current.scheduledGroupId,
-        moduleId: current.moduleId,
-        sortOrder:
-          direction === 'up'
-            ? { lt: current.sortOrder }
-            : { gt: current.sortOrder },
-      },
-      orderBy: { sortOrder: direction === 'up' ? 'desc' : 'asc' },
-      select: { id: true, sortOrder: true },
-    })
-    if (!neighbor) return { success: true }
-
-    await db.$transaction([
-      db.galleryImage.update({
-        where: { id: neighbor.id },
-        data: { sortOrder: current.sortOrder },
-      }),
-      db.galleryImage.update({
-        where: { id },
-        data: { sortOrder: neighbor.sortOrder },
-      }),
-    ])
-
-    revalidateGalleryPaths(current.scheduledGroupId)
-    return { success: true }
-  } catch (err) {
-    console.error('reorderGalleryImage failed:', err)
-    return { success: false, error: 'Greška pri promjeni redoslijeda.' }
-  }
-}
-
-export async function updateGalleryCaption(
-  input: UpdateGalleryCaptionInput,
-): Promise<AdminActionResult> {
-  const session = await requireTeacher()
-
-  const parsed = updateGalleryCaptionSchema.safeParse(input)
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: parsed.error.issues[0]?.message ?? 'Nevažeći podaci.',
-    }
-  }
-  const data = parsed.data
-
-  const existing = await db.galleryImage.findUnique({
-    where: { id: data.id },
-    select: { scheduledGroupId: true },
-  })
-  if (!existing) return { success: false, error: 'Slika nije pronađena.' }
-
-  if (!(await canManageGroupImages(session, existing.scheduledGroupId))) {
-    return { success: false, error: 'Nemate dopuštenje za ovu grupu.' }
-  }
-
-  try {
-    await db.galleryImage.update({
-      where: { id: data.id },
-      data: { caption: data.caption === '' ? null : data.caption },
-    })
-    revalidateGalleryPaths(existing.scheduledGroupId)
-    return { success: true }
-  } catch (err) {
-    console.error('updateGalleryCaption failed:', err)
-    return { success: false, error: 'Greška pri spremanju.' }
-  }
-}

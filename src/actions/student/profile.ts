@@ -3,7 +3,7 @@
 import { db } from '@/lib/db'
 import { requireStudent } from '@/lib/auth-guard'
 
-export type StudentProfile = {
+type StudentProfile = {
   firstName: string
   lastName: string
   email: string

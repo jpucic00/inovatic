@@ -5,32 +5,6 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 
-export async function createModuleEnrollments(
-  enrollmentId: string,
-  moduleScheduleIds: string[],
-): Promise<AdminActionResult> {
-  await requireAdmin()
-
-  if (!enrollmentId || moduleScheduleIds.length === 0) {
-    return { success: false, error: 'Enrollment ID i moduli su obavezni.' }
-  }
-
-  try {
-    await db.moduleEnrollment.createMany({
-      data: moduleScheduleIds.map((moduleScheduleId) => ({
-        enrollmentId,
-        moduleScheduleId,
-      })),
-      skipDuplicates: true,
-    })
-  } catch (err) {
-    console.error('createModuleEnrollments failed:', err)
-    return { success: false, error: 'Greška pri kreiranju upisa u module.' }
-  }
-
-  return { success: true }
-}
-
 export async function deleteModuleEnrollment(id: string): Promise<AdminActionResult> {
   await requireAdmin()
 

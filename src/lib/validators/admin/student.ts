@@ -26,15 +26,5 @@ export const addEnrollmentSchema = z.object({
   moduleScheduleIds: z.array(z.string()).optional(),
 })
 
-export const studentFiltersSchema = z.object({
-  search: z.string().optional(),
-  courseId: z.string().optional(),
-  groupId: z.string().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
-})
-
-export type CreateStudentInput = z.infer<typeof createStudentSchema>
 export type CreateStudentManuallyInput = z.infer<typeof createStudentManuallySchema>
 export type AddEnrollmentInput = z.infer<typeof addEnrollmentSchema>
-export type StudentFiltersInput = z.infer<typeof studentFiltersSchema>

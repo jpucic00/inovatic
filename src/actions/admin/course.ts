@@ -3,8 +3,8 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
-import { createCourseSchema, updateCourseSchema } from '@/lib/validators/admin/course'
-import type { CreateCourseInput, UpdateCourseInput } from '@/lib/validators/admin/course'
+import { createCourseSchema } from '@/lib/validators/admin/course'
+import type { CreateCourseInput } from '@/lib/validators/admin/course'
 import type { AdminActionResult } from '@/lib/action-types'
 import { computeSchoolYear } from '@/lib/school-year'
 
@@ -91,32 +91,6 @@ export async function createCourse(data: CreateCourseInput): Promise<AdminAction
   } catch (err) {
     console.error('createCourse failed:', err)
     return { success: false, error: 'Greška pri kreiranju programa.' }
-  }
-
-  revalidatePath('/admin/programi')
-  return { success: true }
-}
-
-export async function updateCourse(data: UpdateCourseInput): Promise<AdminActionResult> {
-  await requireAdmin()
-
-  const parsed = updateCourseSchema.safeParse(data)
-  if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
-
-  const { id, ...rest } = parsed.data
-
-  try {
-    await db.course.update({
-      where: { id },
-      data: {
-        ...rest,
-        price: rest.price ?? null,
-        imageUrl: rest.imageUrl || null,
-      },
-    })
-  } catch (err) {
-    console.error('course action failed:', err)
-    return { success: false, error: 'Greška pri ažuriranju programa.' }
   }
 
   revalidatePath('/admin/programi')

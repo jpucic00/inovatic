@@ -17,7 +17,7 @@ import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { TeacherCredentialsEmail } from '../../../emails/teacher-credentials'
 import type { PaginatedResult } from './inquiry'
 
-export type TeacherRow = {
+type TeacherRow = {
   id: string
   email: string
   firstName: string
@@ -35,17 +35,17 @@ export type TeacherRow = {
   }[]
 }
 
-export type TeacherFilters = {
+type TeacherFilters = {
   search?: string
   page?: number
   pageSize?: number
 }
 
-export type CreateTeacherResult =
+type CreateTeacherResult =
   | { success: true; teacherId: string; password: string; emailSent: boolean }
   | { success: false; error: string }
 
-export type ResetPasswordResult =
+type ResetPasswordResult =
   | { success: true; password: string; emailSent: boolean }
   | { success: false; error: string }
 

@@ -9,9 +9,4 @@ export const createLocationSchema = z.object({
   lng: z.coerce.number().optional(),
 })
 
-export const updateLocationSchema = createLocationSchema.partial().extend({
-  id: z.string().min(1),
-})
-
 export type CreateLocationInput = z.infer<typeof createLocationSchema>
-export type UpdateLocationInput = z.infer<typeof updateLocationSchema>

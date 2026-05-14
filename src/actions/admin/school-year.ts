@@ -4,7 +4,6 @@ import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
-import { computeSchoolYear } from '@/lib/school-year'
 
 export async function getAvailableSchoolYears(): Promise<string[]> {
   const result = await db.moduleSchedule.findMany({
@@ -57,10 +56,6 @@ export async function createNewSchoolYear(
 
   revalidatePath('/admin/programi')
   return { success: true }
-}
-
-export async function getCurrentSchoolYear(): Promise<string> {
-  return computeSchoolYear()
 }
 
 /**

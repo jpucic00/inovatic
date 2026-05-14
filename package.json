@@ -62,6 +62,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.6.1",
     "eslint": "^9.39.4",
     "eslint-config-next": "^15.5.13",
     "knip": "^5.88.0",

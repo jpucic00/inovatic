@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
 import { computeSchoolYear } from '@/lib/school-year'
 
-export type TeacherGroupDetail = {
+type TeacherGroupDetail = {
   id: string
   name: string | null
   dayOfWeek: string | null

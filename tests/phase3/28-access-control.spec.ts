@@ -3,7 +3,7 @@ import {
   BASE,
   loginAsAdmin,
   loginWithEmail,
-  pickFirstGroupId,
+  pickStandardGroupId,
   createTeacher,
   assignTeacherToGroup,
   createStudentInGroup,
@@ -44,7 +44,7 @@ test.describe('Phase 3 Step 16 — Access-control matrix', () => {
     test.setTimeout(180000)
     const page = await browser.newPage()
     await loginAsAdmin(page)
-    const groupId = pickFirstGroupId(page)
+    const groupId = pickStandardGroupId(page)
     const t = await createTeacher(page, TEACHER)
     const s = await createStudentInGroup(page, groupId, STUDENT)
     seeded = {
@@ -222,7 +222,7 @@ test.describe('Phase 3 — Server-action authz (direct POST)', () => {
     const page = await browser.newPage()
     try {
       await loginAsAdmin(page)
-      const groupAId = pickFirstGroupId(page)
+      const groupAId = pickStandardGroupId(page)
       const tA = await createTeacher(page, TEACHER_SA)
       const tB = await createTeacher(page, TEACHER_SB)
       await assignTeacherToGroup(page, tA.teacherId, groupAId)

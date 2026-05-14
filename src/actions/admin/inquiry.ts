@@ -10,7 +10,7 @@ import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
 import { computeSchoolYear } from '@/lib/school-year'
 
-export type InquiryFilters = {
+type InquiryFilters = {
   status?: InquiryStatus | 'ALL'
   search?: string
   courseId?: string

@@ -7,5 +7,3 @@ export const createCommentSchema = z.object({
   type: z.enum(['COMMENT', 'MODULE_REVIEW']).default('COMMENT'),
   moduleId: z.string().optional(),
 })
-
-export type CreateCommentInput = z.infer<typeof createCommentSchema>

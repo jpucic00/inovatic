@@ -2,7 +2,7 @@
  * Convert a YouTube/Vimeo watch URL into an embeddable iframe src. Returns
  * null for unrecognised hosts; callers should fall back to a plain link.
  */
-export function toEmbedUrl(url: string): string | null {
+function toEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url)
     const host = u.hostname.toLowerCase()

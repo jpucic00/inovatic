@@ -47,7 +47,7 @@ Sonar dashboard: http://localhost:9000/dashboard?id=inovatic · project key: `in
 - **Framework:** Playwright (`@playwright/test`).
 - **Location:** `tests/phaseN/NN-feature.spec.ts` — numbered sequentially within each phase folder. Latest existing: `tests/phase3/29-gallery.spec.ts`. New specs use the next available number in the appropriate phase.
 - **Helpers:** all shared utilities in `tests/helpers/phase3.ts`. Always import from there — never inline login or factory logic.
-  - Constants: `BASE` (http://localhost:3000), `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+  - Constants: `BASE` (http://localhost:3000). Admin credentials are baked into `loginAsAdmin(page)` — call the helper rather than referencing the constants directly.
   - Login: `loginAsAdmin(page)`, `loginWithEmail(page, email, password)`
   - Factories: `createTeacher`, `createStudentInGroup`, `createStudentNoEnrollment`, `assignTeacherToGroup`, `addEnrollmentToStudent`, `addLinkMaterial`, `markSession`
   - Group selection: `pickStandardGroupId(page)`, `pickFirstGroupId(page)`, `collectGroupIds(page, count)`

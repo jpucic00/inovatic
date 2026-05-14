@@ -4,7 +4,7 @@ import type { Prisma } from '@prisma/client'
  * Inputs needed to compute the effective material set for a ScheduledGroup.
  * Caller is responsible for loading these from the DB.
  */
-export type MaterialScopeContext = {
+type MaterialScopeContext = {
   scheduledGroupId: string
   courseId: string
   courseIsCustom: boolean

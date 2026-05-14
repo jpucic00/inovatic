@@ -8,7 +8,7 @@ import type { CreateGroupInput, UpdateGroupInput } from '@/lib/validators/admin/
 import type { AdminActionResult } from '@/lib/action-types'
 import { computeSchoolYear } from '@/lib/school-year'
 
-export type GroupFilters = {
+type GroupFilters = {
   courseId?: string
   locationId?: string
   schoolYear?: string

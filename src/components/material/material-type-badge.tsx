@@ -1,7 +1,7 @@
 import { FileText, Presentation, Video, Link2 } from 'lucide-react'
 import type { MaterialType } from '@prisma/client'
 
-export const MATERIAL_TYPE_LABEL: Record<MaterialType, string> = {
+const MATERIAL_TYPE_LABEL: Record<MaterialType, string> = {
   DOCUMENT: 'Dokument',
   PRESENTATION: 'Prezentacija',
   VIDEO: 'Video',
@@ -13,7 +13,7 @@ interface Props {
   className?: string
 }
 
-export function MaterialTypeIcon({ type, className }: Readonly<Props>) {
+function MaterialTypeIcon({ type, className }: Readonly<Props>) {
   const c = className ?? 'w-5 h-5'
   switch (type) {
     case 'DOCUMENT':

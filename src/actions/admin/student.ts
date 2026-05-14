@@ -36,7 +36,7 @@ export type StudentRow = {
   }[]
 }
 
-export type CreateStudentResult =
+type CreateStudentResult =
   | { success: true; username: string; password: string; isExisting: boolean; studentId: string }
   | { success: false; error: string }
 
@@ -478,7 +478,7 @@ export async function removeModuleEnrollment(
   return { success: true }
 }
 
-export type StudentFilters = {
+type StudentFilters = {
   search?: string
   courseId?: string
   groupId?: string

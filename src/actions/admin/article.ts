@@ -7,16 +7,14 @@ import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import {
   autosaveArticleSchema,
-  updateArticleSchema,
   type AutosaveArticleInput,
-  type UpdateArticleInput,
 } from '@/lib/validators/admin/article'
 import { upsertTagByName } from './tag'
 import { extractImageUrls } from '@/lib/blocknote-images'
 import { destroyCloudinaryAssets } from '@/lib/cloudinary-cleanup'
 import type { PaginatedResult } from './inquiry'
 
-export type ArticleRow = {
+type ArticleRow = {
   id: string
   slug: string
   title: string
@@ -30,7 +28,7 @@ export type ArticleRow = {
   tags: { tag: { id: string; name: string; slug: string } }[]
 }
 
-export type ArticleFilters = {
+type ArticleFilters = {
   search?: string
   status?: 'ALL' | 'PUBLISHED' | 'DRAFT'
   page?: number
@@ -240,95 +238,6 @@ export async function autosaveArticle(
   } catch (err) {
     console.error('autosaveArticle failed:', err)
     return { success: false, error: 'Greška pri spremanju.' }
-  }
-}
-
-export async function updateArticle(
-  input: UpdateArticleInput,
-): Promise<AdminActionResult> {
-  await requireAdmin()
-
-  const parsed = updateArticleSchema.safeParse(input)
-  if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
-  const { id, ...data } = parsed.data
-
-  if (await isSlugTaken(data.slug, id)) {
-    return { success: false, error: 'Članak s tim slugom već postoji.' }
-  }
-
-  try {
-    const existing = await db.article.findUnique({
-      where: { id },
-      select: {
-        slug: true,
-        isPublished: true,
-        publishedAt: true,
-        coverImage: true,
-        content: true,
-      },
-    })
-    if (!existing) return { success: false, error: 'Članak nije pronađen.' }
-
-    // Collect Cloudinary URLs that are removed in this edit so we can clean
-    // them up after the DB update.
-    const oldUrls = [
-      ...(existing.coverImage ? [existing.coverImage] : []),
-      ...extractImageUrls(existing.content),
-    ]
-    const newUrls = new Set([
-      ...(data.coverImage ? [data.coverImage] : []),
-      ...extractImageUrls(data.content),
-    ])
-    const removedUrls = oldUrls.filter((u) => !newUrls.has(u))
-
-    await db.$transaction(async (tx) => {
-      // publishedAt policy: set only the first time isPublished flips to true;
-      // preserve forever thereafter (including across unpublish cycles).
-      let publishedAt = existing.publishedAt
-      if (data.isPublished && !publishedAt) {
-        publishedAt = new Date()
-      }
-
-      await tx.article.update({
-        where: { id },
-        data: {
-          slug: data.slug,
-          title: data.title.trim(),
-          excerpt: data.excerpt?.trim() || null,
-          content: data.content as never,
-          coverImage: data.coverImage || null,
-          isPublished: data.isPublished ?? false,
-          publishedAt,
-        },
-      })
-
-      // Replace tag associations. Creating new tags inline is handled here.
-      await tx.articleTag.deleteMany({ where: { articleId: id } })
-      if (data.tagNames.length > 0) {
-        const tags = await Promise.all(
-          data.tagNames.map((name) => upsertTagByName(name, tx)),
-        )
-        await tx.articleTag.createMany({
-          data: tags.map((t) => ({ articleId: id, tagId: t.id })),
-          skipDuplicates: true,
-        })
-      }
-    })
-
-    // Fire-and-forget Cloudinary cleanup for removed assets.
-    if (removedUrls.length > 0) {
-      await destroyCloudinaryAssets(removedUrls)
-    }
-
-    revalidatePath('/admin/novosti')
-    revalidatePath(`/admin/novosti/${id}/uredi`)
-    revalidatePath('/novosti')
-    if (existing.slug !== data.slug) revalidatePath(`/novosti/${existing.slug}`)
-    revalidatePath(`/novosti/${data.slug}`)
-    return { success: true }
-  } catch (err) {
-    console.error('updateArticle failed:', err)
-    return { success: false, error: 'Greška pri ažuriranju članka.' }
   }
 }
 

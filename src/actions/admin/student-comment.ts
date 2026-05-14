@@ -6,29 +6,6 @@ import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import { createCommentSchema } from '@/lib/validators/admin/student-comment'
 
-export async function getComments(studentId: string, groupId?: string) {
-  await requireAdmin()
-
-  return db.studentComment.findMany({
-    where: {
-      studentId,
-      ...(groupId ? { groupId } : {}),
-    },
-    include: {
-      author: { select: { firstName: true, lastName: true } },
-      module: { select: { id: true, title: true } },
-      group: {
-        select: {
-          id: true,
-          name: true,
-          course: { select: { title: true } },
-        },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
-}
-
 export async function createComment(data: {
   studentId: string
   groupId: string

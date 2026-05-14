@@ -3,8 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 export const BASE = 'http://localhost:3000'
-export const ADMIN_EMAIL = 'jpucic00@gmail.com'
-export const ADMIN_PASSWORD = 'admin123'
+const ADMIN_EMAIL = 'jpucic00@gmail.com'
+const ADMIN_PASSWORD = 'admin123'
 
 const STATE_FILE = path.resolve(__dirname, '../fixtures/phase3-state.json')
 
@@ -60,13 +60,11 @@ export function collectGroupIds(_page: Page, count: number): string[] {
   return ids.slice(0, count)
 }
 
-export function pickFirstGroupId(_page: Page): string {
+export function pickStandardGroupId(_page: Page): string {
   const ids = readBootstrappedGroupIds()
   if (ids.length === 0) throw new Error('no groups in phase3-state.json')
   return ids[0]
 }
-
-export const pickStandardGroupId = pickFirstGroupId
 
 export async function getGroupCourseTitle(page: Page, groupId: string): Promise<string> {
   await page.goto(`${BASE}/admin/grupe/${groupId}`)

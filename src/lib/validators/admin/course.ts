@@ -9,9 +9,4 @@ export const createCourseSchema = z.object({
   imageUrl: z.string().url().optional().or(z.literal('')),
 })
 
-export const updateCourseSchema = createCourseSchema.partial().extend({
-  id: z.string().min(1),
-})
-
 export type CreateCourseInput = z.infer<typeof createCourseSchema>
-export type UpdateCourseInput = z.infer<typeof updateCourseSchema>

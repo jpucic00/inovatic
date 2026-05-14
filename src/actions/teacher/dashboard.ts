@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { requireTeacher } from '@/lib/auth-guard'
 import { computeSchoolYear } from '@/lib/school-year'
 
-export type TeacherGroupSummary = {
+type TeacherGroupSummary = {
   id: string
   name: string | null
   dayOfWeek: string | null

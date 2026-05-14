@@ -19,13 +19,6 @@ export const assignTeacherSchema = z.object({
   scheduledGroupId: z.string().min(1),
 })
 
-export const teacherFiltersSchema = z.object({
-  search: z.string().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
-})
-
 export type CreateTeacherInput = z.infer<typeof createTeacherSchema>
 export type UpdateTeacherInput = z.infer<typeof updateTeacherSchema>
 export type AssignTeacherInput = z.infer<typeof assignTeacherSchema>
-export type TeacherFiltersInput = z.infer<typeof teacherFiltersSchema>

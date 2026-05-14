@@ -15,19 +15,6 @@ const coreFields = {
   isPublished: z.boolean().optional().default(false),
 }
 
-// Strict schema used when publishing or doing a full manual save. Title +
-// slug must be present so the article is actually usable.
-export const updateArticleSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(2),
-  slug: z
-    .string()
-    .min(2)
-    .max(120)
-    .regex(slugRegex, 'Slug smije sadržavati samo mala slova, brojeve i crtice.'),
-  ...coreFields,
-})
-
 // Relaxed schema for auto-save on drafts. Title may be empty (admins type
 // incrementally), slug still enforced so the URL stays well-formed, and
 // isPublished is never accepted here — publishing is an explicit action.
@@ -45,16 +32,7 @@ export const autosaveArticleSchema = z.object({
   tagNames: coreFields.tagNames,
 })
 
-export const articleFiltersSchema = z.object({
-  search: z.string().optional(),
-  status: z.enum(['ALL', 'PUBLISHED', 'DRAFT']).optional().default('ALL'),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
-})
-
-export type UpdateArticleInput = z.infer<typeof updateArticleSchema>
 export type AutosaveArticleInput = z.infer<typeof autosaveArticleSchema>
-export type ArticleFiltersInput = z.infer<typeof articleFiltersSchema>
 
 /** Derive a URL-safe slug from a title; used for auto-fill in the form. */
 export function slugifyTitle(title: string): string {

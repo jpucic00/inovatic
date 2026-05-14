@@ -75,7 +75,7 @@ async function assertGroupHasAvailableSpot(tx: TxClient, scheduledGroupId: strin
   if (available <= 0) throw new GroupFullError()
 }
 
-export type InquiryActionResult =
+type InquiryActionResult =
   | { success: true }
   | { success: false; error: string }
   | { success: false; error: string; code: 'GROUP_FULL'; programs: ActiveProgram[] }

@@ -13,7 +13,7 @@ interface CompetitionCategory {
   description: string
 }
 
-export interface Competition {
+interface Competition {
   slug: string
   title: string
   shortTitle: string

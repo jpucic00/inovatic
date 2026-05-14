@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { loginSchema, type LoginFormData } from '@/lib/validators/login'
 
-export type LoginActionResult =
+type LoginActionResult =
   | { success: true; role: UserRole }
   | { success: false; error: string }
 
