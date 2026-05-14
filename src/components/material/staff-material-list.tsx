@@ -129,6 +129,9 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
                 title={row.title}
                 description={row.description}
                 sortOrder={row.sortOrder}
+                type={row.type}
+                fileUrl={row.fileUrl}
+                fileSize={row.fileSize}
               />
               <DeleteMaterialButton id={row.id} title={row.title} />
             </div>

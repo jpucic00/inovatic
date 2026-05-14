@@ -233,4 +233,123 @@ test.describe('Phase 3 Step 13 — Materials', () => {
     await row.getByRole('button', { name: 'Obriši materijal' }).click()
     await expect(row).toBeHidden({ timeout: 10000 })
   })
+
+  // ── I8: updateMaterial happy path with Cloudinary cleanup of old asset ────
+
+  test('teacher replaces a material file — old Cloudinary asset is destroyed', async ({
+    page,
+  }) => {
+    if (!seeded) throw new Error('not seeded')
+    test.setTimeout(120000)
+
+    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
+    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
+
+    const TITLE = `Replace File Test ${RUN_ID}`
+
+    // ── 1. Create the material with an initial DOCUMENT (text/plain) file ─────
+    await page.getByRole('button', { name: /Dodaj samo u ovu grupu/ }).first().click()
+    const addDialog = page.locator('[role="dialog"]')
+    await addDialog.locator('#material-title').fill(TITLE)
+
+    const addFileInput = addDialog.locator('input[type="file"]')
+    await addFileInput.waitFor({ state: 'attached', timeout: 5000 })
+    // React-hydration wait — same pattern as the gallery spec, otherwise
+    // setInputFiles can fire before React attaches its onChange.
+    await addFileInput.evaluate(
+      (el) =>
+        new Promise<void>((resolve) => {
+          const check = () => {
+            if (Object.keys(el).some((k) => k.startsWith('__reactProps$'))) resolve()
+            else setTimeout(check, 50)
+          }
+          check()
+        }),
+    )
+
+    const firstUploadDone = page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/upload/materials') &&
+        resp.request().method() === 'POST',
+      { timeout: 60000 },
+    )
+    await addFileInput.setInputFiles({
+      name: 'first.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('first content for updateMaterial cleanup test'),
+    })
+    await addFileInput.evaluate((el) =>
+      el.dispatchEvent(new Event('change', { bubbles: true })),
+    )
+    const firstResp = await firstUploadDone
+    expect(firstResp.status(), 'initial upload route returned non-200').toBe(200)
+    const firstJson = (await firstResp.json()) as { url: string }
+    const originalFileUrl = firstJson.url
+    expect(originalFileUrl).toContain('res.cloudinary.com')
+
+    await addDialog.getByRole('button', { name: 'Spremi' }).click()
+    await expect(addDialog).toBeHidden({ timeout: 15000 })
+    await expect(page.getByText(TITLE)).toBeVisible({ timeout: 15000 })
+
+    // ── 2. Open Edit dialog and upload a replacement file ─────────────────────
+    const row = page.locator('li', { has: page.getByText(TITLE) })
+    await row.getByRole('button', { name: 'Uredi materijal' }).click()
+    const editDialog = page.locator('[role="dialog"]')
+    await expect(editDialog.getByText('Zamijeni datoteku')).toBeVisible({ timeout: 5000 })
+
+    const editFileInput = editDialog.locator('#edit-material-file')
+    await editFileInput.waitFor({ state: 'attached', timeout: 5000 })
+    await editFileInput.evaluate(
+      (el) =>
+        new Promise<void>((resolve) => {
+          const check = () => {
+            if (Object.keys(el).some((k) => k.startsWith('__reactProps$'))) resolve()
+            else setTimeout(check, 50)
+          }
+          check()
+        }),
+    )
+
+    const secondUploadDone = page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/upload/materials') &&
+        resp.request().method() === 'POST',
+      { timeout: 60000 },
+    )
+    await editFileInput.setInputFiles({
+      name: 'second.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('second content — replacement file for cleanup test'),
+    })
+    await editFileInput.evaluate((el) =>
+      el.dispatchEvent(new Event('change', { bubbles: true })),
+    )
+    const secondResp = await secondUploadDone
+    expect(secondResp.status(), 'replacement upload route returned non-200').toBe(200)
+    const secondJson = (await secondResp.json()) as { url: string }
+    const newFileUrl = secondJson.url
+    expect(newFileUrl).toContain('res.cloudinary.com')
+    expect(newFileUrl, 'replacement URL must differ from original').not.toBe(originalFileUrl)
+
+    await editDialog.getByRole('button', { name: 'Spremi' }).click()
+    await expect(editDialog).toBeHidden({ timeout: 15000 })
+
+    // ── 3. Old Cloudinary asset must be gone (best-effort destroy is async,
+    //       so we poll). New asset must still be reachable. ───────────────────
+    await expect
+      .poll(
+        async () => (await page.request.head(originalFileUrl)).status(),
+        { timeout: 30000, intervals: [1000, 2000, 3000, 5000] },
+      )
+      .not.toBe(200)
+
+    const newStatus = (await page.request.head(newFileUrl)).status()
+    expect(newStatus, 'replacement asset must still be reachable').toBe(200)
+
+    // ── 4. Cleanup: delete the material so the replacement asset doesn't leak
+    page.on('dialog', (d) => d.accept())
+    await row.getByRole('button', { name: 'Obriši materijal' }).click()
+    await expect(row).toBeHidden({ timeout: 10000 })
+  })
 })
