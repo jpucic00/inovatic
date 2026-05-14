@@ -120,6 +120,8 @@ export async function updateMaterial(
     }
   }
   const data = parsed.data
+  // Scope + FK fields (scope, moduleId, courseId, scheduledGroupId) are immutable post-create.
+  // updateMaterialSchema is .strict() so Zod rejects them above — no need to re-run validateScopeConsistency here.
 
   const existing = await db.material.findUnique({
     where: { id: data.id },
