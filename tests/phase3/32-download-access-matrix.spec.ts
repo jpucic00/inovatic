@@ -61,6 +61,10 @@ const S_NONE: StudentData = {
 const M_GROUP_A_TITLE = `Grupa-A-DL ${RUN_ID}`
 const M_MODULE_TITLE = `Modul-DL ${RUN_ID}`
 const M_GROUP_B_TITLE = `Grupa-B-DL ${RUN_ID}`
+// Croatian diacritics in title — exercises sanitiseFilename's NFD-strip path.
+// After sanitisation: Čćžš lose combining marks → Cczs; đ has no NFD
+// decomposition and falls through to the [^a-zA-Z0-9._-] pass → _.
+const M_DIACRITIC_TITLE = `Čćžšđ-DL ${RUN_ID}`
 
 type Seeded = {
   teacherAssigned: { email: string; password: string }
@@ -72,6 +76,7 @@ type Seeded = {
   materialGroupA: string
   materialModule: string
   materialGroupB: string
+  materialDiacritic: string
 }
 let seeded: Seeded | null = null
 
@@ -155,6 +160,13 @@ test.describe('Phase 3 — /api/download access matrix', () => {
         M_MODULE_TITLE,
       )
 
+      await page.goto(`${BASE}/nastavnik/grupa/${groupA}/materijali`)
+      const materialDiacritic = await uploadFileMaterial(
+        page,
+        /Dodaj samo u ovu grupu/,
+        M_DIACRITIC_TITLE,
+      )
+
       await page.goto(`${BASE}/nastavnik/grupa/${groupB}/materijali`)
       const materialGroupB = await uploadFileMaterial(
         page,
@@ -187,6 +199,7 @@ test.describe('Phase 3 — /api/download access matrix', () => {
         materialGroupA,
         materialModule,
         materialGroupB,
+        materialDiacritic,
       }
     } finally {
       await page.close()
@@ -226,6 +239,17 @@ test.describe('Phase 3 — /api/download access matrix', () => {
     await loginAsAdmin(page)
     const res = await fetchDownload(page, NON_EXISTENT_ID)
     expect(res.status).toBe(404)
+  })
+
+  test('ADMIN → diacritic-title material → Content-Disposition filename is sanitised', async ({ page }) => {
+    if (!seeded) throw new Error('not seeded')
+    await loginAsAdmin(page)
+    const res = await fetchDownload(page, seeded.materialDiacritic)
+    expect(res.status).toBe(200)
+    // Pins cloudinary-url.ts sanitiseFilename(): NFD-strip removes Čćžš combining
+    // marks → Cczs; đ has no NFD decomposition so the next pass replaces it with
+    // `_`; trailing space + RUN_ID becomes `_<RUN_ID>`; ext from text/plain → .txt.
+    expect(res.contentDisposition).toMatch(/filename="Cczs_-DL_\d+\.txt"/)
   })
 
   // ── TEACHER ───────────────────────────────────────────────────────────────

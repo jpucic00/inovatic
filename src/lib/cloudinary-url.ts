@@ -81,7 +81,7 @@ export const MIME_TO_EXT: Record<string, string> = {
 export function sanitiseFilename(name: string): string {
   return name
     .normalize('NFD')
-    .replaceAll(/[̀-ͯ]/g, '')
+    .replaceAll(/[\u0300-\u036F]/g, '')
     .replaceAll(/[^a-zA-Z0-9._-]/g, '_')
     .replaceAll(/_+/g, '_')
     .replaceAll(/(?:^_|_$)/g, '')
