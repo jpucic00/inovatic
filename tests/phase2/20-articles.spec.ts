@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { submitUntilUrl } from '../helpers/hydration'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 9 — Admin Articles (BlockNote)
@@ -28,10 +29,7 @@ async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
   await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await page.locator('button[type="submit"]').click()
-  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
-  // multiple workers hit the login flow simultaneously.
-  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
+  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
   await page.waitForLoadState('networkidle')
 }
 
@@ -58,9 +56,11 @@ test.describe('Admin — Articles', () => {
   test('create a draft article', async ({ page }) => {
     await loginAsAdmin(page)
 
-    // Visiting /nova creates the draft server-side and redirects to the edit view.
-    await page.goto(`${BASE}/admin/novosti/nova`)
-    await page.waitForURL(/\/admin\/novosti\/[^/]+\/uredi/, { timeout: 15000 })
+    // Visiting /nova creates the draft server-side and redirects to the edit
+    // view. The server-side redirect detaches the goto's frame, so swallow
+    // the goto error and rely on waitForURL to confirm we landed on /uredi.
+    await page.goto(`${BASE}/admin/novosti/nova`).catch(() => undefined)
+    await page.waitForURL(/\/admin\/novosti\/[^/]+\/uredi/, { timeout: 30000 })
     await expect(page.getByRole('heading', { name: 'Uredi članak' })).toBeVisible()
 
     // Auto-save kicks in as we type. Replace the placeholder title + excerpt,
@@ -70,8 +70,10 @@ test.describe('Admin — Articles', () => {
     await page.locator('#article-slug').fill(ARTICLE.slug)
     await page.locator('#article-excerpt').fill(ARTICLE.excerpt)
 
-    // Wait until the debounced save lands ("Spremljeno u HH:MM:SS").
-    await expect(page.getByText(/Spremljeno u/)).toBeVisible({ timeout: 10000 })
+    // Wait until the debounced save lands ("Spremljeno u HH:MM:SS"). On a
+    // cold dev server the article-edit route compile + BlockNote debounce can
+    // exceed the original 10s budget.
+    await expect(page.getByText(/Spremljeno u/)).toBeVisible({ timeout: 30000 })
   })
 
   test('article shows in list as draft and NOT on public /novosti', async ({ page }) => {

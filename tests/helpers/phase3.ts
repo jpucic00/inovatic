@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
+import { submitUntilUrl } from './hydration'
 
 export const BASE = 'http://localhost:3000'
 const ADMIN_EMAIL = 'jpucic00@gmail.com'
@@ -39,8 +40,7 @@ export async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
   await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await page.locator('button[type="submit"]').click()
-  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
+  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
   await page.waitForLoadState('domcontentloaded')
 }
 
@@ -48,7 +48,7 @@ export async function loginWithEmail(page: Page, email: string, password: string
   await page.goto(`${BASE}/prijava`)
   await page.locator('#identifier').fill(email)
   await page.locator('input[type="password"]').fill(password)
-  await page.locator('button[type="submit"]').click()
+  await submitUntilUrl(page, page.locator('button[type="submit"]'), /\/(admin|nastavnik|portal)/)
   await page.waitForLoadState('domcontentloaded')
 }
 

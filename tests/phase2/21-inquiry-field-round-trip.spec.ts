@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { BASE, loginAsAdmin } from '../helpers/phase3'
+import { clickUntilVisible } from '../helpers/hydration'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 — Inquiry field round-trip: childGrade + referralSource
@@ -61,27 +62,33 @@ async function submitInquiry(page: Page, data: InquiryData) {
   await page.locator('#parentName').fill(data.parentName)
   await page.locator('#parentEmail').fill(data.parentEmail)
   await page.locator('#parentPhone').fill(data.parentPhone)
-  await page.locator('button', { hasText: 'Dalje' }).click()
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Dalje' }),
+    page.locator('#childFirstName'),
+  )
 
   // Step 2 — child info
-  await expect(page.locator('#childFirstName')).toBeVisible()
   await page.locator('#childFirstName').fill(data.childFirstName)
   await page.locator('#childLastName').fill(data.childLastName)
   await page.locator('#dob-day').selectOption(data.dobDay)
   await page.locator('#dob-month').selectOption(data.dobMonth)
   await page.locator('#dob-year').selectOption(data.dobYear)
-  await page.locator('button', { hasText: 'Dalje' }).click()
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Dalje' }),
+    page.locator('input[name="consent"]'),
+  )
 
   // Step 3 — grade, optional referralSource, consent + submit
-  await expect(page.locator('input[name="consent"]')).toBeVisible()
   await page.locator('select[name="grade"]').selectOption(data.grade)
   if (data.referralSource) {
     await page.locator('#referralSource').selectOption(data.referralSource)
   }
   await page.locator('input[name="consent"]').check()
-  await page.locator('button', { hasText: 'Pošalji upit' }).click()
-
-  await expect(page.locator('text=Upit je poslan!')).toBeVisible({ timeout: 15000 })
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Pošalji upit' }),
+    page.locator('text=Upit je poslan!'),
+    { timeout: 30000 },
+  )
 }
 
 async function openInquiryDetail(page: Page, parentName: string) {

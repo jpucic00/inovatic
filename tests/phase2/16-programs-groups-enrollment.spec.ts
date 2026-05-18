@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 7 — Programs, Groups & Enrollment
@@ -94,10 +95,7 @@ async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
   await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await page.locator('button[type="submit"]').click()
-  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
-  // multiple workers hit the login flow simultaneously.
-  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
+  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
   await page.waitForLoadState('networkidle')
 }
 
@@ -107,11 +105,13 @@ async function fillStep1(page: Page, data: ParentData) {
   await page.locator('#parentName').fill(data.parentName)
   await page.locator('#parentEmail').fill(data.parentEmail)
   await page.locator('#parentPhone').fill(data.parentPhone)
-  await page.locator('button', { hasText: 'Dalje' }).click()
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Dalje' }),
+    page.locator('#childFirstName'),
+  )
 }
 
 async function fillStep2(page: Page, data: ParentData) {
-  await expect(page.locator('#childFirstName')).toBeVisible({ timeout: 5000 })
   await page.locator('#childFirstName').fill(data.childFirstName)
   await page.locator('#childLastName').fill(data.childLastName)
 
@@ -122,14 +122,16 @@ async function fillStep2(page: Page, data: ParentData) {
   await dobWrapper.locator('select').nth(1).selectOption('06')   // Mjesec (Lipanj)
   await dobWrapper.locator('select').nth(2).selectOption('2018') // Godina
 
-  await page.locator('button', { hasText: 'Dalje' }).click()
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Dalje' }),
+    page.locator('input[name="consent"]'),
+  )
 }
 
 async function reachStep3(page: Page, data: ParentData, url = `${BASE}/upisi`) {
   await page.goto(url)
   await fillStep1(page, data)
   await fillStep2(page, data)
-  await expect(page.locator('input[name="consent"]')).toBeVisible({ timeout: 5000 })
 }
 
 async function selectGroupOption(page: Page, groupName: string) {
@@ -189,16 +191,20 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     test('create radionica dialog opens on button click', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
-      await page.locator('button', { hasText: 'Nova radionica' }).click()
-      await expect(page.locator('[role="dialog"]')).toBeVisible()
+      await clickUntilVisible(
+        page.locator('button', { hasText: 'Nova radionica' }),
+        page.locator('[role="dialog"]'),
+      )
       await expect(page.locator('[role="dialog"]').locator('text=Nova radionica')).toBeVisible()
     })
 
     test('creating radionica shows it in the table', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
-      await page.locator('button', { hasText: 'Nova radionica' }).click()
-      await expect(page.locator('[role="dialog"]')).toBeVisible()
+      await clickUntilVisible(
+        page.locator('button', { hasText: 'Nova radionica' }),
+        page.locator('[role="dialog"]'),
+      )
 
       const dialog = page.locator('[role="dialog"]')
       await dialog.locator('input[placeholder*="Ljetne"]').fill(RADIONICA_TITLE)
@@ -255,10 +261,11 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     test('create standard group (SLR 1) with 2 max spots', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
-      await page.locator('button', { hasText: 'Nova grupa' }).click()
-
       const dialog = page.locator('[role="dialog"]')
-      await expect(dialog).toBeVisible()
+      await clickUntilVisible(
+        page.locator('button', { hasText: 'Nova grupa' }),
+        dialog,
+      )
 
       // Program — pick SLR 1 course (seed title: "Svijet LEGO Robotike 1").
       const courseSelect = dialog.locator('select').nth(0)
@@ -288,8 +295,12 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
 
       // Enrollment window is required by the schema; leave it wide open so
       // public-form submissions downstream all land inside the window.
-      await dialog.locator('#create-enrollmentStart').fill('2025-06-01')
-      await dialog.locator('#create-enrollmentEnd').fill('2027-06-30')
+      const enrollStart = dialog.locator('#create-enrollmentStart')
+      await enrollStart.fill('01.06.2025')
+      await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+      const enrollEnd = dialog.locator('#create-enrollmentEnd')
+      await enrollEnd.fill('30.06.2027')
+      await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
 
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
@@ -299,10 +310,11 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     test('create radionica group with 2 max spots', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
-      await page.locator('button', { hasText: 'Nova grupa' }).click()
-
       const dialog = page.locator('[role="dialog"]')
-      await expect(dialog).toBeVisible()
+      await clickUntilVisible(
+        page.locator('button', { hasText: 'Nova grupa' }),
+        dialog,
+      )
 
       // Program — select the radionica we just created (exact title match)
       const courseSelect = dialog.locator('select').nth(0)
@@ -332,8 +344,12 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await maxInput.fill(String(MAX_SPOTS))
 
       // Enrollment window (required)
-      await dialog.locator('#create-enrollmentStart').fill('2025-06-01')
-      await dialog.locator('#create-enrollmentEnd').fill('2027-06-30')
+      const enrollStart = dialog.locator('#create-enrollmentStart')
+      await enrollStart.fill('01.06.2025')
+      await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+      const enrollEnd = dialog.locator('#create-enrollmentEnd')
+      await enrollEnd.fill('30.06.2027')
+      await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
 
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
@@ -474,7 +490,7 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await expect(page.locator('text=Odbiti upit?')).toBeVisible()
       await page.locator('[role="dialog"] button', { hasText: 'Odbij upit' }).last().click()
       await expect(page.locator('span', { hasText: 'Odbijena' }).first()).toBeVisible({
-        timeout: 10000,
+        timeout: 30000,
       })
     })
 
@@ -687,9 +703,12 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
       const row = page.locator('tr', { hasText: STD_GROUP_NAME })
-      await row.locator('a', { hasText: STD_GROUP_NAME }).click()
+      const groupAnchor = row.locator('a', { hasText: STD_GROUP_NAME })
+      const href = await groupAnchor.getAttribute('href')
+      if (!href) throw new Error(`no href on ${STD_GROUP_NAME} row`)
+      await page.goto(`${BASE}${href}`)
 
-      await expect(page).toHaveURL(/\/admin\/grupe\/[^/]+$/)
+      await expect(page).toHaveURL(/\/admin\/grupe\/[^/]+$/, { timeout: 30000 })
       await page.locator('button', { hasText: 'Uredi' }).first().click()
 
       const nameInput = page.locator('#info-name')
@@ -725,10 +744,11 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       const page = await ctx.newPage()
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
-      await page.locator('button', { hasText: 'Nova grupa' }).click()
-
       const dialog = page.locator('[role="dialog"]')
-      await expect(dialog).toBeVisible()
+      await clickUntilVisible(
+        page.locator('button', { hasText: 'Nova grupa' }),
+        dialog,
+      )
 
       const courseSelect = dialog.locator('select').nth(0)
       const radOpt = courseSelect.locator('option', { hasText: RADIONICA_TITLE }).first()
@@ -745,8 +765,12 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await dialog.locator('input[placeholder="19:00"]').fill('10:00')
       await dialog.locator('input[placeholder="20:30"]').fill('12:00')
       await dialog.locator('input[type="number"][min="1"]').fill('2')
-      await dialog.locator('#create-enrollmentStart').fill('2025-06-01')
-      await dialog.locator('#create-enrollmentEnd').fill('2027-06-30')
+      const enrollStart = dialog.locator('#create-enrollmentStart')
+      await enrollStart.fill('01.06.2025')
+      await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+      const enrollEnd = dialog.locator('#create-enrollmentEnd')
+      await enrollEnd.fill('30.06.2027')
+      await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
 

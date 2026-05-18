@@ -336,11 +336,13 @@ test.describe('Phase 3 Step 13 — Materials', () => {
     await expect(editDialog).toBeHidden({ timeout: 15000 })
 
     // ── 3. Old Cloudinary asset must be gone (best-effort destroy is async,
-    //       so we poll). New asset must still be reachable. ───────────────────
+    //       so we poll). New asset must still be reachable. Cloudinary EU
+    //       deletion + CDN invalidation can take 30-60s; widen the window so
+    //       the test isn't flaky under normal Cloudinary latency. ────────────
     await expect
       .poll(
         async () => (await page.request.head(originalFileUrl)).status(),
-        { timeout: 30000, intervals: [1000, 2000, 3000, 5000] },
+        { timeout: 60000, intervals: [2000, 3000, 5000, 8000] },
       )
       .not.toBe(200)
 

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { submitUntilUrl } from '../helpers/hydration'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 9 — Admin Teachers
@@ -25,10 +26,7 @@ async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
   await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await page.locator('button[type="submit"]').click()
-  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
-  // multiple workers hit the login flow simultaneously.
-  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
+  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
   await page.waitForLoadState('networkidle')
 }
 
@@ -52,12 +50,17 @@ test.describe('Admin — Teachers', () => {
     // violations: "Pristupni podaci" also appears inside a longer
     // DialogDescription sentence, and the email shows up twice (inside a
     // <strong> on its own, and as part of "E-mail: {email}").
-    await expect(page.getByText('Pristupni podaci', { exact: true })).toBeVisible()
+    // The server action sends the credentials email via Resend, which can
+    // take a few seconds on a cold dev server — bump past the 5s default.
+    await expect(page.getByText('Pristupni podaci', { exact: true })).toBeVisible({ timeout: 15000 })
     await expect(page.getByText(TEACHER.email, { exact: true }).first()).toBeVisible()
 
     await page.getByRole('button', { name: 'Zatvori' }).click()
 
-    // Teacher now appears in the list
+    // Teacher list is alphabetically ordered + paginated (20/page); once the dev
+    // DB accumulates enough rows, a new lastName like "Nastavnica<RUN_ID>" lands
+    // beyond page 1. Navigate via search to make this resilient to pagination.
+    await page.goto(`${BASE}/admin/nastavnici?search=${TEACHER.lastName}`)
     await expect(page.getByText(`${TEACHER.firstName} ${TEACHER.lastName}`)).toBeVisible()
   })
 

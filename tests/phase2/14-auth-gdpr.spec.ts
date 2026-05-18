@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { clickUntilVisible } from '../helpers/hydration'
 
 const BASE = 'http://localhost:3000'
 
@@ -20,6 +21,9 @@ test.describe('Login Page', () => {
 
   test('shows validation errors on empty submission', async ({ page }) => {
     await page.goto(`${BASE}/prijava`)
+    // waitForLoadState('networkidle') gives the client bundle time to hydrate
+    // so the form's onSubmit handler is attached before we click.
+    await page.waitForLoadState('networkidle')
     await page.locator('#identifier').click()
     await page.locator('input[type="password"]').click()
     await page.locator('button[type="submit"]').click()
@@ -29,6 +33,7 @@ test.describe('Login Page', () => {
 
   test('shows error message on wrong credentials', async ({ page }) => {
     await page.goto(`${BASE}/prijava`)
+    await page.waitForLoadState('networkidle')
     await page.locator('#identifier').fill('wrong@example.com')
     await page.locator('input[type="password"]').fill('wrongpassword')
     await page.locator('button[type="submit"]').click()
@@ -61,11 +66,10 @@ test.describe('Navbar Login Link', () => {
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto(`${BASE}/`)
     const hamburger = page.locator('button[aria-label*="meni"]')
-    await hamburger.click()
     // The mobile menu login link is inside the absolutely-positioned dropdown
     const mobileMenu = page.locator('.md\\:hidden[class*="absolute"]')
     const loginLink = mobileMenu.locator('a[href="/prijava"]')
-    await expect(loginLink).toBeVisible()
+    await clickUntilVisible(hamburger, loginLink)
   })
 })
 
@@ -108,7 +112,10 @@ test.describe('GDPR Consent on Inquiry Form', () => {
     await page.locator('#parentName').fill('Ivan Horvat')
     await page.locator('#parentEmail').fill('ivan@example.com')
     await page.locator('#parentPhone').fill('0991234567')
-    await page.locator('button', { hasText: 'Dalje' }).click()
+    await clickUntilVisible(
+      page.locator('button', { hasText: 'Dalje' }),
+      page.locator('#childFirstName'),
+    )
 
     // Step 2 — fill child info
     await page.locator('#childFirstName').fill('Ana')
@@ -116,13 +123,12 @@ test.describe('GDPR Consent on Inquiry Form', () => {
     await page.locator('#dob-day').selectOption('15')
     await page.locator('#dob-month').selectOption('03')
     await page.locator('#dob-year').selectOption('2018')
-    await page.locator('button', { hasText: 'Dalje' }).click()
+    await clickUntilVisible(
+      page.locator('button', { hasText: 'Dalje' }),
+      page.locator('input[type="checkbox"][name="consent"]'),
+    )
 
-    // Step 3 — verify consent checkbox is present
-    const consentCheckbox = page.locator('input[type="checkbox"][name="consent"]')
-    await expect(consentCheckbox).toBeVisible()
-
-    // Verify consent label text and privacy policy link
+    // Step 3 — verify consent checkbox + label + link
     const consentLabel = page.locator('text=politikom privatnosti')
     await expect(consentLabel).toBeVisible()
 
@@ -138,7 +144,10 @@ test.describe('GDPR Consent on Inquiry Form', () => {
     await page.locator('#parentName').fill('Ivan Horvat')
     await page.locator('#parentEmail').fill('ivan@example.com')
     await page.locator('#parentPhone').fill('0991234567')
-    await page.locator('button', { hasText: 'Dalje' }).click()
+    await clickUntilVisible(
+      page.locator('button', { hasText: 'Dalje' }),
+      page.locator('#childFirstName'),
+    )
 
     // Step 2
     await page.locator('#childFirstName').fill('Ana')
@@ -146,14 +155,17 @@ test.describe('GDPR Consent on Inquiry Form', () => {
     await page.locator('#dob-day').selectOption('15')
     await page.locator('#dob-month').selectOption('03')
     await page.locator('#dob-year').selectOption('2018')
-    await page.locator('button', { hasText: 'Dalje' }).click()
+    await clickUntilVisible(
+      page.locator('button', { hasText: 'Dalje' }),
+      page.locator('input[type="checkbox"][name="consent"]'),
+    )
 
     // Step 3 — select grade but submit without checking consent
     await page.locator('select[name="grade"]').selectOption('3')
-    await page.locator('button[type="submit"]').click()
-
-    // Expect validation error
-    await expect(page.locator('text=Morate pristati na obradu osobnih podataka')).toBeVisible()
+    await clickUntilVisible(
+      page.locator('button[type="submit"]'),
+      page.locator('text=Morate pristati na obradu osobnih podataka'),
+    )
   })
 })
 

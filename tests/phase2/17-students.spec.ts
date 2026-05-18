@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 8 — Student Management
@@ -60,10 +61,7 @@ async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
   await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await page.locator('button[type="submit"]').click()
-  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
-  // multiple workers hit the login flow simultaneously.
-  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
+  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
   await page.waitForLoadState('networkidle')
 }
 
@@ -74,24 +72,30 @@ async function submitInquiry(page: Page, data: typeof INQUIRY_FOR_ACCOUNT) {
   await page.locator('#parentName').fill(data.parentName)
   await page.locator('#parentEmail').fill(data.parentEmail)
   await page.locator('#parentPhone').fill(data.parentPhone)
-  await page.locator('button', { hasText: 'Dalje' }).click()
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Dalje' }),
+    page.locator('#childFirstName'),
+  )
 
   // Step 2 — child info
-  await expect(page.locator('#childFirstName')).toBeVisible()
   await page.locator('#childFirstName').fill(data.childFirstName)
   await page.locator('#childLastName').fill(data.childLastName)
   await page.locator('#dob-day').selectOption(data.dobDay)
   await page.locator('#dob-month').selectOption(data.dobMonth)
   await page.locator('#dob-year').selectOption(data.dobYear)
-  await page.locator('button', { hasText: 'Dalje' }).click()
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Dalje' }),
+    page.locator('input[name="consent"]'),
+  )
 
   // Step 3 — grade, consent + submit
-  await expect(page.locator('input[name="consent"]')).toBeVisible()
   await page.locator('select[name="grade"]').selectOption('3')
   await page.locator('input[name="consent"]').check()
-  await page.locator('button', { hasText: 'Pošalji upit' }).click()
-
-  await expect(page.locator('text=Upit je poslan!')).toBeVisible({ timeout: 15000 })
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Pošalji upit' }),
+    page.locator('text=Upit je poslan!'),
+    { timeout: 30000 },
+  )
 }
 
 /** Opens the inquiry detail page by searching for the parent name. */
@@ -127,7 +131,13 @@ async function createStudentManuallyViaDialog(
 
   await page.locator('#create-student-first').fill(data.firstName)
   await page.locator('#create-student-last').fill(data.lastName)
-  if (data.dateOfBirth) await page.locator('#create-student-dob').fill(data.dateOfBirth)
+  if (data.dateOfBirth) {
+    // DateInput parses dd.MM.yyyy in Croatian locale (task 49j2wma).
+    const [yyyy, mm, dd] = data.dateOfBirth.split('-')
+    const dob = page.locator('#create-student-dob')
+    await dob.fill(`${dd}.${mm}.${yyyy}`)
+    await dob.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+  }
   if (data.childSchool) await page.locator('#create-student-school').fill(data.childSchool)
   if (data.parentName) await page.locator('#create-student-parent-name').fill(data.parentName)
   if (data.parentEmail) await page.locator('#create-student-parent-email').fill(data.parentEmail)

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Session } from 'next-auth'
 import type { UserRole } from '@prisma/client'
 import { auth } from '@/lib/auth'
 
@@ -8,7 +9,8 @@ const ALLOWED_ORIGIN = 'https://elearning.robocamp.eu'
 const ALLOWED_ROLES = new Set<UserRole>(['STUDENT', 'TEACHER', 'ADMIN'])
 const PROXY_PREFIX = '/api/proxy/elearning'
 const MAX_PATH_DEPTH = 20
-const BAD_SEGMENT = /[\\\x00]/
+const BAD_SEGMENT = /\\/
+const NUL_BYTE = String.fromCharCode(0)
 
 const STRIP_HEADERS = [
   'x-frame-options',
@@ -35,134 +37,174 @@ const CSP = [
   "object-src 'none'",
 ].join('; ')
 
-async function handler(
-  req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> },
-) {
-  const session = await auth()
+type TextFlags = { isHtml: boolean; isJs: boolean; isCss: boolean }
+
+function authorize(session: Session | null): NextResponse | null {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   if (!ALLOWED_ROLES.has(session.user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+  return null
+}
 
-  const { path } = await params
+function isInvalidSegment(seg: string): boolean {
+  return (
+    !seg ||
+    seg === '.' ||
+    seg === '..' ||
+    seg.includes('..') ||
+    seg.includes(NUL_BYTE) ||
+    BAD_SEGMENT.test(seg)
+  )
+}
+
+function validatePath(path: string[]): NextResponse | null {
   if (path.length > MAX_PATH_DEPTH) {
     return NextResponse.json({ error: 'Bad path' }, { status: 400 })
   }
   for (const seg of path) {
-    if (!seg || seg === '.' || seg === '..' || seg.includes('..') || BAD_SEGMENT.test(seg)) {
+    if (isInvalidSegment(seg)) {
       return NextResponse.json({ error: 'Bad path' }, { status: 400 })
     }
   }
+  return null
+}
 
+function buildTargetUrl(req: NextRequest, path: string[]): string | NextResponse {
   const targetPath = path.join('/')
   const query = req.nextUrl.searchParams.toString()
   const queryString = query ? `?${query}` : ''
   const targetUrl = `${ALLOWED_ORIGIN}/${targetPath}${queryString}`
-
-  const parsed = new URL(targetUrl)
-  if (parsed.origin !== ALLOWED_ORIGIN) {
+  if (new URL(targetUrl).origin !== ALLOWED_ORIGIN) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+  return targetUrl
+}
 
+function buildForwardHeaders(req: NextRequest): Headers {
   const headers = new Headers()
   for (const name of FORWARD_HEADERS) {
     const val = req.headers.get(name)
     if (val) headers.set(name, val)
   }
   headers.set('referer', `${ALLOWED_ORIGIN}/`)
+  return headers
+}
+
+function rewriteHtmlOrJs(text: string): string {
+  return text
+    .replaceAll(
+      /\b(href|src|action|formaction|data-src|poster)=(["'])\/(?!\/)/gi,
+      `$1=$2${PROXY_PREFIX}/`,
+    )
+    .replaceAll(
+      /\bcontent=(["'])\s*\d+\s*;\s*url=\/(?!\/)/gi,
+      `content=$1 0; url=${PROXY_PREFIX}/`,
+    )
+    .replaceAll(
+      /\b(fetch|axios\.(?:get|post|put|delete|patch))\(\s*(["'`])\/(?!\/)/g,
+      `$1($2${PROXY_PREFIX}/`,
+    )
+    // RoboCamp's nf-renderer stores comma/semicolon-separated absolute
+    // paths in data-urls (e.g. "/a.php,/b.php;/c.php"). Rewrite each
+    // segment inside the attribute value only — keeps the narrow scope.
+    .replaceAll(/\b(data-urls)=(["'])([^"']*)\2/gi, (_, attr, q, val) => {
+      const rewritten = val.replaceAll(/(^|[,;])\/(?!\/)/g, `$1${PROXY_PREFIX}/`)
+      return `${attr}=${q}${rewritten}${q}`
+    })
+    // Template-literal absolute paths in JS: `/video/${id}.mp4` →
+    // `/api/proxy/elearning/video/${id}.mp4`. nf.js sets video.src this
+    // way. Excludes `// (protocol-relative), `${ (interpolation),
+    // and `` ` `` (empty literal).
+    .replaceAll(/(`)\/(?![/$`])/g, `$1${PROXY_PREFIX}/`)
+}
+
+function rewriteCss(text: string): string {
+  return text.replaceAll(/\burl\(\s*(["']?)\/(?!\/)/g, `url($1${PROXY_PREFIX}/`)
+}
+
+function injectBase(html: string): string {
+  // Inject <base> AFTER attribute rewrites so the rewrite regex doesn't
+  // double-prefix the injected URL.
+  return html.replace(/<head(\s[^>]*)?>/i, (m) => `${m}<base href="${PROXY_PREFIX}/">`)
+}
+
+function applyTextRewrites(text: string, flags: TextFlags): string {
+  let patched = text
+  if (flags.isHtml || flags.isJs) patched = rewriteHtmlOrJs(patched)
+  if (flags.isCss || flags.isHtml) patched = rewriteCss(patched)
+  if (flags.isHtml) patched = injectBase(patched)
+  return patched
+}
+
+function stripUpstreamHeaders(upstream: Response): Headers {
+  const headers = new Headers(upstream.headers)
+  for (const h of STRIP_HEADERS) {
+    headers.delete(h)
+  }
+  return headers
+}
+
+function buildTextResponseHeaders(upstream: Response): Headers {
+  const headers = stripUpstreamHeaders(upstream)
+  headers.delete('content-length')
+  headers.set('cache-control', 'no-store')
+  headers.delete('etag')
+  headers.delete('last-modified')
+  headers.set('content-security-policy', CSP)
+  headers.set('x-content-type-options', 'nosniff')
+  headers.set('referrer-policy', 'no-referrer')
+  return headers
+}
+
+async function handler(
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> },
+) {
+  const session = (await auth()) as Session | null
+  const authError = authorize(session)
+  if (authError) return authError
+
+  const { path } = await params
+  const pathError = validatePath(path)
+  if (pathError) return pathError
+
+  const targetUrl = buildTargetUrl(req, path)
+  if (typeof targetUrl !== 'string') return targetUrl
 
   const upstream = await fetch(targetUrl, {
     method: req.method,
-    headers,
+    headers: buildForwardHeaders(req),
     body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
     redirect: 'follow',
     // @ts-expect-error duplex required for streaming request body
     duplex: 'half',
   })
 
-  const responseHeaders = new Headers(upstream.headers)
-  for (const h of STRIP_HEADERS) {
-    responseHeaders.delete(h)
+  const contentType = upstream.headers.get('content-type') ?? ''
+  const flags: TextFlags = {
+    isHtml: contentType.includes('text/html'),
+    isJs: contentType.includes('javascript'),
+    isCss: contentType.includes('text/css'),
   }
 
-  const contentType = upstream.headers.get('content-type') ?? ''
-  const isHtml = contentType.includes('text/html')
-  const isJs = contentType.includes('javascript')
-  const isCss = contentType.includes('text/css')
-  const isText = isHtml || isJs || isCss
-
-  if (isText) {
-    const text = await upstream.text()
-    let patched = text
-
-    if (isHtml || isJs) {
-      patched = patched
-        .replace(
-          /\b(href|src|action|formaction|data-src|poster)=(["'])\/(?!\/)/gi,
-          `$1=$2${PROXY_PREFIX}/`,
-        )
-        .replace(
-          /\bcontent=(["'])\s*\d+\s*;\s*url=\/(?!\/)/gi,
-          `content=$1 0; url=${PROXY_PREFIX}/`,
-        )
-        .replace(
-          /\b(fetch|axios\.(?:get|post|put|delete|patch))\(\s*(["'`])\/(?!\/)/g,
-          `$1($2${PROXY_PREFIX}/`,
-        )
-        // RoboCamp's nf-renderer stores comma/semicolon-separated absolute
-        // paths in data-urls (e.g. "/a.php,/b.php;/c.php"). Rewrite each
-        // segment inside the attribute value only — keeps the narrow scope.
-        .replace(
-          /\b(data-urls)=(["'])([^"']*)\2/gi,
-          (_, attr, q, val) =>
-            `${attr}=${q}${val.replace(/(^|[,;])\/(?!\/)/g, `$1${PROXY_PREFIX}/`)}${q}`,
-        )
-        // Template-literal absolute paths in JS: `/video/${id}.mp4` →
-        // `/api/proxy/elearning/video/${id}.mp4`. nf.js sets video.src this
-        // way. Excludes `// (protocol-relative), `${ (interpolation),
-        // and `` ` `` (empty literal).
-        .replace(/(`)\/(?![/$`])/g, `$1${PROXY_PREFIX}/`)
-    }
-
-    if (isCss || isHtml) {
-      patched = patched.replace(
-        /\burl\(\s*(["']?)\/(?!\/)/g,
-        `url($1${PROXY_PREFIX}/`,
-      )
-    }
-
-    // Inject <base> AFTER attribute rewrites so the rewrite regex doesn't
-    // double-prefix the injected URL.
-    if (isHtml) {
-      patched = patched.replace(
-        /<head(\s[^>]*)?>/i,
-        (m) => `${m}<base href="${PROXY_PREFIX}/">`,
-      )
-    }
-
-    responseHeaders.delete('content-length')
-    responseHeaders.set('cache-control', 'no-store')
-    responseHeaders.delete('etag')
-    responseHeaders.delete('last-modified')
-    responseHeaders.set('content-security-policy', CSP)
-    responseHeaders.set('x-content-type-options', 'nosniff')
-    responseHeaders.set('referrer-policy', 'no-referrer')
-
+  if (flags.isHtml || flags.isJs || flags.isCss) {
+    const patched = applyTextRewrites(await upstream.text(), flags)
     return new NextResponse(patched, {
       status: upstream.status,
       statusText: upstream.statusText,
-      headers: responseHeaders,
+      headers: buildTextResponseHeaders(upstream),
     })
   }
 
-  responseHeaders.set('x-content-type-options', 'nosniff')
+  const headers = stripUpstreamHeaders(upstream)
+  headers.set('x-content-type-options', 'nosniff')
   return new NextResponse(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,
-    headers: responseHeaders,
+    headers,
   })
 }
 

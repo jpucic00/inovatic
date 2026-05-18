@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 8 — Module Enrollment + School-Year Historization
@@ -49,10 +50,7 @@ async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
   await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await page.locator('button[type="submit"]').click()
-  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
-  // multiple workers hit the login flow simultaneously.
-  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
+  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
   await page.waitForLoadState('networkidle')
 }
 
@@ -68,14 +66,30 @@ function slrTable(page: Page) {
 }
 
 /**
+ * Locates the ModuleEnrollmentPanel module-tab button on the group-detail
+ * page. The Galerija section now renders a parallel set of "Modul N – ..."
+ * buttons, so we scope by the panel that contains the "Polaznici po
+ * modulima" heading.
+ */
+function moduleTabButton(page: Page, n: number) {
+  return page
+    .locator('div.bg-white.rounded-xl', {
+      has: page.getByText(/Polaznici po modulima/),
+    })
+    .getByRole('button', { name: new RegExp(`^Modul ${n}\\b`) })
+}
+
+/**
  * Creates a scheduled group for SLR 1 via the admin UI. Returns the group
  * detail URL (we navigate to it after creation).
  */
 async function createStandardGroup(page: Page, groupName: string): Promise<string> {
   await page.goto(`${BASE}/admin/grupe`)
-  await page.locator('button', { hasText: 'Nova grupa' }).click()
   const dialog = page.locator('[role="dialog"]')
-  await expect(dialog).toBeVisible()
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Nova grupa' }),
+    dialog,
+  )
 
   const courseSelect = dialog.locator('select').nth(0)
   const slrOpt = courseSelect.locator('option', { hasText: COURSE_SEARCH }).first()
@@ -96,9 +110,15 @@ async function createStandardGroup(page: Page, groupName: string): Promise<strin
   const maxInput = dialog.locator('input[type="number"][min="1"]')
   await maxInput.fill(String(MAX_CAPACITY))
 
-  // Enrollment window is required by the createGroup schema.
-  await dialog.locator('#create-enrollmentStart').fill('2025-06-01')
-  await dialog.locator('#create-enrollmentEnd').fill('2027-06-30')
+  // Enrollment window is required by the createGroup schema. DateInput
+  // accepts dd.MM.yyyy in Croatian locale (task 49j2wma); fire blur so RHF
+  // commits the parsed value.
+  const enrollStart = dialog.locator('#create-enrollmentStart')
+  await enrollStart.fill('01.06.2025')
+  await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+  const enrollEnd = dialog.locator('#create-enrollmentEnd')
+  await enrollEnd.fill('30.06.2027')
+  await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
 
   await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
   await expect(dialog).not.toBeVisible({ timeout: 10000 })
@@ -108,8 +128,13 @@ async function createStandardGroup(page: Page, groupName: string): Promise<strin
   // text node. The link's accessible name is exactly the group name.
   const groupLink = page.getByRole('link', { name: groupName, exact: true })
   await expect(groupLink).toBeVisible({ timeout: 10000 })
-  await groupLink.click()
-  await page.waitForURL(/\/admin\/grupe\/[^/]+$/, { timeout: 10000 })
+  // Read the href and goto directly — Next.js dev server is slow enough
+  // compiling /admin/grupe/[id] cold that the link's client-nav navigation
+  // can outrun the waitForURL window if hydration also races.
+  const href = await groupLink.getAttribute('href')
+  if (!href) throw new Error(`group link has no href for ${groupName}`)
+  await page.goto(`${BASE}${href}`)
+  await page.waitForURL(/\/admin\/grupe\/[^/]+$/, { timeout: 30000 })
   return page.url()
 }
 
@@ -123,9 +148,11 @@ async function createStudentAndEnroll(
   lastName: string,
 ) {
   await page.goto(`${BASE}/admin/ucenici`)
-  await page.getByRole('button', { name: 'Kreiraj učenika' }).click()
   const dialog = page.locator('[role="dialog"]')
-  await expect(dialog).toBeVisible()
+  await clickUntilVisible(
+    page.getByRole('button', { name: 'Kreiraj učenika' }),
+    dialog,
+  )
 
   await page.locator('#create-student-first').fill(firstName)
   await page.locator('#create-student-last').fill(lastName)
@@ -301,9 +328,11 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       await expect(page.locator('h1', { hasText: COURSE_SEARCH })).toBeVisible()
       // "Polaznici po modulima (9 u grupi)"
       await expect(page.getByText(/Polaznici po modulima \(9 u grupi\)/)).toBeVisible()
-      // Four module tab buttons labeled M1..M4
+      // Four module tab buttons, one per Modul 1..4. Galerija renders a
+      // parallel set with (0) counts — moduleTabButton scopes to the
+      // enrollment panel.
       for (let i = 1; i <= 4; i++) {
-        await expect(page.getByRole('button', { name: new RegExp(`^M${i}`) })).toBeVisible()
+        await expect(moduleTabButton(page, i)).toBeVisible()
       }
     })
 
@@ -342,9 +371,8 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       await expect(page.getByText(/9\/10/).first()).toBeVisible()
       await expect(page.getByText(/1 slobodnih/).first()).toBeVisible()
 
-      // Active tab should have the green dot indicator on the M2 button
-      const m2Btn = page.getByRole('button', { name: /^M2/ })
-      await expect(m2Btn).toBeVisible()
+      // Active tab should have the green dot indicator on the Modul 2 button
+      await expect(moduleTabButton(page, 2)).toBeVisible()
     })
 
     test('E9 — removing one student from the active module reduces its used count', async ({
@@ -354,8 +382,8 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       await loginAsAdmin(page)
       await page.goto(groupDetailUrl)
 
-      // Open M2 (already Aktivan from previous test)
-      await page.getByRole('button', { name: /^M2/ }).click()
+      // Open Modul 2 (already Aktivan from previous test)
+      await moduleTabButton(page, 2).click()
 
       // Locate the student row by its Link — ModuleEnrollmentPanel renders
       // each enrolled student as a Link inside a row div, followed by the
@@ -403,8 +431,8 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       test.setTimeout(60000)
       await loginAsAdmin(page)
       await page.goto(groupDetailUrl)
-      // Open M2 (Aktivan)
-      await page.getByRole('button', { name: /^M2/ }).click()
+      // Open Modul 2 (Aktivan)
+      await moduleTabButton(page, 2).click()
 
       // Since each student was enrolled in all 4 modules, "Sljedeći" should be
       // HIDDEN for any student who already has M3. We verify that the M2 tab

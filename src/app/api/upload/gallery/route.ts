@@ -69,7 +69,7 @@ export async function POST(req: Request) {
       },
       (err: UploadApiErrorResponse | undefined, res: UploadApiResponse | undefined) => {
         if (err) {
-          reject(err instanceof Error ? err : new Error(err.message ?? 'Cloudinary upload failed'))
+          reject(new Error(err.message ?? 'Cloudinary upload failed'))
         } else if (res) {
           resolve(res)
         } else {

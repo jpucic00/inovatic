@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 6 — Admin Dashboard + Inquiry Management
@@ -55,38 +56,42 @@ const INQUIRY_TO_DELETE = {
 async function submitInquiry(page: Page, data: typeof INQUIRY_MAIN) {
   await page.goto(`${BASE}/upisi`)
 
-  // Step 1 — parent info
+  // Step 1 — parent info; clickUntilVisible retries the Dalje click in case
+  // the dev-server-warmed page hasn't hydrated yet when the click arrives.
   await page.locator('#parentName').fill(data.parentName)
   await page.locator('#parentEmail').fill(data.parentEmail)
   await page.locator('#parentPhone').fill(data.parentPhone)
-  await page.locator('button', { hasText: 'Dalje' }).click()
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Dalje' }),
+    page.locator('#childFirstName'),
+  )
 
-  // Step 2 — child info (wait for step to render)
-  await expect(page.locator('#childFirstName')).toBeVisible()
+  // Step 2 — child info
   await page.locator('#childFirstName').fill(data.childFirstName)
   await page.locator('#childLastName').fill(data.childLastName)
   await page.locator('#dob-day').selectOption(data.dobDay)
   await page.locator('#dob-month').selectOption(data.dobMonth)
   await page.locator('#dob-year').selectOption(data.dobYear)
-  await page.locator('button', { hasText: 'Dalje' }).click()
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Dalje' }),
+    page.locator('input[name="consent"]'),
+  )
 
-  // Step 3 — grade, consent + submit (wait for step to render)
-  await expect(page.locator('input[name="consent"]')).toBeVisible()
+  // Step 3 — grade, consent + submit
   await page.locator('select[name="grade"]').selectOption('3')
   await page.locator('input[name="consent"]').check()
-  await page.locator('button', { hasText: 'Pošalji upit' }).click()
-
-  await expect(page.locator('text=Upit je poslan!')).toBeVisible({ timeout: 15000 })
+  await clickUntilVisible(
+    page.locator('button', { hasText: 'Pošalji upit' }),
+    page.locator('text=Upit je poslan!'),
+    { timeout: 30000 },
+  )
 }
 
 async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/prijava`)
   await page.locator('#identifier').fill(ADMIN_EMAIL)
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await page.locator('button[type="submit"]').click()
-  // 30s tolerates the Next.js dev server on-demand-compiling /admin when
-  // multiple workers hit the login flow simultaneously.
-  await page.waitForURL(`${BASE}/admin`, { timeout: 30000 })
+  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
   await page.waitForLoadState('networkidle')
 }
 
