@@ -52,6 +52,8 @@ flowchart LR
         R3[createStudentManually with group + modules]
         R4[addEnrollment on existing student]
         R5[addModuleEnrollment - standard course only]
+        R1_TX["$transaction Serializable<br/>P2034 retried once<br/>second P2034 returns 'Pokusajte ponovno.'<br/>GroupFullError returns GROUP_FULL"]
+        R1 -.-> R1_TX
     end
 
     subgraph "Count decreases - spot freed"
@@ -67,6 +69,7 @@ flowchart LR
     style R3 fill:#fee2e2
     style R4 fill:#fee2e2
     style R5 fill:#fee2e2
+    style R1_TX fill:#fef3c7
     style F1 fill:#d1fae5
     style F2 fill:#d1fae5
     style F3 fill:#d1fae5

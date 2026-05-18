@@ -70,6 +70,23 @@ flowchart LR
 | `true` (radionica) | Single group-wide gallery | Must be `null` (radionica has no modules) | `Radionica nema module — galerija je grupna.` |
 | `false` (standard) | One gallery per module | Must be non-null AND belong to `course.modules` | `Standardni program zahtijeva modul.` / `Modul ne pripada ovom programu.` |
 
+## Deletion rules
+
+`deleteGroup` refuses to delete a group that still has any rows in `GalleryImage`. Admins must clear the gallery first. The check uses Prisma `_count.galleryImages` against zero before any cascade fires.
+
+```mermaid
+flowchart TD
+    A[deleteGroup called] --> B["Fetch ScheduledGroup with _count.galleryImages"]
+    B --> C{galleryImages count > 0?}
+    C -->|Yes| BLOCK["Return error:<br/>'Grupa ima slike u galeriji i ne moze se obrisati.'"]
+    C -->|No| OK[Proceed with delete cascade]
+
+    style BLOCK fill:#fee2e2
+    style OK fill:#d1fae5
+```
+
+> Source: `deleteGroup` in `src/actions/admin/group.ts:274`. The guard prevents orphan Cloudinary assets — Prisma `onDelete: Cascade` would drop the `GalleryImage` rows but the underlying remote files would leak because Cloudinary cleanup runs at the action layer, not via DB trigger. The Croatian error string above uses ASCII inside the mermaid label; the production error preserves the č: `Grupa ima slike u galeriji i ne može se obrisati.`
+
 ## Why no DB `CHECK` constraint
 
 A row-local `CHECK` on `GalleryImage` can only reference its own columns. Whether `moduleId` is required depends on `Course.isCustom`, which sits two FK hops away (`GalleryImage.scheduledGroupId → ScheduledGroup.courseId → Course.isCustom`). PostgreSQL `CHECK` constraints can't traverse FKs. The two enforceable alternatives were:

@@ -30,10 +30,19 @@ sequenceDiagram
     Note right of Action: invalid → 'Podaci nisu valjani.'
 
     Action->>Auth: signIn('credentials', { redirect: false })
+    Auth->>Auth: Zod parse — z.string().email().safeParse(identifier)
+    Note right of Auth: success → lookup by email<br/>fail → lookup by username
+    Auth->>DB: findUnique by chosen field (select includes deletedAt)
+    DB-->>Auth: { passwordHash, role, deletedAt } or null
+    alt user missing or user.deletedAt is set
+        Auth-->>Action: return null → AuthError
+    end
+    Auth->>Auth: bcrypt compare password vs passwordHash
     Auth-->>Action: ok or AuthError
     Note right of Action: AuthError → 'Pogrešno korisničko ime ili lozinka.'
+    Note over Auth,DB: JWT callback re-checks deletedAt on every refresh (max 60s TTL) per src/lib/auth.ts:65-67
 
-    Action->>DB: findUnique by email or username
+    Action->>DB: findUnique by email or username (re-fetch role for routing)
     DB-->>Action: { role }
     Note right of Action: missing row → same error string<br/>(don't leak which field was wrong)
 
@@ -44,7 +53,7 @@ sequenceDiagram
     Form->>Router: router.refresh()
 ```
 
-> Sources: `src/actions/login.ts:14-41` (server action), `src/components/auth/login-form.tsx:30-44` (client switch).
+> Sources: `src/actions/login.ts:14-41` (server action), `src/components/auth/login-form.tsx:30-44` (client switch), `src/lib/auth.ts:17-33` (authorize callback: Zod email parse + deletedAt rejection), `src/lib/auth.ts:48-75` (JWT callback re-check on refresh).
 
 ## Subsequent requests — edge middleware
 

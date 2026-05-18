@@ -106,6 +106,7 @@ erDiagram
         string parentPhone "nullable - migrated from Inquiry"
         string childSchool "nullable - migrated from Inquiry"
         datetime gdprConsentAt "nullable"
+        datetime deletedAt "nullable - soft-delete for teachers (migration 20260513101212)"
     }
 
     Enrollment {

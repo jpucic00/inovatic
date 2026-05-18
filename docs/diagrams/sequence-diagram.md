@@ -26,6 +26,11 @@ sequenceDiagram
     Server->>Server: Create Inquiry status NEW consentGivenAt now
 
     alt scheduledGroupId provided
+        rect rgb(255, 243, 199)
+            Note over Server: $transaction (isolationLevel Serializable)
+            Server->>Server: assertGroupHasAvailableSpot then create Inquiry
+            Note right of Server: P2034 serialization failure retried once. Second P2034 returns "Pokusajte ponovno.". GroupFullError returns code GROUP_FULL with fresh programs.
+        end
         Server->>Server: Spot reserved immediately via preferredInquiries count
     end
 

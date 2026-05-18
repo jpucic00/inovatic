@@ -61,12 +61,14 @@ sequenceDiagram
     Server->>Server: Zod validation (bulkMarkSessionSchema)
     Server->>Server: assertTeacherOwnsGroup(groupId) — ADMIN bypasses
 
-    Server->>DB: Fetch group.schoolYear
-    Server->>DB: Verify all enrollmentIds belong to this group + schoolYear
-    Note right of Server: If count mismatch → error "Neki upisi ne pripadaju ovoj grupi"
-
-    Server->>DB: Transaction: upsert Attendance for each entry
-    Note right of DB: Upsert key: (enrollmentId, sessionDate). Sets present, note, recordedById.
+    rect rgb(224, 242, 254)
+        Note over Server,DB: $transaction (isolationLevel Serializable)
+        Server->>DB: Fetch group.schoolYear
+        Server->>DB: Verify all enrollmentIds belong to this group + schoolYear
+        Note right of Server: If count mismatch → throw ENROLLMENT_MISMATCH (rolls back transaction)
+        Server->>DB: Upsert Attendance for each entry
+        Note right of DB: Upsert key: (enrollmentId, sessionDate). Sets present, note, recordedById.
+    end
 
     Server-->>UI: Success
     UI->>UI: Toast confirmation
