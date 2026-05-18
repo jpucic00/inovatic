@@ -10,7 +10,7 @@ const ALLOWED_ROLES = new Set<UserRole>(['STUDENT', 'TEACHER', 'ADMIN'])
 const PROXY_PREFIX = '/api/proxy/elearning'
 const MAX_PATH_DEPTH = 20
 const BAD_SEGMENT = /\\/
-const NUL_BYTE = String.fromCharCode(0)
+const NUL_BYTE = String.fromCodePoint(0)
 
 const STRIP_HEADERS = [
   'x-frame-options',
