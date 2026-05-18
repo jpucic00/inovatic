@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
+import { v2 as cloudinarySdk } from 'cloudinary'
 import { submitUntilUrl } from './hydration'
 
 export const BASE = 'http://localhost:3000'
@@ -224,6 +225,50 @@ export async function addLinkMaterial(
   await dialog.getByRole('button', { name: 'Spremi' }).click()
   await expect(dialog).toBeHidden({ timeout: 10000 })
   await expect(page.getByText(title)).toBeVisible({ timeout: 15000 })
+}
+
+let cloudinaryConfigured = false
+function configureCloudinaryOnce() {
+  if (cloudinaryConfigured) return
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME
+  const key = process.env.CLOUDINARY_API_KEY
+  const secret = process.env.CLOUDINARY_API_SECRET
+  if (!cloud || !key || !secret) {
+    throw new Error('cloudinaryAssetStatus: CLOUDINARY_* env vars missing')
+  }
+  cloudinarySdk.config({ cloud_name: cloud, api_key: key, api_secret: secret })
+  cloudinaryConfigured = true
+}
+
+/**
+ * Hit Cloudinary's Admin API (NOT the CDN) to check whether an uploaded
+ * asset still exists. Used as a deterministic alternative to polling the
+ * CDN — the Admin API queries Cloudinary's metadata DB, so a destroy()
+ * reflects ~1-3s after the fire-and-forget cleanup kicks off in
+ * src/actions/material/crud.ts:160 with no CDN propagation delay.
+ *
+ * Returns the HTTP status: 200 if the asset exists, 404 if destroyed.
+ * Throws if Cloudinary creds aren't configured — call sites should check
+ * env presence and test.skip() rather than fail noisily.
+ *
+ * Uses the cloudinary SDK rather than a hand-rolled fetch so we don't have
+ * to wrangle URL encoding for publicIds that contain folder slashes.
+ */
+export async function cloudinaryAssetStatus(
+  publicId: string,
+  resourceType: 'image' | 'raw' | 'video',
+): Promise<number> {
+  configureCloudinaryOnce()
+  try {
+    await cloudinarySdk.api.resource(publicId, { resource_type: resourceType })
+    return 200
+  } catch (err: unknown) {
+    const httpCode =
+      (err as { error?: { http_code?: number } }).error?.http_code ??
+      (err as { http_code?: number }).http_code
+    if (httpCode === 404) return 404
+    throw err
+  }
 }
 
 export async function markSession(page: Page, groupId: string, date: string) {

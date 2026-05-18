@@ -1,4 +1,12 @@
 import { defineConfig } from '@playwright/test'
+import { config as loadEnv } from 'dotenv'
+
+// Next.js auto-loads .env.local for the dev server, but the Playwright
+// runner is a separate Node process that doesn't. Some specs (e.g. the
+// I8 Cloudinary deletion assertion in tests/phase3/24-materials.spec.ts)
+// need CLOUDINARY_* creds to hit the Admin API directly.
+loadEnv({ path: '.env.local' })
+loadEnv({ path: '.env', override: false })
 
 export default defineConfig({
   testDir: './tests',

@@ -8,6 +8,7 @@ import {
   assignTeacherToGroup,
   createStudentInGroup,
   addLinkMaterial,
+  cloudinaryAssetStatus,
   type TeacherData,
   type StudentData,
 } from '../helpers/phase3'
@@ -242,6 +243,13 @@ test.describe('Phase 3 Step 13 — Materials', () => {
     if (!seeded) throw new Error('not seeded')
     test.setTimeout(120000)
 
+    test.skip(
+      !process.env.CLOUDINARY_CLOUD_NAME ||
+        !process.env.CLOUDINARY_API_KEY ||
+        !process.env.CLOUDINARY_API_SECRET,
+      'Cloudinary creds missing — skipping authoritative deletion check',
+    )
+
     await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
     await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
     await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
@@ -274,18 +282,28 @@ test.describe('Phase 3 Step 13 — Materials', () => {
         resp.request().method() === 'POST',
       { timeout: 60000 },
     )
+    // setInputFiles fires the change event natively (Playwright docs).
+    // Don't dispatchEvent again — that would call the React onChange a
+    // second time and trigger a second /api/upload/materials POST. The
+    // test would then capture the first response's publicId while the
+    // dialog state ended up with the second response's URL, so the
+    // action would destroy the second URL while the assertion polled
+    // for the first.
     await addFileInput.setInputFiles({
       name: 'first.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('first content for updateMaterial cleanup test'),
     })
-    await addFileInput.evaluate((el) =>
-      el.dispatchEvent(new Event('change', { bubbles: true })),
-    )
     const firstResp = await firstUploadDone
     expect(firstResp.status(), 'initial upload route returned non-200').toBe(200)
-    const firstJson = (await firstResp.json()) as { url: string }
+    const firstJson = (await firstResp.json()) as {
+      url: string
+      publicId: string
+      resourceType: 'image' | 'raw' | 'video'
+    }
     const originalFileUrl = firstJson.url
+    const originalPublicId = firstJson.publicId
+    const originalResourceType = firstJson.resourceType
     expect(originalFileUrl).toContain('res.cloudinary.com')
 
     await addDialog.getByRole('button', { name: 'Spremi' }).click()
@@ -317,37 +335,62 @@ test.describe('Phase 3 Step 13 — Materials', () => {
         resp.request().method() === 'POST',
       { timeout: 60000 },
     )
+    // See comment on the first setInputFiles call — no manual dispatchEvent.
     await editFileInput.setInputFiles({
       name: 'second.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('second content — replacement file for cleanup test'),
     })
-    await editFileInput.evaluate((el) =>
-      el.dispatchEvent(new Event('change', { bubbles: true })),
-    )
     const secondResp = await secondUploadDone
     expect(secondResp.status(), 'replacement upload route returned non-200').toBe(200)
-    const secondJson = (await secondResp.json()) as { url: string }
+    const secondJson = (await secondResp.json()) as {
+      url: string
+      publicId: string
+      resourceType: 'image' | 'raw' | 'video'
+    }
     const newFileUrl = secondJson.url
+    const newPublicId = secondJson.publicId
+    const newResourceType = secondJson.resourceType
     expect(newFileUrl).toContain('res.cloudinary.com')
     expect(newFileUrl, 'replacement URL must differ from original').not.toBe(originalFileUrl)
+
+    // Wait for the dialog's success indicator (<p class="text-emerald-700">)
+    // before clicking Spremi. The upload response lands before React commits
+    // setNewFileUrl, so without this guard the click can race a stale
+    // handleSubmit closure where newFileUrl is still null — updateMaterial
+    // then runs WITHOUT a fileUrl change, replacingFile stays false, and
+    // destroy never fires (the bug that caused this test to flake under
+    // suite load). page.waitForFunction polls the live DOM, so it's robust
+    // to whatever Playwright text-normalization quirk made the prior
+    // getByText(/✓\s+second\.txt/) approach time out.
+    await page.waitForFunction(
+      () =>
+        !!document.querySelector('[role="dialog"] p.text-emerald-700'),
+      null,
+      { timeout: 15000, polling: 100 },
+    )
 
     await editDialog.getByRole('button', { name: 'Spremi' }).click()
     await expect(editDialog).toBeHidden({ timeout: 15000 })
 
-    // ── 3. Old Cloudinary asset must be gone (best-effort destroy is async,
-    //       so we poll). New asset must still be reachable. Cloudinary EU
-    //       deletion + CDN invalidation can take 30-60s; widen the window so
-    //       the test isn't flaky under normal Cloudinary latency. ────────────
+    // ── 3. Old Cloudinary asset must be gone. The action fires destroy() as
+    //       fire-and-forget (crud.ts:160), so we poll Cloudinary's Admin API
+    //       (NOT the CDN — CDN edge caches stale 200s for 30-60s and made
+    //       this test flaky historically). Admin API queries the metadata
+    //       DB synchronously: it returns 404 the instant destroy() completes
+    //       server-side, typically within 1-3s. We use the canonical publicId
+    //       returned by /api/upload/materials rather than re-parsing the
+    //       delivery URL, so this assertion is independent of any quirks in
+    //       publicIdFromUrl (src/lib/cloudinary-url.ts:9). ──────────────────
     await expect
       .poll(
-        async () => (await page.request.head(originalFileUrl)).status(),
-        { timeout: 60000, intervals: [2000, 3000, 5000, 8000] },
+        () => cloudinaryAssetStatus(originalPublicId, originalResourceType),
+        { timeout: 30000, intervals: [500, 1000, 2000] },
       )
-      .not.toBe(200)
+      .toBe(404)
 
-    const newStatus = (await page.request.head(newFileUrl)).status()
-    expect(newStatus, 'replacement asset must still be reachable').toBe(200)
+    const newStatus = await cloudinaryAssetStatus(newPublicId, newResourceType)
+    expect(newStatus, 'replacement asset must still exist').toBe(200)
 
     // ── 4. Cleanup: delete the material so the replacement asset doesn't leak
     page.on('dialog', (d) => d.accept())
