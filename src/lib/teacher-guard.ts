@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import type { Session } from 'next-auth'
 import { db } from '@/lib/db'
 import { requireTeacher } from '@/lib/auth-guard'
@@ -18,6 +18,14 @@ export async function assertTeacherOwnsGroup(groupId: string): Promise<{
 }> {
   const session = await requireTeacher()
   const isAdmin = session.user.role === 'ADMIN'
+
+  // Belt-and-suspenders: the jwt callback re-validates every 60s, but this
+  // closes the window for group-scoped actions where mutations land.
+  const caller = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { deletedAt: true },
+  })
+  if (!caller || caller.deletedAt) redirect('/prijava')
 
   const group = await db.scheduledGroup.findUnique({
     where: { id: groupId },

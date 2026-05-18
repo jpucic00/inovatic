@@ -45,12 +45,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt: ({ token, user }) => {
+    jwt: async ({ token, user }) => {
+      // `user` is only set on initial login; subsequent requests hit the TTL
+      // branch below. checkedAt persists across requests via the JWT cookie.
       if (user) {
         token.id = user.id as string
         token.role = (user as { role: UserRole }).role
+        token.checkedAt = Date.now()
+        return token
       }
-      return token
+      const TTL_MS = 60_000
+      const checkedAt = (token.checkedAt as number | undefined) ?? 0
+      if (Date.now() - checkedAt < TTL_MS) return token
+      const userId = token.id as string | undefined
+      if (!userId) return null
+      try {
+        const dbUser = await db.user.findUnique({
+          where: { id: userId },
+          select: { deletedAt: true, role: true },
+        })
+        if (!dbUser || dbUser.deletedAt) return null
+        token.role = dbUser.role
+        token.checkedAt = Date.now()
+        return token
+      } catch (err) {
+        console.error('jwt callback DB check failed:', err)
+        return null
+      }
     },
     session: ({ session, token }) => {
       session.user.id = token.id as string
