@@ -163,8 +163,7 @@ async function handler(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
-  const session = (await auth()) as Session | null
-  const authError = authorize(session)
+  const authError = authorize(await auth())
   if (authError) return authError
 
   const { path } = await params
