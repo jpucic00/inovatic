@@ -4,9 +4,10 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { db } from './db'
 import type { UserRole } from '@prisma/client'
+import { authConfig } from './auth.config'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  session: { strategy: 'jwt' },
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -45,6 +46,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    ...authConfig.callbacks,
     jwt: async ({ token, user }) => {
       // `user` is only set on initial login; subsequent requests hit the TTL
       // branch below. checkedAt persists across requests via the JWT cookie.
@@ -69,17 +71,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.checkedAt = Date.now()
         return token
       } catch (err) {
+        // Transient DB error (e.g. Neon cold start): keep the existing
+        // session and re-check on the next 60s cycle. Only a definitive
+        // "user gone / soft-deleted" result above invalidates the session.
         console.error('jwt callback DB check failed:', err)
-        return null
+        return token
       }
     },
-    session: ({ session, token }) => {
-      session.user.id = token.id as string
-      session.user.role = token.role as UserRole
-      return session
-    },
-  },
-  pages: {
-    signIn: '/prijava',
   },
 })
