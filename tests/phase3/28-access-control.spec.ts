@@ -3,10 +3,11 @@ import { BASE, loginAsAdmin, loginWithEmail, createTeacher, type TeacherData } f
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Phase 3 — Access-control DOM redirect-flow slice (Flux a69o3ew slim).
-// The 10 headless ACs (API role rejection, requireXxx guard bounces, teacher
-// 404 on others' group, server-action authz, etc.) live at
-// tests/integration/api/access-control.test.ts. This file keeps the 5 tests
-// that exercise the actual browser-side redirect + login-form rendering:
+// The headless ACs (API role rejection, requireXxx guard bounces, teacher
+// 404 on others' group) live at tests/integration/api/access-control.test.ts;
+// the createTeacherComment / deleteTeacherComment server-action authz lives
+// at tests/integration/api/teacher-comment.test.ts. This file keeps the 5
+// tests that exercise the actual browser-side redirect + login-form rendering:
 //   1. unauth /portal redirects to /prijava (full DOM nav)
 //   2. unauth /admin redirects to /prijava (full DOM nav)
 //   3. unauth /nastavnik redirects to /prijava (full DOM nav)
