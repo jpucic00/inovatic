@@ -1,6 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
+import { computeAvailableSpots } from '@/lib/available-spots'
 import { computeSchoolYear } from '@/lib/school-year'
 
 export type ActiveGroup = {
@@ -66,8 +67,10 @@ function toActiveGroup(g: GroupRow, now: Date): ActiveGroup | null {
       ).length
     : g.enrollments.length
 
-  const available = g.maxStudents - enrolledCount - g._count.preferredInquiries
-  const isFull = available <= 0
+  const availableSpots = computeAvailableSpots(
+    g.maxStudents,
+    enrolledCount + g._count.preferredInquiries,
+  )
 
   return {
     id: g.id,
@@ -75,8 +78,8 @@ function toActiveGroup(g: GroupRow, now: Date): ActiveGroup | null {
     dayOfWeek: g.dayOfWeek,
     startTime: g.startTime,
     endTime: g.endTime,
-    availableSpots: Math.max(0, available),
-    isFull,
+    availableSpots,
+    isFull: availableSpots === 0,
     ...(enrollingModuleTitle ? { currentModuleName: enrollingModuleTitle } : {}),
   }
 }

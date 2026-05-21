@@ -7,11 +7,27 @@ import {
   pickStandardGroupId,
   createTeacher,
   assignTeacherToGroup,
-  createStudentInGroup,
   expectNotFoundPage,
   type TeacherData,
   type StudentData,
 } from '../helpers/phase3'
+import {
+  seedTeacher,
+  seedTeacherAssignment,
+  seedStudentInGroup,
+} from '../helpers/seed'
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Phase 3 — Gallery (consolidated)
+// 13 tests collapsed to 8:
+//   - Lifecycle merge: upload → admin sees → student sees (read-only) →
+//     teacher deletes → student no longer sees (was 3 separate tests + the
+//     Galerija-tab visibility check)
+//   - Scope-validation merge: standard requires moduleId + radionica forbids
+//     moduleId + radionica-no-moduleId happy path (was 3 separate tests)
+// Each merged test uses test.step() blocks; descriptive `expect(..., 'why')`
+// labels added.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const RUN_ID = Date.now().toString().slice(-6)
 const SAMPLE_PNG = path.resolve(__dirname, '../fixtures/sample.png')
@@ -51,89 +67,124 @@ type ScopeSeeded = {
 }
 let scopeSeeded: ScopeSeeded | null = null
 
+const HYDRATION_WAIT = (el: HTMLElement) =>
+  new Promise<void>((resolve) => {
+    const check = () => {
+      if (Object.keys(el).some((k) => k.startsWith('__reactProps$'))) resolve()
+      else setTimeout(check, 50)
+    }
+    check()
+  })
+
 test.describe.configure({ mode: 'serial' })
 
 test.describe('Phase 3 — Gallery', () => {
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(240000)
-    const page = await browser.newPage()
-    await loginAsAdmin(page)
-    const groupId = pickStandardGroupId(page)
-    const t = await createTeacher(page, TEACHER)
-    await assignTeacherToGroup(page, t.teacherId, groupId)
-    const s = await createStudentInGroup(page, groupId, STUDENT)
+  test.beforeAll(async () => {
+    // Direct-Prisma seeding (Flux lu3f9sh).
+    const groupId = pickStandardGroupId()
+    const t = await seedTeacher(TEACHER)
+    await seedTeacherAssignment(t.teacherId, groupId)
+    const s = await seedStudentInGroup(groupId, STUDENT)
     seeded = {
       teacher: { email: TEACHER.email, password: t.password, teacherId: t.teacherId },
       student: { email: `${s.username}@student.inovatic.local`, password: s.password },
       groupId,
     }
-    await page.close()
   })
 
-  test('teacher group page surfaces a Galerija tab', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}`)
-    await expect(page.getByRole('link', { name: 'Galerija' })).toBeVisible()
-  })
-
-  test('teacher uploads a PNG via the gallery upload zone — appears on student portal', async ({
+  // Lifecycle merge — original tests 2 + 5 + 9 (+ implicit Galerija tab
+  // visibility check from old test 1 covered by the navigate step).
+  test('lifecycle: teacher uploads → student/admin see → teacher deletes → student loses access', async ({
     page,
   }) => {
     if (!seeded) throw new Error('not seeded')
-    test.setTimeout(120000)
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/galerija`)
+    test.setTimeout(180000)
 
-    const fileInput = page.locator('input[type="file"][id^="gallery-upload-"]').first()
-    await fileInput.waitFor({ state: 'attached', timeout: 5000 })
+    await test.step('Teacher uploads a PNG via the gallery upload zone', async () => {
+      await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await page.goto(`${BASE}/nastavnik/grupa/${seeded!.groupId}/galerija`)
+      await expect(
+        page.getByRole('link', { name: 'Galerija' }),
+        'Galerija tab is present in the teacher group nav',
+      ).toBeVisible()
 
-    // Wait until React has hydrated the input — without this, setInputFiles fires
-    // a native change event that no handler catches yet. We check for React's
-    // internal __reactProps$ key on the DOM node, which only appears post-hydration.
-    await fileInput.evaluate((el) =>
-      new Promise<void>((resolve) => {
-        const check = () => {
-          if (Object.keys(el).some((k) => k.startsWith('__reactProps$'))) resolve()
-          else setTimeout(check, 50)
-        }
-        check()
-      }),
-    )
+      const fileInput = page.locator('input[type="file"][id^="gallery-upload-"]').first()
+      await fileInput.waitFor({ state: 'attached', timeout: 5000 })
+      await fileInput.evaluate(HYDRATION_WAIT)
 
-    // Decouple Cloudinary upload latency from the visibility assertion: wait for
-    // /api/upload/gallery to return before checking the DOM. Under /validate's
-    // back-to-back-suite environment Cloudinary EU can take 15-25s, eating the
-    // 30s budget before router.refresh() repaints the grid.
-    const uploadDone = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/upload/gallery') &&
-        resp.request().method() === 'POST',
-      { timeout: 60000 },
-    )
-    await fileInput.setInputFiles(SAMPLE_PNG)
-    // Belt-and-braces: re-dispatch change in case Playwright's native event
-    // arrived during a hydration micro-task window. Mirrors helpers/phase3.ts:236.
-    await fileInput.evaluate((el) =>
-      el.dispatchEvent(new Event('change', { bubbles: true })),
-    )
-    const uploadResp = await uploadDone
-    expect(uploadResp.status(), 'gallery upload route returned non-200').toBe(200)
+      const uploadDone = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/api/upload/gallery') &&
+          resp.request().method() === 'POST',
+        { timeout: 60000 },
+      )
+      await fileInput.setInputFiles(SAMPLE_PNG)
+      await fileInput.evaluate((el) =>
+        el.dispatchEvent(new Event('change', { bubbles: true })),
+      )
+      const uploadResp = await uploadDone
+      expect(uploadResp.status(), 'gallery upload route returned 200').toBe(200)
+      await expect(
+        page.locator('button[aria-label="Otvori sliku"]').first(),
+        'thumbnail appears in teacher gallery grid after upload',
+      ).toBeVisible({ timeout: 30000 })
+    })
 
-    await expect(
-      page.locator('button[aria-label="Otvori sliku"]').first(),
-    ).toBeVisible({ timeout: 30000 })
+    await test.step('Student sees the image read-only on /portal (no delete affordance)', async () => {
+      await loginWithEmail(page, seeded!.student.email, seeded!.student.password)
+      await page.waitForURL(/\/portal/, { timeout: 30000 })
+      await page.waitForLoadState('domcontentloaded')
+      await page.goto(`${BASE}/portal/grupa/${seeded!.groupId}/galerija`)
+      await expect(
+        page.locator('button[aria-label="Otvori sliku"]').first(),
+        'student sees the uploaded thumbnail',
+      ).toBeVisible({ timeout: 10000 })
+      await expect(
+        page.locator('button[aria-label="Obriši sliku"]'),
+        'student has NO delete affordance',
+      ).toHaveCount(0)
+    })
 
-    await loginWithEmail(page, seeded.student.email, seeded.student.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
-    await page.waitForLoadState('domcontentloaded')
-    await page.goto(`${BASE}/portal/grupa/${seeded.groupId}/galerija`)
-    await expect(
-      page.locator('button[aria-label="Otvori sliku"]').first(),
-    ).toBeVisible({ timeout: 10000 })
-    await expect(page.locator('button[aria-label="Obriši sliku"]')).toHaveCount(0)
+    await test.step('Admin /admin/grupe/<id> renders the Galerija panel with the image', async () => {
+      await loginAsAdmin(page)
+      await page.goto(`${BASE}/admin/grupe/${seeded!.groupId}`, { waitUntil: 'domcontentloaded' })
+      await expect(
+        page.getByRole('heading', { name: 'Galerija' }),
+        'admin Galerija panel heading is visible',
+      ).toBeVisible({ timeout: 30000 })
+      await expect(
+        page.locator('button[aria-label="Otvori sliku"]').first(),
+        'admin Galerija panel shows the uploaded thumbnail',
+      ).toBeVisible({ timeout: 10000 })
+    })
+
+    await test.step('Teacher deletes the image; student no longer sees it', async () => {
+      await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await page.goto(`${BASE}/nastavnik/grupa/${seeded!.groupId}/galerija`)
+
+      page.on('dialog', (d) => d.accept())
+      const firstThumb = page.locator('button[aria-label="Otvori sliku"]').first()
+      await firstThumb.waitFor({ state: 'visible', timeout: 10000 })
+      const deleteBtn = page.locator('button[aria-label="Obriši sliku"]').first()
+      await firstThumb.hover()
+      await deleteBtn.waitFor({ state: 'visible', timeout: 5000 })
+      await deleteBtn.click()
+
+      await expect(
+        page.locator('button[aria-label="Otvori sliku"]'),
+        'teacher gallery is empty after delete',
+      ).toHaveCount(0, { timeout: 10000 })
+
+      await loginWithEmail(page, seeded!.student.email, seeded!.student.password)
+      await page.waitForURL(/\/portal/, { timeout: 30000 })
+      await page.goto(`${BASE}/portal/grupa/${seeded!.groupId}/galerija`)
+      await expect(
+        page.locator('button[aria-label="Otvori sliku"]'),
+        'student gallery is empty after teacher deletes',
+      ).toHaveCount(0)
+    })
   })
 
   test('teacher in a different group → 404 on /nastavnik/grupa/<unknown>/galerija', async ({
@@ -154,19 +205,6 @@ test.describe('Phase 3 — Gallery', () => {
     await page.goto(`${BASE}/portal/grupa/does-not-exist-${RUN_ID}/galerija`)
     await expectNotFoundPage(page)
     await expect(page.locator('img[src*="cloudinary"]')).toHaveCount(0)
-  })
-
-  test('admin /admin/grupe/<id> renders the Galerija panel with the uploaded image', async ({
-    page,
-  }) => {
-    if (!seeded) throw new Error('not seeded')
-    test.setTimeout(120000)
-    await loginAsAdmin(page)
-    await page.goto(`${BASE}/admin/grupe/${seeded.groupId}`, { waitUntil: 'domcontentloaded' })
-    await expect(page.getByRole('heading', { name: 'Galerija' })).toBeVisible({ timeout: 30000 })
-    await expect(
-      page.locator('button[aria-label="Otvori sliku"]').first(),
-    ).toBeVisible({ timeout: 10000 })
   })
 
   test('/api/upload/gallery rejects unauthenticated → 401', async ({ browser }) => {
@@ -211,45 +249,12 @@ test.describe('Phase 3 — Gallery', () => {
     expect(status).toBe(415)
   })
 
-  // ── W4 fix: Use aria-label selector instead of parent traversal ────────────
-
-  test('teacher deletes the uploaded gallery image — student no longer sees it', async ({
-    page,
-  }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/galerija`)
-
-    page.on('dialog', (d) => d.accept())
-    const firstThumb = page.locator('button[aria-label="Otvori sliku"]').first()
-    await firstThumb.waitFor({ state: 'visible', timeout: 10000 })
-    // Find the delete button as a sibling within the same gallery grid area
-    const deleteBtn = page.locator('button[aria-label="Obriši sliku"]').first()
-    // Hover the thumbnail area to reveal the delete button
-    await firstThumb.hover()
-    await deleteBtn.waitFor({ state: 'visible', timeout: 5000 })
-    await deleteBtn.click()
-
-    await expect(page.locator('button[aria-label="Otvori sliku"]')).toHaveCount(0, {
-      timeout: 10000,
-    })
-
-    await loginWithEmail(page, seeded.student.email, seeded.student.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
-    await page.goto(`${BASE}/portal/grupa/${seeded.groupId}/galerija`)
-    await expect(page.locator('button[aria-label="Otvori sliku"]')).toHaveCount(0)
-  })
-
-  // ── C7: Gallery upload file size limit ─────────────────────────────────────
-
   test('/api/upload/gallery rejects files exceeding 10 MB limit → 413', async ({ page }) => {
     if (!seeded) throw new Error('not seeded')
     await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
     await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
 
     const result = await page.evaluate(async () => {
-      // Create an 11 MB blob (exceeds the 10 MB limit)
       const size = 11 * 1024 * 1024
       const blob = new Blob([new ArrayBuffer(size)], { type: 'image/png' })
       const form = new FormData()
@@ -274,7 +279,7 @@ test.describe('Gallery — scope validation', () => {
     await page.getByRole('button', { name: 'Nova radionica' }).click()
     await page.fill('#course-title', `Scope radionica ${RUN_ID}`)
     await page.fill('#course-description', 'Scope test description')
-    await page.fill('#course-price', '50') // z.coerce.number().positive() rejects empty string
+    await page.fill('#course-price', '50')
     await page.getByRole('button', { name: 'Kreiraj radionicu' }).click()
     await expect(page.getByText('Program kreiran.')).toBeVisible({ timeout: 10000 })
 
@@ -287,7 +292,6 @@ test.describe('Gallery — scope validation', () => {
     await page.locator('#create-locationId').selectOption({ index: 1 })
     await page.fill('#create-name', `ScopeGr ${RUN_ID}`)
 
-    // Radionica: single date field (not dayOfWeek)
     const dateInput = page.locator('#create-date')
     await dateInput.fill('01.09.2025.')
     await dateInput.evaluate((el) => el.dispatchEvent(new Event('blur')))
@@ -308,7 +312,6 @@ test.describe('Gallery — scope validation', () => {
     await page.getByRole('button', { name: 'Kreiraj grupu' }).click()
     await expect(page.getByText('Grupa kreirana.')).toBeVisible({ timeout: 10000 })
 
-    // 3. Navigate to group detail to extract its ID (use ?tab=__radionice__ to skip tab default)
     await page.goto(`${BASE}/admin/grupe?tab=__radionice__`)
     const groupLink = page.getByRole('link', { name: new RegExp(`ScopeGr ${RUN_ID}`) }).first()
     await groupLink.waitFor({ state: 'visible', timeout: 10000 })
@@ -317,7 +320,6 @@ test.describe('Gallery — scope validation', () => {
     const radionicaGroupId = page.url().split('/').pop() ?? ''
     expect(radionicaGroupId.length).toBeGreaterThan(0)
 
-    // 4. Create teacher and assign to radionica group
     const t = await createTeacher(page, SCOPE_TEACHER)
     await assignTeacherToGroup(page, t.teacherId, radionicaGroupId)
 
@@ -328,19 +330,21 @@ test.describe('Gallery — scope validation', () => {
     await page.close()
   })
 
-  test('standard-program upload without moduleId → error', async ({ page }) => {
-    // Admin passes through requireTeacher() — no dependency on outer seeded
-    const stdGroupId = pickStandardGroupId(page)
-    await loginAsAdmin(page)
-    await page.waitForURL(/\/admin/, { timeout: 30000 })
+  test('scope validation: standard requires moduleId, radionica forbids it, radionica-without happy path', async ({ page }) => {
+    if (!scopeSeeded) throw new Error('not scope-seeded')
+    test.setTimeout(240000)
+    const { teacher, radionicaGroupId } = scopeSeeded
 
+    // Stub Cloudinary upload to a deterministic success response for all
+    // scope-validation steps — the assertions are about server-action gating,
+    // not Cloudinary upload behaviour.
     await page.route('**/api/upload/gallery', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          url: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1/scope-std-test.jpg',
-          publicId: `scope/std-${RUN_ID}`,
+          url: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1/scope-test.jpg',
+          publicId: `scope/${RUN_ID}`,
           width: 1,
           height: 1,
           bytes: 100,
@@ -348,11 +352,13 @@ test.describe('Gallery — scope validation', () => {
       }),
     )
 
-    // Intercept the server action POST and null out moduleId
-    // Use regex so it matches the URL even when ?tab=... query param is appended
-    await page.route(
-      new RegExp(`nastavnik/grupa/${stdGroupId}/galerija`),
-      async (route, request) => {
+    await test.step('Standard program: nulled moduleId → "Standardni program zahtijeva modul."', async () => {
+      const stdGroupId = pickStandardGroupId(page)
+      await loginAsAdmin(page)
+      await page.waitForURL(/\/admin/, { timeout: 30000 })
+
+      const stdRoute = new RegExp(`nastavnik/grupa/${stdGroupId}/galerija`)
+      await page.route(stdRoute, async (route, request) => {
         if (request.method() !== 'POST' || !request.headers()['next-action']) {
           await route.continue()
           return
@@ -367,59 +373,35 @@ test.describe('Gallery — scope validation', () => {
         } catch {
           await route.continue()
         }
-      },
-    )
+      })
 
-    await page.goto(`${BASE}/nastavnik/grupa/${stdGroupId}/galerija`)
-    const fileInput = page.locator('input[type="file"][id^="gallery-upload-"]').first()
-    await fileInput.waitFor({ state: 'attached', timeout: 10000 })
-    await fileInput.evaluate((el) =>
-      new Promise<void>((resolve) => {
-        const check = () => {
-          if (Object.keys(el).some((k) => k.startsWith('__reactProps$'))) resolve()
-          else setTimeout(check, 50)
-        }
-        check()
-      }),
-    )
+      await page.goto(`${BASE}/nastavnik/grupa/${stdGroupId}/galerija`)
+      const fileInput = page.locator('input[type="file"][id^="gallery-upload-"]').first()
+      await fileInput.waitFor({ state: 'attached', timeout: 10000 })
+      await fileInput.evaluate(HYDRATION_WAIT)
+      await fileInput.setInputFiles({
+        name: 'test.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      })
+      await fileInput.evaluate((el) =>
+        el.dispatchEvent(new Event('change', { bubbles: true })),
+      )
 
-    await fileInput.setInputFiles({
-      name: 'test.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      await expect(
+        page.getByText('Standardni program zahtijeva modul.'),
+        'standard-program upload without moduleId surfaces the validator error',
+      ).toBeVisible({ timeout: 15000 })
+
+      await page.unroute(stdRoute)
     })
-    await fileInput.evaluate((el) => el.dispatchEvent(new Event('change', { bubbles: true })))
 
-    await expect(
-      page.getByText('Standardni program zahtijeva modul.'),
-    ).toBeVisible({ timeout: 15000 })
-  })
+    await test.step('Radionica: injected moduleId → "Radionica nema module — galerija je grupna."', async () => {
+      await loginWithEmail(page, teacher.email, teacher.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
 
-  test('radionica upload WITH moduleId → error', async ({ page }) => {
-    if (!scopeSeeded) throw new Error('not scope-seeded')
-    const { teacher, radionicaGroupId } = scopeSeeded
-    await loginWithEmail(page, teacher.email, teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-
-    await page.route('**/api/upload/gallery', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          url: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1/scope-rad-test.jpg',
-          publicId: `scope/rad-${RUN_ID}`,
-          width: 1,
-          height: 1,
-          bytes: 100,
-        }),
-      }),
-    )
-
-    // Intercept and inject a fake moduleId into the radionica server action call
-    // Use regex to match URL with or without ?tab=... query param
-    await page.route(
-      new RegExp(`nastavnik/grupa/${radionicaGroupId}/galerija`),
-      async (route, request) => {
+      const radRoute = new RegExp(`nastavnik/grupa/${radionicaGroupId}/galerija`)
+      await page.route(radRoute, async (route, request) => {
         if (request.method() !== 'POST' || !request.headers()['next-action']) {
           await route.continue()
           return
@@ -436,66 +418,55 @@ test.describe('Gallery — scope validation', () => {
         } catch {
           await route.continue()
         }
-      },
-    )
+      })
 
-    await page.goto(`${BASE}/nastavnik/grupa/${radionicaGroupId}/galerija`)
-    const fileInput = page.locator('input[type="file"][id^="gallery-upload-"]').first()
-    await fileInput.waitFor({ state: 'attached', timeout: 10000 })
-    await fileInput.evaluate((el) =>
-      new Promise<void>((resolve) => {
-        const check = () => {
-          if (Object.keys(el).some((k) => k.startsWith('__reactProps$'))) resolve()
-          else setTimeout(check, 50)
-        }
-        check()
-      }),
-    )
+      await page.goto(`${BASE}/nastavnik/grupa/${radionicaGroupId}/galerija`)
+      const fileInput = page.locator('input[type="file"][id^="gallery-upload-"]').first()
+      await fileInput.waitFor({ state: 'attached', timeout: 10000 })
+      await fileInput.evaluate(HYDRATION_WAIT)
+      await fileInput.setInputFiles({
+        name: 'test.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      })
+      await fileInput.evaluate((el) =>
+        el.dispatchEvent(new Event('change', { bubbles: true })),
+      )
 
-    await fileInput.setInputFiles({
-      name: 'test.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      await expect(
+        page.getByText('Radionica nema module — galerija je grupna.'),
+        'radionica upload with moduleId surfaces the validator error',
+      ).toBeVisible({ timeout: 15000 })
+
+      await page.unroute(radRoute)
     })
-    await fileInput.evaluate((el) => el.dispatchEvent(new Event('change', { bubbles: true })))
 
-    await expect(
-      page.getByText('Radionica nema module — galerija je grupna.'),
-    ).toBeVisible({ timeout: 15000 })
-  })
+    await test.step('Radionica happy path: upload without moduleId → thumbnail appears', async () => {
+      // Drop the stub for /api/upload/gallery so the real upload runs.
+      await page.unroute('**/api/upload/gallery')
 
-  test('radionica upload without moduleId → success', async ({ page }) => {
-    if (!scopeSeeded) throw new Error('not scope-seeded')
-    test.setTimeout(120000)
-    const { teacher, radionicaGroupId } = scopeSeeded
-    await loginWithEmail(page, teacher.email, teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/grupa/${radionicaGroupId}/galerija`)
+      await page.goto(`${BASE}/nastavnik/grupa/${radionicaGroupId}/galerija`)
+      const fileInput = page.locator('input[type="file"][id^="gallery-upload-"]').first()
+      await fileInput.waitFor({ state: 'attached', timeout: 10000 })
+      await fileInput.evaluate(HYDRATION_WAIT)
 
-    const fileInput = page.locator('input[type="file"][id^="gallery-upload-"]').first()
-    await fileInput.waitFor({ state: 'attached', timeout: 10000 })
-    await fileInput.evaluate((el) =>
-      new Promise<void>((resolve) => {
-        const check = () => {
-          if (Object.keys(el).some((k) => k.startsWith('__reactProps$'))) resolve()
-          else setTimeout(check, 50)
-        }
-        check()
-      }),
-    )
+      const uploadDone = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/api/upload/gallery') &&
+          resp.request().method() === 'POST',
+        { timeout: 60000 },
+      )
+      await fileInput.setInputFiles(SAMPLE_PNG)
+      await fileInput.evaluate((el) =>
+        el.dispatchEvent(new Event('change', { bubbles: true })),
+      )
+      const uploadResp = await uploadDone
+      expect(uploadResp.status(), 'radionica happy-path upload returns 200').toBe(200)
 
-    const uploadDone = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/upload/gallery') && resp.request().method() === 'POST',
-      { timeout: 60000 },
-    )
-    await fileInput.setInputFiles(SAMPLE_PNG)
-    await fileInput.evaluate((el) => el.dispatchEvent(new Event('change', { bubbles: true })))
-    const uploadResp = await uploadDone
-    expect(uploadResp.status(), 'gallery upload should return 200').toBe(200)
-
-    await expect(
-      page.locator('button[aria-label="Otvori sliku"]').first(),
-    ).toBeVisible({ timeout: 30000 })
+      await expect(
+        page.locator('button[aria-label="Otvori sliku"]').first(),
+        'radionica happy-path thumbnail appears in grid',
+      ).toBeVisible({ timeout: 30000 })
+    })
   })
 })

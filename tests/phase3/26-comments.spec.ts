@@ -4,13 +4,31 @@ import {
   loginAsAdmin,
   loginWithEmail,
   collectGroupIds,
-  createTeacher,
-  assignTeacherToGroup,
-  createStudentInGroup,
   expectNotFoundPage,
   type TeacherData,
   type StudentData,
 } from '../helpers/phase3'
+import {
+  seedTeacher,
+  seedTeacherAssignment,
+  seedStudentInGroup,
+} from '../helpers/seed'
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Phase 3 Step 15 — Comments UI (consolidated)
+// 10 single-assertion tests merged into 3 flow tests:
+//   1. teacher comment-lifecycle (add COMMENT + MODULE_REVIEW + delete own)
+//   2. cross-author authz (admin can delete teacher's; teacher cannot delete
+//      admin's; teacher B 404 on teacher A's student)
+//   3. hard gates (portal leakage + cross-group create rejection)
+// Each merged test uses test.step() blocks so the HTML report still pinpoints
+// which assertion failed; descriptive `expect(..., 'why')` labels are added.
+//
+// NOT migrated: the "soft-deleted teacher comment shows 'Bivši nastavnik'
+// badge" check from the criteria — the existing 10-test file did not have
+// this assertion, so there's nothing to merge. Adding it from scratch would
+// be net-new coverage outside this task's scope.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const RUN_ID = Date.now().toString().slice(-6)
 
@@ -97,18 +115,15 @@ async function addAdminComment(page: Page, studentId: string, content: string) {
 test.describe.configure({ mode: 'serial' })
 
 test.describe('Phase 3 Step 15 — Comments UI', () => {
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(240000)
-    const page = await browser.newPage()
-    await loginAsAdmin(page)
+  test.beforeAll(async () => {
+    // Direct-Prisma seeding (Flux lu3f9sh).
+    const [groupAId, groupBId] = collectGroupIds(2)
+    const tA = await seedTeacher(TEACHER_A)
+    const tB = await seedTeacher(TEACHER_B)
+    await seedTeacherAssignment(tA.teacherId, groupAId)
+    await seedTeacherAssignment(tB.teacherId, groupBId)
 
-    const [groupAId, groupBId] = collectGroupIds(page, 2)
-    const tA = await createTeacher(page, TEACHER_A)
-    const tB = await createTeacher(page, TEACHER_B)
-    await assignTeacherToGroup(page, tA.teacherId, groupAId)
-    await assignTeacherToGroup(page, tB.teacherId, groupBId)
-
-    const s = await createStudentInGroup(page, groupAId, STUDENT)
+    const s = await seedStudentInGroup(groupAId, STUDENT)
 
     seeded = {
       teacherA: { email: TEACHER_A.email, password: tA.password, teacherId: tA.teacherId },
@@ -121,174 +136,194 @@ test.describe('Phase 3 Step 15 — Comments UI', () => {
         password: s.password,
       },
     }
-    await page.close()
   })
 
-  test('teacher adds COMMENT + MODULE_REVIEW on their group; both surface for admin', async ({ page }) => {
+  test('teacher comment lifecycle: add COMMENT + MODULE_REVIEW → admin sees both → filter → delete own', async ({ page }) => {
+    test.setTimeout(240000)
+    if (!seeded) throw new Error('not seeded')
+
+    await test.step('Teacher A adds both a COMMENT and a MODULE_REVIEW', async () => {
+      await loginWithEmail(page, seeded!.teacherA.email, seeded!.teacherA.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await submitStudentComment(page, seeded!.studentId, TEACHER_COMMENT, 'COMMENT')
+      await submitStudentComment(page, seeded!.studentId, TEACHER_REVIEW, 'MODULE_REVIEW')
+    })
+
+    await test.step('Admin sees both entries on the student detail page', async () => {
+      await loginAsAdmin(page)
+      await page.goto(`${BASE}/admin/ucenici/${seeded!.studentId}`)
+      await expect(
+        page.getByText(TEACHER_COMMENT),
+        'teacher COMMENT is visible to admin',
+      ).toBeVisible()
+      await expect(
+        page.getByText(TEACHER_REVIEW),
+        'teacher MODULE_REVIEW is visible to admin',
+      ).toBeVisible()
+    })
+
+    await test.step('Admin "Ocjene modula" filter hides COMMENT but keeps MODULE_REVIEW; "Sve" restores both', async () => {
+      const panelRegion = page
+        .getByRole('heading', { name: /Bilješke i recenzije/i })
+        .locator('..')
+      await panelRegion.getByRole('button', { name: /^Ocjene modula$/ }).click()
+      await expect(
+        page.getByText(TEACHER_REVIEW),
+        'MODULE_REVIEW stays visible under "Ocjene modula"',
+      ).toBeVisible()
+      await expect(
+        page.getByText(TEACHER_COMMENT),
+        'plain COMMENT is hidden under "Ocjene modula"',
+      ).toHaveCount(0)
+
+      await panelRegion.getByRole('button', { name: /^Sve$/ }).click()
+      await expect(
+        page.getByText(TEACHER_COMMENT),
+        'COMMENT reappears under "Sve"',
+      ).toBeVisible()
+      await expect(
+        page.getByText(TEACHER_REVIEW),
+        'MODULE_REVIEW still visible under "Sve"',
+      ).toBeVisible()
+    })
+
+    await test.step('School-year tab matches the seeded enrollment year', async () => {
+      const year = new Date().getMonth() >= 8
+        ? new Date().getFullYear()
+        : new Date().getFullYear() - 1
+      const expectedSchoolYear = `${year}/${year + 1}`
+      await expect(
+        page.getByText(expectedSchoolYear).first(),
+        'school-year tab is rendered with the expected year string',
+      ).toBeVisible()
+    })
+
+    await test.step('Teacher creates a throwaway comment and deletes it', async () => {
+      await loginWithEmail(page, seeded!.teacherA.email, seeded!.teacherA.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await submitStudentComment(page, seeded!.studentId, OWN_DELETE_COMMENT, 'COMMENT')
+      await expect(
+        page.getByText(OWN_DELETE_COMMENT),
+        'own comment is visible before delete',
+      ).toBeVisible()
+
+      page.once('dialog', (d) => d.accept())
+      const article = page.locator('article', { hasText: OWN_DELETE_COMMENT })
+      await article.getByRole('button', { name: 'Izbriši bilješku' }).click()
+      await expect(
+        page.getByText('Bilješka izbrisana.'),
+        'delete confirmation toast appears',
+      ).toBeVisible({ timeout: 10000 })
+      await expect(
+        page.getByText(OWN_DELETE_COMMENT),
+        'own comment is gone after delete',
+      ).toHaveCount(0)
+    })
+  })
+
+  test('cross-author authz: admin can delete, teacher cannot delete admin\'s, teacher B 404s', async ({ page }) => {
+    test.setTimeout(240000)
+    if (!seeded) throw new Error('not seeded')
+
+    await test.step('Admin creates ADMIN_COMMENT and can delete it', async () => {
+      await loginAsAdmin(page)
+      await addAdminComment(page, seeded!.studentId, ADMIN_COMMENT)
+      await expect(
+        page.getByText(ADMIN_COMMENT),
+        'admin comment is visible after creation',
+      ).toBeVisible()
+
+      page.once('dialog', (d) => d.accept())
+      const articles = page.locator('article', { hasText: ADMIN_COMMENT })
+      await articles.first().getByRole('button', { name: 'Izbriši bilješku' }).click()
+      await expect(
+        page.getByText('Bilješka izbrisana.'),
+        'admin-delete toast confirms server action ran',
+      ).toBeVisible({ timeout: 15000 })
+      await expect(
+        page.getByText(ADMIN_COMMENT),
+        'admin-deleted comment is gone',
+      ).toHaveCount(0)
+    })
+
+    await test.step('Admin re-creates ADMIN_COMMENT; teacher A sees it but has no delete affordance', async () => {
+      await addAdminComment(page, seeded!.studentId, ADMIN_COMMENT)
+
+      await loginWithEmail(page, seeded!.teacherA.email, seeded!.teacherA.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await page.goto(`${BASE}/nastavnik/ucenik/${seeded!.studentId}`)
+
+      const adminArticle = page.locator('article', { hasText: ADMIN_COMMENT })
+      await expect(
+        adminArticle,
+        'teacher A can READ the admin comment',
+      ).toBeVisible()
+      await expect(
+        adminArticle.getByRole('button', { name: 'Izbriši bilješku' }),
+        'teacher A has NO delete button on the admin comment',
+      ).toHaveCount(0)
+
+      const teacherArticle = page.locator('article', { hasText: TEACHER_COMMENT })
+      await expect(
+        teacherArticle,
+        'teacher A still sees their own original COMMENT',
+      ).toBeVisible()
+      await expect(
+        teacherArticle.getByRole('button', { name: 'Izbriši bilješku' }),
+        'teacher A DOES have a delete button on their own comment',
+      ).toHaveCount(1)
+    })
+
+    await test.step('Teacher B 404s on teacher A\'s student (server-action delete rejection covered by the route guard)', async () => {
+      await loginWithEmail(page, seeded!.teacherB.email, seeded!.teacherB.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await page.goto(`${BASE}/nastavnik/ucenik/${seeded!.studentId}`)
+      await expectNotFoundPage(page)
+      await expect(
+        page.getByRole('button', { name: /Dodaj komentar/ }),
+        'teacher B has no add-comment form (page is 404)',
+      ).toHaveCount(0)
+      await expect(
+        page.getByText(TEACHER_COMMENT),
+        'teacher B cannot READ teacher A\'s comments either',
+      ).toHaveCount(0)
+      await expect(
+        page.getByText(ADMIN_COMMENT),
+        'teacher B cannot READ admin\'s comments on teacher A\'s student',
+      ).toHaveCount(0)
+    })
+  })
+
+  test('hard gates: student portal hides all comment content + teacher B cannot create for non-group student', async ({ page }) => {
     test.setTimeout(180000)
     if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacherA.email, seeded.teacherA.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
 
-    await submitStudentComment(page, seeded.studentId, TEACHER_COMMENT, 'COMMENT')
-    await submitStudentComment(page, seeded.studentId, TEACHER_REVIEW, 'MODULE_REVIEW')
+    await test.step('Student portal pages show no seeded comment content', async () => {
+      await loginWithEmail(page, seeded!.studentLogin.email, seeded!.studentLogin.password)
+      await page.waitForURL(/\/portal/, { timeout: 30000 })
 
-    await loginAsAdmin(page)
-    await page.goto(`${BASE}/admin/ucenici/${seeded.studentId}`)
-    await expect(page.getByText(TEACHER_COMMENT)).toBeVisible()
-    await expect(page.getByText(TEACHER_REVIEW)).toBeVisible()
-  })
+      for (const path of ['/portal', `/portal/grupa/${seeded!.groupAId}`, '/portal/profil']) {
+        await page.goto(`${BASE}${path}`)
+        const body = (await page.locator('body').innerText()).toLowerCase()
+        expect(body, `${path} hides TEACHER_COMMENT`).not.toContain(TEACHER_COMMENT.toLowerCase())
+        expect(body, `${path} hides TEACHER_REVIEW`).not.toContain(TEACHER_REVIEW.toLowerCase())
+        expect(body, `${path} hides ADMIN_COMMENT`).not.toContain(ADMIN_COMMENT.toLowerCase())
+        expect(body, `${path} hides "bilješke i recenzije" heading`).not.toContain(
+          'bilješke i recenzije',
+        )
+        expect(body, `${path} hides "ocjena modula" type label`).not.toContain('ocjena modula')
+      }
+    })
 
-  test('admin type filter hides plain COMMENT entries when MODULE_REVIEW is selected', async ({ page }) => {
-    test.setTimeout(120000)
-    if (!seeded) throw new Error('not seeded')
-    await loginAsAdmin(page)
-    await page.goto(`${BASE}/admin/ucenici/${seeded.studentId}`)
-
-    const panelRegion = page.getByRole('heading', { name: /Bilješke i recenzije/i }).locator('..')
-    await panelRegion.getByRole('button', { name: /^Ocjene modula$/ }).click()
-
-    await expect(page.getByText(TEACHER_REVIEW)).toBeVisible()
-    await expect(page.getByText(TEACHER_COMMENT)).toHaveCount(0)
-
-    await panelRegion.getByRole('button', { name: /^Sve$/ }).click()
-    await expect(page.getByText(TEACHER_COMMENT)).toBeVisible()
-    await expect(page.getByText(TEACHER_REVIEW)).toBeVisible()
-  })
-
-  test('school-year tab matches the currently seeded enrollment\'s year', async ({ page }) => {
-    test.setTimeout(120000)
-    if (!seeded) throw new Error('not seeded')
-    await loginAsAdmin(page)
-    await page.goto(`${BASE}/admin/ucenici/${seeded.studentId}`)
-    const year = new Date().getMonth() >= 8 ? new Date().getFullYear() : new Date().getFullYear() - 1
-    const expectedSchoolYear = `${year}/${year + 1}`
-    await expect(page.getByText(expectedSchoolYear).first()).toBeVisible()
-  })
-
-  test('admin can delete the teacher\'s comment (admin-always-wins)', async ({ page }) => {
-    test.setTimeout(120000)
-    if (!seeded) throw new Error('not seeded')
-    await loginAsAdmin(page)
-    await page.goto(`${BASE}/admin/ucenici/${seeded.studentId}`)
-
-    await addAdminComment(page, seeded.studentId, ADMIN_COMMENT)
-    await expect(page.getByText(ADMIN_COMMENT)).toBeVisible()
-
-    page.once('dialog', (d) => d.accept())
-    const articles = page.locator('article', { hasText: ADMIN_COMMENT })
-    await articles.first().getByRole('button', { name: 'Izbriši bilješku' }).click()
-    await expect(page.getByText('Bilješka izbrisana.')).toBeVisible({ timeout: 15000 })
-    await expect(page.getByText(ADMIN_COMMENT)).toHaveCount(0)
-  })
-
-  test('teacher cannot delete another author\'s comment (no delete affordance)', async ({ page }) => {
-    test.setTimeout(180000)
-    if (!seeded) throw new Error('not seeded')
-    await loginAsAdmin(page)
-    await addAdminComment(page, seeded.studentId, ADMIN_COMMENT)
-
-    await loginWithEmail(page, seeded.teacherA.email, seeded.teacherA.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/ucenik/${seeded.studentId}`)
-
-    const adminArticle = page.locator('article', { hasText: ADMIN_COMMENT })
-    await expect(adminArticle).toBeVisible()
-    await expect(
-      adminArticle.getByRole('button', { name: 'Izbriši bilješku' }),
-    ).toHaveCount(0)
-
-    const teacherArticle = page.locator('article', { hasText: TEACHER_COMMENT })
-    await expect(teacherArticle).toBeVisible()
-    await expect(
-      teacherArticle.getByRole('button', { name: 'Izbriši bilješku' }),
-    ).toHaveCount(1)
-  })
-
-  test('teacher B rejected when viewing teacher A\'s student (404)', async ({ page }) => {
-    test.setTimeout(120000)
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacherB.email, seeded.teacherB.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/ucenik/${seeded.studentId}`)
-    await expectNotFoundPage(page)
-    await expect(page.getByRole('button', { name: /Dodaj komentar/ })).toHaveCount(0)
-  })
-
-  test('student portal shows no seeded comment content (leakage guard)', async ({ page }) => {
-    test.setTimeout(120000)
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.studentLogin.email, seeded.studentLogin.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
-
-    for (const path of ['/portal', `/portal/grupa/${seeded.groupAId}`, '/portal/profil']) {
-      await page.goto(`${BASE}${path}`)
-      const body = (await page.locator('body').innerText()).toLowerCase()
-      expect(body).not.toContain(TEACHER_COMMENT.toLowerCase())
-      expect(body).not.toContain(TEACHER_REVIEW.toLowerCase())
-      expect(body).not.toContain(ADMIN_COMMENT.toLowerCase())
-      expect(body).not.toContain('bilješke i recenzije')
-      expect(body).not.toContain('ocjena modula')
-    }
-  })
-
-  // ── I8: Teacher deletes own comment ────────────────────────────────────────
-
-  test('teacher deletes their own comment successfully', async ({ page }) => {
-    test.setTimeout(180000)
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacherA.email, seeded.teacherA.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-
-    await submitStudentComment(page, seeded.studentId, OWN_DELETE_COMMENT, 'COMMENT')
-    await expect(page.getByText(OWN_DELETE_COMMENT)).toBeVisible()
-
-    page.once('dialog', (d) => d.accept())
-    const article = page.locator('article', { hasText: OWN_DELETE_COMMENT })
-    await article.getByRole('button', { name: 'Izbriši bilješku' }).click()
-    await expect(page.getByText('Bilješka izbrisana.')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByText(OWN_DELETE_COMMENT)).toHaveCount(0)
-  })
-
-  // ── C4: deleteTeacherComment server-side authz ─────────────────────────────
-
-  test('deleteTeacherComment server action rejects deletion of another teacher\'s comment', async ({ page }) => {
-    test.setTimeout(180000)
-    if (!seeded) throw new Error('not seeded')
-    // Teacher A creates a comment
-    await loginWithEmail(page, seeded.teacherA.email, seeded.teacherA.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    const commentText = `Server-authz-test ${RUN_ID}`
-    await submitStudentComment(page, seeded.studentId, commentText, 'COMMENT')
-
-    // Extract the comment's ID from the DOM (data attribute or form action)
-    const commentArticle = page.locator('article', { hasText: commentText })
-    await expect(commentArticle).toBeVisible()
-    const deleteBtn = commentArticle.getByRole('button', { name: 'Izbriši bilješku' })
-    await expect(deleteBtn).toBeVisible()
-
-    // Now login as Teacher B and try to view the student (should 404)
-    // But we already tested that. For the server-side test, we verify from
-    // the UI that Teacher B cannot even see the comment.
-    await loginWithEmail(page, seeded.teacherB.email, seeded.teacherB.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/ucenik/${seeded.studentId}`)
-    await expectNotFoundPage(page)
-    await expect(page.getByText(commentText)).toHaveCount(0)
-  })
-
-  // ── C6: createTeacherComment rejects spoofed studentId ─────────────────────
-
-  test('teacher cannot create a comment for a student not in their group', async ({ page }) => {
-    test.setTimeout(120000)
-    if (!seeded) throw new Error('not seeded')
-    // Teacher B tries to add a comment on Teacher A's student from their own
-    // student detail page — but they can't even access it (assertTeacherCanViewStudent blocks).
-    // The guard returns 404 before the form even renders.
-    await loginWithEmail(page, seeded.teacherB.email, seeded.teacherB.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/ucenik/${seeded.studentId}`)
-    await expectNotFoundPage(page)
-    await expect(page.getByPlaceholder(/Napišite komentar o polazniku/)).toHaveCount(0)
+    await test.step('Teacher B cannot reach the add-comment form for teacher A\'s student', async () => {
+      await loginWithEmail(page, seeded!.teacherB.email, seeded!.teacherB.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await page.goto(`${BASE}/nastavnik/ucenik/${seeded!.studentId}`)
+      await expectNotFoundPage(page)
+      await expect(
+        page.getByPlaceholder(/Napišite komentar o polazniku/),
+        'add-comment textarea is not rendered on the 404 page',
+      ).toHaveCount(0)
+    })
   })
 })

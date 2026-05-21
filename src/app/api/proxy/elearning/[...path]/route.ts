@@ -2,15 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import type { Session } from 'next-auth'
 import type { UserRole } from '@prisma/client'
 import { auth } from '@/lib/auth'
+import {
+  injectProxyBase,
+  rewriteProxyCss,
+  rewriteProxyHtml,
+  rewriteProxyJs,
+  validateProxyPath,
+} from '../_helpers'
 
 export const runtime = 'nodejs'
 
 const ALLOWED_ORIGIN = 'https://elearning.robocamp.eu'
 const ALLOWED_ROLES = new Set<UserRole>(['STUDENT', 'TEACHER', 'ADMIN'])
 const PROXY_PREFIX = '/api/proxy/elearning'
-const MAX_PATH_DEPTH = 20
-const BAD_SEGMENT = /\\/
-const NUL_BYTE = String.fromCodePoint(0)
 
 const STRIP_HEADERS = [
   'x-frame-options',
@@ -49,27 +53,9 @@ function authorize(session: Session | null): NextResponse | null {
   return null
 }
 
-function isInvalidSegment(seg: string): boolean {
-  return (
-    !seg ||
-    seg === '.' ||
-    seg === '..' ||
-    seg.includes('..') ||
-    seg.includes(NUL_BYTE) ||
-    BAD_SEGMENT.test(seg)
-  )
-}
-
 function validatePath(path: string[]): NextResponse | null {
-  if (path.length > MAX_PATH_DEPTH) {
-    return NextResponse.json({ error: 'Bad path' }, { status: 400 })
-  }
-  for (const seg of path) {
-    if (isInvalidSegment(seg)) {
-      return NextResponse.json({ error: 'Bad path' }, { status: 400 })
-    }
-  }
-  return null
+  const result = validateProxyPath(path)
+  return result.ok ? null : NextResponse.json({ error: 'Bad path' }, { status: result.status })
 }
 
 function buildTargetUrl(req: NextRequest, path: string[]): string | NextResponse {
@@ -93,49 +79,12 @@ function buildForwardHeaders(req: NextRequest): Headers {
   return headers
 }
 
-function rewriteHtmlOrJs(text: string): string {
-  return text
-    .replaceAll(
-      /\b(href|src|action|formaction|data-src|poster)=(["'])\/(?!\/)/gi,
-      `$1=$2${PROXY_PREFIX}/`,
-    )
-    .replaceAll(
-      /\bcontent=(["'])\s*\d+\s*;\s*url=\/(?!\/)/gi,
-      `content=$1 0; url=${PROXY_PREFIX}/`,
-    )
-    .replaceAll(
-      /\b(fetch|axios\.(?:get|post|put|delete|patch))\(\s*(["'`])\/(?!\/)/g,
-      `$1($2${PROXY_PREFIX}/`,
-    )
-    // RoboCamp's nf-renderer stores comma/semicolon-separated absolute
-    // paths in data-urls (e.g. "/a.php,/b.php;/c.php"). Rewrite each
-    // segment inside the attribute value only — keeps the narrow scope.
-    .replaceAll(/\b(data-urls)=(["'])([^"']*)\2/gi, (_, attr, q, val) => {
-      const rewritten = val.replaceAll(/(^|[,;])\/(?!\/)/g, `$1${PROXY_PREFIX}/`)
-      return `${attr}=${q}${rewritten}${q}`
-    })
-    // Template-literal absolute paths in JS: `/video/${id}.mp4` →
-    // `/api/proxy/elearning/video/${id}.mp4`. nf.js sets video.src this
-    // way. Excludes `// (protocol-relative), `${ (interpolation),
-    // and `` ` `` (empty literal).
-    .replaceAll(/(`)\/(?![/$`])/g, `$1${PROXY_PREFIX}/`)
-}
-
-function rewriteCss(text: string): string {
-  return text.replaceAll(/\burl\(\s*(["']?)\/(?!\/)/g, `url($1${PROXY_PREFIX}/`)
-}
-
-function injectBase(html: string): string {
-  // Inject <base> AFTER attribute rewrites so the rewrite regex doesn't
-  // double-prefix the injected URL.
-  return html.replace(/<head(\s[^>]*)?>/i, (m) => `${m}<base href="${PROXY_PREFIX}/">`)
-}
-
 function applyTextRewrites(text: string, flags: TextFlags): string {
   let patched = text
-  if (flags.isHtml || flags.isJs) patched = rewriteHtmlOrJs(patched)
-  if (flags.isCss || flags.isHtml) patched = rewriteCss(patched)
-  if (flags.isHtml) patched = injectBase(patched)
+  if (flags.isHtml) patched = rewriteProxyHtml(patched, PROXY_PREFIX)
+  else if (flags.isJs) patched = rewriteProxyJs(patched, PROXY_PREFIX)
+  if (flags.isCss || flags.isHtml) patched = rewriteProxyCss(patched, PROXY_PREFIX)
+  if (flags.isHtml) patched = injectProxyBase(patched, PROXY_PREFIX)
   return patched
 }
 

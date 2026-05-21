@@ -3,7 +3,7 @@
 Website for Udruga za robotiku "Inovatic" (Robotics Association), Split, Croatia. Teaches kids ages 6-14 STEM/robotics through LEGO Spike courses (SLR 1-4).
 
 ## Tech Stack
-Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + PostgreSQL (Neon) + Auth.js v5 + Cloudinary (EU) + Resend + React Email + Zod + next-intl + BlockNote (admin editor only) + Playwright
+Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + PostgreSQL (Neon) + Auth.js v5 + Cloudinary (EU) + Resend + React Email + Zod + next-intl + BlockNote (admin editor only) + Playwright + Vitest (unit + integration tiers)
 
 ## Project Structure
 - Route groups: `(public)`, `(admin)`, `(teacher)`, `(portal)`, `(auth)`
@@ -33,10 +33,31 @@ Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + Postgr
 ## Common Commands
 ```bash
 npm run dev                    # Dev server on port 3000
-npm run lint:all               # ESLint + TypeScript + knip (dead code)
+npm run lint:all               # ESLint + TypeScript + knip + unit tests
 npx tsc --noEmit               # Type check only
-npx playwright test tests/     # Run Playwright tests (requires dev server on port 3000)
+npm run test:unit              # Vitest unit tier (jsdom, < 10s) — pure logic, validators, components
+npm run test:unit:watch        # Vitest unit watch
+npm run test:integration       # Vitest integration tier — resets inovatic_test, then runs route+DB tests
+npm run test:integration:reset # Drop + recreate + migrate inovatic_test (called automatically by test:integration)
+npm run test:integration:watch # Vitest integration watch (no reset — for interactive dev)
+npx playwright test tests/     # Playwright E2E tier (requires dev server on port 3000)
 ```
+
+## Testing — three tiers
+Tests are split across three tiers by what they actually need to run; each newer tier is slower and exercises more of the stack.
+
+- **Tier 1 — Unit** (`vitest`, jsdom env, `tests/unit/`): pure logic, Zod validators, component behavior. Lives under `tests/unit/{lib,validators,proxy,components}/`. No DB, no HTTP, no browser. Sub-10s feedback.
+- **Tier 2 — Integration** (`vitest`, node env, `tests/integration/`): route handlers + Prisma against the dedicated `inovatic_test` Postgres DB. `auth()` from `@/lib/auth` is mocked via `tests/integration/setup.ts`; call `mockSession({ id, role, … })` in a test to inject a logged-in role. Direct-Prisma factories live in `tests/integration/helpers/factory.ts` (createTeacher/Student/Admin/Group/Module/ModuleSchedule/Enrollment/TeacherAssignment/Material/Location). `npm run test:integration` runs `scripts/reset-test-db.sh` first — every full run starts from an empty, fully-migrated baseline so stale state from past tests can never leak. Tests run serially (`fileParallelism: false`).
+- **Tier 3 — E2E** (`@playwright/test`, `tests/phase{1,2,3}/`): real browser, real dev server, real DB. Keeps multi-step UI flows, hydration races, SEO/OG checks.
+
+When adding tests: pure functions → unit; route handlers needing DB+auth → integration; anything that needs a browser → Playwright. `npm run lint:all` runs the unit tier as part of the pre-commit gate.
+
+## Integration test DB
+The `inovatic_test` DB lives in the same Docker `inovatic-db` container as dev `inovatic`. The reset script (`scripts/reset-test-db.sh`) drops, recreates, and `prisma migrate deploy`s it; it terminates any open connections first via `pg_terminate_backend`. To provision manually:
+```bash
+bash scripts/reset-test-db.sh
+```
+If `inovatic-db` container is not running: `docker compose up -d db`. Prisma URLs for the test DB are passed inline by the `test:integration` script — `.env` is not touched.
 
 ## Database Migrations
 Prisma CLI reads `.env` not `.env.local` — must pass env vars inline for local dev:

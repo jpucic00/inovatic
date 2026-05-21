@@ -5,7 +5,8 @@
     "sharp",
     "@eslint/eslintrc",
     "eslint",
-    "eslint-config-next"
+    "eslint-config-next",
+    "@testing-library/user-event"
   ],
   "ignoreBinaries": ["sonar-scanner"]
 }

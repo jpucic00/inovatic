@@ -5,76 +5,53 @@ import { BASE } from './shared'
 // HOMEPAGE
 // Validates that the landing page renders all key sections: hero with CTA,
 // course overview cards, latest news, navigation bar, and footer.
+// All 6 original section assertions are preserved via test.step() blocks on a
+// single shared goto() so failures still pinpoint which selector broke
+// without paying the page-load cost six times.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-test.describe('Homepage — Landing page with hero, courses, and news', () => {
-  test('Page loads successfully and has the branded page title', async ({ page }) => {
-    await test.step('Navigate to the homepage', async () => {
-      const response = await page.goto(BASE)
-      expect(response?.status()).toBe(200)
-    })
+test('homepage renders all key sections', async ({ page }) => {
+  await test.step('Navigate to the homepage and confirm 200', async () => {
+    const response = await page.goto(BASE)
+    expect(response?.status(), 'homepage GET / returns 200').toBe(200)
+  })
 
-    await test.step('Verify the page title contains the brand name and location', async () => {
-      const title = await page.title()
-      expect(title).toBeTruthy()
-      expect(title).toContain('Inovatic')
+  await test.step('Branded page title contains "Inovatic"', async () => {
+    const title = await page.title()
+    expect(title, 'page <title> is non-empty').toBeTruthy()
+    expect(title, 'page <title> mentions the brand').toContain('Inovatic')
+  })
+
+  await test.step('Hero <h1> is visible with non-empty text', async () => {
+    const h1 = page.locator('h1').first()
+    await expect(h1, 'hero <h1> is visible').toBeVisible({ timeout: 10000 })
+    const text = await h1.textContent()
+    expect(text?.length, 'hero <h1> has non-empty text').toBeGreaterThan(0)
+  })
+
+  await test.step('Navigation bar (<nav> or <header>) is visible at the top', async () => {
+    const nav = page.locator('nav, header').first()
+    await expect(nav, 'top-level navigation is visible').toBeVisible()
+  })
+
+  await test.step('Footer is visible at the bottom', async () => {
+    const footer = page.locator('footer').first()
+    await expect(footer, 'page <footer> is visible').toBeVisible()
+  })
+
+  await test.step('Course overview section mentions robotics programs', async () => {
+    const courseContent = page
+      .locator('text=/[Ss]vijet|SLR|[Rr]obotik|[Pp]rogram/')
+      .first()
+    await expect(courseContent, 'course overview text is rendered').toBeVisible({
+      timeout: 10000,
     })
   })
 
-  test('Hero section is visible with a primary heading', async ({ page }) => {
-    await test.step('Navigate to the homepage', async () => {
-      await page.goto(BASE)
-    })
-
-    await test.step('Verify the hero <h1> heading is visible and contains text', async () => {
-      const h1 = page.locator('h1').first()
-      await expect(h1).toBeVisible({ timeout: 10000 })
-      const text = await h1.textContent()
-      expect(text?.length).toBeGreaterThan(0)
-    })
-  })
-
-  test('Navigation bar is rendered at the top of the page', async ({ page }) => {
-    await test.step('Navigate to the homepage', async () => {
-      await page.goto(BASE)
-    })
-
-    await test.step('Verify a <nav> or <header> element is visible', async () => {
-      const nav = page.locator('nav, header').first()
-      await expect(nav).toBeVisible()
-    })
-  })
-
-  test('Footer is rendered at the bottom of the page', async ({ page }) => {
-    await test.step('Navigate to the homepage', async () => {
-      await page.goto(BASE)
-    })
-
-    await test.step('Verify a <footer> element is visible', async () => {
-      const footer = page.locator('footer').first()
-      await expect(footer).toBeVisible()
-    })
-  })
-
-  test('Course overview section is present — mentions robotics programs', async ({ page }) => {
-    await test.step('Navigate to the homepage', async () => {
-      await page.goto(BASE)
-    })
-
-    await test.step('Find text referencing courses (Svijet, SLR, Robotik, or Program)', async () => {
-      const courseContent = page.locator('text=/[Ss]vijet|SLR|[Rr]obotik|[Pp]rogram/').first()
-      await expect(courseContent).toBeVisible({ timeout: 10000 })
-    })
-  })
-
-  test('News section is present — shows latest articles from the association', async ({ page }) => {
-    await test.step('Navigate to the homepage', async () => {
-      await page.goto(BASE)
-    })
-
-    await test.step('Find text referencing news (Novosti, Vijesti, or Članci)', async () => {
-      const newsSection = page.locator('text=/[Nn]ovosti|[Vv]ijesti|[Čč]lanci/').first()
-      await expect(newsSection).toBeVisible({ timeout: 10000 })
+  await test.step('News section mentions Novosti / Vijesti / Članci', async () => {
+    const newsSection = page.locator('text=/[Nn]ovosti|[Vv]ijesti|[Čč]lanci/').first()
+    await expect(newsSection, 'news/articles section is rendered').toBeVisible({
+      timeout: 10000,
     })
   })
 })

@@ -1,3 +1,17 @@
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Phase 3 test helpers — UI-driven seeders.
+//
+// IMPORTANT: `createTeacher`, `createStudentInGroup`, `createStudentNoEnrollment`,
+// and `assignTeacherToGroup` exercise the admin "Kreiraj učenika" / "Kreiraj
+// nastavnika" dialogs end-to-end (clicks, form fills, password capture).
+// Per Flux lu3f9sh, these UI helpers should ONLY be used by:
+//   - tests/phase2/17-students.spec.ts
+//   - tests/phase2/19-teachers.spec.ts
+// as deliberate dialog-regression guards. Every other Phase 3 spec switches
+// to direct-Prisma seeding via `tests/helpers/seed.ts` (~25-50s saved per
+// fixture).
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 import { expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -53,7 +67,12 @@ export async function loginWithEmail(page: Page, email: string, password: string
   await page.waitForLoadState('domcontentloaded')
 }
 
-export function collectGroupIds(_page: Page, count: number): string[] {
+// Both `collectGroupIds` and `pickStandardGroupId` just read from
+// tests/fixtures/phase3-state.json — they don't actually need a Page. The
+// optional `_page` parameter is kept so existing call sites still type-check
+// without churn; seed.ts-only specs can omit it entirely.
+export function collectGroupIds(countOrPage: number | Page, maybeCount?: number): string[] {
+  const count = typeof countOrPage === 'number' ? countOrPage : maybeCount!
   const ids = readBootstrappedGroupIds()
   if (ids.length < count) {
     throw new Error(`Need at least ${count} groups; found ${ids.length}`)
@@ -61,7 +80,7 @@ export function collectGroupIds(_page: Page, count: number): string[] {
   return ids.slice(0, count)
 }
 
-export function pickStandardGroupId(_page: Page): string {
+export function pickStandardGroupId(_page?: Page): string {
   const ids = readBootstrappedGroupIds()
   if (ids.length === 0) throw new Error('no groups in phase3-state.json')
   return ids[0]

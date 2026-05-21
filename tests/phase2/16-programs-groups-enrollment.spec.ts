@@ -470,14 +470,10 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await expect(groupOption).toHaveAttribute('disabled', '')
     })
 
-    test('admin group detail shows 2 inquiry reservations', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/grupe`)
-      // Standard groups tab renders with hideProgram=true; Upiti is column index 3
-      // (Naziv, Lokacija, Termin, Upiti, Polaznici…)
-      const row = page.locator('tr', { hasText: STD_GROUP_NAME })
-      await expect(row.locator('td').nth(3)).toHaveText('2')
-    })
+    // "admin group detail shows 2 inquiry reservations" moved out: pure
+    // capacity arithmetic (maxStudents − active enrollments) is now exercised
+    // at tests/unit/lib/available-spots.test.ts; the parallel radionica row
+    // count test is similarly removed for the same reason.
   })
 
   // ── E: Declining an inquiry frees a spot ───────────────────────────────────
@@ -509,14 +505,10 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await submitWithGroup(page, PARENT_3, '1', STD_GROUP_NAME)
     })
 
-    test('group is full again after parent 3 re-fills the freed spot', async ({ page }) => {
-      await reachStep3(page, PARENT_4)
-      await page.locator('#grade').selectOption('1')
-      await expect(page.locator('#scheduledGroupId')).toBeEnabled({ timeout: 5000 })
-
-      const groupOption = page.locator('#scheduledGroupId option', { hasText: STD_GROUP_NAME })
-      await expect(groupOption).toHaveText(/Popunjeno/)
-    })
+    // "group is full again after parent 3 re-fills" removed — the boundary
+    // arithmetic (active === capacity ⇒ availableSpots = 0 ⇒ Popunjeno) is
+    // covered by tests/unit/lib/available-spots.test.ts. The "(Popunjeno)"
+    // display itself remains exercised by D test 3.
   })
 
   // ── F: Deleting (GDPR) an inquiry frees a spot ─────────────────────────────
@@ -683,17 +675,9 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await expect(page.locator(`text=${RAD_PARENT_2.parentName}`).first()).toBeVisible()
     })
 
-    test('admin radionica group row shows 2 in the Upiti column', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/grupe`)
-      // Find the radionica group row and verify its inquiry count
-      // Radionice tab renders with hideProgram=false; Upiti is column index 4
-      // (Naziv, Program, Lokacija, Termin, Upiti, Polaznici…)
-      // There are two "Radionice" buttons (WeeklySchedule + GroupTabs); click the tab (last)
-      await page.locator('button', { hasText: 'Radionice' }).last().click()
-      const row = page.locator('tr', { hasText: RADIONICA_GROUP_NAME })
-      await expect(row.locator('td').nth(4)).toHaveText('2')
-    })
+    // "admin radionica group row shows 2 in the Upiti column" removed —
+    // capacity arithmetic moved to tests/unit/lib/available-spots.test.ts;
+    // see the parallel standard-group note in section D above.
   })
 
   // ── I: Admin can edit a group ────────────────────────────────────────────────
@@ -777,28 +761,40 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await ctx.close()
     })
 
-    test('delete dialog opens with group name and warning', async ({ page }) => {
+    // Delete-group dialog lifecycle (Flux cvyxnhq merge) — was 2 tests
+    // (open + cancel). The cancel branch shares the open setup; saved a
+    // redundant login + nav + tab-switch.
+    test('delete-group dialog lifecycle: opens with name+warning → cancel closes without deleting', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
       await page.locator('button', { hasText: 'Radionice' }).last().click()
       const row = page.locator('tr', { hasText: EMPTY_GROUP_NAME })
       await row.locator('button', { hasText: 'Obriši' }).click()
 
-      const dialog = page.locator('[role="dialog"]')
-      await expect(dialog).toBeVisible()
-      await expect(dialog.locator('text=Obriši grupu')).toBeVisible()
-      await expect(dialog.locator(`text=${EMPTY_GROUP_NAME}`).first()).toBeVisible()
-    })
+      await test.step('Dialog opens showing group name + warning', async () => {
+        const dialog = page.locator('[role="dialog"]')
+        await expect(dialog, 'delete-group dialog is visible').toBeVisible()
+        await expect(
+          dialog.locator('text=Obriši grupu'),
+          'dialog heading is "Obriši grupu"',
+        ).toBeVisible()
+        await expect(
+          dialog.locator(`text=${EMPTY_GROUP_NAME}`).first(),
+          'dialog shows the target group name',
+        ).toBeVisible()
+      })
 
-    test('cancel closes dialog without deleting the group', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/grupe`)
-      await page.locator('button', { hasText: 'Radionice' }).last().click()
-      const row = page.locator('tr', { hasText: EMPTY_GROUP_NAME })
-      await row.locator('button', { hasText: 'Obriši' }).click()
-      await page.locator('[role="dialog"] button', { hasText: 'Odustani' }).click()
-      await expect(page.locator('[role="dialog"]')).not.toBeVisible()
-      await expect(page.locator(`text=${EMPTY_GROUP_NAME}`).first()).toBeVisible()
+      await test.step('Cancel button closes dialog without deleting', async () => {
+        await page.locator('[role="dialog"] button', { hasText: 'Odustani' }).click()
+        await expect(
+          page.locator('[role="dialog"]'),
+          'dialog is hidden after Odustani',
+        ).not.toBeVisible()
+        await expect(
+          page.locator(`text=${EMPTY_GROUP_NAME}`).first(),
+          'group still listed after cancel',
+        ).toBeVisible()
+      })
     })
   })
 
@@ -808,9 +804,8 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
   // Selector scopes match the A-group card-based pattern.
 
   test.describe('K — Admin: Delete Radionica', () => {
-    test('delete dialog for radionica shows course title and cascade warning', async ({
-      page,
-    }) => {
+    // Delete-radionica dialog lifecycle merge (Flux cvyxnhq) — was 2 tests.
+    test('delete-radionica dialog lifecycle: shows title+cascade warning → cancel keeps radionica', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
       const card = page.locator('div.rounded-lg').filter({
@@ -818,24 +813,34 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       })
       await card.getByRole('button', { name: /Obriši/ }).click()
 
-      const dialog = page.locator('[role="dialog"]')
-      await expect(dialog).toBeVisible()
-      await expect(dialog.locator('text=Obriši radionicu')).toBeVisible()
-      await expect(dialog.locator(`text=${RADIONICA_TITLE}`).first()).toBeVisible()
-      // The dialog should warn that groups will also be deleted
-      await expect(dialog.locator('text=grupe')).toBeVisible()
-    })
-
-    test('cancel closes delete dialog without removing the radionica', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/programi`)
-      const card = page.locator('div.rounded-lg').filter({
-        has: page.locator('h3', { hasText: RADIONICA_TITLE }),
+      await test.step('Dialog opens with title + cascade warning', async () => {
+        const dialog = page.locator('[role="dialog"]')
+        await expect(dialog, 'delete-radionica dialog is visible').toBeVisible()
+        await expect(
+          dialog.locator('text=Obriši radionicu'),
+          'dialog heading is "Obriši radionicu"',
+        ).toBeVisible()
+        await expect(
+          dialog.locator(`text=${RADIONICA_TITLE}`).first(),
+          'dialog shows the target radionica title',
+        ).toBeVisible()
+        await expect(
+          dialog.locator('text=grupe'),
+          'dialog warns that groups will cascade-delete',
+        ).toBeVisible()
       })
-      await card.getByRole('button', { name: /Obriši/ }).click()
-      await page.locator('[role="dialog"] button', { hasText: 'Odustani' }).click()
-      await expect(page.locator('[role="dialog"]')).not.toBeVisible()
-      await expect(page.locator(`h3`, { hasText: RADIONICA_TITLE })).toBeVisible()
+
+      await test.step('Cancel closes dialog; radionica still listed', async () => {
+        await page.locator('[role="dialog"] button', { hasText: 'Odustani' }).click()
+        await expect(
+          page.locator('[role="dialog"]'),
+          'dialog is hidden after Odustani',
+        ).not.toBeVisible()
+        await expect(
+          page.locator(`h3`, { hasText: RADIONICA_TITLE }),
+          'radionica card still on /admin/programi',
+        ).toBeVisible()
+      })
     })
   })
 })

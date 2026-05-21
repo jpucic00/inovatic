@@ -4,14 +4,16 @@ import {
   loginAsAdmin,
   loginWithEmail,
   pickStandardGroupId,
-  createTeacher,
-  assignTeacherToGroup,
-  createStudentInGroup,
   addLinkMaterial,
   cloudinaryAssetStatus,
   type TeacherData,
   type StudentData,
 } from '../helpers/phase3'
+import {
+  seedTeacher,
+  seedTeacherAssignment,
+  seedStudentInGroup,
+} from '../helpers/seed'
 
 const RUN_ID = Date.now().toString().slice(-6)
 
@@ -43,152 +45,170 @@ let seeded: Seeded | null = null
 test.describe.configure({ mode: 'serial' })
 
 test.describe('Phase 3 Step 13 — Materials', () => {
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(240000)
-    const page = await browser.newPage()
-    await loginAsAdmin(page)
-    const groupId = pickStandardGroupId(page)
-    const t = await createTeacher(page, TEACHER)
-    await assignTeacherToGroup(page, t.teacherId, groupId)
-    const s = await createStudentInGroup(page, groupId, STUDENT)
+  test.beforeAll(async () => {
+    // Direct-Prisma seeding (Flux lu3f9sh) — ~25-50s faster than the UI flow.
+    const groupId = pickStandardGroupId()
+    const t = await seedTeacher(TEACHER)
+    await seedTeacherAssignment(t.teacherId, groupId)
+    const s = await seedStudentInGroup(groupId, STUDENT)
     seeded = {
       teacher: { email: TEACHER.email, password: t.password, teacherId: t.teacherId },
       student: { email: `${s.username}@student.inovatic.local`, password: s.password },
       groupId,
     }
-    await page.close()
   })
 
-  test('teacher navbar has a "Materijali" link', async ({ page }) => {
+  // Lifecycle merge (was 6 tests: create GROUP, create MODULE, student sees
+  // both, hide MODULE, unhide MODULE, delete GROUP). Each original `expect()`
+  // is preserved as its own `test.step()` with a descriptive label.
+  test('material lifecycle: create GROUP+MODULE → student sees both → hide → unhide → delete GROUP', async ({
+    page,
+  }) => {
     if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await expect(page.getByRole('link', { name: 'Materijali' }).first()).toBeVisible()
-  })
+    test.setTimeout(240000)
 
-  test('teacher creates a GROUP LINK material and student sees it', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
-
-    await addLinkMaterial(
-      page,
-      /Dodaj samo u ovu grupu/,
-      GROUP_LINK_TITLE,
-      'https://drive.google.com/file/d/abc123',
-    )
-    await expect(page.getByText(GROUP_LINK_TITLE)).toBeVisible()
-  })
-
-  test('teacher creates a MODULE LINK material and student sees it in the group', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
-
-    await addLinkMaterial(
-      page,
-      /Dodaj u modul:/,
-      MODULE_LINK_TITLE,
-      'https://example.com/module-resource',
-    )
-    await expect(page.getByText(MODULE_LINK_TITLE)).toBeVisible()
-  })
-
-  test('student portal renders both GROUP and MODULE materials', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.student.email, seeded.student.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
-    await page.goto(`${BASE}/portal/grupa/${seeded.groupId}`)
-
-    await expect(page.getByText(GROUP_LINK_TITLE)).toBeVisible()
-    await expect(page.getByText(MODULE_LINK_TITLE)).toBeVisible()
-  })
-
-  test('teacher hides the MODULE material in this group — student no longer sees it', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
-
-    const row = page.locator('li', { has: page.getByText(MODULE_LINK_TITLE) })
-    await row.getByRole('button', { name: 'Sakrij u ovoj grupi' }).click()
-    await expect(row.getByText('Sakriveno u grupi')).toBeVisible({ timeout: 5000 })
-
-    await loginWithEmail(page, seeded.student.email, seeded.student.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
-    await page.goto(`${BASE}/portal/grupa/${seeded.groupId}`)
-    await expect(page.getByText(MODULE_LINK_TITLE)).toHaveCount(0)
-    await expect(page.getByText(GROUP_LINK_TITLE)).toBeVisible()
-  })
-
-  // ── I2: Unhide (re-show) MODULE material ──────────────────────────────────
-
-  test('teacher unhides the MODULE material — student sees it again', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
-
-    const row = page.locator('li', { has: page.getByText(MODULE_LINK_TITLE) })
-    await row.getByRole('button', { name: 'Prikaži u ovoj grupi' }).click()
-    await expect(row.getByText('Sakriveno u grupi')).toHaveCount(0, { timeout: 5000 })
-
-    await loginWithEmail(page, seeded.student.email, seeded.student.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
-    await page.goto(`${BASE}/portal/grupa/${seeded.groupId}`)
-    await expect(page.getByText(MODULE_LINK_TITLE)).toBeVisible()
-  })
-
-  test('teacher deletes the GROUP material — student loses it too', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
-
-    page.on('dialog', (d) => d.accept())
-
-    const row = page.locator('li', { has: page.getByText(GROUP_LINK_TITLE) })
-    await row.getByRole('button', { name: 'Obriši materijal' }).click()
-    await expect(row).toBeHidden({ timeout: 10000 })
-
-    await loginWithEmail(page, seeded.student.email, seeded.student.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
-    await page.goto(`${BASE}/portal/grupa/${seeded.groupId}`)
-    await expect(page.getByText(GROUP_LINK_TITLE)).toHaveCount(0)
-  })
-
-  test('/api/upload/materials rejects a STUDENT cookie', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.student.email, seeded.student.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
-
-    const status = await page.evaluate(async () => {
-      const form = new FormData()
-      form.append('file', new Blob(['hi'], { type: 'text/plain' }), 'hi.txt')
-      const res = await fetch('/api/upload/materials', { method: 'POST', body: form })
-      return res.status
-    })
-    expect(status).toBe(401)
-  })
-
-  test('/api/upload/materials rejects an unsupported MIME', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-
-    const status = await page.evaluate(async () => {
-      const form = new FormData()
-      form.append(
-        'file',
-        new Blob(['x'], { type: 'application/x-custom-unsupported' }),
-        'weird.bin',
+    await test.step('Teacher creates a GROUP-scope LINK material', async () => {
+      await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await page.goto(`${BASE}/nastavnik/grupa/${seeded!.groupId}/materijali`)
+      await addLinkMaterial(
+        page,
+        /Dodaj samo u ovu grupu/,
+        GROUP_LINK_TITLE,
+        'https://drive.google.com/file/d/abc123',
       )
-      const res = await fetch('/api/upload/materials', { method: 'POST', body: form })
-      return res.status
+      await expect(
+        page.getByText(GROUP_LINK_TITLE),
+        'GROUP material is visible in teacher list after create',
+      ).toBeVisible()
     })
-    expect(status).toBe(415)
+
+    await test.step('Teacher creates a MODULE-scope LINK material', async () => {
+      await addLinkMaterial(
+        page,
+        /Dodaj u modul:/,
+        MODULE_LINK_TITLE,
+        'https://example.com/module-resource',
+      )
+      await expect(
+        page.getByText(MODULE_LINK_TITLE),
+        'MODULE material is visible in teacher list after create',
+      ).toBeVisible()
+    })
+
+    await test.step('Student portal renders both GROUP and MODULE materials', async () => {
+      await loginWithEmail(page, seeded!.student.email, seeded!.student.password)
+      await page.waitForURL(/\/portal/, { timeout: 30000 })
+      await page.goto(`${BASE}/portal/grupa/${seeded!.groupId}`)
+      await expect(
+        page.getByText(GROUP_LINK_TITLE),
+        'student sees GROUP-scope material',
+      ).toBeVisible()
+      await expect(
+        page.getByText(MODULE_LINK_TITLE),
+        'student sees MODULE-scope material',
+      ).toBeVisible()
+    })
+
+    await test.step('Teacher hides the MODULE material — student loses MODULE, keeps GROUP', async () => {
+      await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await page.goto(`${BASE}/nastavnik/grupa/${seeded!.groupId}/materijali`)
+      const row = page.locator('li', { has: page.getByText(MODULE_LINK_TITLE) })
+      await row.getByRole('button', { name: 'Sakrij u ovoj grupi' }).click()
+      await expect(
+        row.getByText('Sakriveno u grupi'),
+        '"Sakriveno u grupi" pill appears after hide',
+      ).toBeVisible({ timeout: 5000 })
+
+      await loginWithEmail(page, seeded!.student.email, seeded!.student.password)
+      await page.waitForURL(/\/portal/, { timeout: 30000 })
+      await page.goto(`${BASE}/portal/grupa/${seeded!.groupId}`)
+      await expect(
+        page.getByText(MODULE_LINK_TITLE),
+        'student no longer sees the hidden MODULE material',
+      ).toHaveCount(0)
+      await expect(
+        page.getByText(GROUP_LINK_TITLE),
+        'student still sees the GROUP material',
+      ).toBeVisible()
+    })
+
+    await test.step('Teacher unhides — student sees MODULE again', async () => {
+      await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await page.goto(`${BASE}/nastavnik/grupa/${seeded!.groupId}/materijali`)
+      const row = page.locator('li', { has: page.getByText(MODULE_LINK_TITLE) })
+      await row.getByRole('button', { name: 'Prikaži u ovoj grupi' }).click()
+      await expect(
+        row.getByText('Sakriveno u grupi'),
+        '"Sakriveno u grupi" pill disappears after unhide',
+      ).toHaveCount(0, { timeout: 5000 })
+
+      await loginWithEmail(page, seeded!.student.email, seeded!.student.password)
+      await page.waitForURL(/\/portal/, { timeout: 30000 })
+      await page.goto(`${BASE}/portal/grupa/${seeded!.groupId}`)
+      await expect(
+        page.getByText(MODULE_LINK_TITLE),
+        'student sees the MODULE material again after unhide',
+      ).toBeVisible()
+    })
+
+    await test.step('Teacher deletes the GROUP material — student loses it too', async () => {
+      await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      await page.goto(`${BASE}/nastavnik/grupa/${seeded!.groupId}/materijali`)
+      page.on('dialog', (d) => d.accept())
+      const row = page.locator('li', { has: page.getByText(GROUP_LINK_TITLE) })
+      await row.getByRole('button', { name: 'Obriši materijal' }).click()
+      await expect(
+        row,
+        'GROUP material row disappears from teacher list after delete',
+      ).toBeHidden({ timeout: 10000 })
+
+      await loginWithEmail(page, seeded!.student.email, seeded!.student.password)
+      await page.waitForURL(/\/portal/, { timeout: 30000 })
+      await page.goto(`${BASE}/portal/grupa/${seeded!.groupId}`)
+      await expect(
+        page.getByText(GROUP_LINK_TITLE),
+        'student loses the GROUP material after delete',
+      ).toHaveCount(0)
+    })
+  })
+
+  // API guards merge — STUDENT rejection + unsupported MIME (was 2 tests).
+  // Note: the "good file 200" happy-path is implicitly exercised by the
+  // lifecycle test above, which uploads materials via the same /api/upload/materials route.
+  test('upload route guards: STUDENT cookie → 401, unsupported MIME → 415', async ({ page }) => {
+    if (!seeded) throw new Error('not seeded')
+
+    await test.step('STUDENT cookie on /api/upload/materials → 401', async () => {
+      await loginWithEmail(page, seeded!.student.email, seeded!.student.password)
+      await page.waitForURL(/\/portal/, { timeout: 30000 })
+      const status = await page.evaluate(async () => {
+        const form = new FormData()
+        form.append('file', new Blob(['hi'], { type: 'text/plain' }), 'hi.txt')
+        const res = await fetch('/api/upload/materials', { method: 'POST', body: form })
+        return res.status
+      })
+      expect(status, 'STUDENT POST to upload route returns 401').toBe(401)
+    })
+
+    await test.step('Unsupported MIME (application/x-custom-unsupported) → 415', async () => {
+      await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
+      await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+      const status = await page.evaluate(async () => {
+        const form = new FormData()
+        form.append(
+          'file',
+          new Blob(['x'], { type: 'application/x-custom-unsupported' }),
+          'weird.bin',
+        )
+        const res = await fetch('/api/upload/materials', { method: 'POST', body: form })
+        return res.status
+      })
+      expect(status, 'unsupported MIME returns 415').toBe(415)
+    })
   })
 
   test('admin materials page lists existing materials with search + filters', async ({ page }) => {
@@ -504,11 +524,11 @@ test.describe('Phase 3 Step 13 — COURSE-scope material on a radionica', () => 
     if (!courseId) throw new Error(`Could not find courseId for "${RADIONICA_TITLE}"`)
     await page.keyboard.press('Escape')
 
-    // 5) Create a teacher and assign to groupA ONLY — canManageMaterial's
-    //    COURSE branch must succeed via the shared courseId, not via direct
-    //    group ownership.
-    const t = await createTeacher(page, RADIONICA_TEACHER)
-    await assignTeacherToGroup(page, t.teacherId, ids[0])
+    // 5) Direct-Prisma seed the teacher + assignment (Flux lu3f9sh) — saves
+    //    25-50s vs the UI dialogs while leaving the radionica/group creation
+    //    above on the UI to keep the radionica-form regression coverage.
+    const t = await seedTeacher(RADIONICA_TEACHER)
+    await seedTeacherAssignment(t.teacherId, ids[0])
 
     radionicaSeeded = {
       teacher: { email: RADIONICA_TEACHER.email, password: t.password },

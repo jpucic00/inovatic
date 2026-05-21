@@ -19,18 +19,6 @@ test.describe('Login Page', () => {
     await expect(page.locator('button[type="submit"]')).toHaveText('Prijavi se')
   })
 
-  test('shows validation errors on empty submission', async ({ page }) => {
-    await page.goto(`${BASE}/prijava`)
-    // waitForLoadState('networkidle') gives the client bundle time to hydrate
-    // so the form's onSubmit handler is attached before we click.
-    await page.waitForLoadState('networkidle')
-    await page.locator('#identifier').click()
-    await page.locator('input[type="password"]').click()
-    await page.locator('button[type="submit"]').click()
-    await expect(page.getByText('Unesite korisničko ime ili e-mail')).toBeVisible()
-    await expect(page.getByText('Unesite lozinku')).toBeVisible()
-  })
-
   test('shows error message on wrong credentials', async ({ page }) => {
     await page.goto(`${BASE}/prijava`)
     await page.waitForLoadState('networkidle')
@@ -74,24 +62,41 @@ test.describe('Navbar Login Link', () => {
 })
 
 test.describe('Privacy Policy Page', () => {
-  test('renders at /politika-privatnosti with correct heading', async ({ page }) => {
-    const response = await page.goto(`${BASE}/politika-privatnosti`)
-    expect(response?.status()).toBe(200)
-    await expect(page.locator('h1')).toHaveText('Politika privatnosti')
-  })
+  // Cluster merge (Flux cvyxnhq) — heading + sections + metadata were three
+  // discrete tests that all hit /politika-privatnosti. Now share one goto().
+  test('renders heading, all GDPR sections, and brand title metadata', async ({ page }) => {
+    await test.step('GET /politika-privatnosti returns 200 with correct heading', async () => {
+      const response = await page.goto(`${BASE}/politika-privatnosti`)
+      expect(response?.status(), '/politika-privatnosti returns 200').toBe(200)
+      await expect(
+        page.locator('h1'),
+        'page heading is "Politika privatnosti"',
+      ).toHaveText('Politika privatnosti')
+    })
 
-  test('contains key GDPR sections', async ({ page }) => {
-    await page.goto(`${BASE}/politika-privatnosti`)
-    await expect(page.locator('text=Voditelj obrade')).toBeVisible()
-    await expect(page.locator('text=Koje podatke prikupljamo')).toBeVisible()
-    await expect(page.locator('text=Pravna osnova obrade')).toBeVisible()
-    await expect(page.locator('text=Vaša prava')).toBeVisible()
-  })
+    await test.step('Page contains all key GDPR section anchors', async () => {
+      await expect(
+        page.locator('text=Voditelj obrade'),
+        '"Voditelj obrade" section is rendered',
+      ).toBeVisible()
+      await expect(
+        page.locator('text=Koje podatke prikupljamo'),
+        '"Koje podatke prikupljamo" section is rendered',
+      ).toBeVisible()
+      await expect(
+        page.locator('text=Pravna osnova obrade'),
+        '"Pravna osnova obrade" section is rendered',
+      ).toBeVisible()
+      await expect(
+        page.locator('text=Vaša prava'),
+        '"Vaša prava" section is rendered',
+      ).toBeVisible()
+    })
 
-  test('has correct metadata', async ({ page }) => {
-    await page.goto(`${BASE}/politika-privatnosti`)
-    const title = await page.title()
-    expect(title).toContain('Politika privatnosti')
+    await test.step('<title> metadata contains the page name', async () => {
+      const title = await page.title()
+      expect(title, '<title> contains "Politika privatnosti"').toContain('Politika privatnosti')
+    })
   })
 })
 

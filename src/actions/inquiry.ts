@@ -2,6 +2,7 @@
 
 import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
+import { computeAvailableSpots } from '@/lib/available-spots'
 import { computeSchoolYear } from '@/lib/school-year'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
@@ -71,8 +72,11 @@ async function assertGroupHasAvailableSpot(tx: TxClient, scheduledGroupId: strin
       : group.enrollments.length
   }
 
-  const available = group.maxStudents - enrolledCount - group._count.preferredInquiries
-  if (available <= 0) throw new GroupFullError()
+  const available = computeAvailableSpots(
+    group.maxStudents,
+    enrolledCount + group._count.preferredInquiries,
+  )
+  if (available === 0) throw new GroupFullError()
 }
 
 type InquiryActionResult =

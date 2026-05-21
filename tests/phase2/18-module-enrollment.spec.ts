@@ -243,12 +243,20 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
   let originalDates: { startDate: string; endDate: string }[] = []
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180000)
+    test.setTimeout(240000)
     const page = await browser.newPage()
     await loginAsAdmin(page)
 
     // Snapshot original SLR 1 module dates (so we can restore them in afterAll)
     originalDates = await snapshotModuleDates(page)
+
+    // Shift the four SLR 1 modules into deterministic states (M1=Završen,
+    // M2=Aktivan, M3=M4=Nadolazi) so the remove-student-from-module and
+    // button-visibility tests below have a known active-module context.
+    // Date-state derivation is unit-tested at tests/unit/lib/active-module.test.ts.
+    for (let i = 0; i < SHIFT_DATES.length; i++) {
+      await shiftModuleDates(page, i, SHIFT_DATES[i].startDate, SHIFT_DATES[i].endDate)
+    }
 
     // Create a dedicated group + 9 students with all modules selected
     groupDetailUrl = await createStandardGroup(page, STD_GROUP_NAME)
@@ -350,30 +358,12 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
   // ── Available-spots calculation under module date shifts ───────────────────
 
   test.describe('Available spots under date shifts', () => {
-    test('E8 — shifts make M1=Završen, M2=Aktivan, M3=M4=Nadolazi and spots reflect active module', async ({
-      page,
-    }) => {
-      test.setTimeout(90000)
-      await loginAsAdmin(page)
-
-      // Shift all four modules into the target states
-      for (let i = 0; i < SHIFT_DATES.length; i++) {
-        await shiftModuleDates(page, i, SHIFT_DATES[i].startDate, SHIFT_DATES[i].endDate)
-      }
-
-      // Navigate to the group detail — per-module spots appear inside each tab.
-      await page.goto(groupDetailUrl)
-
-      // The default-expanded tab is the first Aktivan module (M2).
-      // Header "{spotsUsed}/{maxStudents}" where spotsUsed is "students enrolled
-      // in M2's schedule". All 9 students were enrolled with all modules, so
-      // spotsUsed = 9 on every tab.
-      await expect(page.getByText(/9\/10/).first()).toBeVisible()
-      await expect(page.getByText(/1 slobodnih/).first()).toBeVisible()
-
-      // Active tab should have the green dot indicator on the Modul 2 button
-      await expect(moduleTabButton(page, 2)).toBeVisible()
-    })
+    // E8 ("shifts make M1=Završen, M2=Aktivan, M3=M4=Nadolazi…") moved to
+    // tests/unit/lib/active-module.test.ts — the date-state derivation logic
+    // is now exercised directly against getCurrentActiveModule without
+    // needing the dev server, DB, or Cromium round-trip. The module-date
+    // shifts that this test used to perform are now done in beforeAll so the
+    // remaining UI tests below still observe the M2=Aktivan state.
 
     test('E9 — removing one student from the active module reduces its used count', async ({
       page,

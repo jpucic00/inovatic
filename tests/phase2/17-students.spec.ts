@@ -387,150 +387,154 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
   // ── Edge cases ─────────────────────────────────────────────────────────────
 
   test.describe('Edge cases', () => {
-    // E1a — same firstName+lastName but DIFFERENT date of birth should create two distinct students
-    test('E1a — same name + different DOB creates two distinct students', async ({ page }) => {
+    // E1a + E1b dedup bundle (Flux cvyxnhq) — both branches of the
+    // (firstName, lastName, dateOfBirth) dedup gate exercised in one flow.
+    test('E1 — dedup gate: different DOB → 2 distinct, same DOB → existing returned', async ({ page }) => {
       await loginAsAdmin(page)
-
-      const sharedName = {
-        firstName: `Marko${RUN_ID}`,
-        lastName: `Dvojnik${RUN_ID}`,
-      }
-
-      // First creation — succeeds
-      await createStudentManuallyViaDialog(page, {
-        ...sharedName,
-        dateOfBirth: '2015-01-01',
-      })
       const dialog = page.locator('[role="dialog"]')
-      await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 10000 })
-      // Assert it's a NEW account (green credentials box is rendered)
-      await expect(dialog.getByText('Pristupni podaci')).toBeVisible()
-      await page.keyboard.press('Escape')
 
-      // Second creation — same name, DIFFERENT DOB → should also be a NEW account
-      await createStudentManuallyViaDialog(page, {
-        ...sharedName,
-        dateOfBirth: '2010-12-31',
-      })
-      await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 10000 })
-      // New account → green Pristupni podaci box should still be visible
-      await expect(dialog.getByText('Pristupni podaci')).toBeVisible()
-      await page.keyboard.press('Escape')
+      await test.step('E1a — same name + different DOB creates two distinct students', async () => {
+        const sharedName = {
+          firstName: `Marko${RUN_ID}`,
+          lastName: `Dvojnik${RUN_ID}`,
+        }
 
-      // List should show 2 students with this name (different usernames)
-      await page.goto(
-        `${BASE}/admin/ucenici?search=${encodeURIComponent(sharedName.firstName)}`,
-      )
-      const matches = page.getByRole('link', {
-        name: new RegExp(`${sharedName.firstName} ${sharedName.lastName}`),
+        await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: '2015-01-01' })
+        await expect(
+          dialog.getByText('Učenik kreiran'),
+          'first creation succeeds',
+        ).toBeVisible({ timeout: 10000 })
+        await expect(
+          dialog.getByText('Pristupni podaci'),
+          'green credentials box → it is a NEW account',
+        ).toBeVisible()
+        await page.keyboard.press('Escape')
+
+        await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: '2010-12-31' })
+        await expect(
+          dialog.getByText('Učenik kreiran'),
+          'second creation (different DOB) succeeds',
+        ).toBeVisible({ timeout: 10000 })
+        await expect(
+          dialog.getByText('Pristupni podaci'),
+          'green credentials box → also a NEW account',
+        ).toBeVisible()
+        await page.keyboard.press('Escape')
+
+        await page.goto(
+          `${BASE}/admin/ucenici?search=${encodeURIComponent(sharedName.firstName)}`,
+        )
+        const matches = page.getByRole('link', {
+          name: new RegExp(`${sharedName.firstName} ${sharedName.lastName}`),
+        })
+        await expect(matches, 'list shows 2 distinct students with that name').toHaveCount(2)
       })
-      await expect(matches).toHaveCount(2)
+
+      await test.step('E1b — same name + same DOB returns existing (isExisting=true)', async () => {
+        const sharedName = {
+          firstName: `Neven${RUN_ID}`,
+          lastName: `Postojeci${RUN_ID}`,
+        }
+
+        await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: DEDUP_DOB })
+        await expect(
+          dialog.getByText('Učenik kreiran'),
+          'first creation succeeds',
+        ).toBeVisible({ timeout: 10000 })
+        await expect(
+          dialog.getByText('Pristupni podaci'),
+          'first creation → NEW account',
+        ).toBeVisible()
+        await page.keyboard.press('Escape')
+
+        await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: DEDUP_DOB })
+        await expect(
+          dialog.getByText('Pronađen je postojeći račun za ovo dijete.'),
+          'second creation surfaces "existing account found" message',
+        ).toBeVisible({ timeout: 10000 })
+        await page.keyboard.press('Escape')
+
+        await page.goto(
+          `${BASE}/admin/ucenici?search=${encodeURIComponent(sharedName.firstName)}`,
+        )
+        const matches = page.getByRole('link', {
+          name: new RegExp(`${sharedName.firstName} ${sharedName.lastName}`),
+        })
+        await expect(matches, 'dedupe worked — list shows exactly 1 student').toHaveCount(1)
+      })
     })
 
-    // E1b — same firstName+lastName AND same DOB should return the existing student
-    test('E1b — same name + same DOB returns existing student (isExisting flag)', async ({
-      page,
-    }) => {
+    // E2 + E3 username sanitization bundle (Flux cvyxnhq) — collision suffix
+    // and diacritic strip both exercise the username-generation pipeline.
+    test('E2 + E3 — username generation: collision adds suffix; Croatian diacritics stripped', async ({ page }) => {
       await loginAsAdmin(page)
-
-      const sharedName = {
-        firstName: `Neven${RUN_ID}`,
-        lastName: `Postojeci${RUN_ID}`,
-      }
-
-      // First creation — new account with green credentials box
-      await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: DEDUP_DOB })
       const dialog = page.locator('[role="dialog"]')
-      await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 10000 })
-      await expect(dialog.getByText('Pristupni podaci')).toBeVisible()
-      await page.keyboard.press('Escape')
 
-      // Second creation — same name + same DOB → should return isExisting=true
-      // DialogTitle is still "Učenik kreiran" in both paths; the differentiator
-      // is the description text + absence of the green credentials box.
-      await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: DEDUP_DOB })
-      await expect(
-        dialog.getByText('Pronađen je postojeći račun za ovo dijete.'),
-      ).toBeVisible({ timeout: 10000 })
-      await page.keyboard.press('Escape')
+      await test.step('E2 — same normalized name → second account gets a "2" suffix', async () => {
+        const baseFirst = `Iva${RUN_ID}`
+        const baseLast = `Kolizija${RUN_ID}`
 
-      // List should show exactly 1 student (dedupe worked)
-      await page.goto(
-        `${BASE}/admin/ucenici?search=${encodeURIComponent(sharedName.firstName)}`,
-      )
-      const matches = page.getByRole('link', {
-        name: new RegExp(`${sharedName.firstName} ${sharedName.lastName}`),
+        await createStudentManuallyViaDialog(page, {
+          firstName: baseFirst,
+          lastName: baseLast,
+          dateOfBirth: '2014-03-03',
+        })
+        await expect(
+          dialog.getByText('Učenik kreiran'),
+          'first creation succeeds',
+        ).toBeVisible({ timeout: 10000 })
+        const firstUsername = await dialog
+          .locator('p', { hasText: 'Korisničko ime:' })
+          .first()
+          .innerText()
+        await page.keyboard.press('Escape')
+
+        await createStudentManuallyViaDialog(page, {
+          firstName: baseFirst,
+          lastName: baseLast,
+          dateOfBirth: '2014-04-04',
+        })
+        await expect(
+          dialog.getByText('Učenik kreiran'),
+          'second creation succeeds (different DOB)',
+        ).toBeVisible({ timeout: 10000 })
+        const secondUsername = await dialog
+          .locator('p', { hasText: 'Korisničko ime:' })
+          .first()
+          .innerText()
+
+        expect(firstUsername, 'colliding usernames are disambiguated').not.toBe(secondUsername)
+        expect(secondUsername, 'second username ends with numeric suffix "2"').toMatch(/2\s*$/)
+        await page.keyboard.press('Escape')
       })
-      await expect(matches).toHaveCount(1)
-    })
 
-    // E2 — username collision: two students whose names normalize to the
-    // same base username should get suffixed (base, base2).
-    test('E2 — username collision gets numeric suffix disambiguation', async ({ page }) => {
-      await loginAsAdmin(page)
-
-      // Two students with same normalized name but different DOB to avoid
-      // the DOB dedup short-circuit.
-      const baseFirst = `Iva${RUN_ID}`
-      const baseLast = `Kolizija${RUN_ID}`
-
-      await createStudentManuallyViaDialog(page, {
-        firstName: baseFirst,
-        lastName: baseLast,
-        dateOfBirth: '2014-03-03',
+      await test.step('E3 — diacritics: Šime Čović → ASCII letters (no š/č)', async () => {
+        const firstName = `Šime${RUN_ID}`
+        const lastName = `Čović${RUN_ID}`
+        await createStudentManuallyViaDialog(page, {
+          firstName,
+          lastName,
+          dateOfBirth: '2013-07-07',
+        })
+        await expect(
+          dialog.getByText('Učenik kreiran'),
+          'diacritic name creation succeeds',
+        ).toBeVisible({ timeout: 10000 })
+        const rawLine = await dialog
+          .locator('p', { hasText: 'Korisničko ime:' })
+          .first()
+          .innerText()
+        const username = rawLine.replace(/^[^:]*:\s*/, '').trim()
+        expect(username, 'no Croatian š/č in the generated username').not.toMatch(/[šč]/i)
+        expect(
+          username.toLowerCase(),
+          'username contains the latin-ized base "sime"',
+        ).toContain('sime')
+        expect(
+          username.toLowerCase(),
+          'username contains the latin-ized base "covic"',
+        ).toContain('covic')
       })
-      const dialog = page.locator('[role="dialog"]')
-      await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 10000 })
-      // Capture the first username from the result screen.
-      const firstUsername = await dialog
-        .locator('p', { hasText: 'Korisničko ime:' })
-        .first()
-        .innerText()
-      await page.keyboard.press('Escape')
-
-      await createStudentManuallyViaDialog(page, {
-        firstName: baseFirst,
-        lastName: baseLast,
-        dateOfBirth: '2014-04-04',
-      })
-      await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 10000 })
-      const secondUsername = await dialog
-        .locator('p', { hasText: 'Korisničko ime:' })
-        .first()
-        .innerText()
-
-      // Usernames should differ: second should end with "2" suffix
-      expect(firstUsername).not.toBe(secondUsername)
-      expect(secondUsername).toMatch(/2\s*$/)
-    })
-
-    // E3 — diacritics: Croatian chars should be stripped from the username
-    test('E3 — Croatian diacritics are stripped from the username', async ({ page }) => {
-      await loginAsAdmin(page)
-      // Note: names include unique RUN_ID so this doesn't collide with E2
-      const firstName = `Šime${RUN_ID}`
-      const lastName = `Čović${RUN_ID}`
-
-      await createStudentManuallyViaDialog(page, {
-        firstName,
-        lastName,
-        dateOfBirth: '2013-07-07',
-      })
-      const dialog = page.locator('[role="dialog"]')
-      await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 10000 })
-
-      // Strip the "Korisničko ime:" label so we only inspect the actual username.
-      // Note: the label itself contains 'č', so we must not match against the
-      // full line.
-      const rawLine = await dialog
-        .locator('p', { hasText: 'Korisničko ime:' })
-        .first()
-        .innerText()
-      const username = rawLine.replace(/^[^:]*:\s*/, '').trim()
-      expect(username).not.toMatch(/[šč]/i)
-      // And it should contain the latin-ized base "sime" + "covic"
-      expect(username.toLowerCase()).toContain('sime')
-      expect(username.toLowerCase()).toContain('covic')
     })
 
     // E4 — DECLINED inquiry: the "Kreiraj račun i upiši" button must be hidden

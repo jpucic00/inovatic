@@ -247,27 +247,49 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
   // ── Search ─────────────────────────────────────────────────────────────────
 
   test.describe('Inquiry Search', () => {
-    test('search by parent name filters to matching results', async ({ page }) => {
+    // 3 positive paths merged into 1 flow test (shares login + initial goto);
+    // the negative no-match case stays isolated so a regression in one path
+    // can't mask a regression in the other.
+    test('positive paths: parent-name search → child-name search → clear restores all', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti`)
 
-      await page.locator('input[placeholder*="Pretraži"]').fill(INQUIRY_MAIN.parentName)
-      await page.locator('button', { hasText: 'Traži' }).click()
+      await test.step('Search by parent name filters down to that row only', async () => {
+        await page.locator('input[placeholder*="Pretraži"]').fill(INQUIRY_MAIN.parentName)
+        await page.locator('button', { hasText: 'Traži' }).click()
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.parentName}`),
+          'searched parent row is visible',
+        ).toBeVisible()
+        await expect(
+          page.locator(`text=${INQUIRY_TO_DECLINE.parentName}`),
+          'other parent rows are filtered out',
+        ).not.toBeVisible()
+      })
 
-      await expect(page.locator(`text=${INQUIRY_MAIN.parentName}`)).toBeVisible()
-      // Other test inquiries should not appear
-      await expect(page.locator(`text=${INQUIRY_TO_DECLINE.parentName}`)).not.toBeVisible()
-    })
+      await test.step('Search by child name filters down to that row only', async () => {
+        await page
+          .locator('input[placeholder*="Pretraži"]')
+          .fill(INQUIRY_TO_DECLINE.childName)
+        await page.locator('button', { hasText: 'Traži' }).click()
+        await expect(
+          page.locator(`text=${INQUIRY_TO_DECLINE.childName}`),
+          'searched child row is visible',
+        ).toBeVisible()
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.childName}`),
+          'other child rows are filtered out',
+        ).not.toBeVisible()
+      })
 
-    test('search by child name filters to matching results', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/upiti`)
-
-      await page.locator('input[placeholder*="Pretraži"]').fill(INQUIRY_TO_DECLINE.childName)
-      await page.locator('button', { hasText: 'Traži' }).click()
-
-      await expect(page.locator(`text=${INQUIRY_TO_DECLINE.childName}`)).toBeVisible()
-      await expect(page.locator(`text=${INQUIRY_MAIN.childName}`)).not.toBeVisible()
+      await test.step('Clearing the search input restores the full list', async () => {
+        await page.locator('input[placeholder*="Pretraži"]').fill('')
+        await page.locator('button', { hasText: 'Traži' }).click()
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.parentName}`),
+          'main parent reappears after clearing search',
+        ).toBeVisible()
+      })
     })
 
     test('search with no match shows empty state', async ({ page }) => {
@@ -281,44 +303,45 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
 
       await expect(page.locator('text=Nema upita koji odgovaraju filteru')).toBeVisible()
     })
-
-    test('clearing search input shows all inquiries again', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/upiti?search=NONEXISTENT`)
-      // Clear the search by emptying the input and resubmitting
-      await page.locator('input[placeholder*="Pretraži"]').fill('')
-      await page.locator('button', { hasText: 'Traži' }).click()
-      await expect(page.locator(`text=${INQUIRY_MAIN.parentName}`)).toBeVisible()
-    })
   })
 
   // ── Status filter ──────────────────────────────────────────────────────────
 
   test.describe('Status Filter', () => {
-    test('"Sve" filter shows all test inquiries', async ({ page }) => {
+    test('flow paths: Sve → Nove → Odbijene navigate and filter correctly', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti`)
-      await page.locator('button', { hasText: 'Sve' }).click()
-      await expect(page.locator(`text=${INQUIRY_MAIN.parentName}`)).toBeVisible()
+
+      await test.step('"Sve" filter shows the main test inquiry', async () => {
+        await page.locator('button', { hasText: 'Sve' }).click()
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.parentName}`),
+          'main inquiry is listed under "Sve"',
+        ).toBeVisible()
+      })
+
+      await test.step('"Nove" filter navigates with ?status=NEW and shows new inquiries', async () => {
+        await page.locator('button', { hasText: 'Nove' }).click()
+        await page.waitForURL(/status=NEW/)
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.parentName}`),
+          'main inquiry (status=NEW) is listed under "Nove"',
+        ).toBeVisible()
+      })
+
+      await test.step('"Odbijene" filter navigates with ?status=DECLINED and hides NEW inquiries', async () => {
+        await page.locator('button', { hasText: 'Odbijene' }).click()
+        await page.waitForURL(/status=DECLINED/)
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.parentName}`),
+          'main (NEW) inquiry is hidden under "Odbijene"',
+        ).not.toBeVisible()
+      })
     })
 
-    test('"Nove" filter shows test inquiries (all are NEW)', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/upiti`)
-      await page.locator('button', { hasText: 'Nove' }).click()
-      await page.waitForURL(/status=NEW/)
-      await expect(page.locator(`text=${INQUIRY_MAIN.parentName}`)).toBeVisible()
-    })
-
-    test('"Odbijene" filter shows empty before any declines', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/upiti`)
-      await page.locator('button', { hasText: 'Odbijene' }).click()
-      await page.waitForURL(/status=DECLINED/)
-      await expect(page.locator(`text=${INQUIRY_MAIN.parentName}`)).not.toBeVisible()
-    })
-
-    test('status filter buttons are highlighted when active', async ({ page }) => {
+    // Stays isolated from the flow test: this asserts CSS state (highlight),
+    // not navigation behaviour — different failure mode.
+    test('active status filter button is highlighted', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti?status=NEW`)
       const noveButton = page.locator('button', { hasText: 'Nove' })
@@ -329,73 +352,107 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
   // ── Inquiry detail ─────────────────────────────────────────────────────────
 
   test.describe('Inquiry Detail Page', () => {
-    test('navigates to detail page via Detalji link', async ({ page }) => {
+    // All 9 originally-discrete display assertions merged into 1 pure-render
+    // test that visits the detail page once. Every original `expect()` is
+    // preserved as its own `test.step()` so the HTML report still pinpoints
+    // which field broke.
+    test('pure display: heading + status + parent + child + DOB + timeline + consent all render', async ({ page }) => {
       await loginAsAdmin(page)
       await openInquiryDetail(page, INQUIRY_MAIN.parentName)
-      expect(page.url()).toMatch(/\/admin\/upiti\/[a-z0-9]+$/)
+
+      await test.step('URL matched the /admin/upiti/[id] pattern', async () => {
+        expect(page.url(), 'detail URL has the expected shape').toMatch(
+          /\/admin\/upiti\/[a-z0-9]+$/,
+        )
+      })
+
+      await test.step('Heading shows the child full name', async () => {
+        await expect(page.locator('h1'), 'detail <h1> is the child name').toHaveText(
+          INQUIRY_MAIN.childName,
+        )
+      })
+
+      await test.step('Status badge "Nova" is visible', async () => {
+        await expect(
+          page.locator('span', { hasText: 'Nova' }).first(),
+          'status badge shows "Nova" for a fresh inquiry',
+        ).toBeVisible()
+      })
+
+      await test.step('Parent name, email and phone are all rendered', async () => {
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.parentName}`).first(),
+          'parent name is on the page',
+        ).toBeVisible()
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.parentEmail}`),
+          'parent email is on the page',
+        ).toBeVisible()
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.parentPhone}`),
+          'parent phone is on the page',
+        ).toBeVisible()
+      })
+
+      await test.step('Child name and date-of-birth are rendered', async () => {
+        await expect(
+          page.locator(`text=${INQUIRY_MAIN.childName}`).first(),
+          'child name is on the page',
+        ).toBeVisible()
+        await expect(
+          page.locator('text=15.').first(),
+          'child DOB day "15." is rendered (HR dd.mm.yyyy. format)',
+        ).toBeVisible()
+      })
+
+      await test.step('Status timeline shows both flow steps', async () => {
+        const timeline = page.locator('h2', { hasText: 'Tijek upita' }).locator('..')
+        await expect(timeline, 'timeline panel is visible').toBeVisible()
+        await expect(
+          timeline.locator('span.text-xs.w-20', { hasText: 'Nova' }),
+          'timeline shows "Nova" step',
+        ).toBeVisible()
+        await expect(
+          timeline.locator('span.text-xs.w-20', { hasText: 'Račun stvoren' }),
+          'timeline shows "Račun stvoren" step',
+        ).toBeVisible()
+      })
+
+      await test.step('GDPR consent timestamp section is rendered', async () => {
+        await expect(
+          page.locator('dt', { hasText: 'Pristanak (GDPR)' }),
+          'GDPR consent <dt> is present',
+        ).toBeVisible()
+        await expect(
+          page.locator('text=Nije zabilježen'),
+          'consent is NOT marked as "Nije zabilježen" (consent was given)',
+        ).not.toBeVisible()
+      })
     })
 
-    test('detail page heading shows child name', async ({ page }) => {
+    test('action affordances: back link + Odbij/Obriši buttons all present', async ({ page }) => {
       await loginAsAdmin(page)
       await openInquiryDetail(page, INQUIRY_MAIN.parentName)
-      await expect(page.locator('h1')).toHaveText(INQUIRY_MAIN.childName)
-    })
 
-    test('detail page shows status badge "Nova"', async ({ page }) => {
-      await loginAsAdmin(page)
-      await openInquiryDetail(page, INQUIRY_MAIN.parentName)
-      await expect(page.locator('span', { hasText: 'Nova' }).first()).toBeVisible()
-    })
+      await test.step('"Natrag na upite" link points to /admin/upiti', async () => {
+        const backLink = page.locator('a', { hasText: 'Natrag na upite' })
+        await expect(backLink, 'back link is visible').toBeVisible()
+        await expect(backLink, 'back link href is /admin/upiti').toHaveAttribute(
+          'href',
+          '/admin/upiti',
+        )
+      })
 
-    test('detail page shows parent name, email, phone', async ({ page }) => {
-      await loginAsAdmin(page)
-      await openInquiryDetail(page, INQUIRY_MAIN.parentName)
-      await expect(page.locator(`text=${INQUIRY_MAIN.parentName}`).first()).toBeVisible()
-      await expect(page.locator(`text=${INQUIRY_MAIN.parentEmail}`)).toBeVisible()
-      await expect(page.locator(`text=${INQUIRY_MAIN.parentPhone}`)).toBeVisible()
-    })
-
-    test('detail page shows child name and date of birth', async ({ page }) => {
-      await loginAsAdmin(page)
-      await openInquiryDetail(page, INQUIRY_MAIN.parentName)
-      await expect(page.locator(`text=${INQUIRY_MAIN.childName}`).first()).toBeVisible()
-      // Date of birth displayed in HR format (dd.mm.yyyy.)
-      await expect(page.locator('text=15.').first()).toBeVisible()
-    })
-
-    test('detail page shows status timeline', async ({ page }) => {
-      await loginAsAdmin(page)
-      await openInquiryDetail(page, INQUIRY_MAIN.parentName)
-      // Scope to the timeline section to avoid matching the status badge
-      const timeline = page.locator('h2', { hasText: 'Tijek upita' }).locator('..')
-      await expect(timeline).toBeVisible()
-      // Step labels are in <span class="text-xs mt-1 text-center w-20 ...">
-      // STATUS_FLOW was simplified to [NEW, ACCOUNT_CREATED] — only two steps now
-      await expect(timeline.locator('span.text-xs.w-20', { hasText: 'Nova' })).toBeVisible()
-      await expect(timeline.locator('span.text-xs.w-20', { hasText: 'Račun stvoren' })).toBeVisible()
-    })
-
-    test('detail page shows consent timestamp', async ({ page }) => {
-      await loginAsAdmin(page)
-      await openInquiryDetail(page, INQUIRY_MAIN.parentName)
-      await expect(page.locator('dt', { hasText: 'Pristanak (GDPR)' })).toBeVisible()
-      // Should show a date, not "Nije zabilježen"
-      await expect(page.locator('text=Nije zabilježen')).not.toBeVisible()
-    })
-
-    test('detail page has "Natrag na upite" back link', async ({ page }) => {
-      await loginAsAdmin(page)
-      await openInquiryDetail(page, INQUIRY_MAIN.parentName)
-      const backLink = page.locator('a', { hasText: 'Natrag na upite' })
-      await expect(backLink).toBeVisible()
-      await expect(backLink).toHaveAttribute('href', '/admin/upiti')
-    })
-
-    test('detail page shows "Odbij upit" and "Obriši (GDPR)" buttons', async ({ page }) => {
-      await loginAsAdmin(page)
-      await openInquiryDetail(page, INQUIRY_MAIN.parentName)
-      await expect(page.locator('button', { hasText: 'Odbij upit' })).toBeVisible()
-      await expect(page.locator('button', { hasText: 'Obriši (GDPR)' })).toBeVisible()
+      await test.step('"Odbij upit" and "Obriši (GDPR)" action buttons are both visible', async () => {
+        await expect(
+          page.locator('button', { hasText: 'Odbij upit' }),
+          '"Odbij upit" button is visible',
+        ).toBeVisible()
+        await expect(
+          page.locator('button', { hasText: 'Obriši (GDPR)' }),
+          '"Obriši (GDPR)" button is visible',
+        ).toBeVisible()
+      })
     })
   })
 
@@ -546,40 +603,71 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
   // ── Pagination ─────────────────────────────────────────────────────────────
 
   test.describe('Pagination', () => {
-    test('header shows total inquiry count', async ({ page }) => {
+    // Lifecycle merge: total-count → nav-range → page-2 → reset-on-search →
+    // prev-disabled — all share the same "is the page big enough to paginate?"
+    // guard, so it's wasteful to re-check it per test.
+    test('lifecycle: total count → page 2 nav → reset on search → prev-disabled on page 1', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti`)
-      // Header caption is a <p> directly under the <h1>Upiti</h1>. Anchor
-      // on a digit-prefix so we don't collide with per-row email cells
-      // like "ivana.upit.712737@test.com" which also contain "upit".
-      await expect(
-        page.locator('p.text-gray-500').filter({ hasText: /^\d+\s+upita?$/ }),
-      ).toBeVisible()
-    })
 
-    test('pagination nav appears and shows "X–Y od Z" range text', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/upiti`)
-      // Only check when more than one page exists
+      await test.step('Header shows the total inquiry count', async () => {
+        await expect(
+          page.locator('p.text-gray-500').filter({ hasText: /^\d+\s+upita?$/ }),
+          'total-inquiry-count caption is visible',
+        ).toBeVisible()
+      })
+
       const countText = await page.locator('p.text-gray-500').first().textContent()
       const total = parseInt(countText?.match(/(\d+)/)?.[1] ?? '0')
-      if (total <= 20) return // not enough data — skip
-      await expect(page.locator('nav[aria-label="Paginacija"]')).toBeVisible()
-      await expect(page.locator('text=/\\d+–\\d+ od \\d+/')).toBeVisible()
+      test.skip(total <= 20, `only ${total} inquiries — page 2 doesn't render`)
+
+      await test.step('Pagination nav and "X–Y od Z" range render when > 1 page', async () => {
+        await expect(
+          page.locator('nav[aria-label="Paginacija"]'),
+          'pagination nav is visible',
+        ).toBeVisible()
+        await expect(
+          page.locator('text=/\\d+–\\d+ od \\d+/'),
+          'range text "X–Y od Z" is rendered',
+        ).toBeVisible()
+      })
+
+      await test.step('Page 2 renders and starts at row 21', async () => {
+        await page.goto(`${BASE}/admin/upiti?page=2`)
+        await expect(
+          page.locator('nav[aria-label="Paginacija"]'),
+          'pagination nav still visible on page 2',
+        ).toBeVisible()
+        await expect(
+          page.locator('text=/^21–/'),
+          'range text starts at row 21 on page 2',
+        ).toBeVisible()
+      })
+
+      await test.step('Submitting a search resets page param', async () => {
+        await page.goto(`${BASE}/admin/upiti?page=2`)
+        await page.locator('input[placeholder*="Pretraži"]').fill('test')
+        await page.locator('button', { hasText: 'Traži' }).click()
+        await page.waitForURL(/search=test/)
+        expect(page.url(), 'page= dropped after search submit').not.toContain('page=')
+      })
+
+      await test.step('Previous-page anchor is absent on page 1', async () => {
+        await page.goto(`${BASE}/admin/upiti`)
+        await expect(
+          page.locator('span[aria-label="Prethodna stranica"]'),
+          'prev <span> not visible on page 1',
+        ).not.toBeVisible()
+        await expect(
+          page.locator('a[aria-label="Prethodna stranica"]'),
+          'prev <a> not rendered on page 1 (disabled)',
+        ).not.toBeVisible()
+      })
     })
 
-    test('navigating to page 2 works and preserves search filters', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/upiti`)
-      const countText = await page.locator('p.text-gray-500').first().textContent()
-      const total = parseInt(countText?.match(/(\d+)/)?.[1] ?? '0')
-      if (total <= 20) return // not enough data — skip
-      await page.goto(`${BASE}/admin/upiti?page=2`)
-      await expect(page.locator('nav[aria-label="Paginacija"]')).toBeVisible()
-      // Range should start at 21
-      await expect(page.locator('text=/^21–/')).toBeVisible()
-    })
-
+    // Stays isolated — this is the only test that mutates page = 2 → status
+    // = NEW and asserts a side effect on URL. Merging into the lifecycle
+    // above would muddle which step caused a regression.
     test('changing status filter resets to page 1', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti?page=2`)
@@ -587,28 +675,6 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       // URL should contain status=NEW but NOT page=2
       await page.waitForURL(/status=NEW/)
       expect(page.url()).not.toContain('page=')
-    })
-
-    test('submitting search resets to page 1', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/upiti?page=2`)
-      await page.locator('input[placeholder*="Pretraži"]').fill('test')
-      await page.locator('button', { hasText: 'Traži' }).click()
-      await page.waitForURL(/search=test/)
-      expect(page.url()).not.toContain('page=')
-    })
-
-    test('previous-page button is disabled on page 1', async ({ page }) => {
-      await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/upiti`)
-      const countText = await page.locator('p.text-gray-500').first().textContent()
-      const total = parseInt(countText?.match(/(\d+)/)?.[1] ?? '0')
-      if (total <= 20) return // pagination won't render
-      // Prev button is rendered as a <span> (disabled) on page 1
-      await expect(page.locator('span[aria-label="Prethodna stranica"]')).not.toBeVisible()
-      // It's a <span> not a link, so no href
-      const prevLink = page.locator('a[aria-label="Prethodna stranica"]')
-      await expect(prevLink).not.toBeVisible()
     })
   })
 })

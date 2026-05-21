@@ -1,0 +1,85 @@
+import { describe, expect, it } from 'vitest'
+import {
+  createStudentSchema,
+  createStudentManuallySchema,
+  addEnrollmentSchema,
+} from '@/lib/validators/admin/student'
+
+describe('createStudentSchema', () => {
+  it('accepts inquiryId + groupId', () => {
+    const result = createStudentSchema.parse({ inquiryId: 'i1', groupId: 'g1' })
+    expect(result.inquiryId).toBe('i1')
+  })
+
+  it('rejects empty inquiryId', () => {
+    const result = createStudentSchema.safeParse({ inquiryId: '', groupId: 'g1' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects empty groupId', () => {
+    const result = createStudentSchema.safeParse({ inquiryId: 'i1', groupId: '' })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('createStudentManuallySchema', () => {
+  const minimal = { firstName: 'Luka', lastName: 'Horvat' }
+
+  it('accepts minimal payload (firstName + lastName)', () => {
+    const result = createStudentManuallySchema.parse(minimal)
+    expect(result.firstName).toBe('Luka')
+  })
+
+  it('accepts all optional fields populated', () => {
+    const result = createStudentManuallySchema.parse({
+      ...minimal,
+      dateOfBirth: '2015-06-15',
+      parentName: 'Marija',
+      parentEmail: 'marija@example.com',
+      parentPhone: '0911234567',
+      childSchool: 'OŠ Split',
+      groupId: 'g1',
+      moduleScheduleIds: ['ms1', 'ms2'],
+    })
+    expect(result.moduleScheduleIds).toEqual(['ms1', 'ms2'])
+  })
+
+  it('accepts empty-string parentEmail', () => {
+    const result = createStudentManuallySchema.parse({ ...minimal, parentEmail: '' })
+    expect(result.parentEmail).toBe('')
+  })
+
+  it('rejects invalid parentEmail when non-empty', () => {
+    const result = createStudentManuallySchema.safeParse({ ...minimal, parentEmail: 'not-email' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects firstName shorter than 2 chars', () => {
+    const result = createStudentManuallySchema.safeParse({ ...minimal, firstName: 'L' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects lastName shorter than 2 chars', () => {
+    const result = createStudentManuallySchema.safeParse({ ...minimal, lastName: 'H' })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('addEnrollmentSchema', () => {
+  it('accepts studentId + groupId', () => {
+    expect(addEnrollmentSchema.parse({ studentId: 's1', groupId: 'g1' }).studentId).toBe('s1')
+  })
+
+  it('accepts optional moduleScheduleIds', () => {
+    const result = addEnrollmentSchema.parse({
+      studentId: 's1',
+      groupId: 'g1',
+      moduleScheduleIds: ['ms1'],
+    })
+    expect(result.moduleScheduleIds).toEqual(['ms1'])
+  })
+
+  it('rejects empty studentId', () => {
+    expect(addEnrollmentSchema.safeParse({ studentId: '', groupId: 'g1' }).success).toBe(false)
+  })
+})
