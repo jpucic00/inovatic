@@ -142,17 +142,17 @@ async function main() {
   })
   console.log(`✅ Admin created: ${admin.email}`)
 
-  // ── Demo teacher ─────────────────────────────────────────────────────────────
-  const teacher = await prisma.user.create({
+  // ── Second admin ─────────────────────────────────────────────────────────────
+  const slava = await prisma.user.create({
     data: {
       email: 'slava.jurcevic@gmail.com',
       passwordHash: adminPassword,
       firstName: 'Slavica',
       lastName: 'Jurčević',
-      role: UserRole.TEACHER,
+      role: UserRole.ADMIN,
     },
   })
-  console.log(`✅ Teacher created: ${teacher.email}`)
+  console.log(`✅ Admin created: ${slava.email}`)
 
   // ── Locations ────────────────────────────────────────────────────────────────
   const velebitska = await prisma.location.create({
@@ -6743,7 +6743,7 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
   console.log('')
   console.log('Demo accounts:')
   console.log('  Admin:   jpucic00@gmail.com       / admin123')
-  console.log('  Teacher: slava.jurcevic@gmail.com / admin123')
+  console.log('  Admin:   slava.jurcevic@gmail.com / admin123')
 }
 
 main()
