@@ -7,6 +7,7 @@
  */
 import bcrypt from 'bcryptjs'
 import {
+  type Attendance,
   type CourseModule,
   type Enrollment,
   type Location,
@@ -177,6 +178,22 @@ export async function createTeacherAssignment(
 ): Promise<TeacherAssignment> {
   return db.teacherAssignment.create({
     data: { userId: teacherId, scheduledGroupId },
+  })
+}
+
+export async function createAttendance(
+  enrollmentId: string,
+  recordedById: string,
+  overrides: Partial<{ sessionDate: Date; present: boolean; note: string | null }> = {},
+): Promise<Attendance> {
+  return db.attendance.create({
+    data: {
+      enrollmentId,
+      recordedById,
+      sessionDate: overrides.sessionDate ?? new Date('2026-03-02T00:00:00.000Z'),
+      present: overrides.present ?? true,
+      note: overrides.note ?? null,
+    },
   })
 }
 
