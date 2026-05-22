@@ -83,7 +83,7 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
 
   // Filter programs: workshop page shows only preselected; standard /upisi excludes radionice
   const filteredPrograms = preselectedCourseId
-    ? programs
+    ? programs.filter((p) => p.id === preselectedCourseId)
     : programs.filter((p) => {
         if (p.isCustom) return false  // radionice only via their own URL
         if (!selectedGrade) return true
