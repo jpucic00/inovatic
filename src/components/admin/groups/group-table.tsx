@@ -123,6 +123,7 @@ function formatDate(dateStr: string): string {
 interface GroupTableProps {
   data: Group[]
   hideProgram?: boolean
+  editable: boolean
 }
 
 function getCapacityColor(pct: number): string {
@@ -156,7 +157,7 @@ function EnrollmentWindowBadge({ group }: Readonly<{ group: Group }>) {
   return <span className="text-xs text-amber-600">Uskoro</span>
 }
 
-function buildColumns(hideProgram: boolean): ColumnDef<Group>[] {
+function buildColumns(hideProgram: boolean, editable: boolean): ColumnDef<Group>[] {
   const cols: ColumnDef<Group>[] = []
 
   cols.push({
@@ -236,7 +237,7 @@ function buildColumns(hideProgram: boolean): ColumnDef<Group>[] {
       header: '',
       cell: (row) => (
         <div className="flex items-center gap-2">
-          {isGroupDeletable(row) && <DeleteGroupButton group={row} />}
+          {editable && isGroupDeletable(row) && <DeleteGroupButton group={row} />}
         </div>
       ),
     },
@@ -245,8 +246,8 @@ function buildColumns(hideProgram: boolean): ColumnDef<Group>[] {
   return cols
 }
 
-export function GroupTable({ data, hideProgram = false }: Readonly<GroupTableProps>) {
-  const columns = buildColumns(hideProgram)
+export function GroupTable({ data, hideProgram = false, editable }: Readonly<GroupTableProps>) {
+  const columns = buildColumns(hideProgram, editable)
 
   return (
     <DataTable

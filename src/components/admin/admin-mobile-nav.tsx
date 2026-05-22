@@ -7,6 +7,7 @@ import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, User
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/shared/logo'
 import { logoutAction } from '@/actions/logout'
+import { SchoolYearSwitcher } from '@/components/admin/school-year-switcher'
 
 const sidebarLinks = [
   { href: '/admin', label: 'Nadzorna ploča', icon: LayoutDashboard },
@@ -68,9 +69,17 @@ function UserFooter({ userName }: Readonly<{ userName: string }>) {
 
 interface AdminNavProps {
   userName: string
+  years: string[]
+  selectedYear: string
+  currentYear: string
 }
 
-export function AdminDesktopSidebar({ userName }: Readonly<AdminNavProps>) {
+export function AdminDesktopSidebar({
+  userName,
+  years,
+  selectedYear,
+  currentYear,
+}: Readonly<AdminNavProps>) {
   const pathname = usePathname()
 
   return (
@@ -78,6 +87,7 @@ export function AdminDesktopSidebar({ userName }: Readonly<AdminNavProps>) {
       <div className="px-4 py-3 border-b border-gray-800">
         <Logo variant="white" href="/admin" size="sm" />
       </div>
+      <SchoolYearSwitcher years={years} selectedYear={selectedYear} currentYear={currentYear} />
       <nav className="flex-1 py-4 px-2 space-y-1">
         <NavLinks pathname={pathname} />
       </nav>
@@ -86,7 +96,12 @@ export function AdminDesktopSidebar({ userName }: Readonly<AdminNavProps>) {
   )
 }
 
-export function AdminMobileNav({ userName }: Readonly<AdminNavProps>) {
+export function AdminMobileNav({
+  userName,
+  years,
+  selectedYear,
+  currentYear,
+}: Readonly<AdminNavProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
 
@@ -121,6 +136,7 @@ export function AdminMobileNav({ userName }: Readonly<AdminNavProps>) {
               <X className="w-6 h-6" />
             </button>
           </div>
+          <SchoolYearSwitcher years={years} selectedYear={selectedYear} currentYear={currentYear} />
           <div className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
             <NavLinks pathname={pathname} onNavigate={() => setIsOpen(false)} />
           </div>

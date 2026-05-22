@@ -7,7 +7,6 @@ const validGroup = {
   name: 'SLR1 Pon 17h',
   startTime: '17:00',
   endTime: '18:30',
-  schoolYear: '2026/2027',
   maxStudents: 12,
   enrollmentStart: '2026-08-01',
   enrollmentEnd: '2026-09-30',

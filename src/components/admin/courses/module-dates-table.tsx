@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Check, X, Pencil, Users, CheckCircle, Calendar } from 'lucide-react'
-import { updateModuleSchedule } from '@/actions/admin/module'
+import { upsertModuleSchedule } from '@/actions/admin/module'
 import { closeModuleSchedule } from '@/actions/admin/module-enrollment'
 import { DateInput } from '@/components/ui/date-input'
 import Link from 'next/link'
@@ -32,6 +32,8 @@ type CourseInfo = {
 interface ModuleDatesTableProps {
   course: CourseInfo
   modules: Module[]
+  selectedYear: string
+  editable: boolean
 }
 
 function formatDate(d: Date | null): string {
@@ -60,7 +62,11 @@ function getModuleStatus(mod: Module): { label: string; className: string } {
   return { label: 'Aktivan', className: 'text-green-700 bg-green-50' }
 }
 
-function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
+function ModuleRow({
+  mod,
+  selectedYear,
+  editable,
+}: Readonly<{ mod: Module; selectedYear: string; editable: boolean }>) {
   const [editing, setEditing] = useState(false)
   const [startDate, setStartDate] = useState(toIsoString(mod.startDate))
   const [endDate, setEndDate] = useState(toIsoString(mod.endDate))
@@ -69,10 +75,10 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
   const status = getModuleStatus(mod)
 
   const handleSave = () => {
-    if (!mod.scheduleId) return
     startTransition(async () => {
-      const result = await updateModuleSchedule({
-        id: mod.scheduleId!,
+      const result = await upsertModuleSchedule({
+        moduleId: mod.id,
+        schoolYear: selectedYear,
         startDate: startDate || null,
         endDate: endDate || null,
       })
@@ -151,7 +157,7 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
         )}
       </td>
       <td className="py-2.5 text-right">
-        {mod.scheduleId && (
+        {editable && (
           editing ? (
             <div className="flex items-center justify-end gap-1">
               <button
@@ -173,7 +179,7 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
             </div>
           ) : (
             <div className="flex items-center justify-end gap-1">
-              {status.label === 'Aktivan' && (
+              {mod.scheduleId && status.label === 'Aktivan' && (
                 <button
                   onClick={handleCloseModule}
                   disabled={isPending}
@@ -187,7 +193,7 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
               <button
                 onClick={() => setEditing(true)}
                 className="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded transition-colors"
-                title="Uredi datume"
+                title={mod.scheduleId ? 'Uredi datume' : 'Postavi datume'}
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
@@ -199,7 +205,12 @@ function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
   )
 }
 
-export function ModuleDatesTable({ course, modules }: Readonly<ModuleDatesTableProps>) {
+export function ModuleDatesTable({
+  course,
+  modules,
+  selectedYear,
+  editable,
+}: Readonly<ModuleDatesTableProps>) {
   if (modules.length === 0) return null
 
   return (
@@ -245,7 +256,7 @@ export function ModuleDatesTable({ course, modules }: Readonly<ModuleDatesTableP
         </thead>
         <tbody>
           {modules.map((mod) => (
-            <ModuleRow key={mod.id} mod={mod} />
+            <ModuleRow key={mod.id} mod={mod} selectedYear={selectedYear} editable={editable} />
           ))}
         </tbody>
       </table>

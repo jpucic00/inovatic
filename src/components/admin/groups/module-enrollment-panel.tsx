@@ -45,6 +45,7 @@ interface ModuleEnrollmentPanelProps {
   modules: ModuleInfo[]
   enrollments: EnrollmentInfo[]
   maxStudents: number
+  editable: boolean
 }
 
 function getModuleStatus(mod: ModuleInfo): { label: string; className: string } {
@@ -60,11 +61,13 @@ function ModuleTab({
   enrollments,
   maxStudents,
   nextModuleScheduleId,
+  editable,
 }: Readonly<{
   mod: ModuleInfo
   enrollments: EnrollmentInfo[]
   maxStudents: number
   nextModuleScheduleId: string | null
+  editable: boolean
 }>) {
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -164,7 +167,7 @@ function ModuleTab({
                   {enrollment.user.firstName} {enrollment.user.lastName}
                 </Link>
                 <div className="flex items-center gap-1.5">
-                  {nextModuleScheduleId && !hasNextModule && (
+                  {editable && nextModuleScheduleId && !hasNextModule && (
                     <button
                       onClick={() => handleAddToNextModule(enrollment.id)}
                       disabled={isPending}
@@ -175,7 +178,7 @@ function ModuleTab({
                       Sljedeći
                     </button>
                   )}
-                  {meForModule && (
+                  {editable && meForModule && (
                     <button
                       onClick={() => handleRemoveFromModule(meForModule.id)}
                       disabled={isPending}
@@ -192,7 +195,7 @@ function ModuleTab({
         </div>
       )}
 
-      {notInModule.length > 0 && (
+      {editable && notInModule.length > 0 && (
         <details className="mt-3">
           <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
             {notInModule.length} polaznika grupe bez ovog modula
@@ -234,6 +237,7 @@ export function ModuleEnrollmentPanel({
   modules,
   enrollments,
   maxStudents,
+  editable,
 }: Readonly<ModuleEnrollmentPanelProps>) {
   const [expandedIdx, setExpandedIdx] = useState(() => {
     const now = new Date()
@@ -276,6 +280,7 @@ export function ModuleEnrollmentPanel({
           enrollments={enrollments}
           maxStudents={maxStudents}
           nextModuleScheduleId={modules[expandedIdx + 1]?.scheduleId ?? null}
+          editable={editable}
         />
       )}
     </div>

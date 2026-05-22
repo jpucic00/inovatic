@@ -1,33 +1,22 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getCourses } from '@/actions/admin/course'
-import { getAvailableSchoolYears, ensureSchedulesForYear } from '@/actions/admin/school-year'
-import { computeSchoolYear } from '@/lib/school-year'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
+import { isArchivedYear } from '@/lib/school-year'
 import { CourseTable } from '@/components/admin/courses/course-table'
 import { CreateCourseDialog } from '@/components/admin/courses/create-course-dialog'
 import { ModuleDatesTable } from '@/components/admin/courses/module-dates-table'
-import { SchoolYearSelector } from '@/components/admin/courses/school-year-selector'
+import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 
 export const metadata: Metadata = { title: 'Admin – Programi' }
 
-interface PageProps {
-  searchParams: Promise<{ schoolYear?: string }>
-}
-
-export default async function CoursesPage({ searchParams }: Readonly<PageProps>) {
+export default async function CoursesPage() {
   await requireAdmin()
 
-  const { schoolYear: yearParam } = await searchParams
-  const currentYear = computeSchoolYear()
-  const selectedYear = yearParam ?? currentYear
+  const selectedYear = await getSelectedSchoolYear()
+  const editable = !isArchivedYear(selectedYear)
 
-  // Bootstrap current-year module schedules on first visit (fresh DB).
-  await ensureSchedulesForYear(currentYear)
-
-  const [courses, years] = await Promise.all([
-    getCourses(selectedYear),
-    getAvailableSchoolYears(),
-  ])
+  const courses = await getCourses()
 
   const standard = courses.filter((c) => !c.isCustom)
   const custom = courses.filter((c) => c.isCustom)
@@ -37,25 +26,22 @@ export default async function CoursesPage({ searchParams }: Readonly<PageProps>)
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Programi</h1>
         <p className="text-gray-500 text-sm mt-1">
-          {standard.length} standardnih + {custom.length} radionica
+          {standard.length} standardnih + {custom.length} radionica · {selectedYear}
         </p>
       </div>
 
+      {!editable && <ArchivedYearBanner year={selectedYear} />}
+
       {standard.length > 0 && (
         <div className="mb-10">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-              Standardni programi (SLR 1–4)
-            </h2>
-            <SchoolYearSelector
-              years={years}
-              currentYear={currentYear}
-              selectedYear={selectedYear}
-            />
-          </div>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Standardni programi (SLR 1–4)
+          </h2>
           {standard.map((course) => (
             <ModuleDatesTable
               key={course.id}
+              selectedYear={selectedYear}
+              editable={editable}
               course={{
                 id: course.id,
                 title: course.title,
@@ -87,10 +73,10 @@ export default async function CoursesPage({ searchParams }: Readonly<PageProps>)
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
             Radionice
           </h2>
-          <CreateCourseDialog />
+          {editable && <CreateCourseDialog />}
         </div>
         {custom.length > 0 ? (
-          <CourseTable data={custom} />
+          <CourseTable data={custom} editable={editable} />
         ) : (
           <p className="text-sm text-gray-400 italic py-4">Nema radionica.</p>
         )}

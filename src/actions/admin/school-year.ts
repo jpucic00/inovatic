@@ -3,100 +3,72 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { computeSchoolYear, getNextSchoolYear } from '@/lib/school-year'
+import { setSchoolYearCookie } from '@/lib/school-year-cookie'
 import type { AdminActionResult } from '@/lib/action-types'
 
-export async function getAvailableSchoolYears(): Promise<string[]> {
-  const result = await db.moduleSchedule.findMany({
-    select: { schoolYear: true },
-    distinct: ['schoolYear'],
-    orderBy: { schoolYear: 'desc' },
-  })
-  return result.map((r) => r.schoolYear)
-}
+const SCHOOL_YEAR_RE = /^\d{4}\/\d{4}$/
 
-export async function createNewSchoolYear(
-  targetYear: string,
-): Promise<AdminActionResult> {
+/**
+ * Every registered school year, newest first. Lazily registers the
+ * date-computed current year so it always appears, even on a fresh DB or
+ * after the calendar rolls into a new school year.
+ */
+export async function getAllSchoolYears(): Promise<string[]> {
   await requireAdmin()
 
-  if (!/^\d{4}\/\d{4}$/.test(targetYear)) {
-    return { success: false, error: 'Format školske godine nije valjan (npr. 2026/2027).' }
-  }
-
-  const existing = await db.moduleSchedule.count({
-    where: { schoolYear: targetYear },
-  })
-  if (existing > 0) {
-    return { success: false, error: `Moduli za ${targetYear} već postoje.` }
-  }
-
-  // Get all standard course modules (templates)
-  const modules = await db.courseModule.findMany({
-    where: { course: { isCustom: false } },
-    select: { id: true },
+  const current = computeSchoolYear()
+  await db.schoolYear.upsert({
+    where: { label: current },
+    create: { label: current },
+    update: {},
   })
 
-  if (modules.length === 0) {
-    return { success: false, error: 'Nema modula za kloniranje.' }
+  const rows = await db.schoolYear.findMany({ orderBy: { label: 'desc' } })
+  return rows.map((r) => r.label)
+}
+
+/** Switches the admin panel to the given (already-registered) school year. */
+export async function setSelectedSchoolYear(year: string): Promise<AdminActionResult> {
+  await requireAdmin()
+
+  if (!SCHOOL_YEAR_RE.test(year)) {
+    return { success: false, error: 'Format školske godine nije valjan.' }
   }
 
-  try {
-    await db.moduleSchedule.createMany({
-      data: modules.map((mod) => ({
-        moduleId: mod.id,
-        schoolYear: targetYear,
-        startDate: null,
-        endDate: null,
-      })),
-    })
-  } catch (err) {
-    console.error('createNewSchoolYear failed:', err)
-    return { success: false, error: 'Greška pri kreiranju modula za novu godinu.' }
+  const exists = await db.schoolYear.findUnique({ where: { label: year } })
+  if (!exists) {
+    return { success: false, error: 'Školska godina ne postoji.' }
   }
 
-  revalidatePath('/admin/programi')
+  await setSchoolYearCookie(year)
+  revalidatePath('/admin', 'layout')
   return { success: true }
 }
 
 /**
- * Ensures ModuleSchedule rows exist for the given school year.
- * Creates them for every standard-course module if missing, spreading
- * 4 modules evenly across the school year (Sep–Aug) so the public
- * inquiry form works out of the box on a fresh install.
- * Called from the admin programi page on first visit.
+ * Creates the next school year as a genuine blank slate — no groups, no
+ * module schedules are carried over — and switches the admin panel to it.
  */
-export async function ensureSchedulesForYear(year: string): Promise<void> {
-  const existing = await db.moduleSchedule.count({ where: { schoolYear: year } })
-  if (existing > 0) return
+export async function createSchoolYear(): Promise<AdminActionResult> {
+  await requireAdmin()
 
-  const modules = await db.courseModule.findMany({
-    where: { course: { isCustom: false } },
-    orderBy: [{ course: { sortOrder: 'asc' } }, { sortOrder: 'asc' }],
-    select: { id: true, sortOrder: true },
-  })
-  if (modules.length === 0) return
+  const latest = await db.schoolYear.findFirst({ orderBy: { label: 'desc' } })
+  const next = getNextSchoolYear(latest?.label ?? computeSchoolYear())
 
-  // Derive start year from "YYYY/YYYY" format (e.g. "2025/2026" → 2025)
-  const startYear = Number.parseInt(year.split('/')[0], 10)
+  const already = await db.schoolYear.findUnique({ where: { label: next } })
+  if (already) {
+    return { success: false, error: `Školska godina ${next} već postoji.` }
+  }
 
-  // Default date ranges for modules 1–4 within a school year
-  const dateRanges = [
-    { start: new Date(startYear, 8, 15), end: new Date(startYear, 11, 20) },      // Sep–Dec
-    { start: new Date(startYear + 1, 0, 12), end: new Date(startYear + 1, 2, 28) }, // Jan–Mar
-    { start: new Date(startYear + 1, 3, 7), end: new Date(startYear + 1, 5, 14) },  // Apr–Jun
-    { start: new Date(startYear + 1, 5, 28), end: new Date(startYear + 1, 7, 30) }, // Jun–Aug
-  ]
+  try {
+    await db.schoolYear.create({ data: { label: next } })
+  } catch (err) {
+    console.error('createSchoolYear failed:', err)
+    return { success: false, error: 'Greška pri kreiranju školske godine.' }
+  }
 
-  await db.moduleSchedule.createMany({
-    data: modules.map((mod) => {
-      const range = dateRanges[(mod.sortOrder - 1) % 4]
-      return {
-        moduleId: mod.id,
-        schoolYear: year,
-        startDate: range?.start ?? null,
-        endDate: range?.end ?? null,
-      }
-    }),
-    skipDuplicates: true,
-  })
+  await setSchoolYearCookie(next)
+  revalidatePath('/admin', 'layout')
+  return { success: true }
 }

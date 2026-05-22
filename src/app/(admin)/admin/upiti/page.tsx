@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getInquiries, getInquiryCourses } from '@/actions/admin/inquiry'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { InquiryFilters } from '@/components/admin/inquiries/inquiry-filters'
 import { InquiryTable } from '@/components/admin/inquiries/inquiry-table'
 import { Pagination } from '@/components/admin/pagination'
@@ -17,6 +18,7 @@ interface PageProps {
 
 export default async function InquiriesPage({ searchParams }: Readonly<PageProps>) {
   await requireAdmin()
+  const selectedYear = await getSelectedSchoolYear()
 
   const params = await searchParams
   const { status, search, course, page: pageParam } = params
@@ -47,7 +49,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Upiti</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {total === 1 ? '1 upit' : `${total} upita`}
+            {total === 1 ? '1 upit' : `${total} upita`} · {selectedYear}
             {currentSearch && ` za "${currentSearch}"`}
           </p>
         </div>

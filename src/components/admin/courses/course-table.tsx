@@ -29,6 +29,7 @@ type Course = {
 
 interface CourseTableProps {
   data: Course[]
+  editable: boolean
 }
 
 const PAGE_SIZE = 10
@@ -118,7 +119,7 @@ function DeleteCourseButton({ course }: Readonly<{ course: Course }>) {
   )
 }
 
-function CourseCard({ course }: Readonly<{ course: Course }>) {
+function CourseCard({ course, editable }: Readonly<{ course: Course; editable: boolean }>) {
   const groupCount = course._count.scheduledGroups
 
   return (
@@ -150,14 +151,14 @@ function CourseCard({ course }: Readonly<{ course: Course }>) {
               {groupCount} {groupCount >= 2 && groupCount <= 4 ? 'grupe' : 'grupa'}
             </Link>
           )}
-          <DeleteCourseButton course={course} />
+          {editable && <DeleteCourseButton course={course} />}
         </div>
       </div>
     </div>
   )
 }
 
-export function CourseTable({ data }: Readonly<CourseTableProps>) {
+export function CourseTable({ data, editable }: Readonly<CourseTableProps>) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
 
@@ -195,7 +196,7 @@ export function CourseTable({ data }: Readonly<CourseTableProps>) {
         </p>
       ) : (
         paginated.map((course) => (
-          <CourseCard key={course.id} course={course} />
+          <CourseCard key={course.id} course={course} editable={editable} />
         ))
       )}
 

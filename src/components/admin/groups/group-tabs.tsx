@@ -38,9 +38,10 @@ type CourseTab = {
 interface GroupTabsProps {
   standardTabs: CourseTab[]
   radioniceTabs: Group[]
+  editable: boolean
 }
 
-export function GroupTabs({ standardTabs, radioniceTabs }: Readonly<GroupTabsProps>) {
+export function GroupTabs({ standardTabs, radioniceTabs, editable }: Readonly<GroupTabsProps>) {
   const tabs = [
     ...standardTabs.map((t) => ({ id: t.courseId, label: t.title })),
     { id: '__radionice__', label: 'Radionice' },
@@ -77,7 +78,7 @@ export function GroupTabs({ standardTabs, radioniceTabs }: Readonly<GroupTabsPro
       </div>
 
       {activeTab === '__radionice__' ? (
-        <GroupTable data={radioniceTabs} />
+        <GroupTable data={radioniceTabs} editable={editable} />
       ) : (
         standardTabs
           .filter((t) => t.courseId === activeTab)
@@ -86,6 +87,7 @@ export function GroupTabs({ standardTabs, radioniceTabs }: Readonly<GroupTabsPro
               key={t.courseId}
               data={t.groups}
               hideProgram
+              editable={editable}
             />
           ))
       )}

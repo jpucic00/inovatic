@@ -37,6 +37,7 @@ interface Props {
   group: GroupForEdit
   courses: CourseOption[]
   locations: LocationOption[]
+  editable: boolean
 }
 
 function toDateInput(date: Date | null): string {
@@ -74,10 +75,10 @@ function getCapacityColor(pct: number): string {
   return 'text-green-600'
 }
 
-export function GroupInfoPanel({ group, courses, locations }: Readonly<Props>) {
+export function GroupInfoPanel({ group, courses, locations, editable }: Readonly<Props>) {
   const [mode, setMode] = useState<'view' | 'edit'>('view')
 
-  if (mode === 'edit') {
+  if (mode === 'edit' && editable) {
     return (
       <GroupInfoEdit
         group={group}
@@ -89,13 +90,14 @@ export function GroupInfoPanel({ group, courses, locations }: Readonly<Props>) {
     )
   }
 
-  return <GroupInfoView group={group} onEdit={() => setMode('edit')} />
+  return <GroupInfoView group={group} editable={editable} onEdit={() => setMode('edit')} />
 }
 
 function GroupInfoView({
   group,
+  editable,
   onEdit,
-}: Readonly<{ group: GroupForEdit; onEdit: () => void }>) {
+}: Readonly<{ group: GroupForEdit; editable: boolean; onEdit: () => void }>) {
   const windowStatus = enrollmentWindowStatus(group.enrollmentStart, group.enrollmentEnd)
   const availableSpots = group.maxStudents - group.enrolledCount
   const pct = group.maxStudents > 0 ? group.enrolledCount / group.maxStudents : 0
@@ -105,14 +107,16 @@ function GroupInfoView({
     <div>
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold text-gray-700">Informacije o grupi</h2>
-        <button
-          onClick={onEdit}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-          title="Uredi grupu"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-          Uredi
-        </button>
+        {editable && (
+          <button
+            onClick={onEdit}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+            title="Uredi grupu"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Uredi
+          </button>
+        )}
       </div>
       <dl>
         <DetailRow
@@ -248,7 +252,6 @@ function GroupInfoEdit({
       dayOfWeek: group.dayOfWeek ?? '',
       startTime: group.startTime ?? '',
       endTime: group.endTime ?? '',
-      schoolYear: group.schoolYear,
       maxStudents: group.maxStudents,
       enrollmentStart: toDateInput(group.enrollmentStart),
       enrollmentEnd: toDateInput(group.enrollmentEnd),
@@ -334,17 +337,10 @@ function GroupInfoEdit({
             {errors.endTime && <p className="text-xs text-red-600 mt-1">{errors.endTime.message}</p>}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="info-schoolYear" className="block text-sm font-medium text-gray-700 mb-1">Školska godina *</label>
-            <input id="info-schoolYear" {...register('schoolYear')} className={adminInputClass} placeholder="2025/2026" />
-            {errors.schoolYear && <p className="text-xs text-red-600 mt-1">{errors.schoolYear.message}</p>}
-          </div>
-          <div>
-            <label htmlFor="info-maxStudents" className="block text-sm font-medium text-gray-700 mb-1">Max polaznika</label>
-            <input id="info-maxStudents" {...register('maxStudents')} type="number" min={1} max={50} className={adminInputClass} />
-            {errors.maxStudents && <p className="text-xs text-red-600 mt-1">{errors.maxStudents.message}</p>}
-          </div>
+        <div>
+          <label htmlFor="info-maxStudents" className="block text-sm font-medium text-gray-700 mb-1">Max polaznika</label>
+          <input id="info-maxStudents" {...register('maxStudents')} type="number" min={1} max={50} className={adminInputClass} />
+          {errors.maxStudents && <p className="text-xs text-red-600 mt-1">{errors.maxStudents.message}</p>}
         </div>
         <div>
           <span className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</span>

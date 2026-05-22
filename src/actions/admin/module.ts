@@ -3,37 +3,48 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
-import { updateModuleSchema } from '@/lib/validators/admin/module'
-import type { UpdateModuleInput } from '@/lib/validators/admin/module'
+import { upsertModuleScheduleSchema } from '@/lib/validators/admin/module'
+import type { UpsertModuleScheduleInput } from '@/lib/validators/admin/module'
 import type { AdminActionResult } from '@/lib/action-types'
+import { archivedYearError } from '@/lib/school-year-guard'
 
-/** Updates a ModuleSchedule's dates. The id is the ModuleSchedule id. */
-export async function updateModuleSchedule(data: UpdateModuleInput): Promise<AdminActionResult> {
+/**
+ * Creates or updates the schedule (start/end dates) for a module in a given
+ * school year. Upserts on the (moduleId, schoolYear) unique so a blank year
+ * can be filled in from scratch.
+ */
+export async function upsertModuleSchedule(
+  data: UpsertModuleScheduleInput,
+): Promise<AdminActionResult> {
   await requireAdmin()
 
-  const parsed = updateModuleSchema.safeParse(data)
+  const parsed = upsertModuleScheduleSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
-  const { id, startDate, endDate } = parsed.data
+  const { moduleId, schoolYear, startDate, endDate } = parsed.data
+
+  const blocked = archivedYearError(schoolYear)
+  if (blocked) return blocked
 
   try {
-    await db.moduleSchedule.update({
-      where: { id },
-      data: {
-        ...(startDate !== undefined && {
-          startDate: startDate ? new Date(startDate) : null,
-        }),
-        ...(endDate !== undefined && {
-          endDate: endDate ? new Date(endDate) : null,
-        }),
+    await db.moduleSchedule.upsert({
+      where: { moduleId_schoolYear: { moduleId, schoolYear } },
+      create: {
+        moduleId,
+        schoolYear,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+      },
+      update: {
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
       },
     })
   } catch (err) {
-    console.error('updateModuleSchedule failed:', err)
-    return { success: false, error: 'Greška pri ažuriranju modula.' }
+    console.error('upsertModuleSchedule failed:', err)
+    return { success: false, error: 'Greška pri spremanju datuma modula.' }
   }
 
   revalidatePath('/admin/programi')
   return { success: true }
 }
-

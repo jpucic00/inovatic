@@ -1,30 +1,25 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
-import { getGroups, getGroupSchoolYears } from '@/actions/admin/group'
+import { getGroups } from '@/actions/admin/group'
 import { getAssignableTeachers } from '@/actions/admin/teacher'
-import { computeSchoolYear } from '@/lib/school-year'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
+import { isArchivedYear } from '@/lib/school-year'
 import { db } from '@/lib/db'
 import { GroupTabs } from '@/components/admin/groups/group-tabs'
 import { WeeklySchedule } from '@/components/admin/groups/weekly-schedule'
 import { CreateGroupDialog } from '@/components/admin/groups/create-group-dialog'
-import { SchoolYearSelector } from '@/components/admin/courses/school-year-selector'
+import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 
 export const metadata: Metadata = { title: 'Admin – Grupe' }
 
-interface PageProps {
-  searchParams: Promise<{ schoolYear?: string }>
-}
-
-export default async function GroupsPage({ searchParams }: Readonly<PageProps>) {
+export default async function GroupsPage() {
   await requireAdmin()
 
-  const { schoolYear: yearParam } = await searchParams
-  const currentYear = computeSchoolYear()
-  const selectedYear = yearParam ?? currentYear
+  const selectedYear = await getSelectedSchoolYear()
+  const editable = !isArchivedYear(selectedYear)
 
-  const [groups, years, courses, locations, teachers] = await Promise.all([
-    getGroups({ schoolYear: selectedYear }),
-    getGroupSchoolYears(),
+  const [groups, courses, locations, teachers] = await Promise.all([
+    getGroups(),
     db.course.findMany({
       orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }],
       select: { id: true, title: true, isCustom: true },
@@ -36,16 +31,12 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
     getAssignableTeachers(),
   ])
 
-  // Ensure current year always appears in the selector
-  const allYears = years.includes(currentYear) ? years : [currentYear, ...years]
-
   const standardCourses = courses.filter((c) => !c.isCustom)
-  const standardTabs = standardCourses
-    .map((course) => ({
-      courseId: course.id,
-      title: course.title,
-      groups: groups.filter((g) => g.course.id === course.id),
-    }))
+  const standardTabs = standardCourses.map((course) => ({
+    courseId: course.id,
+    title: course.title,
+    groups: groups.filter((g) => g.course.id === course.id),
+  }))
 
   const radioniceTabs = groups.filter((g) => g.course.isCustom)
 
@@ -60,18 +51,17 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
             {groups.length} grupa u {selectedYear}
           </p>
         </div>
-        <CreateGroupDialog courses={courseOptions} locations={locations} currentYear={selectedYear} teachers={teachers} />
+        {editable && (
+          <CreateGroupDialog
+            courses={courseOptions}
+            locations={locations}
+            currentYear={selectedYear}
+            teachers={teachers}
+          />
+        )}
       </div>
 
-      <div className="mb-6">
-        <SchoolYearSelector
-          years={allYears}
-          currentYear={currentYear}
-          selectedYear={selectedYear}
-          basePath="/admin/grupe"
-          showCreateButton={false}
-        />
-      </div>
+      {!editable && <ArchivedYearBanner year={selectedYear} />}
 
       <div className="mb-8">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Tjedni raspored</h2>
@@ -81,6 +71,7 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
       <GroupTabs
         standardTabs={standardTabs}
         radioniceTabs={radioniceTabs}
+        editable={editable}
       />
     </div>
   )

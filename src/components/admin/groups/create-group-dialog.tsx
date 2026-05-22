@@ -47,7 +47,7 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
     formState: { errors },
   } = useForm<CreateGroupInput>({
     resolver: zodResolver(createGroupSchema),
-    defaultValues: { maxStudents: 12, schoolYear: currentYear },
+    defaultValues: { maxStudents: 12 },
   })
 
   const selectedCourseId = useWatch({ control, name: 'courseId' })
@@ -81,6 +81,10 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
           <DialogTitle>Nova grupa</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+          <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-md px-3 py-2">
+            Grupa se kreira za školsku godinu{' '}
+            <strong className="text-gray-700">{currentYear}</strong>.
+          </p>
           <div>
             <label htmlFor="create-courseId" className="block text-sm font-medium text-gray-700 mb-1">Program *</label>
             <select id="create-courseId" {...register('courseId')} className={adminSelectClass}>
@@ -138,17 +142,10 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
               {errors.endTime && <p className="text-xs text-red-600 mt-1">{errors.endTime.message}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="create-schoolYear" className="block text-sm font-medium text-gray-700 mb-1">Školska godina *</label>
-              <input id="create-schoolYear" {...register('schoolYear')} className={adminInputClass} placeholder="2025/2026" />
-              {errors.schoolYear && <p className="text-xs text-red-600 mt-1">{errors.schoolYear.message}</p>}
-            </div>
-            <div>
-              <label htmlFor="create-maxStudents" className="block text-sm font-medium text-gray-700 mb-1">Max polaznika</label>
-              <input id="create-maxStudents" {...register('maxStudents')} type="number" min={1} max={50} className={adminInputClass} />
-              {errors.maxStudents && <p className="text-xs text-red-600 mt-1">{errors.maxStudents.message}</p>}
-            </div>
+          <div>
+            <label htmlFor="create-maxStudents" className="block text-sm font-medium text-gray-700 mb-1">Max polaznika</label>
+            <input id="create-maxStudents" {...register('maxStudents')} type="number" min={1} max={50} className={adminInputClass} />
+            {errors.maxStudents && <p className="text-xs text-red-600 mt-1">{errors.maxStudents.message}</p>}
           </div>
           <div>
             <span className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</span>

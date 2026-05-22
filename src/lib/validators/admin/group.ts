@@ -8,7 +8,6 @@ export const createGroupSchema = z.object({
   dayOfWeek: z.string().optional().or(z.literal('')),
   startTime: z.string().min(1, 'Unesite vrijeme početka'),
   endTime: z.string().min(1, 'Unesite vrijeme kraja'),
-  schoolYear: z.string().min(1, 'Unesite školsku godinu'),
   maxStudents: z.coerce.number().int().min(1).max(50),
   enrollmentStart: z.string().min(1, 'Unesite datum početka upisa'),
   enrollmentEnd: z.string().min(1, 'Unesite datum kraja upisa'),

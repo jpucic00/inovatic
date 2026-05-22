@@ -10,6 +10,7 @@ import {
   type AddGalleryImagesInput,
 } from '@/lib/validators/gallery'
 import { destroyCloudinaryAssetsByPublicId } from '@/lib/cloudinary-cleanup'
+import { archivedYearError } from '@/lib/school-year-guard'
 
 type CreatedGalleryImage = {
   id: string
@@ -70,6 +71,7 @@ export async function addGalleryImages(
     where: { id: data.scheduledGroupId },
     select: {
       id: true,
+      schoolYear: true,
       course: {
         select: {
           isCustom: true,
@@ -79,6 +81,9 @@ export async function addGalleryImages(
     },
   })
   if (!group) return { success: false, error: 'Grupa nije pronađena.' }
+
+  const blocked = archivedYearError(group.schoolYear)
+  if (blocked) return blocked
 
   if (group.course.isCustom) {
     if (data.moduleId !== null) {
@@ -150,13 +155,20 @@ export async function removeGalleryImage(id: string): Promise<AdminActionResult>
 
   const existing = await db.galleryImage.findUnique({
     where: { id },
-    select: { scheduledGroupId: true, publicId: true },
+    select: {
+      scheduledGroupId: true,
+      publicId: true,
+      scheduledGroup: { select: { schoolYear: true } },
+    },
   })
   if (!existing) return { success: false, error: 'Slika nije pronađena.' }
 
   if (!(await canManageGroupImages(session, existing.scheduledGroupId))) {
     return { success: false, error: 'Nemate dopuštenje za ovu grupu.' }
   }
+
+  const blocked = archivedYearError(existing.scheduledGroup.schoolYear)
+  if (blocked) return blocked
 
   try {
     await db.galleryImage.delete({ where: { id } })

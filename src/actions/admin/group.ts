@@ -7,17 +7,18 @@ import { createGroupSchema, updateGroupSchema } from '@/lib/validators/admin/gro
 import type { CreateGroupInput, UpdateGroupInput } from '@/lib/validators/admin/group'
 import type { AdminActionResult } from '@/lib/action-types'
 import { computeSchoolYear } from '@/lib/school-year'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
+import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 
 type GroupFilters = {
   courseId?: string
   locationId?: string
-  schoolYear?: string
 }
 
 export async function getGroups(filters: GroupFilters = {}) {
   await requireAdmin()
 
-  const year = filters.schoolYear ?? computeSchoolYear()
+  const year = await getSelectedSchoolYear()
 
   const where = {
     schoolYear: year,
@@ -112,6 +113,11 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
   const parsed = createGroupSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
+  // A new group always belongs to the currently selected school year.
+  const schoolYear = await getSelectedSchoolYear()
+  const blocked = archivedYearError(schoolYear)
+  if (blocked) return blocked
+
   const {
     courseId,
     locationId,
@@ -120,7 +126,6 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
     dayOfWeek,
     startTime,
     endTime,
-    schoolYear,
     maxStudents,
     enrollmentStart,
     enrollmentEnd,
@@ -200,7 +205,10 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
   const parsed = updateGroupSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
-  const { id, courseId, locationId, name, date, dayOfWeek, startTime, endTime, schoolYear, maxStudents, enrollmentStart, enrollmentEnd, teacherIds } = parsed.data
+  const { id, courseId, locationId, name, date, dayOfWeek, startTime, endTime, maxStudents, enrollmentStart, enrollmentEnd, teacherIds } = parsed.data
+
+  const blocked = await archivedGroupError(id)
+  if (blocked) return blocked
 
   try {
     await db.$transaction(async (tx) => {
@@ -214,7 +222,6 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
           ...(dayOfWeek !== undefined && { dayOfWeek: dayOfWeek || null }),
           ...(startTime !== undefined && { startTime: startTime || null }),
           ...(endTime !== undefined && { endTime: endTime || null }),
-          ...(schoolYear !== undefined && { schoolYear }),
           ...(maxStudents !== undefined && { maxStudents }),
           ...(enrollmentStart !== undefined && { enrollmentStart: new Date(enrollmentStart) }),
           ...(enrollmentEnd !== undefined && { enrollmentEnd: new Date(enrollmentEnd) }),
@@ -259,6 +266,9 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
 
     if (!group) return { success: false, error: 'Grupa nije pronađena.' }
 
+    const blocked = archivedYearError(group.schoolYear)
+    if (blocked) return blocked
+
     if (group._count.enrollments > 0) {
       return { success: false, error: 'Grupa ima upisane polaznike i ne može se obrisati.' }
     }
@@ -284,15 +294,4 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
 
   revalidatePath('/admin/grupe')
   return { success: true }
-}
-
-/** Returns distinct school years present in ScheduledGroup. */
-export async function getGroupSchoolYears(): Promise<string[]> {
-  await requireAdmin()
-  const result = await db.scheduledGroup.findMany({
-    select: { schoolYear: true },
-    distinct: ['schoolYear'],
-    orderBy: { schoolYear: 'desc' },
-  })
-  return result.map((r) => r.schoolYear)
 }

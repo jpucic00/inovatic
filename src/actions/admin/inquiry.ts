@@ -8,7 +8,8 @@ import { updateStatusSchema } from '@/lib/validators/admin/inquiry'
 import type { AdminActionResult } from '@/lib/action-types'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
-import { computeSchoolYear } from '@/lib/school-year'
+import { computeSchoolYear, schoolYearDateRange } from '@/lib/school-year'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 
 type InquiryFilters = {
   status?: InquiryStatus | 'ALL'
@@ -38,8 +39,10 @@ export async function getInquiries(
   await requireAdmin()
 
   const { status, search, courseId, page = 1, pageSize = 20 } = filters
+  const { gte, lt } = schoolYearDateRange(await getSelectedSchoolYear())
 
   const where = {
+    createdAt: { gte, lt },
     ...(status && status !== 'ALL' ? { status } : {}),
     ...(courseIdFilter(courseId)),
     ...(search

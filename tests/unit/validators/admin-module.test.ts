@@ -1,35 +1,39 @@
 import { describe, expect, it } from 'vitest'
-import { updateModuleSchema } from '@/lib/validators/admin/module'
+import { upsertModuleScheduleSchema } from '@/lib/validators/admin/module'
 
-describe('updateModuleSchema', () => {
-  it('accepts id-only update', () => {
-    expect(updateModuleSchema.parse({ id: 'm1' }).id).toBe('m1')
+const valid = {
+  moduleId: 'm1',
+  schoolYear: '2026/2027',
+  startDate: '2026-09-01',
+  endDate: '2026-12-15',
+}
+
+describe('upsertModuleScheduleSchema', () => {
+  it('accepts a full valid payload', () => {
+    const result = upsertModuleScheduleSchema.parse(valid)
+    expect(result.moduleId).toBe('m1')
+    expect(result.schoolYear).toBe('2026/2027')
   })
 
-  it('accepts full update', () => {
-    const result = updateModuleSchema.parse({
-      id: 'm1',
-      title: 'Modul 1',
-      startDate: '2026-09-01',
-      endDate: '2026-12-15',
-    })
-    expect(result.title).toBe('Modul 1')
-  })
-
-  it('accepts null startDate/endDate (clearing)', () => {
-    const result = updateModuleSchema.parse({ id: 'm1', startDate: null, endDate: null })
+  it('accepts null start/end dates (clearing)', () => {
+    const result = upsertModuleScheduleSchema.parse({ ...valid, startDate: null, endDate: null })
     expect(result.startDate).toBeNull()
   })
 
-  it('rejects empty id', () => {
-    expect(updateModuleSchema.safeParse({ id: '' }).success).toBe(false)
+  it('accepts omitted dates', () => {
+    const result = upsertModuleScheduleSchema.parse({ moduleId: 'm1', schoolYear: '2026/2027' })
+    expect(result.moduleId).toBe('m1')
   })
 
-  it('rejects title shorter than 2 chars with Croatian message', () => {
-    const result = updateModuleSchema.safeParse({ id: 'm1', title: 'M' })
+  it('rejects empty moduleId', () => {
+    expect(upsertModuleScheduleSchema.safeParse({ ...valid, moduleId: '' }).success).toBe(false)
+  })
+
+  it('rejects a malformed school year with Croatian message', () => {
+    const result = upsertModuleScheduleSchema.safeParse({ ...valid, schoolYear: '2026' })
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.issues[0].message).toContain('najmanje 2 znaka')
+      expect(result.error.issues[0].message).toContain('školska godina')
     }
   })
 })

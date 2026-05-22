@@ -135,6 +135,13 @@ model ModuleSchedule {
   @@unique([moduleId, schoolYear])
 }
 
+// Registry of school years so a year can exist as a blank slate
+// with zero groups/schedules. Label format: "YYYY/YYYY".
+model SchoolYear {
+  label     String   @id
+  createdAt DateTime @default(now())
+}
+
 model Location {
   id       String  @id @default(cuid())
   name     String

@@ -31,12 +31,14 @@ interface Props {
   groupId: string
   assignments: Assignment[]
   assignableTeachers: AssignableTeacher[]
+  editable: boolean
 }
 
 export function GroupTeachersPanel({
   groupId,
   assignments,
   assignableTeachers,
+  editable,
 }: Readonly<Props>) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
@@ -77,7 +79,7 @@ export function GroupTeachersPanel({
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-700">Nastavnici</h2>
-        {!adding && assignableTeachers.length > 0 && (
+        {editable && !adding && assignableTeachers.length > 0 && (
           <button
             onClick={() => setAdding(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded-lg hover:bg-cyan-100 transition-colors"
@@ -152,15 +154,17 @@ export function GroupTeachersPanel({
                   <p className="text-xs text-gray-500 truncate">{a.user.email}</p>
                 </div>
               </div>
-              <button
-                onClick={() => handleUnassign(a.id)}
-                disabled={isPending}
-                className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 shrink-0"
-                aria-label="Ukloni nastavnika"
-                title="Ukloni nastavnika"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {editable && (
+                <button
+                  onClick={() => handleUnassign(a.id)}
+                  disabled={isPending}
+                  className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 shrink-0"
+                  aria-label="Ukloni nastavnika"
+                  title="Ukloni nastavnika"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ))}
         </div>

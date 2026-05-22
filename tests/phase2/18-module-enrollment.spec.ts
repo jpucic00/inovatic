@@ -3,7 +3,7 @@ import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 8 — Module Enrollment + School-Year Historization
-// Exercises the SchoolYearSelector, ModuleDatesTable, and the per-group
+// Exercises the SchoolYearSwitcher, ModuleDatesTable, and the per-group
 // ModuleEnrollmentPanel. Includes edge cases for the per-module "available
 // spots" calculation (capacity − enrollments in the currently-Aktivan module),
 // date shifts between Nadolazi/Aktivan/Završen states, and cross-year
@@ -290,16 +290,17 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
   // ── Programi page — layout + school-year selector ──────────────────────────
 
   test.describe('Programi page', () => {
-    test('loads with default school year and shows SchoolYearSelector', async ({ page }) => {
+    test('loads with default school year and shows the school-year switcher', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
       await expect(page.locator('h1', { hasText: 'Programi' })).toBeVisible()
       await expect(
         page.locator('h2', { hasText: 'Standardni programi' }),
       ).toBeVisible()
-      // Year button for 2025/2026 is highlighted as selected (cyan bg)
-      const currentYearBtn = page.getByRole('button', { name: /2025\/2026/ })
-      await expect(currentYearBtn.first()).toBeVisible()
+      // The global school-year switcher in the sidebar defaults to the current year.
+      const switcher = page.getByLabel('Odaberi školsku godinu')
+      await expect(switcher).toBeVisible()
+      await expect(switcher).toContainText('2025/2026')
     })
 
     test('ModuleDatesTable renders SLR 1 with Modul/Početak/Završetak/Status/Polaznici columns', async ({
@@ -434,36 +435,53 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
   // ── Historization (cross-year) ─────────────────────────────────────────────
 
   test.describe('Historization', () => {
-    test('SchoolYearSelector switches the selected year via URL param', async ({ page }) => {
+    test('the switcher creates a new blank school year', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
 
-      // Click "Nova godina" → confirm "Da" to create the next school year
-      // (only if the next year button isn't already present)
+      const switcher = page.getByLabel('Odaberi školsku godinu')
       const nextYearLabel = '2026/2027'
-      const nextYearBtn = page.getByRole('button', { name: new RegExp(nextYearLabel) })
-      const alreadyExists = await nextYearBtn.first().isVisible().catch(() => false)
+
+      // Register the next year only if it does not already exist.
+      await switcher.click()
+      const alreadyExists = await page
+        .getByRole('option', { name: new RegExp(nextYearLabel) })
+        .isVisible()
+        .catch(() => false)
+      await page.keyboard.press('Escape')
+
       if (!alreadyExists) {
-        await page.getByRole('button', { name: /Nova godina/ }).click()
-        // Use exact match — "Da" alone otherwise matches "Uredi datume" etc.
-        await page.getByRole('button', { name: 'Da', exact: true }).click()
+        await page.getByLabel('Nova školska godina').click()
+        await page
+          .getByRole('button', { name: new RegExp(`Kreiraj ${nextYearLabel}`) })
+          .click()
         await expect(
           page.getByText(`Školska godina ${nextYearLabel} kreirana.`),
         ).toBeVisible({ timeout: 10000 })
       }
 
-      // Click the 2026/2027 button — URL should gain ?schoolYear=2026%2F2027
-      await page.getByRole('button', { name: new RegExp(nextYearLabel) }).first().click()
-      await page.waitForURL(/schoolYear=2026/)
-      expect(page.url()).toContain('schoolYear=')
+      // After creation the switcher reflects the newly created year.
+      await expect(switcher).toContainText(nextYearLabel)
     })
 
-    test('Switching back to 2025/2026 shows the original modules/enrollments', async ({
-      page,
-    }) => {
+    test('switching the school year updates the programs view', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/programi?schoolYear=2025%2F2026`)
-      // SLR 1 table still present with our 4 modules
+      await page.goto(`${BASE}/admin/programi`)
+
+      const switcher = page.getByLabel('Odaberi školsku godinu')
+
+      // Switch to the next year if it is registered, then back to the current year.
+      await switcher.click()
+      const nextOption = page.getByRole('option', { name: /2026\/2027/ })
+      if (await nextOption.isVisible().catch(() => false)) {
+        await nextOption.click()
+        await expect(switcher).toContainText('2026/2027')
+        await switcher.click()
+      }
+      await page.getByRole('option', { name: '2025/2026' }).click()
+      await expect(switcher).toContainText('2025/2026')
+
+      // SLR 1 table renders one row per module (4) for the selected year.
       const table = slrTable(page)
       await expect(table.locator('tbody tr')).toHaveCount(4)
     })

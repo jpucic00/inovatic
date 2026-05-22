@@ -6,11 +6,11 @@ import { revalidatePath } from 'next/cache'
 import { createCourseSchema } from '@/lib/validators/admin/course'
 import type { CreateCourseInput } from '@/lib/validators/admin/course'
 import type { AdminActionResult } from '@/lib/action-types'
-import { computeSchoolYear } from '@/lib/school-year'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 
-export async function getCourses(schoolYear?: string) {
+export async function getCourses() {
   await requireAdmin()
-  const year = schoolYear ?? computeSchoolYear()
+  const year = await getSelectedSchoolYear()
 
   return db.course.findMany({
     orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],

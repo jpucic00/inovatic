@@ -6,6 +6,7 @@ import type { UserRole } from '@prisma/client'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { loginSchema, type LoginFormData } from '@/lib/validators/login'
+import { clearSchoolYearCookie } from '@/lib/school-year-cookie'
 
 type LoginActionResult =
   | { success: true; role: UserRole }
@@ -36,6 +37,9 @@ export async function loginAction(data: LoginFormData): Promise<LoginActionResul
     ? await db.user.findUnique({ where: { email: identifier }, select: { role: true } })
     : await db.user.findUnique({ where: { username: identifier }, select: { role: true } })
   if (!user) return { success: false, error: 'Pogrešno korisničko ime ili lozinka.' }
+
+  // Reset the school-year selection so every login lands on the current year.
+  await clearSchoolYearCookie()
 
   return { success: true, role: user.role }
 }

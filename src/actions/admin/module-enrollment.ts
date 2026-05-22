@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
+import { archivedYearError } from '@/lib/school-year-guard'
 
 export async function deleteModuleEnrollment(id: string): Promise<AdminActionResult> {
   await requireAdmin()
@@ -13,9 +14,14 @@ export async function deleteModuleEnrollment(id: string): Promise<AdminActionRes
   try {
     const moduleEnrollment = await db.moduleEnrollment.findUnique({
       where: { id },
-      select: { enrollment: { select: { scheduledGroupId: true } } },
+      select: {
+        enrollment: { select: { scheduledGroupId: true, schoolYear: true } },
+      },
     })
     if (!moduleEnrollment) return { success: false, error: 'Upis u modul nije pronađen.' }
+
+    const blocked = archivedYearError(moduleEnrollment.enrollment.schoolYear)
+    if (blocked) return blocked
 
     await db.moduleEnrollment.delete({ where: { id } })
 
@@ -39,6 +45,7 @@ export async function closeModuleSchedule(
     const schedule = await db.moduleSchedule.findUnique({
       where: { id: moduleScheduleId },
       select: {
+        schoolYear: true,
         module: {
           select: {
             course: {
@@ -51,6 +58,9 @@ export async function closeModuleSchedule(
       },
     })
     if (!schedule) return { success: false, error: 'Modul nije pronađen.' }
+
+    const blocked = archivedYearError(schedule.schoolYear)
+    if (blocked) return blocked
 
     await db.moduleSchedule.update({
       where: { id: moduleScheduleId },
@@ -79,6 +89,15 @@ export async function addModuleEnrollment(
   }
 
   try {
+    const enrollment = await db.enrollment.findUnique({
+      where: { id: enrollmentId },
+      select: { schoolYear: true },
+    })
+    if (!enrollment) return { success: false, error: 'Upis nije pronađen.' }
+
+    const blocked = archivedYearError(enrollment.schoolYear)
+    if (blocked) return blocked
+
     await db.moduleEnrollment.create({
       data: { enrollmentId, moduleScheduleId },
     })

@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
+import { archivedYearError } from '@/lib/school-year-guard'
 import {
   createTeacherSchema,
   updateTeacherSchema,
@@ -368,11 +369,14 @@ export async function assignTeacherToGroup(
       }),
       db.scheduledGroup.findUnique({
         where: { id: scheduledGroupId },
-        select: { id: true },
+        select: { id: true, schoolYear: true },
       }),
     ])
     if (!teacher) return { success: false, error: 'Nastavnik nije pronađen.' }
     if (!group) return { success: false, error: 'Grupa nije pronađena.' }
+
+    const blocked = archivedYearError(group.schoolYear)
+    if (blocked) return blocked
 
     const existing = await db.teacherAssignment.findUnique({
       where: { userId_scheduledGroupId: { userId: teacherId, scheduledGroupId } },
@@ -403,9 +407,16 @@ export async function unassignTeacherFromGroup(
   try {
     const assignment = await db.teacherAssignment.findUnique({
       where: { id: assignmentId },
-      select: { userId: true, scheduledGroupId: true },
+      select: {
+        userId: true,
+        scheduledGroupId: true,
+        scheduledGroup: { select: { schoolYear: true } },
+      },
     })
     if (!assignment) return { success: false, error: 'Dodjela nije pronađena.' }
+
+    const blocked = archivedYearError(assignment.scheduledGroup.schoolYear)
+    if (blocked) return blocked
 
     await db.teacherAssignment.delete({ where: { id: assignmentId } })
 
