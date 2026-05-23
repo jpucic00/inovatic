@@ -5,6 +5,7 @@ import { Eye } from 'lucide-react'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { InquiryStatusBadge } from './inquiry-status-badge'
 import { formatChildName } from '@/lib/format'
+import { GRADE_LABELS, GRADE_SORT_KEY, type Grade } from '@/lib/inquiry-status'
 
 // Minimal type matching what we pass from the server
 type InquiryRow = {
@@ -14,6 +15,7 @@ type InquiryRow = {
   childFirstName: string
   childLastName: string
   childDateOfBirth: string | null
+  childGrade: string | null
   locationPref: string | null
   status: string
   createdAt: Date
@@ -64,6 +66,20 @@ const columns: ColumnDef<InquiryRow>[] = [
         </div>
       )
     },
+  },
+  {
+    key: 'childGrade',
+    header: 'Razred',
+    sortable: true,
+    sortValue: (row) =>
+      row.childGrade ? (GRADE_SORT_KEY[row.childGrade as Grade] ?? 999) : 999,
+    cell: (row) => (
+      <span className="text-sm text-gray-700 whitespace-nowrap">
+        {row.childGrade
+          ? (GRADE_LABELS[row.childGrade as Grade] ?? row.childGrade)
+          : '–'}
+      </span>
+    ),
   },
   {
     key: 'status',

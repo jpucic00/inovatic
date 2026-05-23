@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { UseFormRegister, FieldErrors, UseFormSetValue, UseFormGetValues } from 'react-hook-form'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import type { ActiveProgram } from '@/actions/public/programs'
+import { GRADE_VALUES, GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
 import { FieldError } from './FieldError'
 
 interface Props {
@@ -20,20 +21,7 @@ const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gr
 const selectClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition'
 const selectDisabledClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed transition'
 
-const GRADE_OPTIONS = [
-  { value: '', label: '– Odaberite razred –' },
-  { value: 'predskolci', label: 'Predškolci' },
-  { value: '1', label: '1. razred' },
-  { value: '2', label: '2. razred' },
-  { value: '3', label: '3. razred' },
-  { value: '4', label: '4. razred' },
-  { value: '5', label: '5. razred' },
-  { value: '6', label: '6. razred' },
-  { value: '7', label: '7. razred' },
-  { value: '8', label: '8. razred' },
-]
-
-const GRADE_TO_LEVEL: Record<string, string> = {
+const GRADE_TO_LEVEL: Record<Grade, string> = {
   predskolci: 'SLR_1',
   '1': 'SLR_1',
   '2': 'SLR_1',
@@ -64,7 +52,7 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
     const groupId = getValues('scheduledGroupId')
     return courseId && groupId ? `${courseId}|${groupId}` : ''
   })
-  const [selectedGrade, setSelectedGrade] = useState(() => getValues('grade') ?? '')
+  const [selectedGrade, setSelectedGrade] = useState<Grade | 'workshop' | ''>(() => getValues('grade') ?? '')
 
   useEffect(() => {
     if (!selectedGroupKey) return
@@ -86,14 +74,14 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
     ? programs.filter((p) => p.id === preselectedCourseId)
     : programs.filter((p) => {
         if (p.isCustom) return false  // radionice only via their own URL
-        if (!selectedGrade) return true
+        if (!selectedGrade || selectedGrade === 'workshop') return true
         return p.level === GRADE_TO_LEVEL[selectedGrade]
       })
 
   const hasAnyGroups = filteredPrograms.some((p) => p.groups.length > 0)
 
   function handleGradeChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    setSelectedGrade(e.target.value)
+    setSelectedGrade(e.target.value as Grade | 'workshop' | '')
     // Reset group selection when grade changes
     setSelectedGroupKey('')
     setValue('scheduledGroupId', undefined)
@@ -182,8 +170,9 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
             }}
             className={selectClass}
           >
-            {GRADE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+            <option value="">– Odaberite razred –</option>
+            {GRADE_VALUES.map((v) => (
+              <option key={v} value={v}>{GRADE_LABELS[v]}</option>
             ))}
           </select>
           <FieldError message={errors.grade?.message} />

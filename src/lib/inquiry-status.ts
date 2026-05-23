@@ -21,3 +21,41 @@ export const STATUS_FLOW = [
   'NEW',
   'ACCOUNT_CREATED',
 ] as const
+
+export const GRADE_VALUES = [
+  'predskolci',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+] as const
+
+export type Grade = (typeof GRADE_VALUES)[number]
+
+export const GRADE_LABELS: Record<Grade, string> = {
+  predskolci: 'Predškolci',
+  '1': '1. razred',
+  '2': '2. razred',
+  '3': '3. razred',
+  '4': '4. razred',
+  '5': '5. razred',
+  '6': '6. razred',
+  '7': '7. razred',
+  '8': '8. razred',
+}
+
+export const GRADE_SORT_KEY: Record<Grade, number> = {
+  predskolci: 0,
+  '1': 1,
+  '2': 2,
+  '3': 3,
+  '4': 4,
+  '5': 5,
+  '6': 6,
+  '7': 7,
+  '8': 8,
+}

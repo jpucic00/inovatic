@@ -6,14 +6,16 @@ import { InquiryFilters } from '@/components/admin/inquiries/inquiry-filters'
 import { InquiryTable } from '@/components/admin/inquiries/inquiry-table'
 import { Pagination } from '@/components/admin/pagination'
 import { InquiryStatus } from '@prisma/client'
+import { GRADE_VALUES, type Grade } from '@/lib/inquiry-status'
 
 export const metadata: Metadata = { title: 'Admin – Upiti' }
 
 const VALID_STATUSES = Object.values(InquiryStatus) as string[]
+const VALID_GRADES = GRADE_VALUES as readonly string[]
 const PAGE_SIZE = 20
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; course?: string; page?: string }>
+  searchParams: Promise<{ status?: string; search?: string; course?: string; grade?: string; page?: string }>
 }
 
 export default async function InquiriesPage({ searchParams }: Readonly<PageProps>) {
@@ -21,10 +23,13 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
   const selectedYear = await getSelectedSchoolYear()
 
   const params = await searchParams
-  const { status, search, course, page: pageParam } = params
+  const { status, search, course, grade, page: pageParam } = params
 
   const statusFilter =
     status && VALID_STATUSES.includes(status) ? (status as InquiryStatus) : undefined
+
+  const gradeFilter =
+    grade && VALID_GRADES.includes(grade) ? (grade as Grade) : undefined
 
   const currentPage = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1)
 
@@ -33,6 +38,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
       status: statusFilter ?? 'ALL',
       search: search?.trim() || undefined,
       courseId: course || undefined,
+      grade: gradeFilter,
       page: currentPage,
       pageSize: PAGE_SIZE,
     }),
@@ -42,6 +48,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
   const currentStatus = status && VALID_STATUSES.includes(status) ? status : 'ALL'
   const currentSearch = search?.trim() ?? ''
   const currentCourse = course ?? ''
+  const currentGrade = gradeFilter ?? ''
 
   return (
     <div>
@@ -55,7 +62,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
         </div>
       </div>
 
-      <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} currentCourse={currentCourse} courses={courses} />
+      <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} currentCourse={currentCourse} currentGrade={currentGrade} courses={courses} />
 
       <InquiryTable data={inquiries} />
 

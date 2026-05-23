@@ -10,11 +10,13 @@ import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
 import { computeSchoolYear, schoolYearDateRange } from '@/lib/school-year'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
+import type { Grade } from '@/lib/inquiry-status'
 
 type InquiryFilters = {
   status?: InquiryStatus | 'ALL'
   search?: string
   courseId?: string
+  grade?: Grade
   page?: number
   pageSize?: number
 }
@@ -38,13 +40,14 @@ export async function getInquiries(
 ): Promise<PaginatedResult<Awaited<ReturnType<typeof db.inquiry.findMany>>[number]>> {
   await requireAdmin()
 
-  const { status, search, courseId, page = 1, pageSize = 20 } = filters
+  const { status, search, courseId, grade, page = 1, pageSize = 20 } = filters
   const { gte, lt } = schoolYearDateRange(await getSelectedSchoolYear())
 
   const where = {
     createdAt: { gte, lt },
     ...(status && status !== 'ALL' ? { status } : {}),
     ...(courseIdFilter(courseId)),
+    ...(grade ? { childGrade: grade } : {}),
     ...(search
       ? {
           OR: [
