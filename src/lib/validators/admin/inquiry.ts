@@ -1,7 +1,10 @@
 import { z } from 'zod'
-import { InquiryStatus } from '@prisma/client'
 
-export const updateStatusSchema = z.object({
+export const declineInquirySchema = z.object({
   id: z.string().min(1),
-  status: z.nativeEnum(InquiryStatus),
+  reason: z
+    .string()
+    .trim()
+    .min(3, 'Razlog je obavezan.')
+    .max(2000, 'Maksimalno 2000 znakova.'),
 })

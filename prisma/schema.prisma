@@ -211,6 +211,7 @@ model Inquiry {
   referralSource  String?
   consentGivenAt  DateTime?
   status          InquiryStatus @default(NEW)
+  declineReason   String?       @db.Text
   assignedGroupId String?
   studentId       String?
   createdAt       DateTime      @default(now())

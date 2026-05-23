@@ -485,10 +485,32 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       await expect(page.locator('span', { hasText: 'Nova' }).first()).toBeVisible()
     })
 
+    test('submit button is disabled when reason textarea is empty', async ({ page }) => {
+      await loginAsAdmin(page)
+      await openInquiryDetail(page, INQUIRY_TO_DECLINE.parentName)
+      await clickUntilVisible(
+        page.locator('button', { hasText: 'Odbij upit' }),
+        page.locator('#decline-reason'),
+      )
+      const submit = page.locator('[role="dialog"] button', { hasText: 'Odbij upit' }).last()
+      await expect(submit).toBeDisabled()
+      // Typing too few characters still keeps it disabled
+      await page.locator('#decline-reason').fill('ab')
+      await expect(submit).toBeDisabled()
+      // Close without submitting
+      await page.locator('[role="dialog"] button', { hasText: 'Odustani' }).click()
+    })
+
     test('confirming decline updates status to "Odbijena"', async ({ page }) => {
       await loginAsAdmin(page)
       await openInquiryDetail(page, INQUIRY_TO_DECLINE.parentName)
-      await page.locator('button', { hasText: 'Odbij upit' }).click()
+      await clickUntilVisible(
+        page.locator('button', { hasText: 'Odbij upit' }),
+        page.locator('#decline-reason'),
+      )
+      await page
+        .locator('#decline-reason')
+        .fill('Test razlog — dijete je premlado za SLR1.')
       await page.locator('[role="dialog"] button', { hasText: 'Odbij upit' }).last().click()
       // Status badge should update
       await expect(page.locator('span', { hasText: 'Odbijena' }).first()).toBeVisible({
@@ -500,6 +522,18 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       await loginAsAdmin(page)
       await openInquiryDetail(page, INQUIRY_TO_DECLINE.parentName)
       await expect(page.locator('text=Upit je odbijen')).toBeVisible()
+    })
+
+    test('declined inquiry shows captured rejection reason + timestamp', async ({ page }) => {
+      await loginAsAdmin(page)
+      await openInquiryDetail(page, INQUIRY_TO_DECLINE.parentName)
+      await expect(page.locator('text=Razlog odbijanja')).toBeVisible()
+      await expect(
+        page.locator('text=Test razlog — dijete je premlado za SLR1.'),
+      ).toBeVisible()
+      await expect(
+        page.getByText(/Odbijeno\s+\d{2}\.\s*\d{2}\.\s*\d{4}\.\s+u\s+\d{2}:\d{2}/),
+      ).toBeVisible()
     })
 
     test('declined inquiry hides "Odbij upit" button', async ({ page }) => {
