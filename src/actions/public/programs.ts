@@ -1,8 +1,8 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { computeAvailableSpots } from '@/lib/available-spots'
 import { computeSchoolYear } from '@/lib/school-year'
+import { computeGroupCapacity } from '@/lib/group-capacity'
 
 export type ActiveGroup = {
   id: string
@@ -44,33 +44,21 @@ type GroupRow = Awaited<ReturnType<typeof db.scheduledGroup.findMany>>[number] &
 function toActiveGroup(g: GroupRow, now: Date): ActiveGroup | null {
   const isStandard = !g.course.isCustom
 
-  let enrollingScheduleId: string | null = null
   let enrollingModuleTitle: string | null = null
-
   if (isStandard) {
     for (const mod of g.course.modules) {
       const schedule = mod.schedules.find(
         (s) => s.schoolYear === g.schoolYear && s.startDate !== null && s.startDate > now,
       )
       if (schedule) {
-        enrollingScheduleId = schedule.id
         enrollingModuleTitle = mod.title
         break
       }
     }
-    if (!enrollingScheduleId) return null
+    if (!enrollingModuleTitle) return null
   }
 
-  const enrolledCount = isStandard
-    ? g.enrollments.filter((e) =>
-        e.moduleEnrollments.some((me) => me.moduleScheduleId === enrollingScheduleId),
-      ).length
-    : g.enrollments.length
-
-  const availableSpots = computeAvailableSpots(
-    g.maxStudents,
-    enrolledCount + g._count.preferredInquiries,
-  )
+  const { availableSpots, isFull } = computeGroupCapacity(g, now)
 
   return {
     id: g.id,
@@ -79,7 +67,7 @@ function toActiveGroup(g: GroupRow, now: Date): ActiveGroup | null {
     startTime: g.startTime,
     endTime: g.endTime,
     availableSpots,
-    isFull: availableSpots === 0,
+    isFull,
     ...(enrollingModuleTitle ? { currentModuleName: enrollingModuleTitle } : {}),
   }
 }

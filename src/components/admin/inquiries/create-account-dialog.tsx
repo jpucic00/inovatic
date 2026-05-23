@@ -14,6 +14,7 @@ import {
 import { UserPlus, Copy, ExternalLink } from 'lucide-react'
 import { createStudentFromInquiry } from '@/actions/admin/student'
 import { getGroupsForCourse } from '@/actions/admin/inquiry'
+import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -30,6 +31,8 @@ interface GroupOption {
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null
+  availableSpots: number
+  isFull: boolean
   location: { name: string }
   course: { title: string; isCustom?: boolean; modules?: ModuleOption[] }
 }
@@ -63,6 +66,8 @@ function mapGroupOption(sg: {
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null
+  availableSpots?: number
+  isFull?: boolean
   location: { name: string }
   course: { title: string; isCustom: boolean; modules?: ModuleOption[] }
 }): GroupOption {
@@ -72,6 +77,8 @@ function mapGroupOption(sg: {
     dayOfWeek: sg.dayOfWeek,
     startTime: sg.startTime,
     endTime: sg.endTime,
+    availableSpots: sg.availableSpots ?? 0,
+    isFull: sg.isFull ?? false,
     location: { name: sg.location.name },
     course: {
       title: sg.course.title,
@@ -139,6 +146,8 @@ export function CreateAccountDialog({
   }
 
   const handleGroupSelect = (groupId: string) => {
+    const target = loadedGroups.find((g) => g.id === groupId)
+    if (target?.isFull) return
     setSelectedGroupId(groupId)
     setSelectedScheduleIds([])
   }
@@ -176,6 +185,11 @@ export function CreateAccountDialog({
         router.refresh()
       } else {
         toast.error(res.error ?? 'Greška pri kreiranju.')
+        if (res.code === 'GROUP_FULL') {
+          if (selectedCourseId) await handleCourseChange(selectedCourseId)
+          setSelectedGroupId('')
+          router.refresh()
+        }
       }
     })
   }
@@ -292,15 +306,15 @@ export function CreateAccountDialog({
                   const label = [g.name, g.dayOfWeek, timeRange, g.location.name]
                     .filter(Boolean)
                     .join(' · ')
+                  const wrapperClass = (() => {
+                    if (g.isFull) return 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
+                    if (selectedGroupId === g.id) return 'bg-cyan-50 border-cyan-300 cursor-pointer'
+                    return 'bg-white border-gray-200 hover:border-gray-300 cursor-pointer'
+                  })()
                   return (
                     <label
                       key={g.id}
-                      className={[
-                        'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                        selectedGroupId === g.id
-                          ? 'bg-cyan-50 border-cyan-300'
-                          : 'bg-white border-gray-200 hover:border-gray-300',
-                      ].join(' ')}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${wrapperClass}`}
                     >
                       <input
                         type="radio"
@@ -308,9 +322,11 @@ export function CreateAccountDialog({
                         value={g.id}
                         checked={selectedGroupId === g.id}
                         onChange={() => handleGroupSelect(g.id)}
-                        className="h-4 w-4 border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                        disabled={g.isFull}
+                        className="h-4 w-4 border-gray-300 text-cyan-600 focus:ring-cyan-500 disabled:cursor-not-allowed"
                       />
-                      <span className="text-sm text-gray-800">{label}</span>
+                      <span className="flex-1 text-sm text-gray-800">{label}</span>
+                      <GroupCapacityChip availableSpots={g.availableSpots} isFull={g.isFull} />
                     </label>
                   )
                 })
@@ -374,7 +390,12 @@ export function CreateAccountDialog({
               </button>
               <button
                 onClick={handleCreate}
-                disabled={isPending || !selectedGroupId || (isStandardCourse && selectedScheduleIds.length === 0)}
+                disabled={
+                  isPending ||
+                  !selectedGroupId ||
+                  (selectedGroup?.isFull ?? false) ||
+                  (isStandardCourse && selectedScheduleIds.length === 0)
+                }
                 className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
               >
                 {isPending ? 'Kreiram...' : 'Kreiraj račun i upiši'}

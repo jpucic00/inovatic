@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Check } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
-import { getInquiry, getInquiryCourses } from '@/actions/admin/inquiry'
+import { getInquiry, getInquiryCourses, getGroupsForCourse } from '@/actions/admin/inquiry'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
 import { DeclineDialog } from '@/components/admin/inquiries/decline-dialog'
 import { DeleteDialog } from '@/components/admin/inquiries/delete-dialog'
@@ -13,12 +13,22 @@ import {
   INQUIRY_STATUS_LABELS,
   COURSE_LEVEL_LABELS,
   STATUS_FLOW,
-  GRADE_LABELS,
-  type Grade,
 } from '@/lib/inquiry-status'
 import { formatChildName } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Admin – Upit' }
+
+const GRADE_LABELS: Record<string, string> = {
+  predskolci: 'Predškolci',
+  '1': '1. razred',
+  '2': '2. razred',
+  '3': '3. razred',
+  '4': '4. razred',
+  '5': '5. razred',
+  '6': '6. razred',
+  '7': '7. razred',
+  '8': '8. razred',
+}
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -101,13 +111,18 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   const canSendSchedule = !isDeclined && !isAccountCreated
   const canCreateAccount = !isDeclined && !isAccountCreated
 
-  // Groups for the dropdowns — strip to plain objects (Decimal fields are not serializable)
+  // Groups for the dropdowns — strip to plain objects (Decimal fields are not serializable).
+  // Capacity fields (availableSpots / isFull) come from getGroupsForCourse so the dialogs
+  // render "X slobodnih mjesta" / "Popunjeno" immediately on first open without an extra
+  // client-side fetch.
   const toGroupOption = (sg: {
     id: string
     name: string | null
     dayOfWeek: string | null
     startTime: string | null
     endTime: string | null
+    availableSpots: number
+    isFull: boolean
     location: { name: string }
     course: {
       title: string
@@ -125,11 +140,16 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     dayOfWeek: sg.dayOfWeek,
     startTime: sg.startTime,
     endTime: sg.endTime,
+    availableSpots: sg.availableSpots,
+    isFull: sg.isFull,
     location: { name: sg.location.name },
     course: { title: sg.course.title, isCustom: sg.course.isCustom, modules: sg.course.modules },
   })
 
-  const courseGroups = (inquiry.course?.scheduledGroups ?? []).map(toGroupOption)
+  const groupsForInitial = inquiry.courseId
+    ? await getGroupsForCourse(inquiry.courseId)
+    : []
+  const courseGroups = groupsForInitial.map(toGroupOption)
   const allCourses = await getInquiryCourses()
 
   const birthInfo: React.ReactNode = inquiry.childDateOfBirth
@@ -189,7 +209,34 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
         <h2 className="text-sm font-semibold text-gray-700 mb-5">Tijek upita</h2>
         <StatusTimeline currentStatus={inquiry.status} />
         {isDeclined && (
-          <p className="mt-4 text-sm text-red-600 font-medium">Upit je odbijen.</p>
+          <>
+            <p className="mt-4 text-sm text-red-600 font-medium">Upit je odbijen.</p>
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                Razlog odbijanja
+              </div>
+              {inquiry.declineReason ? (
+                <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
+                  {inquiry.declineReason}
+                </p>
+              ) : (
+                <p className="mt-1 text-sm italic text-gray-500">Razlog nije zabilježen.</p>
+              )}
+              <p className="mt-2 text-xs text-gray-500">
+                Odbijeno{' '}
+                {inquiry.updatedAt.toLocaleDateString('hr-HR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                })}
+                {' u '}
+                {inquiry.updatedAt.toLocaleTimeString('hr-HR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            </div>
+          </>
         )}
       </div>
 
@@ -238,7 +285,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
           {inquiry.childGrade && (
             <DetailRow
               label="Razred"
-              value={GRADE_LABELS[inquiry.childGrade as Grade] ?? inquiry.childGrade}
+              value={GRADE_LABELS[inquiry.childGrade] ?? inquiry.childGrade}
             />
           )}
         </dl>

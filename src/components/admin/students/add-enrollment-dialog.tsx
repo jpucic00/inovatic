@@ -14,6 +14,7 @@ import {
 import { BookPlus } from 'lucide-react'
 import { addEnrollment } from '@/actions/admin/student'
 import { getGroupsForCourseInYears } from '@/actions/admin/inquiry'
+import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { toast } from 'sonner'
 
 type ModuleOption = {
@@ -30,6 +31,8 @@ type GroupOption = {
   startTime: string | null
   endTime: string | null
   schoolYear: string
+  availableSpots: number
+  isFull: boolean
   location: { name: string }
   course: { title: string; isCustom?: boolean; modules?: ModuleOption[] }
 }
@@ -103,6 +106,8 @@ export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
           startTime: g.startTime,
           endTime: g.endTime,
           schoolYear: g.schoolYear,
+          availableSpots: g.availableSpots,
+          isFull: g.isFull,
           location: { name: g.location.name },
           course: {
             title: g.course.title,
@@ -117,6 +122,8 @@ export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
   }
 
   const handleGroupSelect = (groupId: string) => {
+    const target = groups.find((g) => g.id === groupId)
+    if (target?.isFull) return
     setSelectedGroupId(groupId)
     setSelectedScheduleIds([])
   }
@@ -150,6 +157,12 @@ export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
         router.refresh()
       } else {
         toast.error(res.error ?? 'Greška pri upisu.')
+        if (res.code === 'GROUP_FULL') {
+          // Re-fetch groups so the freshly-filled one shows as Popunjeno.
+          if (selectedCourseId) await handleCourseChange(selectedCourseId)
+          setSelectedGroupId('')
+          router.refresh()
+        }
       }
     })
   }
@@ -219,15 +232,15 @@ export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
               const label = [g.name, g.dayOfWeek, timeRange, g.location.name]
                 .filter(Boolean)
                 .join(' · ')
+              const wrapperClass = (() => {
+                if (g.isFull) return 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
+                if (selectedGroupId === g.id) return 'bg-cyan-50 border-cyan-300 cursor-pointer'
+                return 'bg-white border-gray-200 hover:border-gray-300 cursor-pointer'
+              })()
               return (
                 <label
                   key={g.id}
-                  className={[
-                    'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                    selectedGroupId === g.id
-                      ? 'bg-cyan-50 border-cyan-300'
-                      : 'bg-white border-gray-200 hover:border-gray-300',
-                  ].join(' ')}
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${wrapperClass}`}
                 >
                   <input
                     type="radio"
@@ -235,9 +248,11 @@ export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
                     value={g.id}
                     checked={selectedGroupId === g.id}
                     onChange={() => handleGroupSelect(g.id)}
-                    className="h-4 w-4 border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                    disabled={g.isFull}
+                    className="h-4 w-4 border-gray-300 text-cyan-600 focus:ring-cyan-500 disabled:cursor-not-allowed"
                   />
                   <span className="flex-1 text-sm text-gray-800">{label}</span>
+                  <GroupCapacityChip availableSpots={g.availableSpots} isFull={g.isFull} />
                   <span className="text-[10px] font-medium text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">
                     {g.schoolYear}
                   </span>
@@ -309,7 +324,7 @@ export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isPending || !selectedGroupId}
+            disabled={isPending || !selectedGroupId || (selectedGroup?.isFull ?? false)}
             className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
           >
             {isPending ? 'Upisujem...' : 'Upiši'}

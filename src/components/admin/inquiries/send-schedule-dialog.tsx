@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { CalendarDays } from 'lucide-react'
 import { sendScheduleOptions, getGroupsForCourse } from '@/actions/admin/inquiry'
+import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { toast } from 'sonner'
 
 interface GroupOption {
@@ -21,6 +22,8 @@ interface GroupOption {
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null
+  availableSpots: number
+  isFull: boolean
   location: { name: string }
 }
 
@@ -67,6 +70,8 @@ export function SendScheduleDialog({
           dayOfWeek: sg.dayOfWeek,
           startTime: sg.startTime,
           endTime: sg.endTime,
+          availableSpots: sg.availableSpots,
+          isFull: sg.isFull,
           location: { name: sg.location.name },
         })),
       )
@@ -171,7 +176,8 @@ export function SendScheduleDialog({
                     onChange={() => toggleGroup(g.id)}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-800">{label}</span>
+                  <span className="flex-1 text-sm text-gray-800">{label}</span>
+                  <GroupCapacityChip availableSpots={g.availableSpots} isFull={g.isFull} />
                 </label>
               )
             })

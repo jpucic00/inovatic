@@ -10,6 +10,7 @@ import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
 import { computeSchoolYear, schoolYearDateRange } from '@/lib/school-year'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
+import { computeGroupCapacity } from '@/lib/group-capacity'
 import type { Grade } from '@/lib/inquiry-status'
 
 type InquiryFilters = {
@@ -172,7 +173,7 @@ export async function getGroupsForCourse(courseId: string) {
 
   if (!courseId) return []
 
-  return db.scheduledGroup.findMany({
+  const groups = await db.scheduledGroup.findMany({
     where: { courseId, schoolYear: year },
     include: {
       location: { select: { name: true } },
@@ -188,14 +189,33 @@ export async function getGroupsForCourse(courseId: string) {
               sortOrder: true,
               schedules: {
                 where: { schoolYear: year },
-                select: { id: true, startDate: true, endDate: true },
+                select: { id: true, schoolYear: true, startDate: true, endDate: true },
               },
             },
           },
         },
       },
+      enrollments: {
+        select: {
+          id: true,
+          moduleEnrollments: { select: { moduleScheduleId: true } },
+        },
+      },
+      _count: {
+        select: {
+          preferredInquiries: {
+            where: { status: { notIn: ['DECLINED', 'ACCOUNT_CREATED'] } },
+          },
+        },
+      },
     },
     orderBy: { createdAt: 'asc' },
+  })
+
+  const now = new Date()
+  return groups.map((g) => {
+    const { availableSpots, isFull } = computeGroupCapacity(g, now)
+    return { ...g, availableSpots, isFull }
   })
 }
 
@@ -232,22 +252,41 @@ export async function getGroupsForCourseInYears(courseId: string) {
           },
         },
       },
+      enrollments: {
+        select: {
+          id: true,
+          moduleEnrollments: { select: { moduleScheduleId: true } },
+        },
+      },
+      _count: {
+        select: {
+          preferredInquiries: {
+            where: { status: { notIn: ['DECLINED', 'ACCOUNT_CREATED'] } },
+          },
+        },
+      },
     },
     orderBy: [{ schoolYear: 'asc' }, { createdAt: 'asc' }],
   })
 
+  const now = new Date()
+
   // Filter each group's module schedules down to that group's own school year,
   // so the dialog can show the right dates per group without an N+1.
-  return groups.map((g) => ({
-    ...g,
-    course: {
-      ...g.course,
-      modules: g.course.modules.map((m) => ({
-        ...m,
-        schedules: m.schedules.filter((s) => s.schoolYear === g.schoolYear),
-      })),
-    },
-  }))
+  return groups.map((g) => {
+    const scopedGroup = {
+      ...g,
+      course: {
+        ...g.course,
+        modules: g.course.modules.map((m) => ({
+          ...m,
+          schedules: m.schedules.filter((s) => s.schoolYear === g.schoolYear),
+        })),
+      },
+    }
+    const { availableSpots, isFull } = computeGroupCapacity(scopedGroup, now)
+    return { ...scopedGroup, availableSpots, isFull }
+  })
 }
 
 export async function sendScheduleOptions(

@@ -13,9 +13,18 @@ import {
   type AddEnrollmentInput,
 } from '@/lib/validators/admin/student'
 import { hashPassword, generateSimplePassword } from '@/lib/password'
+import {
+  GroupFullError,
+  assertGroupHasAvailableSpot,
+  runWithGroupCapacityGuard,
+} from '@/lib/group-capacity'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { AccountCredentialsEmail } from '../../../emails/account-credentials'
 import type { PaginatedResult } from './inquiry'
+
+type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
+
+const GROUP_FULL_ERROR = 'Grupa je u međuvremenu popunjena.'
 
 export type StudentRow = {
   id: string
@@ -38,7 +47,7 @@ export type StudentRow = {
 
 type CreateStudentResult =
   | { success: true; username: string; password: string; isExisting: boolean; studentId: string }
-  | { success: false; error: string }
+  | { success: false; error: string; code?: 'GROUP_FULL' }
 
 const DIACRITICS_MAP: Record<string, string> = {
   'č': 'c', 'ć': 'c', 'š': 's', 'ž': 'z', 'đ': 'd',
@@ -49,19 +58,23 @@ function stripDiacritics(str: string): string {
   return str.replaceAll(/[čćšžđČĆŠŽĐ]/g, (ch) => DIACRITICS_MAP[ch] ?? ch)
 }
 
-async function generateUsername(firstName: string, lastName: string): Promise<string> {
+async function generateUsername(
+  tx: TxClient,
+  firstName: string,
+  lastName: string,
+): Promise<string> {
   const base = stripDiacritics(`${firstName}${lastName}`)
     .toLowerCase()
     .replaceAll(/\s+/g, '')
     .replaceAll(/[^a-z0-9]/g, '')
 
-  const existing = await db.user.findUnique({ where: { username: base } })
+  const existing = await tx.user.findUnique({ where: { username: base } })
   if (!existing) return base
 
   let suffix = 2
   while (true) {
     const candidate = `${base}${suffix}`
-    const taken = await db.user.findUnique({ where: { username: candidate } })
+    const taken = await tx.user.findUnique({ where: { username: candidate } })
     if (!taken) return candidate
     suffix++
   }
@@ -98,10 +111,11 @@ type CoreResult = {
 }
 
 async function findOrCreateStudent(
+  tx: TxClient,
   input: CoreInput,
 ): Promise<{ user: { id: string; username: string | null }; password: string; isExisting: boolean }> {
   const existingStudent = input.dateOfBirth
-    ? await db.user.findFirst({
+    ? await tx.user.findFirst({
         where: {
           role: 'STUDENT',
           firstName: { equals: input.firstName, mode: 'insensitive' },
@@ -120,7 +134,7 @@ async function findOrCreateStudent(
     if (input.childSchool) backfill.childSchool = input.childSchool
     if (input.gdprConsentAt) backfill.gdprConsentAt = input.gdprConsentAt
     if (Object.keys(backfill).length > 0) {
-      await db.user.update({
+      await tx.user.update({
         where: { id: existingStudent.id },
         data: backfill,
       })
@@ -132,11 +146,11 @@ async function findOrCreateStudent(
     }
   }
 
-  const username = await generateUsername(input.firstName, input.lastName)
+  const username = await generateUsername(tx, input.firstName, input.lastName)
   const password = generateSimplePassword(6)
   const passwordHash = await hashPassword(password)
 
-  const created = await db.user.create({
+  const created = await tx.user.create({
     data: {
       email: `${username}@student.inovatic.local`,
       username,
@@ -158,11 +172,13 @@ async function findOrCreateStudent(
 }
 
 async function ensureEnrollment(
+  tx: TxClient,
   userId: string,
   groupId: string,
   moduleScheduleIds: string[] | undefined,
+  options: { assertCapacity: boolean } = { assertCapacity: true },
 ): Promise<{ enrollmentId: string; group: CoreResult['group'] }> {
-  const sg = await db.scheduledGroup.findUnique({
+  const sg = await tx.scheduledGroup.findUnique({
     where: { id: groupId },
     include: {
       location: { select: { name: true } },
@@ -171,7 +187,7 @@ async function ensureEnrollment(
   })
   if (!sg) throw new Error('Grupa nije pronađena.')
 
-  const existingEnrollment = await db.enrollment.findUnique({
+  const existingEnrollment = await tx.enrollment.findUnique({
     where: {
       userId_scheduledGroupId_schoolYear: {
         userId,
@@ -181,14 +197,21 @@ async function ensureEnrollment(
     },
   })
 
+  // Only assert capacity when we'd actually be claiming a new spot. An
+  // existing Enrollment row means we're only adding ModuleEnrollment rows;
+  // the student already occupies a seat in this (group, schoolYear).
+  if (!existingEnrollment && options.assertCapacity) {
+    await assertGroupHasAvailableSpot(tx, sg.id)
+  }
+
   const enrollmentId = existingEnrollment
     ? existingEnrollment.id
-    : (await db.enrollment.create({
+    : (await tx.enrollment.create({
         data: { userId, scheduledGroupId: sg.id, schoolYear: sg.schoolYear },
       })).id
 
   if (moduleScheduleIds && moduleScheduleIds.length > 0) {
-    await db.moduleEnrollment.createMany({
+    await tx.moduleEnrollment.createMany({
       data: moduleScheduleIds.map((moduleScheduleId) => ({
         enrollmentId,
         moduleScheduleId,
@@ -206,15 +229,20 @@ async function ensureEnrollment(
  * - When groupId is given, uses the target group's schoolYear (not
  *   computeSchoolYear()) so future-year enrollments work.
  * - Creates ModuleEnrollment rows when moduleScheduleIds is non-empty.
+ * - Capacity is enforced by ensureEnrollment when a new Enrollment row would
+ *   be created; callers running on top of an inquiry that itself reserves a
+ *   spot on the same target group must free that reservation BEFORE invoking
+ *   createStudentCore so the count doesn't double.
  */
-async function createStudentCore(input: CoreInput): Promise<CoreResult> {
-  const { user, password, isExisting } = await findOrCreateStudent(input)
+async function createStudentCore(tx: TxClient, input: CoreInput): Promise<CoreResult> {
+  const { user, password, isExisting } = await findOrCreateStudent(tx, input)
 
   if (!input.groupId) {
     return { user, password, isExisting, enrollmentId: null, group: null }
   }
 
   const { enrollmentId, group } = await ensureEnrollment(
+    tx,
     user.id,
     input.groupId,
     input.moduleScheduleIds,
@@ -232,48 +260,88 @@ export async function createStudentFromInquiry(
   const parsed = createStudentSchema.safeParse({ inquiryId, groupId })
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
+  // Pre-flight status check so we can return a clean error without spinning
+  // up a transaction. The tx body re-checks under serializable isolation.
+  const inquiryPreview = await db.inquiry.findUnique({ where: { id: inquiryId } })
+  if (!inquiryPreview) return { success: false, error: 'Upit nije pronađen.' }
+  if (inquiryPreview.status === 'ACCOUNT_CREATED') {
+    return { success: false, error: 'Račun je već stvoren za ovaj upit.' }
+  }
+  if (inquiryPreview.status === 'DECLINED') {
+    return { success: false, error: 'Upit je odbijen.' }
+  }
+
+  let core: CoreResult
+  let inquiry: typeof inquiryPreview
   try {
-    const inquiry = await db.inquiry.findUnique({
-      where: { id: inquiryId },
+    const result = await runWithGroupCapacityGuard(async (tx) => {
+      const fresh = await tx.inquiry.findUnique({ where: { id: inquiryId } })
+      if (!fresh) throw new Error('Upit nije pronađen.')
+      if (fresh.status === 'ACCOUNT_CREATED') {
+        throw new Error('Račun je već stvoren za ovaj upit.')
+      }
+      if (fresh.status === 'DECLINED') {
+        throw new Error('Upit je odbijen.')
+      }
+
+      // Free this inquiry's reservation BEFORE the capacity assertion so the
+      // count doesn't include the spot we're about to claim. Inquiry-mark
+      // first; backfill studentId/assignedGroupId once we have them.
+      await tx.inquiry.update({
+        where: { id: inquiryId },
+        data: { status: 'ACCOUNT_CREATED' },
+      })
+
+      const created = await createStudentCore(tx, {
+        firstName: fresh.childFirstName,
+        lastName: fresh.childLastName,
+        dateOfBirth: fresh.childDateOfBirth,
+        parentName: fresh.parentName,
+        parentEmail: fresh.parentEmail,
+        parentPhone: fresh.parentPhone,
+        childSchool: fresh.childSchool,
+        gdprConsentAt: fresh.consentGivenAt,
+        groupId,
+        moduleScheduleIds,
+      })
+
+      if (!created.group) {
+        throw new Error('Grupa nije pronađena.')
+      }
+
+      await tx.inquiry.update({
+        where: { id: inquiryId },
+        data: { studentId: created.user.id, assignedGroupId: groupId },
+      })
+
+      return { core: created, inquiry: fresh }
     })
-
-    if (!inquiry) return { success: false, error: 'Upit nije pronađen.' }
-    if (inquiry.status === 'ACCOUNT_CREATED') {
-      return { success: false, error: 'Račun je već stvoren za ovaj upit.' }
+    core = result.core
+    inquiry = result.inquiry
+  } catch (err) {
+    if (err instanceof GroupFullError) {
+      return { success: false, error: GROUP_FULL_ERROR, code: 'GROUP_FULL' }
     }
-    if (inquiry.status === 'DECLINED') {
-      return { success: false, error: 'Upit je odbijen.' }
+    if (err instanceof Error) {
+      const msg = err.message
+      if (
+        msg === 'Upit nije pronađen.' ||
+        msg === 'Račun je već stvoren za ovaj upit.' ||
+        msg === 'Upit je odbijen.' ||
+        msg === 'Grupa nije pronađena.'
+      ) {
+        return { success: false, error: msg }
+      }
     }
+    console.error('createStudentFromInquiry failed:', err)
+    return { success: false, error: 'Greška pri kreiranju računa.' }
+  }
 
-    const core = await createStudentCore({
-      firstName: inquiry.childFirstName,
-      lastName: inquiry.childLastName,
-      dateOfBirth: inquiry.childDateOfBirth,
-      parentName: inquiry.parentName,
-      parentEmail: inquiry.parentEmail,
-      parentPhone: inquiry.parentPhone,
-      childSchool: inquiry.childSchool,
-      gdprConsentAt: inquiry.consentGivenAt,
-      groupId,
-      moduleScheduleIds,
-    })
+  if (!core.group) {
+    return { success: false, error: 'Grupa nije pronađena.' }
+  }
 
-    if (!core.group) {
-      // Shouldn't happen — createStudentSchema requires groupId, and
-      // createStudentCore throws if the group isn't found.
-      return { success: false, error: 'Grupa nije pronađena.' }
-    }
-
-    // Mark the inquiry as processed — kept for audit/historization.
-    await db.inquiry.update({
-      where: { id: inquiryId },
-      data: {
-        status: 'ACCOUNT_CREATED',
-        studentId: core.user.id,
-        assignedGroupId: groupId,
-      },
-    })
-
+  try {
     // Send credentials email (only when Resend is configured)
     const childName = `${inquiry.childFirstName} ${inquiry.childLastName}`.trim()
     const schedule = [
@@ -327,20 +395,31 @@ export async function createStudentManually(
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
   const data = parsed.data
 
+  let core: CoreResult
   try {
-    const core = await createStudentCore({
-      firstName: data.firstName,
-      lastName: data.lastName,
-      dateOfBirth: data.dateOfBirth ?? null,
-      parentName: data.parentName ?? null,
-      parentEmail: data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null,
-      parentPhone: data.parentPhone ?? null,
-      childSchool: data.childSchool ?? null,
-      gdprConsentAt: null,
-      groupId: data.groupId ?? null,
-      moduleScheduleIds: data.moduleScheduleIds,
-    })
+    core = await runWithGroupCapacityGuard((tx) =>
+      createStudentCore(tx, {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        dateOfBirth: data.dateOfBirth ?? null,
+        parentName: data.parentName ?? null,
+        parentEmail: data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null,
+        parentPhone: data.parentPhone ?? null,
+        childSchool: data.childSchool ?? null,
+        gdprConsentAt: null,
+        groupId: data.groupId ?? null,
+        moduleScheduleIds: data.moduleScheduleIds,
+      }),
+    )
+  } catch (err) {
+    if (err instanceof GroupFullError) {
+      return { success: false, error: GROUP_FULL_ERROR, code: 'GROUP_FULL' }
+    }
+    console.error('createStudentManually failed:', err)
+    return { success: false, error: 'Greška pri kreiranju učenika.' }
+  }
 
+  try {
     // Send credentials email only when we have both a parent email AND
     // initial group assignment. For new accounts only (skip deduped existing).
     const parentEmail = data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null
@@ -400,59 +479,68 @@ export async function addEnrollment(
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
   const { studentId, groupId, moduleScheduleIds } = parsed.data
 
+  // Lightweight pre-flight reads outside the tx for clean error mapping.
+  const student = await db.user.findUnique({
+    where: { id: studentId, role: 'STUDENT' },
+    select: { id: true },
+  })
+  if (!student) return { success: false, error: 'Učenik nije pronađen.' }
+
+  const groupPreview = await db.scheduledGroup.findUnique({
+    where: { id: groupId },
+    select: { id: true, schoolYear: true },
+  })
+  if (!groupPreview) return { success: false, error: 'Grupa nije pronađena.' }
+
+  let enrollmentId: string
   try {
-    const student = await db.user.findUnique({
-      where: { id: studentId, role: 'STUDENT' },
-      select: { id: true },
-    })
-    if (!student) return { success: false, error: 'Učenik nije pronađen.' }
-
-    const group = await db.scheduledGroup.findUnique({
-      where: { id: groupId },
-      select: { id: true, schoolYear: true },
-    })
-    if (!group) return { success: false, error: 'Grupa nije pronađena.' }
-
-    const existing = await db.enrollment.findUnique({
-      where: {
-        userId_scheduledGroupId_schoolYear: {
-          userId: studentId,
-          scheduledGroupId: groupId,
-          schoolYear: group.schoolYear,
-        },
-      },
-    })
-
-    let enrollmentId: string
-    if (existing) {
-      enrollmentId = existing.id
-    } else {
-      const created = await db.enrollment.create({
-        data: {
-          userId: studentId,
-          scheduledGroupId: groupId,
-          schoolYear: group.schoolYear,
+    enrollmentId = await runWithGroupCapacityGuard(async (tx) => {
+      const existing = await tx.enrollment.findUnique({
+        where: {
+          userId_scheduledGroupId_schoolYear: {
+            userId: studentId,
+            scheduledGroupId: groupId,
+            schoolYear: groupPreview.schoolYear,
+          },
         },
       })
-      enrollmentId = created.id
-    }
 
-    if (moduleScheduleIds && moduleScheduleIds.length > 0) {
-      await db.moduleEnrollment.createMany({
-        data: moduleScheduleIds.map((moduleScheduleId) => ({
-          enrollmentId,
-          moduleScheduleId,
-        })),
-        skipDuplicates: true,
-      })
-    }
+      if (!existing) {
+        await assertGroupHasAvailableSpot(tx, groupId)
+      }
 
-    revalidatePath(`/admin/ucenici/${studentId}`)
-    return { success: true, enrollmentId }
+      const enrollment = existing
+        ? existing
+        : await tx.enrollment.create({
+            data: {
+              userId: studentId,
+              scheduledGroupId: groupId,
+              schoolYear: groupPreview.schoolYear,
+            },
+          })
+
+      if (moduleScheduleIds && moduleScheduleIds.length > 0) {
+        await tx.moduleEnrollment.createMany({
+          data: moduleScheduleIds.map((moduleScheduleId) => ({
+            enrollmentId: enrollment.id,
+            moduleScheduleId,
+          })),
+          skipDuplicates: true,
+        })
+      }
+
+      return enrollment.id
+    })
   } catch (err) {
+    if (err instanceof GroupFullError) {
+      return { success: false, error: GROUP_FULL_ERROR, code: 'GROUP_FULL' }
+    }
     console.error('addEnrollment failed:', err)
     return { success: false, error: 'Greška pri upisu u grupu.' }
   }
+
+  revalidatePath(`/admin/ucenici/${studentId}`)
+  return { success: true, enrollmentId }
 }
 
 /**

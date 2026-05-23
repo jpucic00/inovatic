@@ -21,6 +21,10 @@ export default defineConfig({
         },
       },
       {
+        // React plugin for parse-time JSX handling — some server-action modules
+        // transitively import .tsx email templates (e.g. emails/account-credentials.tsx).
+        // These tests still run in a node env and don't render React.
+        plugins: [react()],
         resolve: { alias },
         test: {
           name: 'integration',
