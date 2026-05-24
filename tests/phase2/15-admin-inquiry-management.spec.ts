@@ -646,7 +646,7 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
 
       await test.step('Header shows the total inquiry count', async () => {
         await expect(
-          page.locator('p.text-gray-500').filter({ hasText: /^\d+\s+upita?$/ }),
+          page.locator('p.text-gray-500').filter({ hasText: /^\d+\s+upita?\b/ }),
           'total-inquiry-count caption is visible',
         ).toBeVisible()
       })

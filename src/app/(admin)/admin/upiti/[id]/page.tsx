@@ -13,22 +13,11 @@ import {
   INQUIRY_STATUS_LABELS,
   COURSE_LEVEL_LABELS,
   STATUS_FLOW,
+  GRADE_LABELS,
 } from '@/lib/inquiry-status'
 import { formatChildName } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Admin – Upit' }
-
-const GRADE_LABELS: Record<string, string> = {
-  predskolci: 'Predškolci',
-  '1': '1. razred',
-  '2': '2. razred',
-  '3': '3. razred',
-  '4': '4. razred',
-  '5': '5. razred',
-  '6': '6. razred',
-  '7': '7. razred',
-  '8': '8. razred',
-}
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -285,7 +274,11 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
           {inquiry.childGrade && (
             <DetailRow
               label="Razred"
-              value={GRADE_LABELS[inquiry.childGrade] ?? inquiry.childGrade}
+              value={
+                inquiry.childGrade in GRADE_LABELS
+                  ? GRADE_LABELS[inquiry.childGrade as keyof typeof GRADE_LABELS]
+                  : inquiry.childGrade
+              }
             />
           )}
         </dl>
