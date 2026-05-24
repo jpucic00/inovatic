@@ -15,7 +15,7 @@ import {
 import { UserPlus, Copy, ExternalLink } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
 import { createStudentManually } from '@/actions/admin/student'
-import { getGroupsForCourseInYears } from '@/actions/admin/inquiry'
+import { getGroupsForCourseInSelectedYear } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { toast } from 'sonner'
 
@@ -126,7 +126,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
     if (!courseId) return
     setLoadingGroups(true)
     try {
-      const res = await getGroupsForCourseInYears(courseId)
+      const res = await getGroupsForCourseInSelectedYear(courseId)
       setGroups(
         res.map((g) => ({
           id: g.id,

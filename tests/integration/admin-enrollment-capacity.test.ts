@@ -1,4 +1,5 @@
-import { describe, expect, it, vi, beforeAll } from 'vitest'
+import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
+import type { Mock } from 'vitest'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
 import {
@@ -9,20 +10,48 @@ import {
   createLocation,
   createStudent,
 } from './helpers/factory'
+import { computeSchoolYear, getNextSchoolYear } from '@/lib/school-year'
 
 // The admin actions call revalidatePath on success. next/cache is a no-op
 // outside a request scope; stub it so the action body runs to completion.
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+
+// next/headers.cookies() is the source of the selected-school-year cookie.
+// Stub it so getSelectedSchoolYear() returns a deterministic value per test;
+// without this the loader queries return nothing because cookies() has no
+// request scope in vitest.
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(),
+}))
+
+import { cookies } from 'next/headers'
+const mockedCookies = cookies as unknown as Mock
+
+function setSelectedYearCookie(value: string | undefined): void {
+  mockedCookies.mockResolvedValue({
+    get: (name: string) =>
+      name === 'inovatic_school_year' && value !== undefined
+        ? { value, name }
+        : undefined,
+  })
+}
 
 beforeAll(() => {
   // The createStudent* actions try to send credentials via Resend when
   // RESEND_API_KEY is present. The test environment shouldn't talk to Resend;
   // clear the var so the action skips the send.
   delete process.env.RESEND_API_KEY
+  // Default cookie state — no selection, so getSelectedSchoolYear() falls
+  // back to computeSchoolYear(). Per-test overrides via setSelectedYearCookie.
+  setSelectedYearCookie(undefined)
 })
 
 const { addEnrollment, createStudentManually, createStudentFromInquiry } =
   await import('@/actions/admin/student')
+const { getGroupsForCourse, getGroupsForCourseInSelectedYear } =
+  await import('@/actions/admin/inquiry')
+
+const ARCHIVED_ERROR_MSG = 'Arhivirana školska godina je samo za pregled.'
 
 async function fillGroup(groupId: string, count: number, schoolYear?: string): Promise<void> {
   for (let i = 0; i < count; i++) {
@@ -218,5 +247,169 @@ describe('createStudentFromInquiry — capacity guardrail', () => {
     expect(refreshed?.status).toBe('NEW')
     expect(refreshed?.assignedGroupId).toBeNull()
     expect(refreshed?.studentId).toBeNull()
+  })
+})
+
+describe('archived-school-year guard — enrollment-creating actions', () => {
+  it('addEnrollment rejects when target group is in an archived school year', async () => {
+    const admin = await createAdmin()
+    const radionica = await createCourse({ isCustom: true })
+    const archivedGroup = await createGroup({
+      courseId: radionica.id,
+      schoolYear: '2024/2025',
+    })
+    const student = await createStudent()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const res = await addEnrollment({
+      studentId: student.id,
+      groupId: archivedGroup.id,
+    })
+
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toBe(ARCHIVED_ERROR_MSG)
+
+    const rows = await db.enrollment.count({
+      where: { scheduledGroupId: archivedGroup.id },
+    })
+    expect(rows).toBe(0)
+  })
+
+  it('createStudentManually rejects when supplied groupId is in an archived year — no User, no Enrollment', async () => {
+    const admin = await createAdmin()
+    const radionica = await createCourse({ isCustom: true })
+    const archivedGroup = await createGroup({
+      courseId: radionica.id,
+      schoolYear: '2024/2025',
+    })
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const res = await createStudentManually({
+      firstName: 'Arhiv',
+      lastName: 'Reject',
+      dateOfBirth: null,
+      parentName: null,
+      parentEmail: null,
+      parentPhone: null,
+      childSchool: null,
+      groupId: archivedGroup.id,
+      moduleScheduleIds: [],
+    })
+
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toBe(ARCHIVED_ERROR_MSG)
+
+    const stray = await db.user.findFirst({
+      where: { firstName: 'Arhiv', lastName: 'Reject' },
+    })
+    expect(stray).toBeNull()
+    const rows = await db.enrollment.count({
+      where: { scheduledGroupId: archivedGroup.id },
+    })
+    expect(rows).toBe(0)
+  })
+
+  it('createStudentFromInquiry rejects archived-year group and leaves inquiry status NEW', async () => {
+    const admin = await createAdmin()
+    const location = await createLocation()
+    const radionica = await createCourse({ isCustom: true })
+    const archivedGroup = await createGroup({
+      courseId: radionica.id,
+      locationId: location.id,
+      schoolYear: '2024/2025',
+    })
+
+    const inquiry = await db.inquiry.create({
+      data: {
+        parentName: 'Archived Parent',
+        parentEmail: `archived-${Date.now()}@example.local`,
+        parentPhone: '+38500099',
+        childFirstName: 'Stari',
+        childLastName: 'Upit',
+        childDateOfBirth: '2014-04-04',
+        consentGivenAt: new Date(),
+        courseId: radionica.id,
+        status: 'NEW',
+      },
+    })
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const res = await createStudentFromInquiry(inquiry.id, archivedGroup.id)
+
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toBe(ARCHIVED_ERROR_MSG)
+
+    const refreshed = await db.inquiry.findUnique({
+      where: { id: inquiry.id },
+    })
+    expect(refreshed?.status).toBe('NEW')
+    expect(refreshed?.studentId).toBeNull()
+    expect(refreshed?.assignedGroupId).toBeNull()
+    const rows = await db.enrollment.count({
+      where: { scheduledGroupId: archivedGroup.id },
+    })
+    expect(rows).toBe(0)
+  })
+})
+
+describe('group pickers — scope by selected school year', () => {
+  beforeEach(() => {
+    setSelectedYearCookie(undefined)
+  })
+
+  it('getGroupsForCourseInSelectedYear returns only the cookie-selected year', async () => {
+    const admin = await createAdmin()
+    const radionica = await createCourse({ isCustom: true })
+    const currentYear = computeSchoolYear()
+    const futureYear = getNextSchoolYear(currentYear)
+    const archivedGroup = await createGroup({
+      courseId: radionica.id,
+      schoolYear: '2024/2025',
+    })
+    const currentGroup = await createGroup({
+      courseId: radionica.id,
+      schoolYear: currentYear,
+    })
+    const futureGroup = await createGroup({
+      courseId: radionica.id,
+      schoolYear: futureYear,
+    })
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    setSelectedYearCookie(futureYear)
+    let res = await getGroupsForCourseInSelectedYear(radionica.id)
+    expect(res.map((g) => g.id)).toEqual([futureGroup.id])
+
+    setSelectedYearCookie('2024/2025')
+    res = await getGroupsForCourseInSelectedYear(radionica.id)
+    expect(res.map((g) => g.id)).toEqual([archivedGroup.id])
+
+    setSelectedYearCookie(undefined)
+    res = await getGroupsForCourseInSelectedYear(radionica.id)
+    expect(res.map((g) => g.id)).toEqual([currentGroup.id])
+  })
+
+  it('getGroupsForCourse returns only the cookie-selected year', async () => {
+    const admin = await createAdmin()
+    const radionica = await createCourse({ isCustom: true })
+    const currentYear = computeSchoolYear()
+    const futureYear = getNextSchoolYear(currentYear)
+    const currentGroup = await createGroup({
+      courseId: radionica.id,
+      schoolYear: currentYear,
+    })
+    const futureGroup = await createGroup({
+      courseId: radionica.id,
+      schoolYear: futureYear,
+    })
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    setSelectedYearCookie(futureYear)
+    let res = await getGroupsForCourse(radionica.id)
+    expect(res.map((g) => g.id)).toEqual([futureGroup.id])
+
+    setSelectedYearCookie(undefined)
+    res = await getGroupsForCourse(radionica.id)
+    expect(res.map((g) => g.id)).toEqual([currentGroup.id])
   })
 })

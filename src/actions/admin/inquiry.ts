@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { InquiryStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
-import { updateStatusSchema } from '@/lib/validators/admin/inquiry'
+import { declineInquirySchema } from '@/lib/validators/admin/inquiry'
 import type { AdminActionResult } from '@/lib/action-types'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
@@ -130,20 +130,25 @@ export async function getInquiry(id: string) {
   })
 }
 
-export async function updateInquiryStatus(
+export async function declineInquiry(
   id: string,
-  status: InquiryStatus,
+  reason: string,
 ): Promise<AdminActionResult> {
   await requireAdmin()
 
-  const parsed = updateStatusSchema.safeParse({ id, status })
-  if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
+  const parsed = declineInquirySchema.safeParse({ id, reason })
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
+  }
 
   try {
-    await db.inquiry.update({ where: { id }, data: { status } })
+    await db.inquiry.update({
+      where: { id: parsed.data.id },
+      data: { status: 'DECLINED', declineReason: parsed.data.reason },
+    })
   } catch (err) {
-    console.error('updateInquiryStatus failed:', err)
-    return { success: false, error: 'Greška pri ažuriranju statusa.' }
+    console.error('declineInquiry failed:', err)
+    return { success: false, error: 'Greška pri odbijanju upita.' }
   }
 
   revalidatePath('/admin/upiti')
@@ -169,7 +174,7 @@ export async function deleteInquiry(id: string): Promise<AdminActionResult> {
 
 export async function getGroupsForCourse(courseId: string) {
   await requireAdmin()
-  const year = computeSchoolYear()
+  const year = await getSelectedSchoolYear()
 
   if (!courseId) return []
 
@@ -220,19 +225,19 @@ export async function getGroupsForCourse(courseId: string) {
 }
 
 /**
- * Returns groups for a course in the current school year and any future ones.
- * Used by the student detail "add enrollment" and manual create dialogs so
- * admins can pre-enroll into next year. Each group's modules include only the
- * schedules for that group's own school year.
+ * Returns groups for a course in the admin's currently-selected school year
+ * (from the school-year switcher cookie). Used by the student detail
+ * "add enrollment" and manual create dialogs. Each group's modules include
+ * only the schedules for that same school year.
  */
-export async function getGroupsForCourseInYears(courseId: string) {
+export async function getGroupsForCourseInSelectedYear(courseId: string) {
   await requireAdmin()
   if (!courseId) return []
 
-  const currentYear = computeSchoolYear()
+  const year = await getSelectedSchoolYear()
 
   const groups = await db.scheduledGroup.findMany({
-    where: { courseId, schoolYear: { gte: currentYear } },
+    where: { courseId, schoolYear: year },
     include: {
       location: { select: { name: true } },
       course: {
@@ -246,6 +251,7 @@ export async function getGroupsForCourseInYears(courseId: string) {
               title: true,
               sortOrder: true,
               schedules: {
+                where: { schoolYear: year },
                 select: { id: true, schoolYear: true, startDate: true, endDate: true },
               },
             },
@@ -266,26 +272,13 @@ export async function getGroupsForCourseInYears(courseId: string) {
         },
       },
     },
-    orderBy: [{ schoolYear: 'asc' }, { createdAt: 'asc' }],
+    orderBy: { createdAt: 'asc' },
   })
 
   const now = new Date()
-
-  // Filter each group's module schedules down to that group's own school year,
-  // so the dialog can show the right dates per group without an N+1.
   return groups.map((g) => {
-    const scopedGroup = {
-      ...g,
-      course: {
-        ...g.course,
-        modules: g.course.modules.map((m) => ({
-          ...m,
-          schedules: m.schedules.filter((s) => s.schoolYear === g.schoolYear),
-        })),
-      },
-    }
-    const { availableSpots, isFull } = computeGroupCapacity(scopedGroup, now)
-    return { ...scopedGroup, availableSpots, isFull }
+    const { availableSpots, isFull } = computeGroupCapacity(g, now)
+    return { ...g, availableSpots, isFull }
   })
 }
 

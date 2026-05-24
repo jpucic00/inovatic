@@ -19,6 +19,7 @@ import {
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
+import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 import { AccountCredentialsEmail } from '../../../emails/account-credentials'
 import type { PaginatedResult } from './inquiry'
 
@@ -171,12 +172,14 @@ async function findOrCreateStudent(
   return { user: created, password, isExisting: false }
 }
 
+const ENSURE_ENROLLMENT_DEFAULT_OPTIONS = { assertCapacity: true } as const
+
 async function ensureEnrollment(
   tx: TxClient,
   userId: string,
   groupId: string,
   moduleScheduleIds: string[] | undefined,
-  options: { assertCapacity: boolean } = { assertCapacity: true },
+  options: { assertCapacity: boolean } = ENSURE_ENROLLMENT_DEFAULT_OPTIONS,
 ): Promise<{ enrollmentId: string; group: CoreResult['group'] }> {
   const sg = await tx.scheduledGroup.findUnique({
     where: { id: groupId },
@@ -271,6 +274,9 @@ export async function createStudentFromInquiry(
     return { success: false, error: 'Upit je odbijen.' }
   }
 
+  const archived = await archivedGroupError(groupId)
+  if (archived) return archived
+
   let core: CoreResult
   let inquiry: typeof inquiryPreview
   try {
@@ -342,48 +348,61 @@ export async function createStudentFromInquiry(
   }
 
   try {
-    // Send credentials email (only when Resend is configured)
-    const childName = `${inquiry.childFirstName} ${inquiry.childLastName}`.trim()
-    const schedule = [
-      core.group.dayOfWeek,
-      core.group.startTime ? `${core.group.startTime}–${core.group.endTime ?? ''}` : null,
-    ]
-      .filter(Boolean)
-      .join(', ')
-
-    if (process.env.RESEND_API_KEY) {
-      await resend.emails.send({
-        from: FROM_EMAIL,
-        replyTo: REPLY_TO,
-        to: inquiry.parentEmail,
-        subject: `Pristupni podaci za ${childName} – Inovatic`,
-        react: AccountCredentialsEmail({
-          parentName: inquiry.parentName,
-          childName,
-          username: core.user.username ?? '',
-          password: core.password,
-          groupName: core.group.name ?? core.group.course.title,
-          schedule,
-          locationName: core.group.location.name,
-        }),
-      })
-    }
-
-    revalidatePath('/admin/upiti')
-    revalidatePath(`/admin/upiti/${inquiryId}`)
-    revalidatePath('/admin/ucenici')
-
-    return {
-      success: true,
-      username: core.user.username ?? '',
-      password: core.password,
-      isExisting: core.isExisting,
-      studentId: core.user.id,
-    }
+    await sendInquiryCredentialsEmail(inquiry, core)
   } catch (err) {
     console.error('createStudentFromInquiry failed:', err)
     return { success: false, error: 'Greška pri kreiranju računa.' }
   }
+
+  revalidatePath('/admin/upiti')
+  revalidatePath(`/admin/upiti/${inquiryId}`)
+  revalidatePath('/admin/ucenici')
+
+  return {
+    success: true,
+    username: core.user.username ?? '',
+    password: core.password,
+    isExisting: core.isExisting,
+    studentId: core.user.id,
+  }
+}
+
+type InquiryEmailContext = {
+  childFirstName: string
+  childLastName: string
+  parentName: string
+  parentEmail: string
+}
+
+async function sendInquiryCredentialsEmail(
+  inquiry: InquiryEmailContext,
+  core: CoreResult,
+): Promise<void> {
+  if (!process.env.RESEND_API_KEY || !core.group) return
+
+  const childName = `${inquiry.childFirstName} ${inquiry.childLastName}`.trim()
+  const schedule = [
+    core.group.dayOfWeek,
+    core.group.startTime ? `${core.group.startTime}–${core.group.endTime ?? ''}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+  await resend.emails.send({
+    from: FROM_EMAIL,
+    replyTo: REPLY_TO,
+    to: inquiry.parentEmail,
+    subject: `Pristupni podaci za ${childName} – Inovatic`,
+    react: AccountCredentialsEmail({
+      parentName: inquiry.parentName,
+      childName,
+      username: core.user.username ?? '',
+      password: core.password,
+      groupName: core.group.name ?? core.group.course.title,
+      schedule,
+      locationName: core.group.location.name,
+    }),
+  })
 }
 
 export async function createStudentManually(
@@ -394,6 +413,11 @@ export async function createStudentManually(
   const parsed = createStudentManuallySchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
   const data = parsed.data
+
+  if (data.groupId) {
+    const archived = await archivedGroupError(data.groupId)
+    if (archived) return archived
+  }
 
   let core: CoreResult
   try {
@@ -492,6 +516,9 @@ export async function addEnrollment(
   })
   if (!groupPreview) return { success: false, error: 'Grupa nije pronađena.' }
 
+  const archived = archivedYearError(groupPreview.schoolYear)
+  if (archived) return archived
+
   let enrollmentId: string
   try {
     enrollmentId = await runWithGroupCapacityGuard(async (tx) => {
@@ -509,15 +536,15 @@ export async function addEnrollment(
         await assertGroupHasAvailableSpot(tx, groupId)
       }
 
-      const enrollment = existing
-        ? existing
-        : await tx.enrollment.create({
-            data: {
-              userId: studentId,
-              scheduledGroupId: groupId,
-              schoolYear: groupPreview.schoolYear,
-            },
-          })
+      const enrollment =
+        existing ??
+        (await tx.enrollment.create({
+          data: {
+            userId: studentId,
+            scheduledGroupId: groupId,
+            schoolYear: groupPreview.schoolYear,
+          },
+        }))
 
       if (moduleScheduleIds && moduleScheduleIds.length > 0) {
         await tx.moduleEnrollment.createMany({

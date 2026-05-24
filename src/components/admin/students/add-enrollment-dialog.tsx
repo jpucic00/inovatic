@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { BookPlus } from 'lucide-react'
 import { addEnrollment } from '@/actions/admin/student'
-import { getGroupsForCourseInYears } from '@/actions/admin/inquiry'
+import { getGroupsForCourseInSelectedYear } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { toast } from 'sonner'
 
@@ -97,7 +97,7 @@ export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
     if (!courseId) return
     setLoadingGroups(true)
     try {
-      const result = await getGroupsForCourseInYears(courseId)
+      const result = await getGroupsForCourseInSelectedYear(courseId)
       setGroups(
         result.map((g) => ({
           id: g.id,
