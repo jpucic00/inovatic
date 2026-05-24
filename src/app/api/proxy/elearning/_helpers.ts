@@ -8,7 +8,7 @@ const MAX_PATH_DEPTH = 20
 const BAD_SEGMENT = /\\/
 const NUL_BYTE = String.fromCodePoint(0)
 
-export type PathValidationResult =
+type PathValidationResult =
   | { ok: true }
   | { ok: false; status: 400; reason: 'depth' | 'segment' }
 

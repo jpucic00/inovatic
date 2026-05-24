@@ -14,7 +14,6 @@ import {
   type Material,
   MaterialScope,
   MaterialType,
-  type ModuleSchedule,
   type ScheduledGroup,
   type TeacherAssignment,
   type User,
@@ -27,7 +26,7 @@ const uniq = () => `${Date.now().toString(36)}${(++counter).toString(36)}`
 
 const HASH_ROUNDS = 4 // low rounds — tests don't need production security
 
-export async function createUser(
+async function createUser(
   overrides: Partial<{
     email: string
     username: string
@@ -111,20 +110,6 @@ export async function createModule(
       courseId,
       title: overrides.title ?? `Modul ${id}`,
       sortOrder: overrides.sortOrder ?? 0,
-    },
-  })
-}
-
-export async function createModuleSchedule(
-  moduleId: string,
-  overrides: Partial<{ schoolYear: string; startDate: Date | null; endDate: Date | null }> = {},
-): Promise<ModuleSchedule> {
-  return db.moduleSchedule.create({
-    data: {
-      moduleId,
-      schoolYear: overrides.schoolYear ?? '2026/2027',
-      startDate: overrides.startDate,
-      endDate: overrides.endDate,
     },
   })
 }

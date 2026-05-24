@@ -1,12 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignore": ["src/components/ui/**"],
   "ignoreDependencies": [
     "next-intl",
     "sharp",
     "@eslint/eslintrc",
     "eslint",
-    "eslint-config-next",
-    "@testing-library/user-event"
+    "eslint-config-next"
   ],
   "ignoreBinaries": ["sonar-scanner"]
 }

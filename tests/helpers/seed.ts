@@ -19,7 +19,7 @@
  * Playwright run is pointed at (dev `inovatic` by default).
  */
 import bcrypt from 'bcryptjs'
-import type { Enrollment, ScheduledGroup, TeacherAssignment, User } from '@prisma/client'
+import type { TeacherAssignment } from '@prisma/client'
 import { db } from '@/lib/db'
 import type { StudentData, TeacherData } from './phase3'
 
@@ -138,46 +138,3 @@ export async function seedStudentInGroup(
   return { studentId: result.id, username, password }
 }
 
-/** Direct-Prisma equivalent of `phase3.ts:createStudentNoEnrollment`. */
-export async function seedStudentNoEnrollment(
-  s: StudentData,
-): Promise<{ studentId: string; username: string; password: string }> {
-  const password = generatePassword()
-  const passwordHash = await bcrypt.hash(password, HASH_ROUNDS)
-  const suffix = uniqSuffix()
-  const base = `${s.firstName}.${s.lastName}`
-    .toLowerCase()
-    .replaceAll(/[čć]/g, 'c')
-    .replaceAll('š', 's')
-    .replaceAll('ž', 'z')
-    .replaceAll('đ', 'd')
-    .replaceAll(/[^a-z0-9.]/g, '.')
-    .replaceAll(/\.{2,}/g, '.')
-    .replaceAll(/(?:^\.|\.$)/g, '')
-  const username = `${base}.${suffix}`.slice(0, 50)
-  const user = await db.user.create({
-    data: {
-      email: `${username}@student.inovatic.local`,
-      username,
-      firstName: s.firstName,
-      lastName: s.lastName,
-      dateOfBirth: s.dateOfBirth,
-      childSchool: s.childSchool,
-      parentName: s.parentName,
-      parentEmail: s.parentEmail,
-      parentPhone: s.parentPhone,
-      passwordHash,
-      plainPassword: password,
-      role: 'STUDENT',
-    },
-  })
-  return { studentId: user.id, username, password }
-}
-
-/** Re-export the type aliases so spec files only import from this module. */
-export type SeededTeacher = Awaited<ReturnType<typeof seedTeacher>>
-export type SeededStudent = Awaited<ReturnType<typeof seedStudentInGroup>>
-
-// Internal type guards for fully-typed Enrollment/User returns (rarely needed
-// at the call site — most specs only use `.studentId`/`.teacherId`).
-export type { Enrollment, ScheduledGroup, User }
