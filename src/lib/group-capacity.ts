@@ -34,6 +34,21 @@ interface GroupCapacityInfo {
   isFull: boolean
 }
 
+/**
+ * Remaining-spots view of a `ScheduledGroup`.
+ *
+ * Standard course: `enrolledCount` only counts enrollments tied to the next
+ * upcoming `ModuleSchedule` in the group's `schoolYear` (registration is
+ * per-module). When no upcoming schedule exists — between modules, end of
+ * school year, or before next year's schedules are seeded — we fall back to
+ * `enrollments.length` (lifetime total). This is intentionally conservative
+ * (cannot over-book) but is not a meaningful "open enrollment" signal;
+ * callers in an open-enrollment context should pre-filter such groups (see
+ * `toActiveGroup` in `src/actions/public/programs.ts`). Admin loaders return
+ * them on purpose so admins can still review/manage.
+ *
+ * Custom course (radionica): `enrolledCount = enrollments.length`.
+ */
 export function computeGroupCapacity(
   group: GroupCapacityRow,
   now: Date = new Date(),
