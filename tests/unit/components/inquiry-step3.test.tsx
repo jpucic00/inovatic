@@ -68,7 +68,7 @@ function Harness({
     formState: { errors },
   } = useForm<InquiryFormData>({
     defaultValues: preselectedCourseId
-      ? { courseId: preselectedCourseId, grade: 'workshop' }
+      ? { courseId: preselectedCourseId }
       : undefined,
   })
   return (
@@ -108,5 +108,16 @@ describe('InquiryStep3 — group dropdown scoping', () => {
 
     expect(screen.getByRole('option', { name: /Termin Gamma/ })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: /Termin Alpha/ })).not.toBeInTheDocument()
+  })
+
+  it('radionica preselect flow still shows the grade dropdown (info only)', () => {
+    render(
+      <Harness
+        programs={[radionicaA, standardC]}
+        preselectedCourseId="course-a"
+      />,
+    )
+
+    expect(screen.getByLabelText(/Razred djeteta/)).toBeInTheDocument()
   })
 })

@@ -14,12 +14,11 @@ const step2Schema = z.object({
   childSchool: z.string().optional(),
 })
 
-// Includes the 'workshop' sentinel used by the radionica preselection flow,
-// where the visible grade dropdown is hidden and the value is set in form
-// defaults. Persisted as-is on childGrade; admin views fall back to the raw
-// string in the (rare) absence of a label.
+// grade is required for every inquiry — both the /upisi flow and the
+// /radionice/{slug} preselect flow. On radionica forms it is captured
+// for admin reference only and does not gate group selection.
 const step3Schema = z.object({
-  grade: z.enum([...GRADE_VALUES, 'workshop'] as const, {
+  grade: z.enum(GRADE_VALUES, {
     errorMap: () => ({ message: 'Odaberite razred djeteta' }),
   }),
   courseId: z.string().optional(),

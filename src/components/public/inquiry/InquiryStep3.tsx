@@ -52,7 +52,7 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
     const groupId = getValues('scheduledGroupId')
     return courseId && groupId ? `${courseId}|${groupId}` : ''
   })
-  const [selectedGrade, setSelectedGrade] = useState<Grade | 'workshop' | ''>(() => getValues('grade') ?? '')
+  const [selectedGrade, setSelectedGrade] = useState<Grade | ''>(() => getValues('grade') ?? '')
 
   useEffect(() => {
     if (!selectedGroupKey) return
@@ -74,14 +74,14 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
     ? programs.filter((p) => p.id === preselectedCourseId)
     : programs.filter((p) => {
         if (p.isCustom) return false  // radionice only via their own URL
-        if (!selectedGrade || selectedGrade === 'workshop') return true
+        if (!selectedGrade) return true
         return p.level === GRADE_TO_LEVEL[selectedGrade]
       })
 
   const hasAnyGroups = filteredPrograms.some((p) => p.groups.length > 0)
 
   function handleGradeChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    setSelectedGrade(e.target.value as Grade | 'workshop' | '')
+    setSelectedGrade(e.target.value as Grade | '')
     // Reset group selection when grade changes
     setSelectedGroupKey('')
     setValue('scheduledGroupId', undefined)
@@ -156,28 +156,26 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
         <p className="text-gray-500 text-sm">Svi unosi su neobavezni – pomažu nam u dodjeli odgovarajuće grupe.</p>
       </div>
 
-      {!preselectedCourseId && (
-        <div>
-          <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-1.5">
-            Razred djeteta <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="grade"
-            {...gradeReg}
-            onChange={(e) => {
-              gradeReg.onChange(e)
-              handleGradeChange(e)
-            }}
-            className={selectClass}
-          >
-            <option value="">– Odaberite razred –</option>
-            {GRADE_VALUES.map((v) => (
-              <option key={v} value={v}>{GRADE_LABELS[v]}</option>
-            ))}
-          </select>
-          <FieldError message={errors.grade?.message} />
-        </div>
-      )}
+      <div>
+        <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-1.5">
+          Razred djeteta <span className="text-red-500">*</span>
+        </label>
+        <select
+          id="grade"
+          {...gradeReg}
+          onChange={(e) => {
+            gradeReg.onChange(e)
+            handleGradeChange(e)
+          }}
+          className={selectClass}
+        >
+          <option value="">– Odaberite razred –</option>
+          {GRADE_VALUES.map((v) => (
+            <option key={v} value={v}>{GRADE_LABELS[v]}</option>
+          ))}
+        </select>
+        <FieldError message={errors.grade?.message} />
+      </div>
 
       <div>
         <label htmlFor="scheduledGroupId" className="block text-sm font-medium text-gray-700 mb-1.5">

@@ -22,6 +22,12 @@ export const STATUS_FLOW = [
   'ACCOUNT_CREATED',
 ] as const
 
+// Canonical grade values for Inquiry.childGrade. Required by the public
+// inquiry Zod schema for every flow, including /radionice/{slug}. On
+// radionica forms the grade is informational only and does not filter
+// group selection. Legacy rows submitted before this normalization may
+// still carry the literal string 'workshop' — admin views render those
+// via the GRADE_LABELS[v] ?? v fallback.
 export const GRADE_VALUES = [
   'predskolci',
   '1',

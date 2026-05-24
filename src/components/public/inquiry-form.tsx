@@ -68,7 +68,7 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
   } = useForm<InquiryFormData>({
     resolver: zodResolver(inquirySchema),
     mode: 'onTouched',
-    defaultValues: preselectedCourseId ? { courseId: preselectedCourseId, grade: 'workshop' } : undefined,
+    defaultValues: preselectedCourseId ? { courseId: preselectedCourseId } : undefined,
   })
 
   async function handleNext() {
@@ -112,7 +112,7 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
       parentName: getValues('parentName'),
       parentEmail: getValues('parentEmail'),
       parentPhone: getValues('parentPhone'),
-      ...(preselectedCourseId ? { courseId: preselectedCourseId, grade: 'workshop' } : {}),
+      ...(preselectedCourseId ? { courseId: preselectedCourseId } : {}),
     })
     setDone(false)
     setStep(2)

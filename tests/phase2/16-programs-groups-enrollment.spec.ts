@@ -13,7 +13,7 @@ import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 //   D) Submitting 2 inquiries fills a group → "(Popunjeno)" in dropdown
 //   E) Admin declines an inquiry → spot is freed in the dropdown
 //   F) Admin GDPR-deletes an inquiry → spot is freed in the dropdown
-//   G) Public radionica form at /radionice/[slug] hides grade, shows radionica groups
+//   G) Public radionica form at /radionice/[slug] shows grade (info only) + radionica groups
 //   H) Radionica group fills up and shows "(Popunjeno)" on the radionica page
 //
 // Requires: dev server on localhost:3000, seeded admin user, at least 1 active location.
@@ -554,10 +554,10 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await expect(page.locator('text=Radionica').first()).toBeVisible()
     })
 
-    test('radionica form does NOT show the grade dropdown', async ({ page }) => {
+    test('radionica form shows the grade dropdown (info only)', async ({ page }) => {
       await reachStep3(page, RAD_PARENT_1, `${BASE}/radionice/${RADIONICA_SLUG}`)
-      // Grade select is hidden for workshop forms (preselectedCourseId is set)
-      await expect(page.locator('#grade')).not.toBeVisible()
+      // Grade is captured for admin reference on every flow, including radionica
+      await expect(page.locator('#grade')).toBeVisible()
     })
 
     test('radionica group select is enabled immediately (no grade needed)', async ({ page }) => {
@@ -587,7 +587,7 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await submitWithGroup(
         page,
         RAD_PARENT_1,
-        null, // no grade for radionica
+        '5', // grade now required for radionica too (informational)
         RADIONICA_GROUP_NAME,
         `${BASE}/radionice/${RADIONICA_SLUG}`,
       )
@@ -597,7 +597,7 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await submitWithGroup(
         page,
         RAD_PARENT_2,
-        null,
+        '3',
         RADIONICA_GROUP_NAME,
         `${BASE}/radionice/${RADIONICA_SLUG}`,
       )
@@ -654,7 +654,8 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       }
 
       await reachStep3(page, RAD_PARENT_3, `${BASE}/radionice/${RADIONICA_SLUG}`)
-      // Do not select the full group — just consent and submit
+      // Grade now required for radionica too — fill it but skip group selection
+      await page.locator('#grade').selectOption('5')
       await page.locator('input[name="consent"]').check()
       await page.locator('button', { hasText: 'Pošalji upit' }).click()
       await expect(page.locator('text=Upit je poslan!')).toBeVisible({ timeout: 15000 })
