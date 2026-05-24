@@ -33,6 +33,7 @@ stateDiagram-v2
 
     note left of DECLINED
         Spot freed from preferredInquiries count
+        declineReason captured and stored on Inquiry row
         No automated email
         TERMINAL STATE
     end note
@@ -44,7 +45,7 @@ stateDiagram-v2
 |------|-----|--------|-------|-------------|
 | -- | `NEW` | submitInquiry | Zod validation | Inquiry created, confirmation email, spot reserved if group selected |
 | `NEW` | `ACCOUNT_CREATED` | createStudentFromInquiry | `status !== ACCOUNT_CREATED && status !== DECLINED` | User + Enrollment + ModuleEnrollments created, credentials email, studentId + assignedGroupId set |
-| `NEW` | `DECLINED` | updateInquiryStatus | None in code | Spot freed, no automated email |
+| `NEW` | `DECLINED` | declineInquiry | Zod (reason min 3 trimmed, max 2000) | Spot freed, `declineReason` persisted on Inquiry row, no automated email |
 
 ## Non-Status Actions
 

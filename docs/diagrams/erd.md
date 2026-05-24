@@ -36,6 +36,11 @@ erDiagram
         datetime endDate "nullable - set to now to close early"
     }
 
+    SchoolYear {
+        string label PK "format YYYY/YYYY - referenced by schoolYear string columns"
+        datetime createdAt "default now"
+    }
+
     Location {
         string id PK
         string name
@@ -87,6 +92,7 @@ erDiagram
         string referralSource "nullable"
         datetime consentGivenAt "nullable"
         InquiryStatus status "NEW - ACCOUNT_CREATED - DECLINED"
+        string declineReason "nullable - db.Text - reason captured on DECLINE"
     }
 
     User {
@@ -283,6 +289,7 @@ erDiagram
 | ScheduledGroup → GalleryImage → CourseModule | Images scoped to group; `moduleId` required for standard programs, null for radionice |
 | Enrollment → Attendance | One attendance record per session date per enrollment. Session dates are derived, not stored. |
 | User → Article | Author relation for news articles |
+| SchoolYear | Standalone registry of valid year labels (`YYYY/YYYY`). `ScheduledGroup.schoolYear`, `ModuleSchedule.schoolYear`, and `Enrollment.schoolYear` reference `SchoolYear.label` by string — no Prisma FK relation. |
 
 ## Unique Constraints
 
