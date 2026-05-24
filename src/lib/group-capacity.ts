@@ -122,6 +122,15 @@ export async function assertGroupHasAvailableSpot(
             orderBy: { sortOrder: 'asc' },
             select: {
               schedules: {
+                // Intentionally broader than computeGroupCapacity needs:
+                // Prisma sub-selects cannot correlate against the parent
+                // row's group.schoolYear, so we fetch current-or-future
+                // schedules here and let computeGroupCapacity below narrow
+                // to s.schoolYear === group.schoolYear. The gte floor
+                // slides forward each Sept (past years drop out
+                // automatically), so this set stays bounded — 1 current
+                // schoolYear plus at most 1 future per project policy.
+                // Same pattern as getActivePrograms → toActiveGroup.
                 where: { schoolYear: { gte: computeSchoolYear() } },
                 select: { id: true, schoolYear: true, startDate: true },
               },
