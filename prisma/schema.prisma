@@ -221,6 +221,9 @@ model Inquiry {
   scheduledGroup   ScheduledGroup? @relation("PreferredGroup", fields: [scheduledGroupId], references: [id])
   assignedGroup    ScheduledGroup? @relation("AssignedGroup", fields: [assignedGroupId], references: [id])
   student          User?           @relation("CreatedStudent", fields: [studentId], references: [id])
+
+  @@index([scheduledGroupId])
+  @@index([status])
 }
 
 
