@@ -484,6 +484,10 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await openInquiryDetail(page, PARENT_1.parentEmail)
       await page.locator('button', { hasText: 'Odbij upit' }).click()
       await expect(page.locator('text=Odbiti upit?')).toBeVisible()
+      // declineInquiry (commit 736f2ea onward) requires a reason — Zod
+      // enforces min 3 trimmed chars and the submit button stays disabled
+      // until the textarea is filled.
+      await page.locator('#decline-reason').fill('Premlado dijete za ovu razinu.')
       await page.locator('[role="dialog"] button', { hasText: 'Odbij upit' }).last().click()
       await expect(page.locator('span', { hasText: 'Odbijena' }).first()).toBeVisible({
         timeout: 30000,

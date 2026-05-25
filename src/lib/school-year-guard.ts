@@ -7,10 +7,10 @@ import type { AdminActionResult } from '@/lib/action-types'
 // that the success branch is missing fields.
 type ArchivedFailure = Extract<AdminActionResult, { success: false }>
 
-const ARCHIVED_ERROR: ArchivedFailure = {
+const ARCHIVED_ERROR: ArchivedFailure = Object.freeze({
   success: false,
   error: 'Arhivirana školska godina je samo za pregled.',
-}
+})
 
 /** Error result when the year is archived (read-only), otherwise null. */
 export function archivedYearError(year: string): ArchivedFailure | null {

@@ -78,4 +78,35 @@ describe('inquirySchema', () => {
     const result = inquirySchema.safeParse({ ...baseInquiry, grade: '' })
     expect(result.success).toBe(false)
   })
+
+  it('rejects the legacy workshop sentinel value', () => {
+    // Pre-1bf0212 radionica forms posted grade='workshop' as a sentinel.
+    // After the sentinel removal, every flow (including /radionice) must
+    // submit a real canonical grade. A regression that re-introduces
+    // grade='workshop' as a default would slip past unit tests if this
+    // case were not pinned.
+    const result = inquirySchema.safeParse({ ...baseInquiry, grade: 'workshop' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === 'grade')
+      expect(issue).toBeDefined()
+    }
+  })
+
+  it('rejects an omitted grade key entirely', () => {
+    const { grade: _grade, ...withoutGrade } = baseInquiry
+    void _grade
+    const result = inquirySchema.safeParse(withoutGrade)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === 'grade')
+      expect(issue).toBeDefined()
+    }
+  })
+
+  it('accepts predskolci (preschool — the first GRADE_VALUES entry)', () => {
+    const result = inquirySchema.safeParse({ ...baseInquiry, grade: 'predskolci' })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.grade).toBe('predskolci')
+  })
 })

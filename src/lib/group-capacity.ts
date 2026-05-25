@@ -145,6 +145,11 @@ export async function assertGroupHasAvailableSpot(
   if (computeGroupCapacity(group).isFull) throw new GroupFullError()
 }
 
+// Single retry on P2034 is sufficient at the project's current write volume
+// (low single-digit concurrent admin writes + public form bursts) — Postgres
+// serialization conflicts on Inquiry/Enrollment hot rows resolve in one
+// re-roll. If a P2034 ever surfaces in production logs after retry, bump this
+// to N attempts with exponential backoff.
 export async function runWithGroupCapacityGuard<T>(
   fn: (tx: TxClient) => Promise<T>,
 ): Promise<T> {

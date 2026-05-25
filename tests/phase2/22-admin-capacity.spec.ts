@@ -32,25 +32,29 @@ test.beforeAll(async () => {
       address: `Test ulica ${RUN_ID}`,
     },
   })
+  // Both the course and its group must live in the current school year.
+  // getCourses() (which feeds the AddEnrollmentDialog program dropdown on
+  // /admin/ucenici/[id]) filters radionice by schoolYear via the admin
+  // cookie (default = current year). getGroupsForCourse / *InSelectedYear
+  // (which feed CreateAccountDialog + AddEnrollmentDialog group lists) also
+  // scope by the cookie year. A null-schoolYear radionica is therefore
+  // invisible to either flow.
+  const currentSchoolYear = (() => {
+    const now = new Date()
+    const y = now.getFullYear()
+    return now.getMonth() + 1 >= 9 ? `${y}/${y + 1}` : `${y - 1}/${y}`
+  })()
   const course = await db.course.create({
     data: {
       slug: `capacity-radionica-${RUN_ID}`,
       title: `Capacity Radionica ${RUN_ID}`,
       description: 'Test radionica',
       isCustom: true,
+      schoolYear: currentSchoolYear,
       ageMin: 6,
       ageMax: 14,
     },
   })
-  // Group must live in the current school year so getGroupsForCourse (which
-  // filters to computeSchoolYear()-only and feeds the inquiry→account dialog)
-  // finds it. Add-enrollment uses getGroupsForCourseInYears (current + future)
-  // so either year works for that flow.
-  const currentSchoolYear = (() => {
-    const now = new Date()
-    const y = now.getFullYear()
-    return now.getMonth() + 1 >= 9 ? `${y}/${y + 1}` : `${y - 1}/${y}`
-  })()
   const group = await db.scheduledGroup.create({
     data: {
       courseId: course.id,
