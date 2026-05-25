@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatDate } from '@/lib/format'
 import { fromDateKey, toDateKey } from '@/lib/session-dates'
+import type { ModuleMarker, WorkshopLabel } from '@/lib/school-year-planner'
 import {
   upsertHoliday,
   upsertHolidayRange,
@@ -25,19 +26,22 @@ import {
   type HolidayRow,
 } from '@/actions/admin/holidays'
 
-export type ModuleMarker = {
-  date: string // YYYY-MM-DD
-  kind: 'start' | 'end'
-  label: string
-  tooltip: string
-}
-
 type Props = {
   schoolYear: string // "YYYY/YYYY"
   archived: boolean
   holidays: HolidayRow[]
-  activeWeekdays: string[] // Croatian names
+  /**
+   * Per-weekday list of YYYY-MM-DD keys that paint as session cells. Caller
+   * caps each list at 28 (STANDARD_PROGRAM_SESSION_TARGET) so sessions beyond
+   * the curriculum target stay unpainted even when admin module windows are
+   * over-long.
+   */
+  sessionDatesByWeekday: Record<string, ReadonlyArray<string>>
+  /** YYYY-MM-DD of the 28th (last) session per weekday — gets a ring marker. */
+  lastSessionDateByWeekday: Record<string, string | null>
   moduleMarkers: ModuleMarker[]
+  /** Per-day radionica (workshop) Course.title labels — empty when no workshops are scheduled. */
+  workshopLabels?: WorkshopLabel[]
 }
 
 type CellState = {
@@ -47,9 +51,13 @@ type CellState = {
   weekdayName: string // Croatian
   inMonth: boolean
   isToday: boolean
-  isActiveWeekday: boolean
+  /** True when this cell's date is in the per-weekday session list (≤28). */
+  isSessionDate: boolean
+  /** True when this cell is the 28th session for its weekday. */
+  isLastSessionDate: boolean
   holiday: HolidayRow | null
   markers: ModuleMarker[]
+  workshops: string[] // course titles for any radionica covering this day
 }
 
 /**
@@ -152,9 +160,11 @@ function buildMonthGrid(
   month: number,
   ctx: {
     today: Date
-    activeWeekdaySet: Set<string>
+    sessionDateSet: Set<string>
+    lastSessionDateSet: Set<string>
     holidaysByDate: Map<string, HolidayRow>
     markersByDate: Map<string, ModuleMarker[]>
+    workshopsByDate: Map<string, string[]>
   },
 ): CellState[] {
   const firstOfMonth = utcMidnight(year, month, 1)
@@ -175,9 +185,11 @@ function buildMonthGrid(
       weekdayName,
       inMonth: d.getUTCMonth() === month && d.getUTCFullYear() === year,
       isToday: d.getTime() === ctx.today.getTime(),
-      isActiveWeekday: ctx.activeWeekdaySet.has(weekdayName),
+      isSessionDate: ctx.sessionDateSet.has(key),
+      isLastSessionDate: ctx.lastSessionDateSet.has(key),
       holiday: ctx.holidaysByDate.get(key) ?? null,
       markers: ctx.markersByDate.get(key) ?? [],
+      workshops: ctx.workshopsByDate.get(key) ?? [],
     })
   }
   return cells
@@ -187,8 +199,10 @@ export function HolidayCalendar({
   schoolYear,
   archived,
   holidays,
-  activeWeekdays,
+  sessionDatesByWeekday,
+  lastSessionDateByWeekday,
   moduleMarkers,
+  workshopLabels = [],
 }: Readonly<Props>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -214,7 +228,29 @@ export function HolidayCalendar({
     }
     return m
   }, [moduleMarkers])
-  const activeWeekdaySet = useMemo(() => new Set(activeWeekdays), [activeWeekdays])
+  const workshopsByDate = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const w of workshopLabels) {
+      const arr = m.get(w.date) ?? []
+      arr.push(w.title)
+      m.set(w.date, arr)
+    }
+    return m
+  }, [workshopLabels])
+  const sessionDateSet = useMemo(() => {
+    const s = new Set<string>()
+    for (const keys of Object.values(sessionDatesByWeekday)) {
+      for (const k of keys) s.add(k)
+    }
+    return s
+  }, [sessionDatesByWeekday])
+  const lastSessionDateSet = useMemo(() => {
+    const s = new Set<string>()
+    for (const k of Object.values(lastSessionDateByWeekday)) {
+      if (k) s.add(k)
+    }
+    return s
+  }, [lastSessionDateByWeekday])
   const today = useMemo(todayUtcMidnight, [])
 
   const isRange = editing !== null && editing.startKey !== editing.endKey
@@ -359,7 +395,14 @@ export function HolidayCalendar({
   // the rangeStart cell may live in any of the 12 month grids.
   const rangeStartDate = rangeStart ? fromDateKey(rangeStart) : null
 
-  const gridCtx = { today, activeWeekdaySet, holidaysByDate, markersByDate }
+  const gridCtx = {
+    today,
+    sessionDateSet,
+    lastSessionDateSet,
+    holidaysByDate,
+    markersByDate,
+    workshopsByDate,
+  }
 
   return (
     <>
@@ -567,10 +610,14 @@ function DayCell({
   onClick: () => void
   onDoubleClick: () => void
 }>) {
-  const { inMonth, isToday, isActiveWeekday, holiday, markers, date, weekday } = cell
+  const { inMonth, isToday, isSessionDate, isLastSessionDate, holiday, markers, workshops, date, weekday } = cell
 
-  const startMarker = markers.find((m) => m.kind === 'start')
-  const endMarker = markers.find((m) => m.kind === 'end')
+  // Dedupe start/end markers by moduleIndex — multiple courses already merge
+  // upstream, but a cell can still receive several markers from custom radionice.
+  const startBadges = uniqByIndex(markers.filter((m) => m.kind === 'start'))
+  const endBadges = uniqByIndex(markers.filter((m) => m.kind === 'end'))
+  const showLastRing = isLastSessionDate && inMonth && !holiday
+  const hasWorkshops = inMonth && workshops.length > 0
 
   return (
     <button
@@ -582,45 +629,68 @@ function DayCell({
       data-holiday={holiday ? 'true' : 'false'}
       data-in-month={inMonth ? 'true' : 'false'}
       data-range-start={isRangeStart ? 'true' : 'false'}
+      data-session={isSessionDate ? 'true' : 'false'}
+      data-last-session={isLastSessionDate ? 'true' : 'false'}
       title={[
         holiday ? `Praznik${holiday.name ? `: ${holiday.name}` : ''}` : '',
+        showLastRing ? 'Zadnja radionica (28. po redu)' : '',
+        ...workshops.map((w) => `Radionica: ${w}`),
         ...markers.map((m) => m.tooltip),
       ]
         .filter(Boolean)
         .join('\n') || undefined}
       className={cn(
-        'relative h-14 rounded-md border text-left text-xs transition-colors',
+        'relative h-20 rounded-md border p-1 text-left text-xs transition-colors',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500',
         !inMonth && 'border-transparent bg-transparent text-gray-300',
-        inMonth && !holiday && !isActiveWeekday && 'border-gray-100 bg-white text-gray-600 hover:bg-gray-50',
-        inMonth && !holiday && isActiveWeekday && 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
+        inMonth && !holiday && !isSessionDate && !hasWorkshops && 'border-gray-100 bg-white text-gray-600 hover:bg-gray-50',
+        inMonth && !holiday && !isSessionDate && hasWorkshops && 'border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100',
+        inMonth && !holiday && isSessionDate && 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
         inMonth && holiday && 'border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200',
+        showLastRing && 'ring-2 ring-inset ring-emerald-700',
         isToday && inMonth && !isRangeStart && 'ring-2 ring-cyan-500',
         isRangeStart && 'ring-2 ring-cyan-600 ring-offset-1',
-        weekday === 0 && inMonth && !holiday && 'text-gray-400',
+        weekday === 0 && inMonth && !holiday && !hasWorkshops && 'text-gray-400',
         disabled && 'cursor-default',
       )}
-      aria-label={`${date.getUTCDate()}. ${date.getUTCMonth() + 1}. ${date.getUTCFullYear()}${holiday ? ' — praznik' : ''}${isRangeStart ? ' — početak raspona' : ''}`}
+      aria-label={`${date.getUTCDate()}. ${date.getUTCMonth() + 1}. ${date.getUTCFullYear()}${holiday ? ' — praznik' : ''}${showLastRing ? ' — zadnja radionica' : ''}${isRangeStart ? ' — početak raspona' : ''}`}
     >
-      <span className="absolute left-1 top-0.5 text-[11px] font-semibold">
+      <span className="text-[11px] font-semibold leading-none">
         {date.getUTCDate()}
       </span>
-      {(startMarker || endMarker) && inMonth && (
-        <span className="absolute right-1 top-0.5 flex items-center gap-0.5">
-          {startMarker && (
-            <ArrowUpFromLine
-              className="h-2.5 w-2.5 text-emerald-700"
-              aria-label="Početak modula"
-            />
+
+      {inMonth && (startBadges.length > 0 || endBadges.length > 0 || showLastRing) && (
+        <div className="mt-1 flex flex-wrap gap-0.5">
+          {startBadges.map((m) => (
+            <ModuleBadge key={`s-${m.moduleIndex}`} kind="start" moduleIndex={m.moduleIndex} />
+          ))}
+          {endBadges.map((m) => (
+            <ModuleBadge key={`e-${m.moduleIndex}`} kind="end" moduleIndex={m.moduleIndex} />
+          ))}
+          {showLastRing && (
+            <span
+              className="inline-flex items-center rounded-sm border border-emerald-700 bg-white px-1 py-px text-[9px] font-semibold leading-none text-emerald-900"
+              aria-label="Zadnja radionica (28.)"
+            >
+              28.
+            </span>
           )}
-          {endMarker && (
-            <ArrowDownToLine
-              className="h-2.5 w-2.5 text-orange-700"
-              aria-label="Kraj modula"
-            />
-          )}
-        </span>
+        </div>
       )}
+
+      {hasWorkshops && !holiday && (
+        <div
+          className="absolute inset-x-1 bottom-0.5 space-y-px text-[9px] font-medium leading-tight text-rose-800"
+          data-testid="workshop-labels"
+        >
+          {workshops.map((w) => (
+            <span key={w} className="block truncate" title={w}>
+              {w}
+            </span>
+          ))}
+        </div>
+      )}
+
       {holiday?.name && inMonth && (
         <span className="absolute inset-x-1 bottom-0.5 truncate text-[9px] font-medium leading-tight text-sky-800">
           {holiday.name}
@@ -630,24 +700,75 @@ function DayCell({
   )
 }
 
+function uniqByIndex(markers: ModuleMarker[]): ModuleMarker[] {
+  const seen = new Set<number>()
+  const out: ModuleMarker[] = []
+  for (const m of markers) {
+    if (seen.has(m.moduleIndex)) continue
+    seen.add(m.moduleIndex)
+    out.push(m)
+  }
+  out.sort((a, b) => a.moduleIndex - b.moduleIndex)
+  return out
+}
+
+function ModuleBadge({
+  kind,
+  moduleIndex,
+}: Readonly<{ kind: 'start' | 'end'; moduleIndex: number }>) {
+  const isStart = kind === 'start'
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-0.5 rounded-sm border px-1 py-px text-[9px] font-semibold leading-none',
+        isStart
+          ? 'border-emerald-400 bg-emerald-100 text-emerald-900'
+          : 'border-orange-400 bg-orange-100 text-orange-900',
+      )}
+      aria-label={isStart ? `Modul ${moduleIndex} početak` : `Modul ${moduleIndex} kraj`}
+    >
+      M{moduleIndex}
+      {isStart ? (
+        <ArrowUpFromLine className="h-2 w-2" aria-hidden />
+      ) : (
+        <ArrowDownToLine className="h-2 w-2" aria-hidden />
+      )}
+    </span>
+  )
+}
+
 function CalendarLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs text-gray-600">
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-3 w-3 rounded border border-emerald-200 bg-emerald-50" />
-        Aktivan dan grupe
+        Radionica
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block h-3 w-3 rounded border border-rose-200 bg-rose-50" />
+        Radionica (cijeli dan)
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-3 w-3 rounded border border-sky-300 bg-sky-100" />
         Praznik
       </span>
       <span className="flex items-center gap-1.5">
-        <ArrowUpFromLine className="h-3 w-3 text-emerald-700" />
+        <span className="inline-flex items-center gap-0.5 rounded-sm border border-emerald-400 bg-emerald-100 px-1 py-px text-[9px] font-semibold leading-none text-emerald-900">
+          M1 <ArrowUpFromLine className="h-2 w-2" />
+        </span>
         Početak modula
       </span>
       <span className="flex items-center gap-1.5">
-        <ArrowDownToLine className="h-3 w-3 text-orange-700" />
+        <span className="inline-flex items-center gap-0.5 rounded-sm border border-orange-400 bg-orange-100 px-1 py-px text-[9px] font-semibold leading-none text-orange-900">
+          M1 <ArrowDownToLine className="h-2 w-2" />
+        </span>
         Kraj modula
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-flex items-center rounded-sm border border-emerald-700 bg-white px-1 py-px text-[9px] font-semibold leading-none text-emerald-900">
+          28.
+        </span>
+        28. radionica (zadnja)
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-3 w-3 rounded ring-2 ring-cyan-500" />

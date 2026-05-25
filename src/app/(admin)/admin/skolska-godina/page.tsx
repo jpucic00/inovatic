@@ -5,14 +5,13 @@ import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 import { listHolidays } from '@/actions/admin/holidays'
-import {
-  computeWeekdaySummary,
-  type CourseWithModules,
-} from '@/lib/group-end-dates'
 import { toDateKey } from '@/lib/session-dates'
-import { HolidayCalendar, type ModuleMarker } from '@/components/admin/school-year/holiday-calendar'
 import { HolidayImportDialog } from '@/components/admin/school-year/holiday-import-dialog'
-import { WeekdayEndSummary } from '@/components/admin/school-year/weekday-end-summary'
+import {
+  SchoolYearPlannerView,
+  type SchoolYearCourseInput,
+  type SchoolYearRadionicaGroupInput,
+} from '@/components/admin/school-year/school-year-planner-view'
 
 export const metadata: Metadata = { title: 'Admin – Školska godina' }
 
@@ -22,30 +21,36 @@ export default async function SchoolYearPage() {
   const schoolYear = await getSelectedSchoolYear()
   const archived = isArchivedYear(schoolYear)
 
-  const [holidays, distinctWeekdays, moduleSchedules, standardCourses] = await Promise.all([
+  // Calendar shows holidays + module markers (standard programs) + workshop
+  // labels (radionice groups whose [dateStart, dateEnd] range covers the day).
+  // Standard ScheduledGroups are NOT a calendar input — they only matter for
+  // attendance and the per-group teacher panel.
+  const [holidays, standardCoursesRaw, customCoursesRaw, radionicaGroupsRaw] = await Promise.all([
     listHolidays(schoolYear),
-    db.scheduledGroup.findMany({
-      where: { schoolYear, dayOfWeek: { not: null } },
-      select: { dayOfWeek: true },
-      distinct: ['dayOfWeek'],
-    }),
-    db.moduleSchedule.findMany({
-      where: { schoolYear },
+    db.course.findMany({
+      where: { isCustom: false },
       select: {
-        startDate: true,
-        endDate: true,
-        module: {
+        id: true,
+        title: true,
+        level: true,
+        modules: {
           select: {
-            title: true,
+            id: true,
             sortOrder: true,
-            course: { select: { title: true, level: true, isCustom: true } },
+            title: true,
+            schedules: {
+              where: { schoolYear },
+              select: { startDate: true, endDate: true },
+            },
           },
+          orderBy: { sortOrder: 'asc' },
         },
       },
+      orderBy: [{ level: 'asc' }, { title: 'asc' }],
     }),
     db.course.findMany({
       where: {
-        isCustom: false,
+        isCustom: true,
         modules: { some: { schedules: { some: { schoolYear } } } },
       },
       select: {
@@ -54,60 +59,75 @@ export default async function SchoolYearPage() {
         level: true,
         modules: {
           select: {
+            id: true,
+            sortOrder: true,
+            title: true,
             schedules: {
               where: { schoolYear },
               select: { startDate: true, endDate: true },
             },
           },
+          orderBy: { sortOrder: 'asc' },
         },
       },
-      orderBy: [{ level: 'asc' }, { title: 'asc' }],
+      orderBy: { title: 'asc' },
+    }),
+    db.scheduledGroup.findMany({
+      where: {
+        schoolYear,
+        course: { isCustom: true },
+        dateStart: { not: null },
+        dateEnd: { not: null },
+      },
+      select: {
+        id: true,
+        dateStart: true,
+        dateEnd: true,
+        course: { select: { title: true } },
+      },
+      orderBy: { dateStart: 'asc' },
     }),
   ])
 
-  const activeWeekdays = new Set(
-    distinctWeekdays.map((g) => g.dayOfWeek).filter((v): v is string => v !== null),
-  )
+  function formatCourseLabel(course: { title: string; level: string | null }): string {
+    return course.level ? course.level.replace('_', ' ') : course.title
+  }
 
-  const moduleMarkers: ModuleMarker[] = []
-  for (const sched of moduleSchedules) {
-    const course = sched.module.course
-    const courseTag = course.level
-      ? `${course.level.replace('_', ' ')} · ${sched.module.title}`
-      : `${course.title} · ${sched.module.title}`
-    if (sched.startDate) {
-      moduleMarkers.push({
-        date: toDateKey(sched.startDate),
-        kind: 'start',
-        label: sched.module.title,
-        tooltip: `${courseTag} — početak`,
-      })
-    }
-    if (sched.endDate) {
-      moduleMarkers.push({
-        date: toDateKey(sched.endDate),
-        kind: 'end',
-        label: sched.module.title,
-        tooltip: `${courseTag} — kraj`,
-      })
+  function toCourseInput(
+    course: (typeof standardCoursesRaw)[number],
+  ): SchoolYearCourseInput {
+    return {
+      courseId: course.id,
+      courseTitle: course.title,
+      courseLabel: formatCourseLabel(course),
+      level: course.level,
+      modules: course.modules.map((m) => {
+        const sched = m.schedules[0]
+        return {
+          id: m.id,
+          sortOrder: m.sortOrder,
+          title: m.title,
+          startDateKey: sched?.startDate ? toDateKey(sched.startDate) : null,
+          endDateKey: sched?.endDate ? toDateKey(sched.endDate) : null,
+        }
+      }),
     }
   }
 
-  const coursesForSummary: CourseWithModules[] = standardCourses.map((c) => ({
-    courseId: c.id,
-    courseTitle: c.title,
-    level: c.level,
-    moduleWindows: c.modules.flatMap((m) =>
-      m.schedules.map((s) => ({ startDate: s.startDate, endDate: s.endDate })),
-    ),
+  const standardCourses = standardCoursesRaw.map(toCourseInput)
+  const customCourses = customCoursesRaw.map(toCourseInput)
+  const radionicaGroups: SchoolYearRadionicaGroupInput[] = radionicaGroupsRaw.map((g) => ({
+    groupId: g.id,
+    dateStart: g.dateStart,
+    dateEnd: g.dateEnd,
+    courseTitle: g.course.title,
   }))
 
-  const holidayDateSet = new Set(holidays.map((h) => h.date))
-  const summary = computeWeekdaySummary({
-    courses: coursesForSummary,
-    holidayDates: holidayDateSet,
-  })
+  const hasAnyModuleDate = standardCourses.some((c) =>
+    c.modules.some((m) => m.startDateKey || m.endDateKey),
+  )
 
+  const holidayDateKeys = holidays.map((h) => h.date)
   const holidayCount = holidays.length
 
   return (
@@ -131,15 +151,16 @@ export default async function SchoolYearPage() {
 
       {archived && <ArchivedYearBanner year={schoolYear} />}
 
-      <HolidayCalendar
+      <SchoolYearPlannerView
         schoolYear={schoolYear}
         archived={archived}
         holidays={holidays}
-        activeWeekdays={Array.from(activeWeekdays)}
-        moduleMarkers={moduleMarkers}
+        holidayDateKeys={holidayDateKeys}
+        standardCourses={standardCourses}
+        customCourses={customCourses}
+        radionicaGroups={radionicaGroups}
+        hasAnyModuleDate={hasAnyModuleDate}
       />
-
-      <WeekdayEndSummary summary={summary} />
     </div>
   )
 }

@@ -62,11 +62,19 @@ export function computeWeekdaySummary(input: {
   return ACTIVE_WEEKDAYS.map((weekday) => ({
     weekday,
     courses: input.courses.map((course) => {
-      const sessions = computeExpectedSessions({
+      // Cap at the curriculum target (28). Holidays clustered on one weekday
+      // can push the module boundary past faster weekdays' natural 7ths, so
+      // faster weekdays would otherwise accumulate "bonus" sessions inside
+      // the window (e.g. 29 or 30 Mondays). For the summary we want the
+      // curriculum-meaningful count: each weekday's first 28 sessions, with
+      // the 28th as the canonical "last session" graduation date for that
+      // weekday's groups.
+      const allSessions = computeExpectedSessions({
         dayOfWeek: weekday,
         moduleWindows: course.moduleWindows,
         holidayDates: input.holidayDates,
       })
+      const sessions = allSessions.slice(0, target)
       const lastSessionDate = sessions.at(-1) ?? null
       const lastModuleEndDate = course.moduleWindows
         .map((w) => w.endDate)

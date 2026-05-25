@@ -76,4 +76,24 @@ describe('computeWeekdaySummary', () => {
     expect(out.length).toBe(ACTIVE_WEEKDAYS.length)
     expect(out.every((w) => w.courses.length === 0)).toBe(true)
   })
+
+  it('caps at target (28) when the window would generate more sessions', () => {
+    // Window long enough for 30+ Mondays. With no cap, Mon would show 30/28.
+    // With cap, summary shows 28/28 and the 28th Monday as lastSessionDate —
+    // matches user expectation that "all groups are 28/28" even when the
+    // module boundary extends past faster weekdays' natural 7ths due to
+    // holidays on slower weekdays.
+    const course = {
+      courseId: 'slr-long',
+      courseTitle: 'SLR Long',
+      level: CourseLevel.SLR_1,
+      moduleWindows: [{ startDate: utc(2025, 9, 1), endDate: utc(2026, 6, 30) }],
+    }
+    const out = computeWeekdaySummary({ courses: [course], holidayDates: new Set() })
+    const mon = out.find((w) => w.weekday === 'Ponedjeljak')!.courses[0]
+    expect(mon.computedSessions).toBe(28)
+    expect(mon.shortOfTarget).toBe(false)
+    // 28th Monday from Mon 2025-09-01 (no holidays) = 2026-03-09.
+    expect(toDateKey(mon.lastSessionDate!)).toBe('2026-03-09')
+  })
 })
