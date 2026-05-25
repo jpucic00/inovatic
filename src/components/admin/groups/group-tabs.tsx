@@ -7,7 +7,8 @@ import { GroupTable } from './group-table'
 type Group = {
   id: string
   name: string | null
-  date: string | null
+  dateStart: string | null
+  dateEnd: string | null
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null

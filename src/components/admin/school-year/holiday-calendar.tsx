@@ -678,9 +678,12 @@ function DayCell({
         </div>
       )}
 
-      {hasWorkshops && !holiday && (
+      {hasWorkshops && (
         <div
-          className="absolute inset-x-1 bottom-0.5 space-y-px text-[9px] font-medium leading-tight text-rose-800"
+          className={cn(
+            'absolute inset-x-1 bottom-0.5 space-y-px text-[9px] font-medium leading-tight',
+            holiday ? 'text-sky-900' : 'text-rose-800',
+          )}
           data-testid="workshop-labels"
         >
           {workshops.map((w) => (
@@ -691,7 +694,7 @@ function DayCell({
         </div>
       )}
 
-      {holiday?.name && inMonth && (
+      {holiday?.name && inMonth && !hasWorkshops && (
         <span className="absolute inset-x-1 bottom-0.5 truncate text-[9px] font-medium leading-tight text-sky-800">
           {holiday.name}
         </span>

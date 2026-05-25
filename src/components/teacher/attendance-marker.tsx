@@ -15,7 +15,10 @@ import { fromDateKey, todayUtc, toDateKey } from '@/lib/session-dates'
 
 interface Props {
   groupId: string
+  isCustom: boolean
   dayOfWeek: string | null
+  dateStart: string | null
+  dateEnd: string | null
   startTime: string | null
   endTime: string | null
   expectedSessions: string[]
@@ -63,7 +66,10 @@ function markedCount(roster: AttendanceRosterRow[], byEnrollment: Map<string, At
 
 export function AttendanceMarker({
   groupId,
+  isCustom,
   dayOfWeek,
+  dateStart,
+  dateEnd,
   startTime,
   endTime,
   expectedSessions,
@@ -161,7 +167,16 @@ export function AttendanceMarker({
 
   const endSuffix = endTime ? `–${endTime}` : ''
   const timeRange = startTime ? ` · ${startTime}${endSuffix}` : ''
-  const scheduleHint = dayOfWeek ? `${dayOfWeek}${timeRange}` : null
+  let scheduleHint: string | null = null
+  if (isCustom && dateStart && dateEnd) {
+    const rangeLabel =
+      dateStart === dateEnd
+        ? formatDate(fromDateKey(dateStart))
+        : `${formatDate(fromDateKey(dateStart))} – ${formatDate(fromDateKey(dateEnd))}`
+    scheduleHint = `${rangeLabel}${timeRange}`
+  } else if (dayOfWeek) {
+    scheduleHint = `${dayOfWeek}${timeRange}`
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">

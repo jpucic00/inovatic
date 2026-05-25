@@ -268,11 +268,12 @@ export type WorkshopLabel = {
 
 /**
  * Enumerate every day in [dateStart, dateEnd] (inclusive, YYYY-MM-DD keys) for
- * each radionica group + emit one label per (date, course.title). Deduped per
+ * each radionica group + emit one label per (date, course.title). Skips Sundays
+ * because the association never schedules workshops on Nedjelja. Deduped per
  * day so two groups of the same workshop on the same day collapse to one
- * label. Holiday-aware: a radionica scheduled on a holiday still surfaces
- * because the admin needs to see the conflict. Attendance computation handles
- * the holiday skip separately.
+ * label. Holidays are NOT skipped here — the admin needs to see when a workshop
+ * conflicts with a holiday. Attendance computation handles the holiday skip
+ * separately.
  */
 export function computeWorkshopLabels(input: {
   radionicaGroups: ReadonlyArray<{
@@ -290,13 +291,16 @@ export function computeWorkshopLabels(input: {
     const end = fromDateKey(g.dateEnd).getTime()
     if (end < cur) continue
     while (cur <= end) {
-      const key = toDateKey(new Date(cur))
-      let entry = byDate.get(key)
-      if (!entry) {
-        entry = { titles: new Set() }
-        byDate.set(key, entry)
+      const day = new Date(cur)
+      if (day.getUTCDay() !== 0) {
+        const key = toDateKey(day)
+        let entry = byDate.get(key)
+        if (!entry) {
+          entry = { titles: new Set() }
+          byDate.set(key, entry)
+        }
+        entry.titles.add(g.courseTitle)
       }
-      entry.titles.add(g.courseTitle)
       cur += DAY_MS
     }
   }

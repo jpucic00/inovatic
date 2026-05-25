@@ -18,7 +18,8 @@ import { deleteGroup } from '@/actions/admin/group'
 type Group = {
   id: string
   name: string | null
-  date: string | null
+  dateStart: string | null
+  dateEnd: string | null
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null
@@ -197,10 +198,14 @@ function buildColumns(hideProgram: boolean, editable: boolean): ColumnDef<Group>
       key: 'schedule',
       header: 'Termin',
       cell: (row) => {
-        if (row.course.isCustom && row.date) {
+        if (row.course.isCustom && row.dateStart && row.dateEnd) {
+          const range =
+            row.dateStart === row.dateEnd
+              ? formatDate(row.dateStart)
+              : `${formatDate(row.dateStart)} – ${formatDate(row.dateEnd)}`
           return (
             <span className="text-sm text-gray-600">
-              {formatDate(row.date)}{row.startTime ? ` ${row.startTime}` : ''}
+              {range}{row.startTime ? ` ${row.startTime}` : ''}
             </span>
           )
         }

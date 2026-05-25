@@ -15,6 +15,7 @@ import { UserPlus, Copy, ExternalLink } from 'lucide-react'
 import { createStudentFromInquiry } from '@/actions/admin/student'
 import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
+import { formatGroupSchedule } from '@/lib/format'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -29,12 +30,14 @@ interface GroupOption {
   id: string
   name: string | null
   dayOfWeek: string | null
+  dateStart: string | null
+  dateEnd: string | null
   startTime: string | null
   endTime: string | null
   availableSpots: number
   isFull: boolean
   location: { name: string }
-  course: { title: string; isCustom?: boolean; modules?: ModuleOption[] }
+  course: { title: string; isCustom: boolean; modules?: ModuleOption[] }
 }
 
 interface CourseOption {
@@ -64,6 +67,8 @@ function mapGroupOption(sg: {
   id: string
   name: string | null
   dayOfWeek: string | null
+  dateStart: string | null
+  dateEnd: string | null
   startTime: string | null
   endTime: string | null
   availableSpots?: number
@@ -75,6 +80,8 @@ function mapGroupOption(sg: {
     id: sg.id,
     name: sg.name,
     dayOfWeek: sg.dayOfWeek,
+    dateStart: sg.dateStart,
+    dateEnd: sg.dateEnd,
     startTime: sg.startTime,
     endTime: sg.endTime,
     availableSpots: sg.availableSpots ?? 0,
@@ -300,10 +307,15 @@ export function CreateAccountDialog({
               )}
               {!loadingGroups && loadedGroups.length > 0 && (
                 loadedGroups.map((g) => {
-                  const timeRange = g.startTime
-                    ? `${g.startTime}–${g.endTime ?? ''}`
-                    : null
-                  const label = [g.name, g.dayOfWeek, timeRange, g.location.name]
+                  const schedule = formatGroupSchedule({
+                    isCustom: g.course.isCustom,
+                    dayOfWeek: g.dayOfWeek,
+                    dateStart: g.dateStart,
+                    dateEnd: g.dateEnd,
+                    startTime: g.startTime,
+                    endTime: g.endTime,
+                  })
+                  const label = [g.name, schedule || null, g.location.name]
                     .filter(Boolean)
                     .join(' · ')
                   const wrapperClass = (() => {

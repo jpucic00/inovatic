@@ -29,9 +29,53 @@ describe('createGroupSchema', () => {
     expect(result.teacherIds).toEqual(['t1', 't2'])
   })
 
-  it('accepts empty date/dayOfWeek strings', () => {
-    const result = createGroupSchema.parse({ ...validGroup, date: '', dayOfWeek: '' })
-    expect(result.date).toBe('')
+  it('accepts empty dateStart/dateEnd/dayOfWeek strings', () => {
+    const result = createGroupSchema.parse({
+      ...validGroup,
+      dateStart: '',
+      dateEnd: '',
+      dayOfWeek: '',
+    })
+    expect(result.dateStart).toBe('')
+    expect(result.dateEnd).toBe('')
+  })
+
+  it('accepts a full radionica date range', () => {
+    const result = createGroupSchema.parse({
+      ...validGroup,
+      dateStart: '2026-07-15',
+      dateEnd: '2026-07-21',
+    })
+    expect(result.dateStart).toBe('2026-07-15')
+    expect(result.dateEnd).toBe('2026-07-21')
+  })
+
+  it('accepts a single-day radionica range (start === end)', () => {
+    const result = createGroupSchema.parse({
+      ...validGroup,
+      dateStart: '2026-07-15',
+      dateEnd: '2026-07-15',
+    })
+    expect(result.dateStart).toBe('2026-07-15')
+  })
+
+  it('rejects dateStart without dateEnd', () => {
+    const res = createGroupSchema.safeParse({ ...validGroup, dateStart: '2026-07-15' })
+    expect(res.success).toBe(false)
+  })
+
+  it('rejects dateEnd without dateStart', () => {
+    const res = createGroupSchema.safeParse({ ...validGroup, dateEnd: '2026-07-21' })
+    expect(res.success).toBe(false)
+  })
+
+  it('rejects dateEnd before dateStart', () => {
+    const res = createGroupSchema.safeParse({
+      ...validGroup,
+      dateStart: '2026-07-21',
+      dateEnd: '2026-07-15',
+    })
+    expect(res.success).toBe(false)
   })
 
   it('rejects empty courseId', () => {

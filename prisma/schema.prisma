@@ -183,7 +183,11 @@ model ScheduledGroup {
   courseId        String
   locationId      String
   name            String?
-  date            String?
+  // For radionice (Course.isCustom = true): closed YYYY-MM-DD range — the group runs every day in
+  // [dateStart, dateEnd] at the same startTime/endTime. For standard programs both are null and
+  // `dayOfWeek` is used instead.
+  dateStart       String?
+  dateEnd         String?
   dayOfWeek       String?
   startTime       String?
   endTime         String?

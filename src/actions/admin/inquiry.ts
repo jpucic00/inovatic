@@ -11,6 +11,7 @@ import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
 import { computeSchoolYear, schoolYearDateRange } from '@/lib/school-year'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { computeGroupCapacity } from '@/lib/group-capacity'
+import { formatGroupSchedule } from '@/lib/format'
 import type { Grade } from '@/lib/inquiry-status'
 
 type InquiryFilters = {
@@ -304,14 +305,19 @@ export async function sendScheduleOptions(
 
     const groups = await db.scheduledGroup.findMany({
       where: { id: { in: groupIds } },
-      include: { location: true },
+      include: { location: true, course: { select: { isCustom: true } } },
     })
 
     const options = groups.map((g) => ({
       groupName: g.name ?? 'Grupa',
-      dayOfWeek: g.dayOfWeek ?? '',
-      startTime: g.startTime ?? '',
-      endTime: g.endTime ?? '',
+      schedule: formatGroupSchedule({
+        isCustom: g.course.isCustom,
+        dayOfWeek: g.dayOfWeek,
+        dateStart: g.dateStart,
+        dateEnd: g.dateEnd,
+        startTime: g.startTime,
+        endTime: g.endTime,
+      }),
       locationName: g.location.name,
     }))
 

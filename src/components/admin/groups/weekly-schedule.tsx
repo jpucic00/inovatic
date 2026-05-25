@@ -11,7 +11,7 @@ const HEADER_HEIGHT = 26
 const DEFAULT_DURATION = 90
 const BODY_PAD = 10
 
-type FilterKey = 'all' | 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4' | 'radionice'
+type FilterKey = 'all' | 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'Sve grupe' },
@@ -19,7 +19,6 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'SLR_2', label: 'SLR 2' },
   { key: 'SLR_3', label: 'SLR 3' },
   { key: 'SLR_4', label: 'SLR 4' },
-  { key: 'radionice', label: 'Radionice' },
 ]
 
 function parseTime(t: string): number {
@@ -33,8 +32,7 @@ function formatTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-function courseColor(level: string | null, isCustom: boolean) {
-  if (isCustom) return { bg: 'bg-rose-100', border: 'border-rose-300', text: 'text-rose-800', dot: 'bg-rose-400', active: 'bg-rose-500 text-white', inactive: 'bg-rose-50 text-rose-600 border border-rose-200' }
+function courseColor(level: string | null) {
   switch (level) {
     case 'SLR_1': return { bg: 'bg-cyan-100', border: 'border-cyan-300', text: 'text-cyan-800', dot: 'bg-cyan-500', active: 'bg-cyan-500 text-white', inactive: 'bg-cyan-50 text-cyan-700 border border-cyan-200' }
     case 'SLR_2': return { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-800', dot: 'bg-green-500', active: 'bg-green-500 text-white', inactive: 'bg-green-50 text-green-700 border border-green-200' }
@@ -46,43 +44,22 @@ function courseColor(level: string | null, isCustom: boolean) {
 
 function filterColor(key: FilterKey) {
   switch (key) {
-    case 'SLR_1': return courseColor('SLR_1', false)
-    case 'SLR_2': return courseColor('SLR_2', false)
-    case 'SLR_3': return courseColor('SLR_3', false)
-    case 'SLR_4': return courseColor('SLR_4', false)
-    case 'radionice': return courseColor(null, true)
+    case 'SLR_1': return courseColor('SLR_1')
+    case 'SLR_2': return courseColor('SLR_2')
+    case 'SLR_3': return courseColor('SLR_3')
+    case 'SLR_4': return courseColor('SLR_4')
     default: return null
   }
 }
 
-function matchesFilter(g: { course: { level: string | null; isCustom: boolean } }, filter: FilterKey): boolean {
+function matchesFilter(g: { course: { level: string | null } }, filter: FilterKey): boolean {
   if (filter === 'all') return true
-  if (filter === 'radionice') return g.course.isCustom
-  return g.course.level === filter && !g.course.isCustom
-}
-
-const DATE_TO_DAY: Record<number, string> = {
-  0: 'Nedjelja', 1: 'Ponedjeljak', 2: 'Utorak', 3: 'Srijeda',
-  4: 'Četvrtak', 5: 'Petak', 6: 'Subota',
-}
-
-function dateToDay(dateStr: string): string {
-  const parts = dateStr.split('-').map(Number)
-  const y = parts[0] ?? 0
-  const m = parts[1] ?? 0
-  const d = parts[2] ?? 0
-  return DATE_TO_DAY[new Date(y, m - 1, d).getDay()] ?? ''
-}
-
-function formatDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-')
-  return `${d}.${m}.${y}.`
+  return g.course.level === filter
 }
 
 type Group = {
   id: string
   name: string | null
-  date: string | null
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null
@@ -99,18 +76,21 @@ interface WeeklyScheduleProps {
 export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
 
-  // For radionice, derive effective day from the date field
-  const withEffectiveDay = groups.map((g) => ({
-    ...g,
-    effectiveDay: g.course.isCustom && g.date ? dateToDay(g.date) : (g.dayOfWeek ?? null),
-  }))
+  // Radionice (Course.isCustom = true) live on a calendar date range, not a weekday —
+  // they're shown on the /admin/skolska-godina calendar instead of this weekly grid.
+  const withEffectiveDay = groups
+    .filter((g) => !g.course.isCustom)
+    .map((g) => ({
+      ...g,
+      effectiveDay: g.dayOfWeek ?? null,
+    }))
 
   const allScheduled = withEffectiveDay.filter((g) => g.effectiveDay && g.startTime)
 
   if (allScheduled.length === 0) {
     return (
       <div className="text-xs text-gray-400 text-center py-6">
-        Nema zakazanih grupa s određenim terminima.
+        Nema zakazanih grupa standardnih programa s određenim terminima.
       </div>
     )
   }
@@ -250,13 +230,12 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
                           const { laneIndex, laneCount } = layouts[idx]
                           const widthPct = 100 / laneCount
                           const leftPct = laneIndex * widthPct
-                          const color = courseColor(g.course.level, g.course.isCustom)
+                          const color = courseColor(g.course.level)
                           const label = g.name ?? g.course.title
-                          const dateLabel = g.course.isCustom && g.date ? formatDate(g.date) : null
                           const timeRange = g.endTime ? g.startTime + '–' + g.endTime : g.startTime
                           const titleText = [
                             label + ' – ' + g.location.name,
-                            (dateLabel ?? g.effectiveDay) + ' ' + timeRange,
+                            g.effectiveDay + ' ' + timeRange,
                             g._count.enrollments + '/' + g.maxStudents + ' polaznika · ' + g._count.preferredInquiries + ' upita',
                           ].join('\n')
 
@@ -277,7 +256,7 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
                               </p>
                               {height > 28 && (
                                 <p className={`text-[10px] leading-tight truncate opacity-70 ${color.text}`}>
-                                  {dateLabel ?? timeRange}
+                                  {timeRange}
                                 </p>
                               )}
                             </div>

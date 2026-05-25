@@ -122,7 +122,9 @@ type CreateGroupOverrides = {
   name?: string
   schoolYear?: string
   maxStudents?: number
-  dayOfWeek?: string
+  dayOfWeek?: string | null
+  dateStart?: string | null
+  dateEnd?: string | null
   startTime?: string
   endTime?: string
 }
@@ -131,6 +133,10 @@ export async function createGroup(overrides: CreateGroupOverrides = {}): Promise
   const courseId = overrides.courseId ?? (await createCourse()).id
   const locationId = overrides.locationId ?? (await createLocation()).id
   const id = uniq()
+  // When the caller supplies a date range, treat the group as a radionica and
+  // null out dayOfWeek; otherwise default to the standard-program weekday.
+  const radionicaRange =
+    overrides.dateStart !== undefined || overrides.dateEnd !== undefined
   return db.scheduledGroup.create({
     data: {
       courseId,
@@ -138,7 +144,11 @@ export async function createGroup(overrides: CreateGroupOverrides = {}): Promise
       name: overrides.name ?? `Grupa ${id}`,
       schoolYear: overrides.schoolYear ?? '2026/2027',
       maxStudents: overrides.maxStudents ?? 12,
-      dayOfWeek: overrides.dayOfWeek ?? 'Ponedjeljak',
+      dayOfWeek: radionicaRange
+        ? (overrides.dayOfWeek ?? null)
+        : (overrides.dayOfWeek ?? 'Ponedjeljak'),
+      dateStart: overrides.dateStart ?? null,
+      dateEnd: overrides.dateEnd ?? null,
       startTime: overrides.startTime ?? '17:00',
       endTime: overrides.endTime ?? '18:30',
     },

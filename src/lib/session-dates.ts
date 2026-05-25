@@ -109,3 +109,33 @@ export function todayUtc(): Date {
   const now = new Date()
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
 }
+
+/**
+ * Enumerate every calendar day in the closed YYYY-MM-DD range [dateStart, dateEnd],
+ * skipping holidays AND Sundays. Used by radionice attendance: each day in the
+ * range is one expected session. Sundays are excluded because the association
+ * never schedules workshops on Nedjelja (matches `ACTIVE_WEEKDAYS` which lists
+ * only Pon-Sub for standard programs).
+ * Returns an empty list when either bound is missing or end < start.
+ */
+export function computeRadionicaSessions(input: {
+  dateStart: string | null
+  dateEnd: string | null
+  holidayDates?: ReadonlySet<string>
+}): Date[] {
+  if (!input.dateStart || !input.dateEnd) return []
+  const start = fromDateKey(input.dateStart).getTime()
+  const end = fromDateKey(input.dateEnd).getTime()
+  if (end < start) return []
+
+  const DAY_MS = 86_400_000
+  const holidays = input.holidayDates
+  const out: Date[] = []
+  for (let t = start; t <= end; t += DAY_MS) {
+    const d = new Date(t)
+    if (d.getUTCDay() === 0) continue // Sunday — never a workshop day
+    if (holidays?.has(toDateKey(d))) continue
+    out.push(d)
+  }
+  return out
+}

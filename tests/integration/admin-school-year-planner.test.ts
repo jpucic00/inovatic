@@ -31,7 +31,15 @@ beforeAll(async () => {
 afterEach(async () => {
   // Each test seeds its own standard courses; if we left them lying around
   // the planner's "standard programs" count + drift-detection guards would
-  // see polluted state across tests.
+  // see polluted state across tests. Delete in FK-safe order: rows that
+  // reference ScheduledGroup (Attendance → ModuleEnrollment → Enrollment →
+  // TeacherAssignment) must go before ScheduledGroup itself. Without this,
+  // any prior test file that left enrollments behind would FK-block the
+  // ScheduledGroup wipe.
+  await db.attendance.deleteMany({})
+  await db.moduleEnrollment.deleteMany({})
+  await db.enrollment.deleteMany({})
+  await db.teacherAssignment.deleteMany({})
   await db.moduleSchedule.deleteMany({})
   await db.scheduledGroup.deleteMany({})
   await db.courseModule.deleteMany({})

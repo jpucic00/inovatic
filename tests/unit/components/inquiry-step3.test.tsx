@@ -17,6 +17,8 @@ function makeGroup(id: string, name: string): ActiveGroup {
     id,
     name,
     dayOfWeek: 'Ponedjeljak',
+    dateStart: null,
+    dateEnd: null,
     startTime: '17:00',
     endTime: '18:00',
     availableSpots: 5,

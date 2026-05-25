@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
-import { computeExpectedSessions, fromDateKey, toDateKey } from '@/lib/session-dates'
+import {
+  computeExpectedSessions,
+  computeRadionicaSessions,
+  fromDateKey,
+  toDateKey,
+} from '@/lib/session-dates'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import {
   bulkMarkSessionSchema,
@@ -30,7 +35,10 @@ export type AttendanceRecord = {
 type GroupAttendance = {
   groupId: string
   schoolYear: string
+  isCustom: boolean
   dayOfWeek: string | null
+  dateStart: string | null
+  dateEnd: string | null
   startTime: string | null
   endTime: string | null
   expectedSessions: string[] // YYYY-MM-DD, ascending
@@ -55,31 +63,39 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
       id: true,
       schoolYear: true,
       dayOfWeek: true,
+      dateStart: true,
+      dateEnd: true,
       startTime: true,
       endTime: true,
       courseId: true,
+      course: { select: { isCustom: true } },
     },
   })
 
   const schoolYear = group.schoolYear
+  const isCustom = group.course.isCustom
 
   const [schedules, holidayDates] = await Promise.all([
-    db.moduleSchedule.findMany({
-      where: { schoolYear, module: { courseId: group.courseId } },
-      select: { startDate: true, endDate: true },
-    }),
+    isCustom
+      ? Promise.resolve([])
+      : db.moduleSchedule.findMany({
+          where: { schoolYear, module: { courseId: group.courseId } },
+          select: { startDate: true, endDate: true },
+        }),
     loadHolidayDateKeys(schoolYear),
   ])
-  const moduleWindows = schedules.map((s) => ({
-    startDate: s.startDate,
-    endDate: s.endDate,
-  }))
 
-  const expectedDates = computeExpectedSessions({
-    dayOfWeek: group.dayOfWeek,
-    moduleWindows,
-    holidayDates,
-  })
+  const expectedDates = isCustom
+    ? computeRadionicaSessions({
+        dateStart: group.dateStart,
+        dateEnd: group.dateEnd,
+        holidayDates,
+      })
+    : computeExpectedSessions({
+        dayOfWeek: group.dayOfWeek,
+        moduleWindows: schedules.map((s) => ({ startDate: s.startDate, endDate: s.endDate })),
+        holidayDates,
+      })
   const expectedSessions = expectedDates.map(toDateKey)
   const expectedSet = new Set(expectedSessions)
 
@@ -129,7 +145,10 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
   return {
     groupId: group.id,
     schoolYear,
+    isCustom,
     dayOfWeek: group.dayOfWeek,
+    dateStart: group.dateStart,
+    dateEnd: group.dateEnd,
     startTime: group.startTime,
     endTime: group.endTime,
     expectedSessions,

@@ -122,7 +122,8 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
     courseId,
     locationId,
     name,
-    date,
+    dateStart,
+    dateEnd,
     dayOfWeek,
     startTime,
     endTime,
@@ -139,7 +140,8 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
           courseId,
           locationId,
           name: name || null,
-          date: date || null,
+          dateStart: dateStart || null,
+          dateEnd: dateEnd || null,
           dayOfWeek: dayOfWeek || null,
           startTime,
           endTime,
@@ -205,7 +207,7 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
   const parsed = updateGroupSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
-  const { id, courseId, locationId, name, date, dayOfWeek, startTime, endTime, maxStudents, enrollmentStart, enrollmentEnd, teacherIds } = parsed.data
+  const { id, courseId, locationId, name, dateStart, dateEnd, dayOfWeek, startTime, endTime, maxStudents, enrollmentStart, enrollmentEnd, teacherIds } = parsed.data
 
   const blocked = await archivedGroupError(id)
   if (blocked) return blocked
@@ -218,7 +220,8 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
           ...(courseId !== undefined && { courseId }),
           ...(locationId !== undefined && { locationId }),
           ...(name !== undefined && { name: name || null }),
-          ...(date !== undefined && { date: date || null }),
+          ...(dateStart !== undefined && { dateStart: dateStart || null }),
+          ...(dateEnd !== undefined && { dateEnd: dateEnd || null }),
           ...(dayOfWeek !== undefined && { dayOfWeek: dayOfWeek || null }),
           ...(startTime !== undefined && { startTime: startTime || null }),
           ...(endTime !== undefined && { endTime: endTime || null }),

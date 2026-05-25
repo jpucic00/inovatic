@@ -13,7 +13,10 @@ export default async function TeacherGroupDolazakPage({
   return (
     <AttendanceMarker
       groupId={data.groupId}
+      isCustom={data.isCustom}
       dayOfWeek={data.dayOfWeek}
+      dateStart={data.dateStart}
+      dateEnd={data.dateEnd}
       startTime={data.startTime}
       endTime={data.endTime}
       expectedSessions={data.expectedSessions}

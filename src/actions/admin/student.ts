@@ -21,6 +21,7 @@ import {
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 import { AccountCredentialsEmail } from '../../../emails/account-credentials'
+import { formatGroupSchedule } from '@/lib/format'
 import type { PaginatedResult } from './inquiry'
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
@@ -104,6 +105,8 @@ type CoreResult = {
     id: string
     name: string | null
     dayOfWeek: string | null
+    dateStart: string | null
+    dateEnd: string | null
     startTime: string | null
     endTime: string | null
     schoolYear: string
@@ -382,12 +385,14 @@ async function sendInquiryCredentialsEmail(
   if (!process.env.RESEND_API_KEY || !core.group) return
 
   const childName = `${inquiry.childFirstName} ${inquiry.childLastName}`.trim()
-  const schedule = [
-    core.group.dayOfWeek,
-    core.group.startTime ? `${core.group.startTime}–${core.group.endTime ?? ''}` : null,
-  ]
-    .filter(Boolean)
-    .join(', ')
+  const schedule = formatGroupSchedule({
+    isCustom: core.group.course.isCustom,
+    dayOfWeek: core.group.dayOfWeek,
+    dateStart: core.group.dateStart,
+    dateEnd: core.group.dateEnd,
+    startTime: core.group.startTime,
+    endTime: core.group.endTime,
+  })
 
   await resend.emails.send({
     from: FROM_EMAIL,
@@ -455,12 +460,14 @@ export async function createStudentManually(
       process.env.RESEND_API_KEY
     ) {
       const childName = `${data.firstName} ${data.lastName}`.trim()
-      const schedule = [
-        core.group.dayOfWeek,
-        core.group.startTime ? `${core.group.startTime}–${core.group.endTime ?? ''}` : null,
-      ]
-        .filter(Boolean)
-        .join(', ')
+      const schedule = formatGroupSchedule({
+        isCustom: core.group.course.isCustom,
+        dayOfWeek: core.group.dayOfWeek,
+        dateStart: core.group.dateStart,
+        dateEnd: core.group.dateEnd,
+        startTime: core.group.startTime,
+        endTime: core.group.endTime,
+      })
 
       await resend.emails.send({
         from: FROM_EMAIL,

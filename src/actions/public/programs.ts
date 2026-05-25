@@ -8,6 +8,8 @@ export type ActiveGroup = {
   id: string
   name: string | null
   dayOfWeek: string | null
+  dateStart: string | null
+  dateEnd: string | null
   startTime: string | null
   endTime: string | null
   availableSpots: number
@@ -64,6 +66,8 @@ function toActiveGroup(g: GroupRow, now: Date): ActiveGroup | null {
     id: g.id,
     name: g.name,
     dayOfWeek: g.dayOfWeek,
+    dateStart: g.dateStart,
+    dateEnd: g.dateEnd,
     startTime: g.startTime,
     endTime: g.endTime,
     availableSpots,

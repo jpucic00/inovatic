@@ -6,6 +6,7 @@ import type { UseFormRegister, FieldErrors, UseFormSetValue, UseFormGetValues } 
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import type { ActiveProgram } from '@/actions/public/programs'
 import { GRADE_VALUES, GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
+import { formatGroupSchedule } from '@/lib/format'
 import { FieldError } from './FieldError'
 
 interface Props {
@@ -33,11 +34,18 @@ const GRADE_TO_LEVEL: Record<Grade, string> = {
   '8': 'SLR_4',
 }
 
-function formatGroupLabel(g: ActiveProgram['groups'][number]): string {
+function formatGroupLabel(g: ActiveProgram['groups'][number], isCustom: boolean): string {
   const parts: string[] = []
   if (g.name) parts.push(g.name)
-  if (g.dayOfWeek) parts.push(g.dayOfWeek)
-  if (g.startTime) parts.push(g.startTime + (g.endTime ? `–${g.endTime}` : ''))
+  const schedule = formatGroupSchedule({
+    isCustom,
+    dayOfWeek: g.dayOfWeek,
+    dateStart: g.dateStart,
+    dateEnd: g.dateEnd,
+    startTime: g.startTime,
+    endTime: g.endTime,
+  })
+  if (schedule) parts.push(schedule)
   if (g.isFull) {
     parts.push('(Popunjeno)')
   } else {
@@ -116,7 +124,7 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
             if (preselectedCourseId) {
               return p.groups.map((g) => (
                 <option key={g.id} value={g.isFull ? '' : `${p.id}|${g.id}`} disabled={g.isFull}>
-                  {formatGroupLabel(g)}
+                  {formatGroupLabel(g, p.isCustom)}
                 </option>
               ))
             }
@@ -124,7 +132,7 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
               <optgroup key={p.id} label={p.isCustom ? p.title : `${p.title} (${p.ageMin}–${p.ageMax} god.)`}>
                 {p.groups.map((g) => (
                   <option key={g.id} value={g.isFull ? '' : `${p.id}|${g.id}`} disabled={g.isFull}>
-                    {formatGroupLabel(g)}
+                    {formatGroupLabel(g, p.isCustom)}
                   </option>
                 ))}
               </optgroup>

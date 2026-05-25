@@ -110,38 +110,58 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
             <input id="create-name" {...register('name')} className={adminInputClass} placeholder="npr. Grupa A, Ujutro" />
             {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              {isRadionica ? (
-                <>
-                  <label htmlFor="create-date" className="block text-sm font-medium text-gray-700 mb-1">Datum *</label>
-                  <Controller name="date" control={control} render={({ field }) => <DateInput id="create-date" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
-                  {errors.date && <p className="text-xs text-red-600 mt-1">{errors.date.message}</p>}
-                </>
-              ) : (
-                <>
-                  <label htmlFor="create-dayOfWeek" className="block text-sm font-medium text-gray-700 mb-1">Dan *</label>
-                  <select id="create-dayOfWeek" {...register('dayOfWeek')} className={adminSelectClass}>
-                    <option value="">–</option>
-                    {DAYS_HR.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                  {errors.dayOfWeek && <p className="text-xs text-red-600 mt-1">{errors.dayOfWeek.message}</p>}
-                </>
-              )}
+          {isRadionica ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="create-dateStart" className="block text-sm font-medium text-gray-700 mb-1">Početak *</label>
+                  <Controller name="dateStart" control={control} render={({ field }) => <DateInput id="create-dateStart" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
+                  {errors.dateStart && <p className="text-xs text-red-600 mt-1">{errors.dateStart.message}</p>}
+                </div>
+                <div>
+                  <label htmlFor="create-dateEnd" className="block text-sm font-medium text-gray-700 mb-1">Kraj *</label>
+                  <Controller name="dateEnd" control={control} render={({ field }) => <DateInput id="create-dateEnd" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
+                  {errors.dateEnd && <p className="text-xs text-red-600 mt-1">{errors.dateEnd.message}</p>}
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">Radionica se održava svaki dan u rasponu u istom terminu.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="create-startTime" className="block text-sm font-medium text-gray-700 mb-1">Vrijeme početka *</label>
+                  <input id="create-startTime" {...register('startTime')} className={adminInputClass} placeholder="19:00" />
+                  {errors.startTime && <p className="text-xs text-red-600 mt-1">{errors.startTime.message}</p>}
+                </div>
+                <div>
+                  <label htmlFor="create-endTime" className="block text-sm font-medium text-gray-700 mb-1">Vrijeme kraja *</label>
+                  <input id="create-endTime" {...register('endTime')} className={adminInputClass} placeholder="20:30" />
+                  {errors.endTime && <p className="text-xs text-red-600 mt-1">{errors.endTime.message}</p>}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label htmlFor="create-dayOfWeek" className="block text-sm font-medium text-gray-700 mb-1">Dan *</label>
+                <select id="create-dayOfWeek" {...register('dayOfWeek')} className={adminSelectClass}>
+                  <option value="">–</option>
+                  {DAYS_HR.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+                {errors.dayOfWeek && <p className="text-xs text-red-600 mt-1">{errors.dayOfWeek.message}</p>}
+              </div>
+              <div>
+                <label htmlFor="create-startTime" className="block text-sm font-medium text-gray-700 mb-1">Početak *</label>
+                <input id="create-startTime" {...register('startTime')} className={adminInputClass} placeholder="19:00" />
+                {errors.startTime && <p className="text-xs text-red-600 mt-1">{errors.startTime.message}</p>}
+              </div>
+              <div>
+                <label htmlFor="create-endTime" className="block text-sm font-medium text-gray-700 mb-1">Kraj *</label>
+                <input id="create-endTime" {...register('endTime')} className={adminInputClass} placeholder="20:30" />
+                {errors.endTime && <p className="text-xs text-red-600 mt-1">{errors.endTime.message}</p>}
+              </div>
             </div>
-            <div>
-              <label htmlFor="create-startTime" className="block text-sm font-medium text-gray-700 mb-1">Početak *</label>
-              <input id="create-startTime" {...register('startTime')} className={adminInputClass} placeholder="19:00" />
-              {errors.startTime && <p className="text-xs text-red-600 mt-1">{errors.startTime.message}</p>}
-            </div>
-            <div>
-              <label htmlFor="create-endTime" className="block text-sm font-medium text-gray-700 mb-1">Kraj *</label>
-              <input id="create-endTime" {...register('endTime')} className={adminInputClass} placeholder="20:30" />
-              {errors.endTime && <p className="text-xs text-red-600 mt-1">{errors.endTime.message}</p>}
-            </div>
-          </div>
+          )}
           <div>
             <label htmlFor="create-maxStudents" className="block text-sm font-medium text-gray-700 mb-1">Max polaznika</label>
             <input id="create-maxStudents" {...register('maxStudents')} type="number" min={1} max={50} className={adminInputClass} />

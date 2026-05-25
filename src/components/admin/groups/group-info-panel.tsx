@@ -20,7 +20,8 @@ type GroupForEdit = {
   courseId: string
   locationId: string
   name: string | null
-  date: string | null
+  dateStart: string | null
+  dateEnd: string | null
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null
@@ -200,11 +201,15 @@ function TimeSlot({ startTime, endTime }: Readonly<{ startTime: string | null; e
 }
 
 function TerminValue({ group }: Readonly<{ group: GroupForEdit }>) {
-  if (group.course.isCustom && group.date) {
+  if (group.course.isCustom && group.dateStart && group.dateEnd) {
+    const rangeLabel =
+      group.dateStart === group.dateEnd
+        ? formatDate(group.dateStart)
+        : `${formatDate(group.dateStart)} – ${formatDate(group.dateEnd)}`
     return (
       <span className="flex items-center gap-1">
         <Calendar className="w-3.5 h-3.5 text-gray-400" />
-        {formatDate(group.date)}
+        {rangeLabel}
         <TimeSlot startTime={group.startTime} endTime={group.endTime} />
       </span>
     )
@@ -248,7 +253,8 @@ function GroupInfoEdit({
       courseId: group.courseId,
       locationId: group.locationId,
       name: group.name ?? '',
-      date: group.date ?? '',
+      dateStart: group.dateStart ?? '',
+      dateEnd: group.dateEnd ?? '',
       dayOfWeek: group.dayOfWeek ?? '',
       startTime: group.startTime ?? '',
       endTime: group.endTime ?? '',
@@ -305,38 +311,58 @@ function GroupInfoEdit({
           <input id="info-name" {...register('name')} className={adminInputClass} placeholder="npr. Grupa A, Ujutro" />
           {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            {isRadionica ? (
-              <>
-                <label htmlFor="info-date" className="block text-sm font-medium text-gray-700 mb-1">Datum *</label>
-                <Controller name="date" control={control} render={({ field }) => <DateInput id="info-date" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
-                {errors.date && <p className="text-xs text-red-600 mt-1">{errors.date.message}</p>}
-              </>
-            ) : (
-              <>
-                <label htmlFor="info-dayOfWeek" className="block text-sm font-medium text-gray-700 mb-1">Dan *</label>
-                <select id="info-dayOfWeek" {...register('dayOfWeek')} className={adminSelectClass}>
-                  <option value="">–</option>
-                  {DAYS_HR.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-                {errors.dayOfWeek && <p className="text-xs text-red-600 mt-1">{errors.dayOfWeek.message}</p>}
-              </>
-            )}
+        {isRadionica ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="info-dateStart" className="block text-sm font-medium text-gray-700 mb-1">Početak *</label>
+                <Controller name="dateStart" control={control} render={({ field }) => <DateInput id="info-dateStart" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
+                {errors.dateStart && <p className="text-xs text-red-600 mt-1">{errors.dateStart.message}</p>}
+              </div>
+              <div>
+                <label htmlFor="info-dateEnd" className="block text-sm font-medium text-gray-700 mb-1">Kraj *</label>
+                <Controller name="dateEnd" control={control} render={({ field }) => <DateInput id="info-dateEnd" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
+                {errors.dateEnd && <p className="text-xs text-red-600 mt-1">{errors.dateEnd.message}</p>}
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">Radionica se održava svaki dan u rasponu u istom terminu.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="info-startTime" className="block text-sm font-medium text-gray-700 mb-1">Vrijeme početka *</label>
+                <input id="info-startTime" {...register('startTime')} className={adminInputClass} placeholder="19:00" />
+                {errors.startTime && <p className="text-xs text-red-600 mt-1">{errors.startTime.message}</p>}
+              </div>
+              <div>
+                <label htmlFor="info-endTime" className="block text-sm font-medium text-gray-700 mb-1">Vrijeme kraja *</label>
+                <input id="info-endTime" {...register('endTime')} className={adminInputClass} placeholder="20:30" />
+                {errors.endTime && <p className="text-xs text-red-600 mt-1">{errors.endTime.message}</p>}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label htmlFor="info-dayOfWeek" className="block text-sm font-medium text-gray-700 mb-1">Dan *</label>
+              <select id="info-dayOfWeek" {...register('dayOfWeek')} className={adminSelectClass}>
+                <option value="">–</option>
+                {DAYS_HR.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              {errors.dayOfWeek && <p className="text-xs text-red-600 mt-1">{errors.dayOfWeek.message}</p>}
+            </div>
+            <div>
+              <label htmlFor="info-startTime" className="block text-sm font-medium text-gray-700 mb-1">Početak *</label>
+              <input id="info-startTime" {...register('startTime')} className={adminInputClass} placeholder="19:00" />
+              {errors.startTime && <p className="text-xs text-red-600 mt-1">{errors.startTime.message}</p>}
+            </div>
+            <div>
+              <label htmlFor="info-endTime" className="block text-sm font-medium text-gray-700 mb-1">Kraj *</label>
+              <input id="info-endTime" {...register('endTime')} className={adminInputClass} placeholder="20:30" />
+              {errors.endTime && <p className="text-xs text-red-600 mt-1">{errors.endTime.message}</p>}
+            </div>
           </div>
-          <div>
-            <label htmlFor="info-startTime" className="block text-sm font-medium text-gray-700 mb-1">Početak *</label>
-            <input id="info-startTime" {...register('startTime')} className={adminInputClass} placeholder="19:00" />
-            {errors.startTime && <p className="text-xs text-red-600 mt-1">{errors.startTime.message}</p>}
-          </div>
-          <div>
-            <label htmlFor="info-endTime" className="block text-sm font-medium text-gray-700 mb-1">Kraj *</label>
-            <input id="info-endTime" {...register('endTime')} className={adminInputClass} placeholder="20:30" />
-            {errors.endTime && <p className="text-xs text-red-600 mt-1">{errors.endTime.message}</p>}
-          </div>
-        </div>
+        )}
         <div>
           <label htmlFor="info-maxStudents" className="block text-sm font-medium text-gray-700 mb-1">Max polaznika</label>
           <input id="info-maxStudents" {...register('maxStudents')} type="number" min={1} max={50} className={adminInputClass} />

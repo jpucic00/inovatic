@@ -13,9 +13,9 @@ import {
 
 interface GroupOption {
   groupName: string
-  dayOfWeek: string
-  startTime: string
-  endTime: string
+  /** Pre-formatted schedule string, e.g. "Ponedjeljak, 17:00–18:30" for standard
+   * programs or "15.07.2026. – 21.07.2026., 09:00–11:00" for radionice. */
+  schedule: string
   locationName: string
 }
 
@@ -51,7 +51,7 @@ export function ScheduleOptionsEmail({
               <Text style={optionText}>
                 <strong>{opt.groupName}</strong>
                 <br />
-                {opt.dayOfWeek}, {opt.startTime}–{opt.endTime}
+                {opt.schedule}
                 <br />
                 📍 {opt.locationName}
               </Text>

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { DAYS_HR, formatChildName, formatDate } from '@/lib/format'
+import {
+  DAYS_HR,
+  formatChildName,
+  formatDate,
+  formatDateKey,
+  formatGroupSchedule,
+} from '@/lib/format'
 
 const utc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d, 12))
 
@@ -57,6 +63,73 @@ describe('formatChildName', () => {
 
   it('returns fallback when both whitespace-only', () => {
     expect(formatChildName({ childFirstName: '   ', childLastName: '\t' })).toBe('–')
+  })
+})
+
+describe('formatDateKey', () => {
+  it('formats a YYYY-MM-DD key into dd.MM.yyyy.', () => {
+    expect(formatDateKey('2026-07-15')).toBe('15.07.2026.')
+  })
+
+  it('passes through non-key strings unchanged', () => {
+    expect(formatDateKey('')).toBe('')
+    expect(formatDateKey('not-a-date')).toBe('not-a-date')
+  })
+})
+
+describe('formatGroupSchedule', () => {
+  it('renders a date range with time for radionice', () => {
+    expect(
+      formatGroupSchedule({
+        isCustom: true,
+        dateStart: '2026-07-15',
+        dateEnd: '2026-07-21',
+        startTime: '09:00',
+        endTime: '11:00',
+      }),
+    ).toBe('15.07.2026. – 21.07.2026. · 09:00–11:00')
+  })
+
+  it('collapses to a single date when start === end', () => {
+    expect(
+      formatGroupSchedule({
+        isCustom: true,
+        dateStart: '2026-07-15',
+        dateEnd: '2026-07-15',
+        startTime: '09:00',
+        endTime: '11:00',
+      }),
+    ).toBe('15.07.2026. · 09:00–11:00')
+  })
+
+  it('renders the weekday + time for standard programs', () => {
+    expect(
+      formatGroupSchedule({
+        isCustom: false,
+        dayOfWeek: 'Ponedjeljak',
+        startTime: '17:00',
+        endTime: '18:30',
+      }),
+    ).toBe('Ponedjeljak · 17:00–18:30')
+  })
+
+  it('falls back to weekday when isCustom but no date range supplied', () => {
+    expect(
+      formatGroupSchedule({
+        isCustom: true,
+        dayOfWeek: 'Ponedjeljak',
+        startTime: '17:00',
+        endTime: '18:30',
+      }),
+    ).toBe('Ponedjeljak · 17:00–18:30')
+  })
+
+  it('emits just the time when no weekday or date is set', () => {
+    expect(formatGroupSchedule({ startTime: '17:00', endTime: '18:30' })).toBe('17:00–18:30')
+  })
+
+  it('emits an empty string when no parts are supplied', () => {
+    expect(formatGroupSchedule({})).toBe('')
   })
 })
 

@@ -14,17 +14,21 @@ import {
 import { CalendarDays } from 'lucide-react'
 import { sendScheduleOptions, getGroupsForCourse } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
+import { formatGroupSchedule } from '@/lib/format'
 import { toast } from 'sonner'
 
 interface GroupOption {
   id: string
   name: string | null
   dayOfWeek: string | null
+  dateStart: string | null
+  dateEnd: string | null
   startTime: string | null
   endTime: string | null
   availableSpots: number
   isFull: boolean
   location: { name: string }
+  course: { isCustom: boolean }
 }
 
 interface CourseOption {
@@ -68,11 +72,14 @@ export function SendScheduleDialog({
           id: sg.id,
           name: sg.name,
           dayOfWeek: sg.dayOfWeek,
+          dateStart: sg.dateStart,
+          dateEnd: sg.dateEnd,
           startTime: sg.startTime,
           endTime: sg.endTime,
           availableSpots: sg.availableSpots,
           isFull: sg.isFull,
           location: { name: sg.location.name },
+          course: { isCustom: sg.course.isCustom },
         })),
       )
     } finally {
@@ -154,10 +161,15 @@ export function SendScheduleDialog({
           {!loadingGroups && loadedGroups.length > 0 && (
             loadedGroups.map((g) => {
               const checked = selectedIds.includes(g.id)
-              const timeRange = g.startTime
-                ? `${g.startTime}–${g.endTime ?? ''}`
-                : null
-              const label = [g.name, g.dayOfWeek, timeRange, g.location.name]
+              const schedule = formatGroupSchedule({
+                isCustom: g.course.isCustom,
+                dayOfWeek: g.dayOfWeek,
+                dateStart: g.dateStart,
+                dateEnd: g.dateEnd,
+                startTime: g.startTime,
+                endTime: g.endTime,
+              })
+              const label = [g.name, schedule || null, g.location.name]
                 .filter(Boolean)
                 .join(' · ')
               return (

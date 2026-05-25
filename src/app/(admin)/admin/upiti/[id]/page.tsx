@@ -108,6 +108,8 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     id: string
     name: string | null
     dayOfWeek: string | null
+    dateStart: string | null
+    dateEnd: string | null
     startTime: string | null
     endTime: string | null
     availableSpots: number
@@ -115,7 +117,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     location: { name: string }
     course: {
       title: string
-      isCustom?: boolean
+      isCustom: boolean
       modules?: {
         id: string
         title: string
@@ -127,6 +129,8 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     id: sg.id,
     name: sg.name,
     dayOfWeek: sg.dayOfWeek,
+    dateStart: sg.dateStart,
+    dateEnd: sg.dateEnd,
     startTime: sg.startTime,
     endTime: sg.endTime,
     availableSpots: sg.availableSpots,
