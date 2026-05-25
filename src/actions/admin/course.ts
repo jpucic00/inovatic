@@ -7,12 +7,18 @@ import { createCourseSchema } from '@/lib/validators/admin/course'
 import type { CreateCourseInput } from '@/lib/validators/admin/course'
 import type { AdminActionResult } from '@/lib/action-types'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
+import { archivedYearError } from '@/lib/school-year-guard'
 
 export async function getCourses() {
   await requireAdmin()
   const year = await getSelectedSchoolYear()
 
   return db.course.findMany({
+    // Standard SLR courses are global (schoolYear = null) and always appear.
+    // Radionice are year-scoped — only those stamped with the selected year.
+    where: {
+      OR: [{ isCustom: false }, { schoolYear: year }],
+    },
     orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
     select: {
       id: true,
@@ -57,6 +63,10 @@ export async function getCourses() {
 export async function createCourse(data: CreateCourseInput): Promise<AdminActionResult> {
   await requireAdmin()
 
+  const year = await getSelectedSchoolYear()
+  const archived = archivedYearError(year)
+  if (archived) return archived
+
   const parsed = createCourseSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
@@ -85,6 +95,7 @@ export async function createCourse(data: CreateCourseInput): Promise<AdminAction
         price: price ?? null,
         imageUrl: imageUrl || null,
         isCustom: true,
+        schoolYear: year,
         sortOrder: 99,
       },
     })

@@ -82,6 +82,7 @@ type CreateCourseOverrides = {
   slug?: string
   description?: string
   isCustom?: boolean
+  schoolYear?: string | null
   ageMin?: number
   ageMax?: number
 }
@@ -96,6 +97,7 @@ export async function createCourse(overrides: CreateCourseOverrides = {}) {
       ageMin: overrides.ageMin ?? 6,
       ageMax: overrides.ageMax ?? 14,
       isCustom: overrides.isCustom ?? false,
+      schoolYear: overrides.schoolYear ?? null,
     },
   })
 }

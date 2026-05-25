@@ -79,6 +79,7 @@ model User {
   authoredComments     StudentComment[]   @relation("CommentAuthor")
   studentComments      StudentComment[]   @relation("CommentStudent")
   recordedAttendances  Attendance[]       @relation("AttendanceRecorder")
+  createdHolidays      SchoolYearHoliday[] @relation("HolidayCreator")
 }
 
 model Course {
@@ -97,6 +98,8 @@ model Course {
   imageUrl    String?
   sortOrder   Int          @default(0)
   isCustom    Boolean      @default(false)
+  // Set on custom radionice (year-scoped); null on standard SLR (global).
+  schoolYear  String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -124,8 +127,8 @@ model ModuleSchedule {
   id         String    @id @default(cuid())
   moduleId   String
   schoolYear String
-  startDate  DateTime?
-  endDate    DateTime?
+  startDate  DateTime? @db.Date
+  endDate    DateTime? @db.Date
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -140,6 +143,27 @@ model ModuleSchedule {
 model SchoolYear {
   label     String   @id
   createdAt DateTime @default(now())
+
+  holidays SchoolYearHoliday[]
+}
+
+// Per-school-year days when no workshops happen — public holidays, school
+// breaks, ad-hoc closures. Excluded from `computeExpectedSessions`, so
+// attendance never shows a slot for them.
+model SchoolYearHoliday {
+  id          String   @id @default(cuid())
+  schoolYear  String
+  date        DateTime @db.Date
+  name        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  schoolYearRef SchoolYear @relation(fields: [schoolYear], references: [label], onDelete: Cascade)
+  createdBy     User?      @relation("HolidayCreator", fields: [createdById], references: [id])
+
+  @@unique([schoolYear, date])
+  @@index([schoolYear])
 }
 
 model Location {
