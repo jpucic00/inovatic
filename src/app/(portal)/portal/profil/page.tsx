@@ -29,7 +29,6 @@ export default async function ProfilePage() {
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">Učenik</h2>
         <dl>
           <Row label="Korisničko ime" value={profile.username} />
-          <Row label="E-mail" value={profile.email} />
           <Row label="Telefon" value={profile.phone} />
           <Row label="Datum rođenja" value={profile.dateOfBirth} />
           <Row label="Škola" value={profile.childSchool} />

@@ -6,7 +6,6 @@ import { requireStudent } from '@/lib/auth-guard'
 type StudentProfile = {
   firstName: string
   lastName: string
-  email: string
   username: string | null
   phone: string | null
   dateOfBirth: string | null
@@ -24,7 +23,6 @@ export async function getMyProfile(): Promise<StudentProfile> {
     select: {
       firstName: true,
       lastName: true,
-      email: true,
       username: true,
       phone: true,
       dateOfBirth: true,
