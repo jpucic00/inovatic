@@ -32,6 +32,7 @@ export type StudentRow = {
   firstName: string
   lastName: string
   username: string | null
+  dateOfBirth: string | null
   createdAt: Date
   enrollments: {
     id: string
@@ -641,6 +642,7 @@ export async function getStudents(
         firstName: true,
         lastName: true,
         username: true,
+        dateOfBirth: true,
         createdAt: true,
         enrollments: {
           include: {

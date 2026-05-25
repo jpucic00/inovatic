@@ -20,15 +20,17 @@ const columns: ColumnDef<StudentRow>[] = [
     ),
   },
   {
-    key: 'username',
-    header: 'Korisničko ime',
+    key: 'dateOfBirth',
+    header: 'Datum rođenja',
     sortable: true,
-    sortValue: (row) => row.username ?? '',
-    cell: (row) => (
-      <span className="font-mono text-sm text-gray-600">
-        {row.username ?? '—'}
-      </span>
-    ),
+    sortValue: (row) => row.dateOfBirth ?? '',
+    cell: (row) => {
+      const iso = row.dateOfBirth
+      if (!iso) return <span className="text-gray-400">—</span>
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+      if (!m) return iso
+      return `${m[3]}.${m[2]}.${m[1]}.`
+    },
   },
   {
     key: 'groups',
@@ -53,7 +55,7 @@ const columns: ColumnDef<StudentRow>[] = [
   },
   {
     key: 'createdAt',
-    header: 'Datum',
+    header: 'Datum kreiranja',
     sortable: true,
     sortValue: (row) => row.createdAt.getTime(),
     cell: (row) => {
