@@ -6,7 +6,6 @@ import { isArchivedYear } from '@/lib/school-year'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 import { listHolidays } from '@/actions/admin/holidays'
 import {
-  ACTIVE_WEEKDAYS,
   computeWeekdaySummary,
   type CourseWithModules,
 } from '@/lib/group-end-dates'
@@ -110,7 +109,6 @@ export default async function SchoolYearPage() {
   })
 
   const holidayCount = holidays.length
-  const activeWeekdayCount = activeWeekdays.size
 
   return (
     <div className="space-y-8">
@@ -127,11 +125,6 @@ export default async function SchoolYearPage() {
         <div className="flex flex-wrap gap-3 pt-1 text-sm text-gray-600">
           <span className="rounded-md bg-gray-100 px-2.5 py-1">
             Praznika: <strong className="text-gray-900">{holidayCount}</strong>
-          </span>
-          <span className="rounded-md bg-gray-100 px-2.5 py-1">
-            Aktivnih dana u tjednu:{' '}
-            <strong className="text-gray-900">{activeWeekdayCount}</strong> /{' '}
-            {ACTIVE_WEEKDAYS.length}
           </span>
         </div>
       </header>
