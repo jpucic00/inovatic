@@ -12,6 +12,7 @@ import { ResetPasswordButton } from '@/components/admin/teachers/reset-password-
 import { DeleteTeacherDialog } from '@/components/admin/teachers/delete-teacher-dialog'
 import { TeacherAssignmentPanel } from '@/components/admin/teachers/teacher-assignment-panel'
 import { CopyTeacherCredentials } from '@/components/admin/teachers/copy-teacher-credentials'
+import { CopyButton } from '@/components/shared/copy-button'
 
 export const metadata: Metadata = { title: 'Admin – Nastavnik' }
 
@@ -86,26 +87,32 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
           <DetailRow
             label="E-mail"
             value={
-              <a
-                href={`mailto:${teacher.email}`}
-                className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
-              >
-                <Mail className="w-3.5 h-3.5" />
-                {teacher.email}
-              </a>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`mailto:${teacher.email}`}
+                  className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  {teacher.email}
+                </a>
+                <CopyButton value={teacher.email} label="e-mail" />
+              </div>
             }
           />
           {teacher.phone && (
             <DetailRow
               label="Telefon"
               value={
-                <a
-                  href={`tel:${teacher.phone}`}
-                  className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  {teacher.phone}
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`tel:${teacher.phone}`}
+                    className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    {teacher.phone}
+                  </a>
+                  <CopyButton value={teacher.phone} label="telefon" />
+                </div>
               }
             />
           )}

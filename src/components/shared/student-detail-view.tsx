@@ -15,6 +15,7 @@ import { DeleteStudentDialog } from '@/components/admin/students/delete-student-
 import { AddEnrollmentDialog } from '@/components/admin/students/add-enrollment-dialog'
 import { ManageEnrollmentModules } from '@/components/admin/students/manage-enrollment-modules'
 import { CopyCredentials } from './copy-credentials'
+import { CopyButton } from './copy-button'
 
 type StudentWithRelations = NonNullable<Awaited<ReturnType<typeof getStudent>>>
 
@@ -151,13 +152,16 @@ export function StudentDetailView({
               <DetailRow
                 label="E-mail roditelja"
                 value={
-                  <a
-                    href={`mailto:${student.parentEmail}`}
-                    className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    {student.parentEmail}
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`mailto:${student.parentEmail}`}
+                      className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      {student.parentEmail}
+                    </a>
+                    <CopyButton value={student.parentEmail} label="e-mail" />
+                  </div>
                 }
               />
             )}
@@ -165,13 +169,16 @@ export function StudentDetailView({
               <DetailRow
                 label="Telefon roditelja"
                 value={
-                  <a
-                    href={`tel:${student.parentPhone}`}
-                    className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    {student.parentPhone}
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`tel:${student.parentPhone}`}
+                      className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      {student.parentPhone}
+                    </a>
+                    <CopyButton value={student.parentPhone} label="telefon" />
+                  </div>
                 }
               />
             )}
