@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { assignLanes } from '@/lib/calendar-lanes'
 
 const DAYS = ['Ponedjeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota', 'Nedjelja']
 const DAY_SHORT = ['Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub', 'Ned']
@@ -229,13 +230,26 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
                     const dayGroups = scheduled.filter((g) => g.effectiveDay === day)
                     const hasAny = allScheduled.some((g) => g.effectiveDay === day)
 
+                    const dayGroupsWithBounds = dayGroups.map((g) => {
+                      const start = parseTime(g.startTime!)
+                      const end = g.endTime ? parseTime(g.endTime) : start + DEFAULT_DURATION
+                      return { group: g, start, end }
+                    })
+                    const layouts = assignLanes(
+                      dayGroupsWithBounds.map(({ start, end }) => ({
+                        startMinutes: start,
+                        endMinutes: end,
+                      })),
+                    )
+
                     return (
                       <div key={day} className={`relative ${hasAny ? '' : 'bg-gray-50/50'}`}>
-                        {dayGroups.map((g) => {
-                          const start = parseTime(g.startTime!)
-                          const end = g.endTime ? parseTime(g.endTime) : start + DEFAULT_DURATION
+                        {dayGroupsWithBounds.map(({ group: g, start, end }, idx) => {
                           const top = (start - minTime) * PX_PER_MIN + BODY_PAD
                           const height = Math.max((end - start) * PX_PER_MIN - 2, 16)
+                          const { laneIndex, laneCount } = layouts[idx]
+                          const widthPct = 100 / laneCount
+                          const leftPct = laneIndex * widthPct
                           const color = courseColor(g.course.level, g.course.isCustom)
                           const label = g.name ?? g.course.title
                           const dateLabel = g.course.isCustom && g.date ? formatDate(g.date) : null
@@ -249,8 +263,13 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
                           return (
                             <div
                               key={g.id}
-                              className={`absolute left-0.5 right-0.5 rounded border px-1 overflow-hidden ${color.bg} ${color.border}`}
-                              style={{ top, height }}
+                              className={`absolute rounded border px-1 overflow-hidden ${color.bg} ${color.border}`}
+                              style={{
+                                top,
+                                height,
+                                left: `calc(${leftPct}% + 2px)`,
+                                width: `calc(${widthPct}% - 4px)`,
+                              }}
                               title={titleText}
                             >
                               <p className={`text-[10px] font-semibold leading-tight truncate ${color.text}`}>
