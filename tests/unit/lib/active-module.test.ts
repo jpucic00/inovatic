@@ -1,148 +1,204 @@
 import { describe, expect, it } from 'vitest'
-import { getCurrentActiveModule } from '@/lib/active-module'
+import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
 
 const SCHOOL_YEAR = '2026/2027'
-const NOW = new Date('2026-10-15T12:00:00Z')
 
-type Mod = Parameters<typeof getCurrentActiveModule>[0][number]
+type Mod = Parameters<typeof getCurrentActiveModuleForGroup>[0]['modules'][number]
 
-const mkModule = (
+function mkModule(
   id: string,
   sortOrder: number,
   schedule: { startDate: Date | null; endDate: Date | null } | null,
-): Mod => ({
-  id,
-  title: id,
-  sortOrder,
-  schedules: schedule
-    ? [{ schoolYear: SCHOOL_YEAR, startDate: schedule.startDate, endDate: schedule.endDate }]
-    : [],
-})
+): Mod {
+  return {
+    id,
+    title: id,
+    sortOrder,
+    schedules: schedule
+      ? [
+          {
+            id: `${id}-sched`,
+            schoolYear: SCHOOL_YEAR,
+            startDate: schedule.startDate,
+            endDate: schedule.endDate,
+          },
+        ]
+      : [],
+  }
+}
 
 const utc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d))
 
-describe('getCurrentActiveModule — priority rules', () => {
-  it('rule 1: picks the currently-Aktivan window first (covers today)', () => {
-    const modules = [
-      mkModule('M1', 0, { startDate: utc(2026, 9, 1), endDate: utc(2026, 9, 30) }), // Završen
-      mkModule('M2', 1, { startDate: utc(2026, 10, 1), endDate: utc(2026, 10, 31) }), // Aktivan
-      mkModule('M3', 2, { startDate: utc(2026, 11, 1), endDate: utc(2026, 11, 30) }), // Nadolazi
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, NOW)?.id).toBe('M2')
+/**
+ * Helper for the typical four-module standard course shape. Module windows
+ * mirror the planner output for a 2026-09-01 kickoff so the resulting arcs
+ * have predictable per-weekday sessions.
+ */
+const STD_MODULES: Mod[] = [
+  mkModule('M1', 0, { startDate: utc(2026, 9, 1), endDate: utc(2026, 10, 19) }),
+  mkModule('M2', 1, { startDate: utc(2026, 10, 20), endDate: utc(2026, 12, 7) }),
+  mkModule('M3', 2, { startDate: utc(2026, 12, 8), endDate: utc(2027, 1, 25) }),
+  mkModule('M4', 3, { startDate: utc(2027, 1, 26), endDate: utc(2027, 3, 15) }),
+]
+
+describe('getCurrentActiveModuleForGroup', () => {
+  it('returns null for an empty module list (radionice)', () => {
+    expect(
+      getCurrentActiveModuleForGroup({
+        dayOfWeek: 'Srijeda',
+        modules: [],
+        schoolYear: SCHOOL_YEAR,
+        holidayDates: new Set(),
+        now: utc(2026, 10, 15),
+      }),
+    ).toBeNull()
   })
 
-  it('rule 2: falls back to the soonest-upcoming Nadolazi when no Aktivan', () => {
-    const modules = [
-      mkModule('M1', 0, { startDate: utc(2026, 8, 1), endDate: utc(2026, 8, 31) }), // Završen
-      mkModule('M2', 1, { startDate: utc(2026, 11, 1), endDate: utc(2026, 11, 30) }), // Nadolazi (later)
-      mkModule('M3', 2, { startDate: utc(2026, 10, 20), endDate: utc(2026, 10, 31) }), // Nadolazi (soonest)
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, NOW)?.id).toBe('M3')
+  it('picks the in-progress module when asOfDate is inside an arc entry', () => {
+    const result = getCurrentActiveModuleForGroup({
+      dayOfWeek: 'Srijeda',
+      modules: STD_MODULES,
+      schoolYear: SCHOOL_YEAR,
+      holidayDates: new Set(),
+      now: utc(2026, 11, 18), // Mid-Module-2 for Wed (M2 window Nov 4 - Dec 16)
+    })
+    expect(result?.id).toBe('M2')
   })
 
-  it('rule 3: falls back to most-recently-Završen when no Aktivan + no Nadolazi', () => {
-    const modules = [
-      mkModule('M1', 0, { startDate: utc(2026, 8, 1), endDate: utc(2026, 8, 31) }),
-      mkModule('M2', 1, { startDate: utc(2026, 9, 1), endDate: utc(2026, 9, 30) }), // most recent end
-      mkModule('M3', 2, { startDate: utc(2026, 7, 1), endDate: utc(2026, 7, 31) }),
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, NOW)?.id).toBe('M2')
+  it('picks the most-recently-completed module during off-session weeks', () => {
+    // Wed M1 lastSession = 14.10. Wed M2 firstSession = 21.10. On 16.10, no
+    // module is in progress for Wed — fall back to last completed.
+    const result = getCurrentActiveModuleForGroup({
+      dayOfWeek: 'Srijeda',
+      modules: STD_MODULES,
+      schoolYear: SCHOOL_YEAR,
+      holidayDates: new Set(),
+      now: utc(2026, 10, 16),
+    })
+    expect(result?.id).toBe('M1')
   })
 
-  it('rule 4: falls back to first-by-sortOrder when no schedules exist for the year', () => {
+  it('picks the next-enrolling module before the arc starts (pre-school-year)', () => {
+    const result = getCurrentActiveModuleForGroup({
+      dayOfWeek: 'Srijeda',
+      modules: STD_MODULES,
+      schoolYear: SCHOOL_YEAR,
+      holidayDates: new Set(),
+      now: utc(2026, 8, 15),
+    })
+    expect(result?.id).toBe('M1')
+  })
+
+  it('falls back to first-by-sortOrder when no schedules exist for the year', () => {
     const modules = [
       mkModule('M3', 2, null),
       mkModule('M1', 0, null),
       mkModule('M2', 1, null),
     ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, NOW)?.id).toBe('M1')
-  })
-})
-
-describe('getCurrentActiveModule — edge cases', () => {
-  it('returns null for empty module list', () => {
-    expect(getCurrentActiveModule([], SCHOOL_YEAR, NOW)).toBeNull()
-  })
-
-  it('all Nadolazi → first upcoming wins', () => {
-    const modules = [
-      mkModule('M1', 0, { startDate: utc(2026, 11, 15), endDate: utc(2026, 11, 30) }),
-      mkModule('M2', 1, { startDate: utc(2026, 11, 1), endDate: utc(2026, 11, 14) }),
-      mkModule('M3', 2, { startDate: utc(2026, 12, 1), endDate: utc(2026, 12, 31) }),
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, NOW)?.id).toBe('M2')
+    expect(
+      getCurrentActiveModuleForGroup({
+        dayOfWeek: 'Srijeda',
+        modules,
+        schoolYear: SCHOOL_YEAR,
+        holidayDates: new Set(),
+        now: utc(2026, 10, 15),
+      })?.id,
+    ).toBe('M1')
   })
 
-  it('all Završen → most recent wins', () => {
-    const modules = [
-      mkModule('M1', 0, { startDate: utc(2026, 1, 1), endDate: utc(2026, 1, 31) }),
-      mkModule('M2', 1, { startDate: utc(2026, 9, 1), endDate: utc(2026, 9, 30) }),
-      mkModule('M3', 2, { startDate: utc(2026, 5, 1), endDate: utc(2026, 5, 31) }),
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, NOW)?.id).toBe('M2')
+  it('falls back to first-by-sortOrder when dayOfWeek is null (radionica with modules — unusual but handled)', () => {
+    expect(
+      getCurrentActiveModuleForGroup({
+        dayOfWeek: null,
+        modules: STD_MODULES,
+        schoolYear: SCHOOL_YEAR,
+        holidayDates: new Set(),
+        now: utc(2026, 10, 15),
+      })?.id,
+    ).toBe('M1')
   })
 
-  it('Aktivan = today exactly equals startDate (boundary inclusivity, lower)', () => {
-    const today = utc(2026, 10, 15)
-    const modules = [
-      mkModule('M1', 0, { startDate: today, endDate: utc(2026, 10, 31) }),
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, today)?.id).toBe('M1')
+  it('Mon (2 holidays in M1) and Wed (no holidays) yield different active modules on the same date', () => {
+    // Holidays land on Mondays inside Module 1 — Mon's arc shifts later, Wed's
+    // is unaffected. On 30.10 Wed is mid-Module-2 and Mon is still in M1.
+    const holidays = new Set(['2026-09-21', '2026-10-05'])
+    const wed = getCurrentActiveModuleForGroup({
+      dayOfWeek: 'Srijeda',
+      modules: STD_MODULES,
+      schoolYear: SCHOOL_YEAR,
+      holidayDates: holidays,
+      now: utc(2026, 11, 4),
+    })
+    const mon = getCurrentActiveModuleForGroup({
+      dayOfWeek: 'Ponedjeljak',
+      modules: STD_MODULES,
+      schoolYear: SCHOOL_YEAR,
+      holidayDates: holidays,
+      now: utc(2026, 11, 4),
+    })
+    expect(wed?.id).toBe('M2')
+    expect(mon?.id).toBe('M1')
   })
 
-  it('Aktivan = today exactly equals endDate (boundary inclusivity, upper)', () => {
-    const today = utc(2026, 10, 31)
-    const modules = [
-      mkModule('M1', 0, { startDate: utc(2026, 10, 1), endDate: today }),
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, today)?.id).toBe('M1')
-  })
-
-  it('cross-year selection: today in January 2027 prefers Aktivan winter module', () => {
-    const today = utc(2027, 1, 10)
-    const modules = [
-      mkModule('M1', 0, { startDate: utc(2026, 10, 1), endDate: utc(2026, 12, 15) }), // Završen
-      mkModule('M2', 1, { startDate: utc(2026, 12, 16), endDate: utc(2027, 1, 31) }), // Aktivan
-      mkModule('M3', 2, { startDate: utc(2027, 2, 1), endDate: utc(2027, 3, 15) }), // Nadolazi
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, today)?.id).toBe('M2')
+  it('returns the most-recent module past the last session of the arc', () => {
+    // Past 2027-03-15, Wed is "done" — last completed = M4.
+    expect(
+      getCurrentActiveModuleForGroup({
+        dayOfWeek: 'Srijeda',
+        modules: STD_MODULES,
+        schoolYear: SCHOOL_YEAR,
+        holidayDates: new Set(),
+        now: utc(2027, 5, 1),
+      })?.id,
+    ).toBe('M4')
   })
 
   it('ignores schedules for a different schoolYear', () => {
+    // Only schedule belongs to 2025/2026 — for 2026/2027 there's no schedule
+    // → arc is empty → falls back to first-by-sortOrder.
     const modules: Mod[] = [
       {
         id: 'M1',
         title: 'M1',
         sortOrder: 0,
         schedules: [
-          { schoolYear: '2025/2026', startDate: utc(2026, 10, 1), endDate: utc(2026, 10, 31) },
+          {
+            id: 'M1-sched',
+            schoolYear: '2025/2026',
+            startDate: utc(2026, 10, 1),
+            endDate: utc(2026, 10, 31),
+          },
         ],
       },
+      mkModule('M2', 1, null),
     ]
-    // For 2026/2027 there's no schedule → falls through to rule 4 (first by sortOrder)
-    expect(getCurrentActiveModule(modules, '2026/2027', NOW)?.id).toBe('M1')
-  })
-
-  it('mixes schedule-less and scheduled modules — Aktivan still wins', () => {
-    const modules = [
-      mkModule('M1', 0, null),
-      mkModule('M2', 1, { startDate: utc(2026, 10, 1), endDate: utc(2026, 10, 31) }),
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, NOW)?.id).toBe('M2')
+    expect(
+      getCurrentActiveModuleForGroup({
+        dayOfWeek: 'Srijeda',
+        modules,
+        schoolYear: '2026/2027',
+        holidayDates: new Set(),
+        now: utc(2026, 10, 15),
+      })?.id,
+    ).toBe('M1')
   })
 
   it('defaults `now` to current time when not supplied', () => {
+    // Very wide window covering year 1900–2200 — arc covers any "now". Pick
+    // the first module since every other module is null.
     const modules = [
       mkModule('M1', 0, { startDate: utc(1900, 1, 1), endDate: utc(2200, 12, 31) }),
+      mkModule('M2', 1, null),
+      mkModule('M3', 2, null),
+      mkModule('M4', 3, null),
     ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR)?.id).toBe('M1')
-  })
-
-  it('module with null start/end falls through to fallback rules', () => {
-    const modules = [
-      mkModule('M1', 0, { startDate: null, endDate: null }),
-      mkModule('M2', 1, { startDate: utc(2026, 11, 1), endDate: utc(2026, 11, 30) }),
-    ]
-    expect(getCurrentActiveModule(modules, SCHOOL_YEAR, NOW)?.id).toBe('M2')
+    expect(
+      getCurrentActiveModuleForGroup({
+        dayOfWeek: 'Srijeda',
+        modules,
+        schoolYear: SCHOOL_YEAR,
+        holidayDates: new Set(),
+      })?.id,
+    ).toBe('M1')
   })
 })

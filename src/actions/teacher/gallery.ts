@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
 import { computeSchoolYear } from '@/lib/school-year'
-import { getCurrentActiveModule } from '@/lib/active-module'
+import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
+import { loadHolidayDateKeys } from '@/lib/holidays'
 
 export type GalleryImageRow = {
   id: string
@@ -48,6 +49,7 @@ export async function getGroupGallery(groupId: string): Promise<GalleryView> {
     select: {
       id: true,
       name: true,
+      dayOfWeek: true,
       course: {
         select: {
           id: true,
@@ -61,7 +63,7 @@ export async function getGroupGallery(groupId: string): Promise<GalleryView> {
               sortOrder: true,
               schedules: {
                 where: { schoolYear },
-                select: { schoolYear: true, startDate: true, endDate: true },
+                select: { id: true, schoolYear: true, startDate: true, endDate: true },
               },
             },
           },
@@ -87,7 +89,13 @@ export async function getGroupGallery(groupId: string): Promise<GalleryView> {
     },
   })
 
-  const activeModule = getCurrentActiveModule(group.course.modules, schoolYear)
+  const holidayDates = await loadHolidayDateKeys(schoolYear)
+  const activeModule = getCurrentActiveModuleForGroup({
+    dayOfWeek: group.dayOfWeek,
+    modules: group.course.modules,
+    schoolYear,
+    holidayDates,
+  })
 
   return {
     group: {

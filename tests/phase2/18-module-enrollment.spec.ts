@@ -361,8 +361,8 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
   test.describe('Available spots under date shifts', () => {
     // E8 ("shifts make M1=Završen, M2=Aktivan, M3=M4=Nadolazi…") moved to
     // tests/unit/lib/active-module.test.ts — the date-state derivation logic
-    // is now exercised directly against getCurrentActiveModule without
-    // needing the dev server, DB, or Cromium round-trip. The module-date
+    // is now exercised directly against getCurrentActiveModuleForGroup without
+    // needing the dev server, DB, or Chromium round-trip. The module-date
     // shifts that this test used to perform are now done in beforeAll so the
     // remaining UI tests below still observe the M2=Aktivan state.
 

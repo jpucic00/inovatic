@@ -12,8 +12,8 @@ sequenceDiagram
 
     Parent->>Web: Visits /upisi or /programi/slug/prijava
     Web->>Server: getActivePrograms()
-    Note right of Server: Filters by active enrollment window only - schoolYear ignored. Standard courses also require a next-starting ModuleSchedule.
-    Server-->>Web: Programs with groups, spots (next-starting module for standards), enrollment windows
+    Note right of Server: Filters by active enrollment window. For each group computes a per-group race-ahead arc (getGroupModuleArc on dayOfWeek + holidays). Standard groups with no future arc module (graduated past M4) are hidden.
+    Server-->>Web: Programs with groups, spots-against-this-group's-next-module, enrollment windows
 
     Note over Parent, Web: Step 1: parentName, parentEmail, parentPhone
     Note over Parent, Web: Step 2: childFirstName, childLastName, childDateOfBirth, childSchool
@@ -29,7 +29,7 @@ sequenceDiagram
         rect rgb(255, 243, 199)
             Note over Server: $transaction (isolationLevel Serializable)
             Server->>Server: assertGroupHasAvailableSpot then create Inquiry
-            Note right of Server: P2034 serialization failure retried once. Second P2034 returns "Pokusajte ponovno.". GroupFullError returns code GROUP_FULL with fresh programs.
+            Note right of Server: assertGroupHasAvailableSpot reads holidays via tx, computes the per-group arc, counts enrollments against this group's nextEnrollingModule.moduleScheduleId. P2034 serialization failure retried once. Second P2034 returns "Pokusajte ponovno.". GroupFullError returns code GROUP_FULL with fresh programs.
         end
         Server->>Server: Spot reserved immediately via preferredInquiries count
     end

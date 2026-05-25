@@ -25,11 +25,69 @@ const DAY_INDEX: Record<string, number> = {
   Subota: 6,
 }
 
+const DAY_MS = 86_400_000
+
 function parseCroatianWeekday(name: string | null | undefined): number | null {
   if (!name) return null
   const key = name.trim()
   const idx = DAY_INDEX[key]
   return typeof idx === 'number' ? idx : null
+}
+
+export function utcMidnight(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  )
+}
+
+export function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * DAY_MS)
+}
+
+/**
+ * Collect the first `count` non-holiday occurrences of `weekdayName` on or
+ * after `start`. Returns up to `count` dates; fewer if a pathological holiday
+ * set would push the search past MAX_WEEKS. Used by both the school-year
+ * planner (slowest-weekday's 7th session, n=7) and the per-group module arc
+ * (a group's 7 sessions of one module).
+ */
+export function collectWeekdaySessions(
+  start: Date,
+  weekdayName: string,
+  holidays: ReadonlySet<string>,
+  count: number,
+): Date[] {
+  const weekday = parseCroatianWeekday(weekdayName)
+  if (weekday === null || count <= 0) return []
+  const MAX_WEEKS = 520 // ~10 years — far beyond any real school-year input
+  let cur = utcMidnight(start)
+  while (cur.getUTCDay() !== weekday) cur = new Date(cur.getTime() + DAY_MS)
+  const out: Date[] = []
+  for (let i = 0; i < MAX_WEEKS && out.length < count; i++) {
+    if (!holidays.has(toDateKey(cur))) out.push(cur)
+    cur = new Date(cur.getTime() + 7 * DAY_MS)
+  }
+  return out
+}
+
+/**
+ * Convenience: nth non-holiday occurrence of `weekdayName` on or after `start`.
+ * Throws if fewer than n occurrences exist within MAX_WEEKS — callers that
+ * tolerate "not enough sessions" should use `collectWeekdaySessions` directly.
+ */
+export function nthWeekdaySession(
+  start: Date,
+  weekdayName: string,
+  holidays: ReadonlySet<string>,
+  n: number,
+): Date {
+  const sessions = collectWeekdaySessions(start, weekdayName, holidays, n)
+  if (sessions.length < n) {
+    throw new Error(
+      `nthWeekdaySession: did not find session #${n} for ${weekdayName} on or after ${toDateKey(start)}`,
+    )
+  }
+  return sessions[n - 1]
 }
 
 /**
@@ -79,7 +137,6 @@ export function computeExpectedSessions(input: {
     }))
   if (windows.length === 0) return []
 
-  const DAY_MS = 86_400_000
   const holidays = input.holidayDates
   const seen = new Set<string>()
   const out: Date[] = []
@@ -128,7 +185,6 @@ export function computeRadionicaSessions(input: {
   const end = fromDateKey(input.dateEnd).getTime()
   if (end < start) return []
 
-  const DAY_MS = 86_400_000
   const holidays = input.holidayDates
   const out: Date[] = []
   for (let t = start; t <= end; t += DAY_MS) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, XCircle, Users } from 'lucide-react'
@@ -8,6 +8,11 @@ import {
   deleteModuleEnrollment,
   addModuleEnrollment,
 } from '@/actions/admin/module-enrollment'
+import {
+  getActiveModuleForGroup,
+  getGroupModuleArc,
+  type GroupModuleArcEntry,
+} from '@/lib/group-module-arc'
 import Link from 'next/link'
 
 function fmtDate(d: Date): string {
@@ -46,14 +51,40 @@ interface ModuleEnrollmentPanelProps {
   enrollments: EnrollmentInfo[]
   maxStudents: number
   editable: boolean
+  /** Group's weekday — drives per-group arc race-ahead. Null for radionice. */
+  dayOfWeek: string | null
+  /** YYYY-MM-DD keys for the group's school-year holidays. */
+  holidayDateKeys: string[]
 }
 
-function getModuleStatus(mod: ModuleInfo): { label: string; className: string } {
-  const now = new Date()
-  if (!mod.startDate || !mod.endDate) return { label: 'Nema datuma', className: 'text-gray-400 bg-gray-50' }
-  if (now < new Date(mod.startDate)) return { label: 'Nadolazi', className: 'text-blue-600 bg-blue-50' }
-  if (now > new Date(mod.endDate)) return { label: 'Završen', className: 'text-gray-500 bg-gray-100' }
-  return { label: 'Aktivan', className: 'text-green-700 bg-green-50' }
+type ModuleStatus = { label: string; className: string }
+
+function statusFromArcContext(
+  mod: ModuleInfo,
+  arcByModuleId: Map<string, GroupModuleArcEntry>,
+  inProgressModuleId: string | null,
+  lastCompletedModuleId: string | null,
+): ModuleStatus {
+  if (!mod.scheduleId || !mod.startDate || !mod.endDate) {
+    return { label: 'Nema datuma', className: 'text-gray-400 bg-gray-50' }
+  }
+  const arcEntry = arcByModuleId.get(mod.id)
+  if (!arcEntry) {
+    // Per-group arc couldn't include this module (likely missing date or
+    // earlier-module gap). Fall back to course-window comparison.
+    const now = new Date()
+    if (now < new Date(mod.startDate))
+      return { label: 'Nadolazi', className: 'text-blue-600 bg-blue-50' }
+    if (now > new Date(mod.endDate))
+      return { label: 'Završen', className: 'text-gray-500 bg-gray-100' }
+    return { label: 'Aktivan', className: 'text-green-700 bg-green-50' }
+  }
+  if (mod.id === inProgressModuleId)
+    return { label: 'Aktivan', className: 'text-green-700 bg-green-50' }
+  // Completed modules: arc entry's lastSession is in the past.
+  if (mod.id === lastCompletedModuleId || arcEntry.lastSession.getTime() < Date.now())
+    return { label: 'Završen', className: 'text-gray-500 bg-gray-100' }
+  return { label: 'Nadolazi', className: 'text-blue-600 bg-blue-50' }
 }
 
 function ModuleTab({
@@ -62,12 +93,16 @@ function ModuleTab({
   maxStudents,
   nextModuleScheduleId,
   editable,
+  status,
+  arcEntry,
 }: Readonly<{
   mod: ModuleInfo
   enrollments: EnrollmentInfo[]
   maxStudents: number
   nextModuleScheduleId: string | null
   editable: boolean
+  status: ModuleStatus
+  arcEntry: GroupModuleArcEntry | null
 }>) {
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -83,7 +118,6 @@ function ModuleTab({
         (e) => !e.moduleEnrollments.some((me) => me.moduleSchedule.id === scheduleId),
       )
     : enrollments
-  const status = getModuleStatus(mod)
   const spotsUsed = enrolledInModule.length
   const spotsAvailable = maxStudents - spotsUsed
 
@@ -138,10 +172,18 @@ function ModuleTab({
         </span>
       </div>
 
-      {mod.startDate && mod.endDate && (
+      {arcEntry ? (
         <p className="text-xs text-gray-400 mb-3">
-          {fmtDate(mod.startDate)} – {fmtDate(mod.endDate)}
+          {fmtDate(arcEntry.firstSession)} – {fmtDate(arcEntry.lastSession)}{' '}
+          <span className="text-gray-300">(7 sjednica)</span>
         </p>
+      ) : (
+        mod.startDate &&
+        mod.endDate && (
+          <p className="text-xs text-gray-400 mb-3">
+            {fmtDate(mod.startDate)} – {fmtDate(mod.endDate)}
+          </p>
+        )
       )}
 
       {enrolledInModule.length === 0 ? (
@@ -238,13 +280,42 @@ export function ModuleEnrollmentPanel({
   enrollments,
   maxStudents,
   editable,
+  dayOfWeek,
+  holidayDateKeys,
 }: Readonly<ModuleEnrollmentPanelProps>) {
+  // Compute the group's race-ahead arc once per render. Pure + tiny — fine on
+  // the client. Holidays travel as a string[] across the server boundary and
+  // we wrap them back into a Set the arc primitive expects.
+  const { arcByModuleId, inProgressModuleId, lastCompletedModuleId } = useMemo(() => {
+    const holidays = new Set(holidayDateKeys)
+    const arc = getGroupModuleArc({
+      dayOfWeek,
+      modules: modules.map((m) => ({
+        id: m.id,
+        title: m.title,
+        sortOrder: m.sortOrder,
+        schedule:
+          m.scheduleId && m.startDate && m.endDate
+            ? { id: m.scheduleId, startDate: m.startDate, endDate: m.endDate }
+            : null,
+      })),
+      holidayDates: holidays,
+    })
+    const state = getActiveModuleForGroup(arc, new Date())
+    const byId = new Map(arc.map((e) => [e.moduleId, e]))
+    return {
+      arcByModuleId: byId,
+      inProgressModuleId: state.inProgressModule?.moduleId ?? null,
+      lastCompletedModuleId: state.lastCompletedModule?.moduleId ?? null,
+    }
+  }, [modules, dayOfWeek, holidayDateKeys])
+
   const [expandedIdx, setExpandedIdx] = useState(() => {
-    const now = new Date()
-    const activeIdx = modules.findIndex(
-      (m) => m.startDate && m.endDate && new Date(m.startDate) <= now && now <= new Date(m.endDate),
-    )
-    return Math.max(activeIdx, 0)
+    if (inProgressModuleId !== null) {
+      const idx = modules.findIndex((m) => m.id === inProgressModuleId)
+      if (idx >= 0) return idx
+    }
+    return 0
   })
 
   return (
@@ -281,6 +352,13 @@ export function ModuleEnrollmentPanel({
           maxStudents={maxStudents}
           nextModuleScheduleId={modules[expandedIdx + 1]?.scheduleId ?? null}
           editable={editable}
+          status={statusFromArcContext(
+            modules[expandedIdx],
+            arcByModuleId,
+            inProgressModuleId,
+            lastCompletedModuleId,
+          )}
+          arcEntry={arcByModuleId.get(modules[expandedIdx].id) ?? null}
         />
       )}
     </div>

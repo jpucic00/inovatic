@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { requireStudent } from '@/lib/auth-guard'
 import { computeSchoolYear } from '@/lib/school-year'
-import { getCurrentActiveModule } from '@/lib/active-module'
+import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
+import { loadHolidayDateKeys } from '@/lib/holidays'
 import type { GalleryView } from '@/actions/teacher/gallery'
 
 export async function getGroupGalleryForStudent(
@@ -24,6 +25,7 @@ export async function getGroupGalleryForStudent(
     select: {
       id: true,
       name: true,
+      dayOfWeek: true,
       course: {
         select: {
           id: true,
@@ -37,7 +39,7 @@ export async function getGroupGalleryForStudent(
               sortOrder: true,
               schedules: {
                 where: { schoolYear },
-                select: { schoolYear: true, startDate: true, endDate: true },
+                select: { id: true, schoolYear: true, startDate: true, endDate: true },
               },
             },
           },
@@ -63,7 +65,13 @@ export async function getGroupGalleryForStudent(
     },
   })
 
-  const activeModule = getCurrentActiveModule(group.course.modules, schoolYear)
+  const holidayDates = await loadHolidayDateKeys(schoolYear)
+  const activeModule = getCurrentActiveModuleForGroup({
+    dayOfWeek: group.dayOfWeek,
+    modules: group.course.modules,
+    schoolYear,
+    holidayDates,
+  })
 
   return {
     group: {

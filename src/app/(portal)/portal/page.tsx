@@ -78,40 +78,66 @@ async function SingleEnrollmentView({ enrollment }: Readonly<{ enrollment: Stude
   )
 }
 
+function groupEnrollmentsByCourse(
+  enrollments: StudentEnrollmentSummary[]
+): Array<{ courseId: string; courseTitle: string; enrollments: StudentEnrollmentSummary[] }> {
+  const sections = new Map<
+    string,
+    { courseId: string; courseTitle: string; enrollments: StudentEnrollmentSummary[] }
+  >()
+  for (const e of enrollments) {
+    let section = sections.get(e.group.course.id)
+    if (!section) {
+      section = { courseId: e.group.course.id, courseTitle: e.group.course.title, enrollments: [] }
+      sections.set(e.group.course.id, section)
+    }
+    section.enrollments.push(e)
+  }
+  return Array.from(sections.values())
+}
+
 function MultiEnrollmentGrid({ enrollments }: Readonly<{ enrollments: StudentEnrollmentSummary[] }>) {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Moje grupe</h1>
       <p className="text-sm text-gray-500 mb-6">Odaberite grupu za pregled materijala.</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {enrollments.map((e) => (
-          <Link
-            key={e.enrollmentId}
-            href={`/portal/grupa/${e.group.id}`}
-            className="block p-5 rounded-lg border border-gray-200 bg-white hover:border-cyan-400 hover:shadow-sm transition"
-          >
-            <h2 className="text-lg font-semibold text-gray-900">{e.group.course.title}</h2>
-            {e.group.name ? <p className="text-sm text-gray-500 mt-1">{e.group.name}</p> : null}
-            <div className="mt-3 space-y-1 text-sm text-gray-600">
-              {e.group.dayOfWeek || e.group.startTime ? (
-                <div className="inline-flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-gray-400" />
-                  {[e.group.dayOfWeek, e.group.startTime && e.group.endTime ? `${e.group.startTime}–${e.group.endTime}` : e.group.startTime]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </div>
-              ) : null}
-              <div className="inline-flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-gray-400" />
-                {e.group.location.name}
-              </div>
+      <div className="space-y-8">
+        {groupEnrollmentsByCourse(enrollments).map((section) => (
+          <section key={section.courseId}>
+            <h2 className="text-xl font-semibold text-gray-900 mb-3">{section.courseTitle}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {section.enrollments.map((e) => (
+                <Link
+                  key={e.enrollmentId}
+                  href={`/portal/grupa/${e.group.id}`}
+                  className="block p-5 rounded-lg border border-gray-200 bg-white hover:border-cyan-400 hover:shadow-sm transition"
+                >
+                  {e.group.name ? (
+                    <h3 className="text-lg font-semibold text-gray-900">{e.group.name}</h3>
+                  ) : null}
+                  <div className={`${e.group.name ? 'mt-3 ' : ''}space-y-1 text-sm text-gray-600`}>
+                    {e.group.dayOfWeek || e.group.startTime ? (
+                      <div className="inline-flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        {[e.group.dayOfWeek, e.group.startTime && e.group.endTime ? `${e.group.startTime}–${e.group.endTime}` : e.group.startTime]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
+                    ) : null}
+                    <div className="inline-flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      {e.group.location.name}
+                    </div>
+                  </div>
+                  {e.activeModule ? (
+                    <p className="mt-3 text-xs text-cyan-700">
+                      Aktivan modul: <span className="font-medium">{e.activeModule.title}</span>
+                    </p>
+                  ) : null}
+                </Link>
+              ))}
             </div>
-            {e.activeModule ? (
-              <p className="mt-3 text-xs text-cyan-700">
-                Aktivan modul: <span className="font-medium">{e.activeModule.title}</span>
-              </p>
-            ) : null}
-          </Link>
+          </section>
         ))}
       </div>
     </div>

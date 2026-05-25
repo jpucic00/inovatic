@@ -42,12 +42,28 @@ erDiagram
 | Concept | Lives on | Changes year to year? |
 |---------|----------|----------------------|
 | Module title, description, `sortOrder` | `CourseModule` | No — one template, many year instances |
-| Start / end dates | `ModuleSchedule` | Yes — new row per `schoolYear` |
+| Start / end dates (slowest-weekday reference) | `ModuleSchedule` | Yes — new row per `schoolYear` |
+| **Per-group module first/last session** | *Derived* — `getGroupModuleArc` | N/A — computed on every read |
 | Roster (which students took this module) | `ModuleEnrollment` → `ModuleSchedule` | Yes — scoped to a single year |
 | Material (MODULE scope) | `Material.moduleId` → `CourseModule` | No — inherited forward, shared by all cohorts |
 | Material (COURSE scope) | `Material.courseId` → `Course` | No — radionice only, course-wide |
 | Material (GROUP scope) | `Material.scheduledGroupId` → `ScheduledGroup` | Yes — specific to one cohort/group |
 | Student feedback / module reviews | `StudentComment.moduleId` → `CourseModule` | Stays on the template |
+
+### `ModuleSchedule.startDate / endDate` are course-wide reference, NOT per-group
+
+`ModuleSchedule.startDate` is the school-year kickoff for the whole course (the date the planner anchors on). `ModuleSchedule.endDate` is the **slowest-weekday's 7th session** — written by the planner so all weekdays are guaranteed at least 7 sessions inside the window. These dates are the same for every group in the same course + year.
+
+But each `ScheduledGroup` runs on its own `dayOfWeek`, and `SchoolYearHoliday` rows don't fall evenly across weekdays. So the *real* first/last session for a Wed group (no holidays on Wednesdays) is earlier than the same module's first/last for a Mon group (with two Mon holidays). The downstream "which module is this group on" question therefore can't be answered from `ModuleSchedule.startDate/endDate` alone.
+
+`getGroupModuleArc({ dayOfWeek, modules, holidayDates })` ([src/lib/group-module-arc.ts](../../src/lib/group-module-arc.ts)) walks 4×7 weekday occurrences forward from the school-year kickoff, race-ahead: a fast weekday's Module 2 starts on its next weekday occurrence after its Module 1's 7th session, *not* at `ModuleSchedule[2].startDate`. Used by:
+
+- `computeGroupCapacity` (`src/lib/group-capacity.ts`) — counts enrollments against each group's own next-enrolling module (`nextEnrollingModule.moduleScheduleId`).
+- `toActiveGroup` in `src/actions/public/programs.ts` — hides a group from the public inquiry form when its arc has no future module (graduated past M4).
+- `getCurrentActiveModuleForGroup` in `src/lib/active-module.ts` — drives "current materials" in the student portal + teacher gallery.
+- `computeModuleMarkers` in `src/lib/school-year-planner.ts` — the calendar's M1↑/M1↓ markers land on each weekday's *own* 7th session, not the slowest weekday's date.
+
+Admin breaks (winter holidays etc.) are modeled by adding `SchoolYearHoliday` rows for every weekday in the break — `ModuleSchedule.startDate` gaps are not honored by the arc.
 
 ## Unique constraint
 

@@ -11,6 +11,7 @@ import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
 import { computeSchoolYear, schoolYearDateRange } from '@/lib/school-year'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { computeGroupCapacity } from '@/lib/group-capacity'
+import { loadHolidayDateKeys } from '@/lib/holidays'
 import { formatGroupSchedule } from '@/lib/format'
 import type { Grade } from '@/lib/inquiry-status'
 
@@ -219,8 +220,9 @@ export async function getGroupsForCourse(courseId: string) {
   })
 
   const now = new Date()
+  const holidayDates = await loadHolidayDateKeys(year)
   return groups.map((g) => {
-    const { availableSpots, isFull } = computeGroupCapacity(g, now)
+    const { availableSpots, isFull } = computeGroupCapacity(g, holidayDates, now)
     return { ...g, availableSpots, isFull }
   })
 }
@@ -277,8 +279,9 @@ export async function getGroupsForCourseInSelectedYear(courseId: string) {
   })
 
   const now = new Date()
+  const holidayDates = await loadHolidayDateKeys(year)
   return groups.map((g) => {
-    const { availableSpots, isFull } = computeGroupCapacity(g, now)
+    const { availableSpots, isFull } = computeGroupCapacity(g, holidayDates, now)
     return { ...g, availableSpots, isFull }
   })
 }

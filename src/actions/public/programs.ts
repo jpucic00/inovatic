@@ -3,6 +3,7 @@
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { computeGroupCapacity } from '@/lib/group-capacity'
+import { loadHolidayDateKeys } from '@/lib/holidays'
 
 export type ActiveGroup = {
   id: string
@@ -36,31 +37,29 @@ type GroupRow = Awaited<ReturnType<typeof db.scheduledGroup.findMany>>[number] &
     sortOrder: number;
     modules: {
       id: string; title: string; sortOrder: number;
-      schedules: { id: string; schoolYear: string; startDate: Date | null }[];
+      schedules: {
+        id: string; schoolYear: string;
+        startDate: Date | null; endDate: Date | null;
+      }[];
     }[];
   };
   enrollments: { id: string; moduleEnrollments: { moduleScheduleId: string }[] }[];
   _count: { preferredInquiries: number };
 }
 
-function toActiveGroup(g: GroupRow, now: Date): ActiveGroup | null {
-  const isStandard = !g.course.isCustom
-
-  let enrollingModuleTitle: string | null = null
-  if (isStandard) {
-    for (const mod of g.course.modules) {
-      const schedule = mod.schedules.find(
-        (s) => s.schoolYear === g.schoolYear && s.startDate !== null && s.startDate > now,
-      )
-      if (schedule) {
-        enrollingModuleTitle = mod.title
-        break
-      }
-    }
-    if (!enrollingModuleTitle) return null
-  }
-
-  const { availableSpots, isFull } = computeGroupCapacity(g, now)
+function toActiveGroup(
+  g: GroupRow,
+  holidayDates: ReadonlySet<string>,
+  now: Date,
+): ActiveGroup | null {
+  const { availableSpots, isFull, nextEnrollingModule } = computeGroupCapacity(
+    g,
+    holidayDates,
+    now,
+  )
+  // Standard course hidden from public form when no next module exists for
+  // this group's arc (race-ahead past M4 → graduated, or schedule incomplete).
+  if (!g.course.isCustom && !nextEnrollingModule) return null
 
   return {
     id: g.id,
@@ -72,7 +71,7 @@ function toActiveGroup(g: GroupRow, now: Date): ActiveGroup | null {
     endTime: g.endTime,
     availableSpots,
     isFull,
-    ...(enrollingModuleTitle ? { currentModuleName: enrollingModuleTitle } : {}),
+    ...(nextEnrollingModule ? { currentModuleName: nextEnrollingModule.title } : {}),
   }
 }
 
@@ -121,6 +120,7 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
                   id: true,
                   schoolYear: true,
                   startDate: true,
+                  endDate: true,
                 },
               },
             },
@@ -144,9 +144,25 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
     orderBy: [{ course: { sortOrder: 'asc' } }, { createdAt: 'asc' }],
   })
 
+  // Group holidays by school year so each group resolves its arc against
+  // its OWN year's holiday set. Most realistic data has one current school
+  // year + at most one upcoming, so we end up with ≤2 distinct keys here
+  // and the same number of holiday-table queries — bounded, not per-group.
+  const distinctYears = new Set(groups.map((g) => g.schoolYear))
+  const holidaysByYear = new Map<string, Set<string>>()
+  await Promise.all(
+    Array.from(distinctYears).map(async (year) => {
+      holidaysByYear.set(year, await loadHolidayDateKeys(year))
+    }),
+  )
+
   const courseMap = new Map<string, ActiveProgram>()
   for (const g of groups) {
-    const activeGroup = toActiveGroup(g, now)
+    const activeGroup = toActiveGroup(
+      g,
+      holidaysByYear.get(g.schoolYear) ?? new Set(),
+      now,
+    )
     if (!activeGroup) continue
 
     if (!courseMap.has(g.courseId)) {

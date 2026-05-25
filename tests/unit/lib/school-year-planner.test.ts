@@ -322,6 +322,86 @@ describe('computeModuleMarkers', () => {
     expect(m2?.moduleIndex).toBe(2)
   })
 
+  it('places per-weekday end markers at each weekday\'s 7th session, not the last occurrence inside the slowest-weekday window', () => {
+    // Regression for the bug where Mon (2 holidays in M1) and Wed (no
+    // holidays) both got M1-end markers in the same week — `computeExpectedSessions`
+    // was returning the LAST weekday occurrence inside the slowest-weekday-
+    // anchored window, which for fast weekdays is their 8th-or-9th, not 7th.
+    //
+    // Planner anchors Module 1 endDate on the slowest weekday's 7th. With 2
+    // Mon holidays, Mon's 7th is later than Wed's 7th — markers must reflect
+    // that, NOT cluster on the slowest weekday's date.
+    const holidays = new Set(['2026-09-07', '2026-09-21'])
+    const plan = computeSchoolYearPlan({
+      startDate: fromDateKey('2026-09-01'),
+      activeWeekdays: ALL_SIX,
+      holidayDates: holidays,
+    })
+    // Mon's 7th (anchor): 7 Mons from 01.09 skipping 07.09 and 21.09 = 14.09,
+    // 28.09, 05.10, 12.10, 19.10, 26.10, 02.11.
+    expect(toDateKey(plan.modules[0].endDate)).toBe('2026-11-02')
+    const markers = computeModuleMarkers({
+      courses: [
+        {
+          courseId: 'c1',
+          courseLabel: 'SLR 1',
+          modules: [
+            {
+              sortOrder: 0,
+              title: 'Modul 1',
+              startDate: plan.modules[0].startDate,
+              endDate: plan.modules[0].endDate,
+            },
+          ],
+        },
+      ],
+      holidayDates: holidays,
+    })
+    // Mon M1 end on 02.11; Wed M1 end on its own 7th = 02.09, 09.09, 16.09,
+    // 23.09, 30.09, 07.10, 14.10 → 14.10. Different week from Mon.
+    const monEnd = markers.find((m) => m.kind === 'end' && m.tooltip.includes('Pon'))
+    const wedEnd = markers.find((m) => m.kind === 'end' && m.tooltip.includes('Sri'))
+    expect(monEnd?.date).toBe('2026-11-02')
+    expect(wedEnd?.date).toBe('2026-10-14')
+    // Different ISO weeks — concretely separated by 2.5+ weeks.
+    expect(
+      fromDateKey(monEnd!.date).getTime() - fromDateKey(wedEnd!.date).getTime(),
+    ).toBeGreaterThan(7 * 86_400_000)
+  })
+
+  it('places M2 start markers per-weekday on the race-ahead next session, not at ModuleSchedule.startDate', () => {
+    // Wed finishes M1 a week earlier than the slowest weekday — its M2 start
+    // marker must land on the next Wed after its M1 7th (race-ahead), not on
+    // the course-level ModuleSchedule[2].startDate which targets the slowest
+    // weekday.
+    const plan = computeSchoolYearPlan({
+      startDate: fromDateKey('2026-09-01'),
+      activeWeekdays: ALL_SIX,
+      holidayDates: new Set(),
+    })
+    const markers = computeModuleMarkers({
+      courses: [
+        {
+          courseId: 'c1',
+          courseLabel: 'SLR 1',
+          modules: plan.modules.map((m, i) => ({
+            sortOrder: i,
+            title: `Modul ${i + 1}`,
+            startDate: m.startDate,
+            endDate: m.endDate,
+          })),
+        },
+      ],
+      holidayDates: new Set(),
+    })
+    // Wed M1 7th = 14.10. Wed M2 1st (race-ahead) = 21.10.
+    // ModuleSchedule[2].startDate = 20.10 (Mon). Marker must be at 21.10, NOT 20.10.
+    const wedM2Start = markers.find(
+      (m) => m.kind === 'start' && m.label === 'Modul 2' && m.tooltip.includes('Sri'),
+    )
+    expect(wedM2Start?.date).toBe('2026-10-21')
+  })
+
   it('omits modules without a startDate or endDate', () => {
     const markers = computeModuleMarkers({
       courses: [

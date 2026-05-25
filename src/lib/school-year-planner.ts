@@ -13,23 +13,20 @@
  */
 import { STANDARD_PROGRAM_SESSION_TARGET } from '@/lib/constants'
 import { ACTIVE_WEEKDAYS, type ActiveWeekday } from '@/lib/group-end-dates'
-import { computeExpectedSessions, fromDateKey, toDateKey } from '@/lib/session-dates'
+import { getGroupModuleArc } from '@/lib/group-module-arc'
+import {
+  addDays,
+  computeExpectedSessions,
+  fromDateKey,
+  nthWeekdaySession,
+  toDateKey,
+  utcMidnight,
+} from '@/lib/session-dates'
 
 const SESSIONS_PER_MODULE = 7
 export const MODULE_COUNT = 4
 
 const DAY_MS = 86_400_000
-
-const DAY_INDEX: Record<string, number> = {
-  Nedjelja: 0,
-  Ponedjeljak: 1,
-  Utorak: 2,
-  Srijeda: 3,
-  Četvrtak: 4,
-  Cetvrtak: 4,
-  Petak: 5,
-  Subota: 6,
-}
 
 const SHORT_WEEKDAY: Record<string, string> = {
   Nedjelja: 'Ned',
@@ -78,16 +75,6 @@ type SchoolYearPlan = SessionDerivation & {
   modules: PlannedModuleWindow[] // length 4 (or all-zero stub on empty active set)
 }
 
-function utcMidnight(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  )
-}
-
-function addDays(date: Date, days: number): Date {
-  return new Date(date.getTime() + days * DAY_MS)
-}
-
 function emptyByWeekday<V>(make: () => V): Record<ActiveWeekday, V> {
   const out = {} as Record<ActiveWeekday, V>
   for (const w of ACTIVE_WEEKDAYS) out[w] = make()
@@ -99,35 +86,6 @@ function filterActiveWeekdays(input: ReadonlyArray<string>): ActiveWeekday[] {
   // Preserve ACTIVE_WEEKDAYS order regardless of input order so plan results
   // are stable across permutations of the caller's array.
   return ACTIVE_WEEKDAYS.filter((w) => set.has(w) && input.includes(w))
-}
-
-/**
- * Find the n-th occurrence of `weekday` on/after `start`, skipping holidays.
- * Open-ended (no end cap) — the planner uses this to ask "where is the 7th
- * Monday counting from this module's start?" before deciding the module's
- * endDate. Bounded at MAX_WEEKS to fail loudly if a pathological holiday set
- * keeps consuming every candidate.
- */
-function nthSessionOnOrAfter(
-  start: Date,
-  weekday: number,
-  holidays: ReadonlySet<string>,
-  n: number,
-): Date {
-  const MAX_WEEKS = 520 // ~10 years — far beyond any real school-year input
-  let cur = utcMidnight(start)
-  while (cur.getUTCDay() !== weekday) cur = addDays(cur, 1)
-  let collected = 0
-  for (let i = 0; i < MAX_WEEKS; i++) {
-    if (!holidays.has(toDateKey(cur))) {
-      collected++
-      if (collected === n) return cur
-    }
-    cur = addDays(cur, 7)
-  }
-  throw new Error(
-    `nthSessionOnOrAfter: did not find session #${n} within ${MAX_WEEKS} weeks`,
-  )
 }
 
 function deriveSessionsForWeekdays(input: {
@@ -193,11 +151,9 @@ export function computeSchoolYearPlan(input: {
   for (let i = 0; i < MODULE_COUNT; i++) {
     let moduleEnd = moduleStart
     for (const w of activeWeekdays) {
-      const weekdayIdx = DAY_INDEX[w]
-      if (weekdayIdx === undefined) continue
-      const seventh = nthSessionOnOrAfter(
+      const seventh = nthWeekdaySession(
         moduleStart,
-        weekdayIdx,
+        w,
         input.holidayDates,
         SESSIONS_PER_MODULE,
       )
@@ -319,14 +275,21 @@ export function computeWorkshopLabels(input: {
 
 /**
  * For every (course × module × weekday in Pon–Sub) tuple, emit two markers:
- * one at the first session date inside the module window, one at the last.
- * Holiday-filtered, so a holiday on the boundary date naturally shifts the
- * marker to the next/previous real session.
+ * one at the weekday's *first* session of the module, one at its *7th*. Uses
+ * `getGroupModuleArc` so the markers carry race-ahead semantics — a fast
+ * weekday's M1-end lands on its own 7th session, not on the slowest
+ * weekday's. The slowest weekday's marker still anchors on
+ * `ModuleSchedule.endDate` because the planner already wrote that as its 7th.
  *
  * Markers always cover all 6 weekdays regardless of where ScheduledGroups
  * currently exist — the calendar is a projection of the schedule, not of
  * group attendance. Dedupes across courses that share the same
  * (date, kind, position, label) so SLR 1-4 collapse to one chip per cell.
+ *
+ * Note: when a module is missing its dates, the arc stops there (race-ahead
+ * cursor has nowhere to land) so later-module markers are suppressed too.
+ * In practice the planner sets all 4 dates atomically, so partial-date input
+ * only happens during ad-hoc admin edits.
  */
 export function computeModuleMarkers(input: {
   courses: ReadonlyArray<ModuleMarkerInputCourse>
@@ -343,35 +306,39 @@ export function computeModuleMarkers(input: {
   const grouped = new Map<string, Group>()
 
   for (const course of input.courses) {
+    // The arc primitive expects ArcModuleInput shape. We don't need module/
+    // schedule IDs for marker rendering, so pass empty-string placeholders.
+    const arcModules = course.modules.map((m) => ({
+      id: '',
+      title: m.title,
+      sortOrder: m.sortOrder,
+      schedule:
+        m.startDate && m.endDate
+          ? { id: '', startDate: m.startDate, endDate: m.endDate }
+          : null,
+    }))
     for (const w of ACTIVE_WEEKDAYS) {
-      // Modules arrive sorted by sortOrder ASC — position in the array is the
-      // 1-based ordinal regardless of whether the underlying sortOrder field
-      // starts at 0 or 1 (the seed uses 1, 2, 3, 4; older data may use 0).
-      for (let position = 0; position < course.modules.length; position++) {
-        const m = course.modules[position]
-        if (!m.startDate || !m.endDate) continue
-        const sessions = computeExpectedSessions({
-          dayOfWeek: w,
-          moduleWindows: [{ startDate: m.startDate, endDate: m.endDate }],
-          holidayDates: input.holidayDates,
-        })
-        if (sessions.length === 0) continue
-        const firstKey = toDateKey(sessions[0])
-        const lastKey = toDateKey(sessions[sessions.length - 1])
-        const moduleIndex = position + 1
+      const arc = getGroupModuleArc({
+        dayOfWeek: w,
+        modules: arcModules,
+        holidayDates: input.holidayDates,
+      })
+      for (const entry of arc) {
+        const firstKey = toDateKey(entry.firstSession)
+        const lastKey = toDateKey(entry.lastSession)
 
         for (const [date, kind] of [
           [firstKey, 'start' as const],
           [lastKey, 'end' as const],
         ] as const) {
-          const key = `${date}|${kind}|${moduleIndex}|${m.title}`
+          const key = `${date}|${kind}|${entry.moduleIndex}|${entry.moduleTitle}`
           let g = grouped.get(key)
           if (!g) {
             g = {
               date,
               kind,
-              moduleIndex,
-              moduleTitle: m.title,
+              moduleIndex: entry.moduleIndex,
+              moduleTitle: entry.moduleTitle,
               weekdayName: w,
               courses: new Set(),
             }

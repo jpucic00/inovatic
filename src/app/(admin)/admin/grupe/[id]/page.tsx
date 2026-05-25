@@ -12,6 +12,7 @@ import { GroupInfoPanel } from '@/components/admin/groups/group-info-panel'
 import { GroupGalleryPanel } from '@/components/admin/groups/group-gallery-panel'
 import { isArchivedYear } from '@/lib/school-year'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
+import { loadHolidayDateKeys } from '@/lib/holidays'
 
 export const metadata: Metadata = { title: 'Admin – Detalji grupe' }
 
@@ -39,6 +40,9 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   if (!group) notFound()
 
   const editable = !isArchivedYear(group.schoolYear)
+  const holidayDateKeys = group.course.isCustom
+    ? []
+    : Array.from(await loadHolidayDateKeys(group.schoolYear))
 
   const assignedUserIds = new Set(group.teacherAssignments.map((ta) => ta.user.id))
   const assignableTeachers = allTeachers.filter((t) => !assignedUserIds.has(t.id))
@@ -139,6 +143,8 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
             enrollments={group.enrollments}
             maxStudents={group.maxStudents}
             editable={editable}
+            dayOfWeek={group.dayOfWeek}
+            holidayDateKeys={holidayDateKeys}
           />
         </div>
       ) : (

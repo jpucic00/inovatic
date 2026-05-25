@@ -5,7 +5,8 @@ import { db } from '@/lib/db'
 import { requireStudent } from '@/lib/auth-guard'
 import { computeSchoolYear } from '@/lib/school-year'
 import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
-import { getCurrentActiveModule } from '@/lib/active-module'
+import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
+import { loadHolidayDateKeys } from '@/lib/holidays'
 import type { MaterialType } from '@prisma/client'
 
 export type MaterialItem = {
@@ -85,7 +86,13 @@ export async function getEffectiveMaterialsForStudent(
   if (!group) notFound()
 
   const moduleIds = group.course.modules.map((m) => m.id)
-  const activeModule = getCurrentActiveModule(group.course.modules, schoolYear)
+  const holidayDates = await loadHolidayDateKeys(schoolYear)
+  const activeModule = getCurrentActiveModuleForGroup({
+    dayOfWeek: group.dayOfWeek,
+    modules: group.course.modules,
+    schoolYear,
+    holidayDates,
+  })
 
   const materials = await db.material.findMany({
     where: buildEffectiveMaterialsWhere({

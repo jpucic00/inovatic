@@ -3,7 +3,8 @@
 import { db } from '@/lib/db'
 import { requireStudent } from '@/lib/auth-guard'
 import { computeSchoolYear } from '@/lib/school-year'
-import { getCurrentActiveModule } from '@/lib/active-module'
+import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
+import { loadHolidayDateKeys } from '@/lib/holidays'
 
 export type StudentEnrollmentSummary = {
   enrollmentId: string
@@ -38,10 +39,15 @@ export type StudentEnrollmentSummary = {
 export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummary[]> {
   const session = await requireStudent()
   const schoolYear = computeSchoolYear()
+  const holidayDates = await loadHolidayDateKeys(schoolYear)
 
   const enrollments = await db.enrollment.findMany({
     where: { userId: session.user.id, schoolYear },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [
+      { scheduledGroup: { course: { sortOrder: 'asc' } } },
+      { scheduledGroup: { name: 'asc' } },
+      { createdAt: 'asc' },
+    ],
     include: {
       scheduledGroup: {
         include: {
@@ -67,10 +73,12 @@ export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummar
   })
 
   return enrollments.map((e) => {
-    const activeModule = getCurrentActiveModule(
-      e.scheduledGroup.course.modules,
-      schoolYear
-    )
+    const activeModule = getCurrentActiveModuleForGroup({
+      dayOfWeek: e.scheduledGroup.dayOfWeek,
+      modules: e.scheduledGroup.course.modules,
+      schoolYear,
+      holidayDates,
+    })
 
     return {
       enrollmentId: e.id,
