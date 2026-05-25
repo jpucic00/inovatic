@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, FolderOpen } from 'lucide-react'
+import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, FolderOpen, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/shared/logo'
 import { logoutAction } from '@/actions/logout'
@@ -18,6 +18,7 @@ const sidebarLinks = [
   { href: '/admin/programi', label: 'Programi', icon: BookOpen },
   { href: '/admin/lokacije', label: 'Lokacije', icon: MapPin },
   { href: '/admin/materijali', label: 'Materijali', icon: FolderOpen },
+  { href: '/admin/skolska-godina', label: 'Školska godina', icon: CalendarDays },
   { href: '/admin/novosti', label: 'Novosti', icon: Newspaper },
 ]
 

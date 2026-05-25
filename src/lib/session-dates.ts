@@ -58,11 +58,13 @@ type ModuleWindow = {
 /**
  * Compute every weekly session date implied by the group's weekday + the
  * supplied module windows. Returns an ascending list of UTC-midnight dates
- * with no duplicates (overlapping windows are merged).
+ * with no duplicates (overlapping windows are merged). Holiday dates (passed
+ * as YYYY-MM-DD keys via `holidayDates`) are dropped from the result.
  */
 export function computeExpectedSessions(input: {
   dayOfWeek: string | null
   moduleWindows: ModuleWindow[]
+  holidayDates?: ReadonlySet<string>
 }): Date[] {
   const weekday = parseCroatianWeekday(input.dayOfWeek)
   if (weekday === null) return []
@@ -78,6 +80,7 @@ export function computeExpectedSessions(input: {
   if (windows.length === 0) return []
 
   const DAY_MS = 86_400_000
+  const holidays = input.holidayDates
   const seen = new Set<string>()
   const out: Date[] = []
 
@@ -89,7 +92,7 @@ export function computeExpectedSessions(input: {
     }
     while (cur.getTime() <= end.getTime()) {
       const key = toDateKey(cur)
-      if (!seen.has(key)) {
+      if (!seen.has(key) && !(holidays?.has(key) ?? false)) {
         seen.add(key)
         out.push(new Date(cur))
       }

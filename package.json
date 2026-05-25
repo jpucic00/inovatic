@@ -23,6 +23,7 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:previous-year": "tsx prisma/seed-previous-year.ts",
     "download-wp-images": "tsx scripts/download-wp-images.ts",
     "migrate-images": "tsx scripts/migrate-images-to-cloudinary.ts",
     "db:studio": "prisma studio",

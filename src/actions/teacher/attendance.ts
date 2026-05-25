@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
 import { computeExpectedSessions, fromDateKey, toDateKey } from '@/lib/session-dates'
+import { loadHolidayDateKeys } from '@/lib/holidays'
 import {
   bulkMarkSessionSchema,
   type BulkMarkSessionInput,
@@ -62,10 +63,13 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
 
   const schoolYear = group.schoolYear
 
-  const schedules = await db.moduleSchedule.findMany({
-    where: { schoolYear, module: { courseId: group.courseId } },
-    select: { startDate: true, endDate: true },
-  })
+  const [schedules, holidayDates] = await Promise.all([
+    db.moduleSchedule.findMany({
+      where: { schoolYear, module: { courseId: group.courseId } },
+      select: { startDate: true, endDate: true },
+    }),
+    loadHolidayDateKeys(schoolYear),
+  ])
   const moduleWindows = schedules.map((s) => ({
     startDate: s.startDate,
     endDate: s.endDate,
@@ -74,6 +78,7 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
   const expectedDates = computeExpectedSessions({
     dayOfWeek: group.dayOfWeek,
     moduleWindows,
+    holidayDates,
   })
   const expectedSessions = expectedDates.map(toDateKey)
   const expectedSet = new Set(expectedSessions)
