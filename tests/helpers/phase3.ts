@@ -131,6 +131,30 @@ export async function assignTeacherToGroup(page: Page, teacherId: string, groupI
   })
 }
 
+/**
+ * Reads username + plainPassword off the admin student detail page's
+ * "Pristupni podaci" card. The create dialogs no longer surface credentials in
+ * a result modal, so callers navigate to /admin/ucenici/[id] and read them here.
+ * Assumes the page is already on the student detail route.
+ */
+async function readCredentialsFromDetail(
+  page: Page,
+): Promise<{ username: string; password: string }> {
+  const username = (
+    await page
+      .locator('xpath=//dt[normalize-space()="Korisničko ime"]/following-sibling::dd')
+      .first()
+      .innerText()
+  ).trim()
+  const password = (
+    await page
+      .locator('xpath=//dt[normalize-space()="Lozinka"]/following-sibling::dd')
+      .first()
+      .innerText()
+  ).trim()
+  return { username, password }
+}
+
 export async function createStudentInGroup(
   page: Page,
   groupId: string,
@@ -174,30 +198,23 @@ export async function createStudentInGroup(
   }
 
   await dialog.getByRole('button', { name: 'Kreiraj učenika' }).click()
-  await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 15000 })
+  // The result modal was dropped: on success the dialog closes (setOpen(false))
+  // and a toast fires. Locate the new student and read credentials off the
+  // detail page's "Pristupni podaci" card.
+  await expect(dialog).toBeHidden({ timeout: 15000 })
 
-  const unameText = (await dialog.locator('p', { hasText: 'Korisničko ime:' }).innerText()).trim()
-  const passText = (await dialog.locator('p', { hasText: 'Lozinka:' }).innerText()).trim()
-  const username = unameText.replace(/^Korisničko ime:\s*/, '').trim()
-  const password = passText.replace(/^Lozinka:\s*/, '').trim()
-  if (!username || !password) {
-    throw new Error(`Could not parse credentials: ${unameText} / ${passText}`)
-  }
-
-  const profileLink = dialog.getByRole('link', { name: /Profil učenika|Otvori profil/i }).first()
-  const href = (await profileLink.getAttribute('href').catch(() => null)) ?? ''
-  const m = href.match(/\/admin\/ucenici\/([^/?#]+)/)
-  let studentId = m?.[1] ?? ''
-  await page.keyboard.press('Escape')
-
-  if (!studentId) {
-    await page.goto(`${BASE}/admin/ucenici?q=${encodeURIComponent(student.lastName)}`)
-    const row = page.locator(`a[href^="/admin/ucenici/"]`, { hasText: student.lastName }).first()
-    const hrefBack = await row.getAttribute('href')
-    const m2 = hrefBack?.match(/\/admin\/ucenici\/([^/?#]+)/)
-    studentId = m2?.[1] ?? ''
-  }
+  await page.goto(`${BASE}/admin/ucenici?search=${encodeURIComponent(student.lastName)}`)
+  const row = page.locator('a[href^="/admin/ucenici/"]', { hasText: student.lastName }).first()
+  const href = (await row.getAttribute('href')) ?? ''
+  const studentId = href.match(/\/admin\/ucenici\/([^/?#]+)/)?.[1] ?? ''
   if (!studentId) throw new Error('student id not found after creation')
+  await row.click()
+  await page.waitForURL(/\/admin\/ucenici\/[a-z0-9]+/)
+
+  const { username, password } = await readCredentialsFromDetail(page)
+  if (!username || !password) {
+    throw new Error(`Could not read credentials for ${student.lastName}`)
+  }
   return { studentId, username, password }
 }
 
@@ -218,14 +235,18 @@ export async function createStudentNoEnrollment(
 
   const dialog = page.locator('[role="dialog"]')
   await dialog.getByRole('button', { name: 'Kreiraj učenika' }).click()
-  await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 10000 })
+  // Result modal dropped — dialog closes on success; read credentials off the
+  // student detail page instead.
+  await expect(dialog).toBeHidden({ timeout: 10000 })
 
-  const usernameText = (await dialog.locator('p', { hasText: 'Korisničko ime:' }).innerText()).trim()
-  const passwordText = (await dialog.locator('p', { hasText: 'Lozinka:' }).innerText()).trim()
-  const username = usernameText.replace(/^Korisničko ime:\s*/, '').trim()
-  const password = passwordText.replace(/^Lozinka:\s*/, '').trim()
+  await page.goto(`${BASE}/admin/ucenici?search=${encodeURIComponent(student.lastName)}`)
+  const row = page.locator('a[href^="/admin/ucenici/"]', { hasText: student.lastName }).first()
+  await row.click()
+  await page.waitForURL(/\/admin\/ucenici\/[a-z0-9]+/)
+
+  const { username, password } = await readCredentialsFromDetail(page)
   if (!username || !password) {
-    throw new Error(`Could not parse credentials: ${usernameText} / ${passwordText}`)
+    throw new Error(`Could not read credentials for ${student.lastName}`)
   }
   return { username, password }
 }
