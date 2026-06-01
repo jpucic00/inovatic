@@ -8,7 +8,7 @@ import { declineInquirySchema } from '@/lib/validators/admin/inquiry'
 import type { AdminActionResult } from '@/lib/action-types'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
-import { computeSchoolYear, schoolYearDateRange } from '@/lib/school-year'
+import { schoolYearDateRange } from '@/lib/school-year'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { computeGroupCapacity } from '@/lib/group-capacity'
 import { loadHolidayDateKeys } from '@/lib/holidays'
@@ -87,7 +87,6 @@ export async function getInquiryCourses() {
 
 export async function getInquiry(id: string) {
   await requireAdmin()
-  const year = computeSchoolYear()
 
   return db.inquiry.findUnique({
     where: { id },
@@ -97,31 +96,6 @@ export async function getInquiry(id: string) {
           id: true,
           title: true,
           level: true,
-          scheduledGroups: {
-            where: { schoolYear: year },
-            include: {
-              location: true,
-              course: {
-                select: {
-                  title: true,
-                  isCustom: true,
-                  modules: {
-                    orderBy: { sortOrder: 'asc' },
-                    select: {
-                      id: true,
-                      title: true,
-                      sortOrder: true,
-                      schedules: {
-                        where: { schoolYear: year },
-                        select: { id: true, startDate: true, endDate: true },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            orderBy: { createdAt: 'asc' },
-          },
         },
       },
       scheduledGroup: { include: { location: true } },
