@@ -185,7 +185,7 @@ export async function getGroupsForCourse(courseId: string) {
       _count: {
         select: {
           preferredInquiries: {
-            where: { status: { notIn: ['DECLINED', 'ACCOUNT_CREATED'] } },
+            where: { status: 'NEW' },
           },
         },
       },
@@ -244,7 +244,7 @@ export async function getGroupsForCourseInSelectedYear(courseId: string) {
       _count: {
         select: {
           preferredInquiries: {
-            where: { status: { notIn: ['DECLINED', 'ACCOUNT_CREATED'] } },
+            where: { status: 'NEW' },
           },
         },
       },

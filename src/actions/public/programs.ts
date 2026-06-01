@@ -137,7 +137,7 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
       },
       _count: {
         select: {
-          preferredInquiries: { where: { status: { notIn: ['DECLINED', 'ACCOUNT_CREATED'] } } },
+          preferredInquiries: { where: { status: 'NEW' } },
         },
       },
     },

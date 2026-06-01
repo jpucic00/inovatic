@@ -160,7 +160,7 @@ export async function assertGroupHasAvailableSpot(
       _count: {
         select: {
           preferredInquiries: {
-            where: { status: { notIn: ['DECLINED', 'ACCOUNT_CREATED'] } },
+            where: { status: 'NEW' },
           },
         },
       },
