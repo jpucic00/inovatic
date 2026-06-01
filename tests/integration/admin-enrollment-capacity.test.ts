@@ -251,6 +251,55 @@ describe('createStudentFromInquiry — capacity guardrail', () => {
   })
 })
 
+describe('createStudentFromInquiry — error contract (named-error mapping)', () => {
+  // After the string-match catch block was replaced with instanceof checks on
+  // named error classes (InquiryNotFoundError / GroupNotFoundError etc.), the
+  // localized Croatian copy lives only at the action-result boundary. These
+  // pin that copy so a careless edit shows up in a diff instead of silently
+  // demoting the error to the generic 'Greška pri kreiranju računa.' branch.
+  it('returns "Upit nije pronađen." for a non-existent inquiry', async () => {
+    const admin = await createAdmin()
+    const radionica = await createCourse({ isCustom: true })
+    const group = await createGroup({ courseId: radionica.id, maxStudents: 5 })
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const res = await createStudentFromInquiry('nonexistent-inquiry-id', group.id)
+
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toBe('Upit nije pronađen.')
+  })
+
+  it('returns "Grupa nije pronađena." for a valid inquiry but non-existent group', async () => {
+    const admin = await createAdmin()
+    const radionica = await createCourse({ isCustom: true })
+
+    const inquiry = await db.inquiry.create({
+      data: {
+        parentName: 'NoGroup Parent',
+        parentEmail: `nogroup-${Date.now()}@example.local`,
+        parentPhone: '+38500005',
+        childFirstName: 'Bez',
+        childLastName: 'Grupe',
+        childDateOfBirth: '2015-05-05',
+        consentGivenAt: new Date(),
+        courseId: radionica.id,
+        status: 'NEW',
+      },
+    })
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const res = await createStudentFromInquiry(inquiry.id, 'nonexistent-group-id')
+
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toBe('Grupa nije pronađena.')
+
+    // No account created and the inquiry stays NEW so the admin can retry.
+    const refreshed = await db.inquiry.findUnique({ where: { id: inquiry.id } })
+    expect(refreshed?.status).toBe('NEW')
+    expect(refreshed?.studentId).toBeNull()
+  })
+})
+
 describe('archived-school-year guard — enrollment-creating actions', () => {
   it('addEnrollment rejects when target group is in an archived school year', async () => {
     const admin = await createAdmin()

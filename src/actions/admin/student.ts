@@ -28,6 +28,38 @@ type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
 
 const GROUP_FULL_ERROR = 'Grupa je u međuvremenu popunjena.'
 
+// Named errors thrown inside the createStudentFromInquiry transaction to
+// short-circuit + roll back. The catch block maps each to its localized
+// action-result message via `instanceof`, so the Croatian copy lives only at
+// that boundary — not string-matched across throw + catch sites (which used to
+// silently demote to the generic error on any copy edit). Mirrors the
+// GroupFullError pattern in src/lib/group-capacity.ts. Local (not exported):
+// 'use server' modules may only export async functions, and every throw +
+// catch site is in this file.
+class InquiryNotFoundError extends Error {
+  constructor() {
+    super('Inquiry not found')
+  }
+}
+
+class InquiryAlreadyProcessedError extends Error {
+  constructor() {
+    super('Inquiry already processed')
+  }
+}
+
+class InquiryDeclinedError extends Error {
+  constructor() {
+    super('Inquiry declined')
+  }
+}
+
+class GroupNotFoundError extends Error {
+  constructor() {
+    super('Group not found')
+  }
+}
+
 export type StudentRow = {
   id: string
   firstName: string
@@ -203,7 +235,7 @@ async function ensureEnrollment(
       course: { select: { title: true, isCustom: true } },
     },
   })
-  if (!sg) throw new Error('Grupa nije pronađena.')
+  if (!sg) throw new GroupNotFoundError()
 
   const existingEnrollment = await tx.enrollment.findUnique({
     where: {
@@ -297,12 +329,12 @@ export async function createStudentFromInquiry(
   try {
     const result = await runWithGroupCapacityGuard(async (tx) => {
       const fresh = await tx.inquiry.findUnique({ where: { id: inquiryId } })
-      if (!fresh) throw new Error('Upit nije pronađen.')
+      if (!fresh) throw new InquiryNotFoundError()
       if (fresh.status === 'ACCOUNT_CREATED') {
-        throw new Error('Račun je već stvoren za ovaj upit.')
+        throw new InquiryAlreadyProcessedError()
       }
       if (fresh.status === 'DECLINED') {
-        throw new Error('Upit je odbijen.')
+        throw new InquiryDeclinedError()
       }
 
       // Free this inquiry's reservation BEFORE the capacity assertion so the
@@ -327,7 +359,7 @@ export async function createStudentFromInquiry(
       })
 
       if (!created.group) {
-        throw new Error('Grupa nije pronađena.')
+        throw new GroupNotFoundError()
       }
 
       await tx.inquiry.update({
@@ -343,16 +375,17 @@ export async function createStudentFromInquiry(
     if (err instanceof GroupFullError) {
       return { success: false, error: GROUP_FULL_ERROR, code: 'GROUP_FULL' }
     }
-    if (err instanceof Error) {
-      const msg = err.message
-      if (
-        msg === 'Upit nije pronađen.' ||
-        msg === 'Račun je već stvoren za ovaj upit.' ||
-        msg === 'Upit je odbijen.' ||
-        msg === 'Grupa nije pronađena.'
-      ) {
-        return { success: false, error: msg }
-      }
+    if (err instanceof InquiryNotFoundError) {
+      return { success: false, error: 'Upit nije pronađen.' }
+    }
+    if (err instanceof InquiryAlreadyProcessedError) {
+      return { success: false, error: 'Račun je već stvoren za ovaj upit.' }
+    }
+    if (err instanceof InquiryDeclinedError) {
+      return { success: false, error: 'Upit je odbijen.' }
+    }
+    if (err instanceof GroupNotFoundError) {
+      return { success: false, error: 'Grupa nije pronađena.' }
     }
     console.error('createStudentFromInquiry failed:', err)
     return { success: false, error: 'Greška pri kreiranju računa.' }
@@ -474,6 +507,13 @@ export async function createStudentManually(
   } catch (err) {
     if (err instanceof GroupFullError) {
       return { success: false, error: GROUP_FULL_ERROR, code: 'GROUP_FULL' }
+    }
+    // Symmetric application of the named-error pattern: ensureEnrollment throws
+    // GroupNotFoundError when data.groupId points at a missing group. Normally
+    // shadowed by the archivedGroupError pre-flight, but reachable if the group
+    // is deleted mid-tx — surface the specific message instead of the generic.
+    if (err instanceof GroupNotFoundError) {
+      return { success: false, error: 'Grupa nije pronađena.' }
     }
     console.error('createStudentManually failed:', err)
     return { success: false, error: 'Greška pri kreiranju učenika.' }
