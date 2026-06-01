@@ -121,8 +121,9 @@ sequenceDiagram
     Note over Parent, Admin: ALTERNATE EXITS
 
     alt Admin declines inquiry
-        Admin->>Server: updateInquiryStatus id DECLINED
-        Server->>Server: Status to DECLINED spot freed no automated email
+        Admin->>Server: declineInquiry(id, reason)
+        Server->>Server: Validate reason with Zod declineInquirySchema (trimmed min 3, max 2000)
+        Server->>Server: status DECLINED, declineReason persisted, spot freed, no automated email
     end
 
     alt Admin deletes inquiry

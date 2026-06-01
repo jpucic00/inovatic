@@ -57,7 +57,7 @@ flowchart LR
     end
 
     subgraph "Count decreases - spot freed"
-        F1[updateInquiryStatus to DECLINED]
+        F1[declineInquiry with reason]
         F2[deleteInquiry]
         F3[deleteEnrollment - hard delete row]
         F4[deleteModuleEnrollment - hard delete row]
@@ -80,6 +80,39 @@ flowchart LR
 > Note: When an inquiry transitions to ACCOUNT_CREATED, it stops counting as a preferred inquiry (filter excludes both DECLINED and ACCOUNT_CREATED). The new enrollment takes over the slot, so the net count stays the same.
 >
 > Note: `closeModuleSchedule` doesn't delete any `ModuleEnrollment` rows — it just moves `ModuleSchedule.endDate` to now. The "enrolling module" logic advances to the next module (by sortOrder) whose `startDate` is still in the future, so the displayed free-spot count flips to that next module's capacity.
+
+### Capacity Guard Pattern (write path)
+
+Every action that can take up a spot routes its mutation through the shared guard in `src/lib/group-capacity.ts`. The guard runs the mutation inside a `Serializable` transaction, re-checks capacity from inside that same snapshot, and throws `GroupFullError` rather than over-booking. Consumers: `submitInquiry`, `createStudentFromInquiry`, `createStudentManually`, `addEnrollment`.
+
+```mermaid
+flowchart TD
+    A["Enrollment write actions:<br/>submitInquiry · createStudentFromInquiry ·<br/>createStudentManually · addEnrollment"] --> B["runWithGroupCapacityGuard(fn)<br/>db.$transaction(fn, isolationLevel: Serializable)"]
+
+    B --> C["assertGroupHasAvailableSpot(tx, groupId)<br/>loads group + holidays inside the tx"]
+    C --> D["computeGroupCapacity<br/>standard: enrollments on the per-group<br/>next-enrolling module (weekday + holiday arc)<br/>radionica: enrollments.length"]
+    D --> E{"Spot free?<br/>enrolled + reservedInquiries(NEW) &lt; maxStudents"}
+
+    E -->|Yes| F["Run the mutation, commit, return result"]
+    E -->|No| G["throw GroupFullError"]
+
+    B -.->|P2034 serialization conflict| H{"Which attempt?"}
+    H -->|First| I["Re-run the whole tx once"]
+    I --> B
+    H -->|Second| K["Rethrow P2034"]
+
+    G --> FULL["Caller catches GroupFullError →<br/>public form: code GROUP_FULL + fresh programs payload<br/>admin dialogs: code GROUP_FULL + 'Grupa je u međuvremenu popunjena.'"]
+    K --> RETRY["Caller returns 'Pokušajte ponovno.'"]
+
+    style F fill:#d1fae5
+    style E fill:#e0f2fe
+    style G fill:#fee2e2
+    style FULL fill:#fee2e2
+    style K fill:#fee2e2
+    style RETRY fill:#fef3c7
+```
+
+> Note: `GroupFullError` is a domain signal, **not** a serialization failure — it propagates straight to the caller and is never retried. Only Prisma `P2034` (Serializable write-write conflict) triggers the single re-run inside `runWithGroupCapacityGuard`; a second `P2034` is rethrown for the caller to surface as a generic retry message.
 
 ---
 
