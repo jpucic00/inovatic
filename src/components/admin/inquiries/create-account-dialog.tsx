@@ -11,13 +11,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { UserPlus, Copy, ExternalLink } from 'lucide-react'
+import { UserPlus } from 'lucide-react'
 import { createStudentFromInquiry } from '@/actions/admin/student'
 import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { formatGroupSchedule } from '@/lib/format'
 import { toast } from 'sonner'
-import Link from 'next/link'
 
 type ModuleOption = {
   id: string
@@ -116,12 +115,6 @@ export function CreateAccountDialog({
   const [open, setOpen] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState(preferredGroupId ?? '')
   const [isPending, startTransition] = useTransition()
-  const [result, setResult] = useState<{
-    username: string
-    password: string
-    isExisting: boolean
-    studentId: string
-  } | null>(null)
   const router = useRouter()
   const [selectedCourseId, setSelectedCourseId] = useState(preferredCourseId ?? '')
   const [loadedGroups, setLoadedGroups] = useState<GroupOption[]>(initialGroups)
@@ -183,12 +176,18 @@ export function CreateAccountDialog({
         isStandardCourse && selectedScheduleIds.length > 0 ? selectedScheduleIds : undefined,
       )
       if (res.success) {
-        setResult(res)
-        toast.success(
-          res.isExisting
-            ? 'Dijete upisano u novu grupu (postojeći račun).'
-            : 'Račun kreiran i dijete upisano!',
-        )
+        if (res.emailFailed) {
+          toast.warning(
+            'Račun kreiran, ali slanje e-maila nije uspjelo — pristupni podaci su dostupni na profilu učenika.',
+          )
+        } else {
+          toast.success(
+            res.isExisting
+              ? 'Dijete upisano u novu grupu (postojeći račun).'
+              : 'Račun kreiran i dijete upisano. Otvorite profil učenika za pristupne podatke.',
+          )
+        }
+        setOpen(false)
         router.refresh()
       } else {
         toast.error(res.error ?? 'Greška pri kreiranju.')
@@ -201,13 +200,6 @@ export function CreateAccountDialog({
     })
   }
 
-  const copyCredentials = () => {
-    if (!result) return
-    const text = `Korisničko ime: ${result.username}\nLozinka: ${result.password}`
-    navigator.clipboard.writeText(text)
-    toast.success('Podaci kopirani.')
-  }
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -218,64 +210,14 @@ export function CreateAccountDialog({
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            {result ? 'Račun kreiran' : 'Kreiraj račun i upiši dijete'}
-          </DialogTitle>
+          <DialogTitle>Kreiraj račun i upiši dijete</DialogTitle>
           <DialogDescription>
-            {(() => {
-              if (!result) return `Odaberite grupu u koju želite upisati ${childName}.`
-              return result.isExisting
-                ? `${childName} je upisano u novu grupu s postojećim računom.`
-                : `Račun za ${childName} je uspješno kreiran.`
-            })()}
+            Odaberite grupu u koju želite upisati {childName}.
           </DialogDescription>
         </DialogHeader>
 
-        {result ? (
-          <div className="space-y-4 py-2">
-            {!result.isExisting && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <p className="text-sm font-medium text-green-800 mb-2">
-                  Pristupni podaci
-                </p>
-                <div className="font-mono text-sm text-gray-800 space-y-1">
-                  <p>
-                    <span className="text-gray-500">Korisničko ime:</span>{' '}
-                    {result.username}
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Lozinka:</span>{' '}
-                    {result.password}
-                  </p>
-                </div>
-                <button
-                  onClick={copyCredentials}
-                  className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200 transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  Kopiraj podatke
-                </button>
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <Link
-                href={`/admin/ucenici/${result.studentId}`}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded-lg hover:bg-cyan-100 transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Profil učenika
-              </Link>
-              <button
-                onClick={() => setOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Zatvori
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="py-2">
+        <>
+          <div className="py-2">
               <label htmlFor="course-select" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Program
               </label>
@@ -413,8 +355,7 @@ export function CreateAccountDialog({
                 {isPending ? 'Kreiram...' : 'Kreiraj račun i upiši'}
               </button>
             </DialogFooter>
-          </>
-        )}
+        </>
       </DialogContent>
     </Dialog>
   )

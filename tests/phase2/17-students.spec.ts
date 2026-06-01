@@ -6,8 +6,7 @@ import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 // Tests run serially: beforeAll creates one inquiry for create-from-inquiry
 // tests, then the suite exercises the student list, detail, create
 // (manual + from-inquiry), add/remove enrollment, delete (GDPR), and edge
-// cases (DOB-based dedup, username collision, diacritics, DECLINED blocking,
-// clipboard credentials copy).
+// cases (DOB-based dedup, username collision, diacritics, DECLINED blocking).
 // Requires: dev server on localhost:3000, seeded admin user, seeded standard
 // courses + groups (SLR 1..4 with at least one scheduled group each).
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -149,6 +148,37 @@ async function createStudentManuallyViaDialog(
   await dialog.getByRole('button', { name: 'Kreiraj učenika' }).click()
 }
 
+/**
+ * Searches the student list for `lastName`, opens every matching student's
+ * detail page, and returns the username shown in the "Pristupni podaci" card.
+ * The create dialog no longer surfaces the generated username, so the
+ * username-generation assertions read it off the detail page instead.
+ */
+async function readGeneratedUsernames(
+  page: Page,
+  lastName: string,
+  nameRegex: RegExp,
+): Promise<string[]> {
+  await page.goto(`${BASE}/admin/ucenici?search=${encodeURIComponent(lastName)}`)
+  const links = page.getByRole('link', { name: nameRegex })
+  await expect(links.first()).toBeVisible({ timeout: 10000 })
+  const hrefs = await links.evaluateAll((els) =>
+    els.map((el) => el.getAttribute('href') ?? ''),
+  )
+  const usernames: string[] = []
+  for (const href of hrefs) {
+    await page.goto(`${BASE}${href}`)
+    const username = (
+      await page
+        .locator('xpath=//dt[normalize-space()="Korisničko ime"]/following-sibling::dd')
+        .first()
+        .innerText()
+    ).trim()
+    usernames.push(username)
+  }
+  return usernames
+}
+
 // ─── Test suite ──────────────────────────────────────────────────────────────
 
 test.describe.serial('Phase 2 Step 8 — Student Management', () => {
@@ -190,11 +220,8 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
         firstName: searchName,
         lastName: `Pretraga${RUN_ID}`,
       })
-      await expect(page.locator('[role="dialog"]').getByText('Učenik kreiran')).toBeVisible({
-        timeout: 10000,
-      })
-      // Close dialog and search
-      await page.keyboard.press('Escape')
+      // Result modal dropped — the dialog closes itself on success.
+      await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 })
       await page.goto(`${BASE}/admin/ucenici?search=${encodeURIComponent(searchName)}`)
       await expect(page.getByRole('link', { name: new RegExp(searchName) })).toBeVisible()
     })
@@ -203,17 +230,16 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
   // ── Create student manually ────────────────────────────────────────────────
 
   test.describe('Create student manually', () => {
-    test('dialog creates student and shows credentials', async ({ page }) => {
+    test('dialog creates student, fires success toast, and closes', async ({ page }) => {
       await loginAsAdmin(page)
       await createStudentManuallyViaDialog(page, MANUAL_STUDENT)
 
-      // Result screen
-      const dialog = page.locator('[role="dialog"]')
-      await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 10000 })
-      await expect(dialog.getByText('Pristupni podaci')).toBeVisible()
-      await expect(dialog.getByText('Korisničko ime:')).toBeVisible()
-      await expect(dialog.getByText('Lozinka:')).toBeVisible()
-      await expect(dialog.getByRole('link', { name: 'Profil učenika' })).toBeVisible()
+      // The result modal was dropped — success is signalled by a toast that
+      // points the admin to the profile for credentials, and the dialog closes.
+      await expect(
+        page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+      ).toBeVisible({ timeout: 10000 })
+      await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 })
     })
 
     test('submit button is disabled until firstName and lastName are filled', async ({ page }) => {
@@ -360,12 +386,15 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
         lastName: `Brišemo${RUN_ID}`,
       }
       await createStudentManuallyViaDialog(page, disposable)
-      await expect(page.locator('[role="dialog"]').getByText('Učenik kreiran')).toBeVisible({
-        timeout: 10000,
-      })
+      // Result modal dropped — dialog closes on success; reach the profile via
+      // the student list instead of an in-dialog link.
+      await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 })
+      await page.goto(
+        `${BASE}/admin/ucenici?search=${encodeURIComponent(disposable.lastName)}`,
+      )
       await page
-        .locator('[role="dialog"]')
-        .getByRole('link', { name: 'Profil učenika' })
+        .getByRole('link', { name: new RegExp(`${disposable.firstName} ${disposable.lastName}`) })
+        .first()
         .click()
       await page.waitForURL(/\/admin\/ucenici\/[a-z0-9]+/)
 
@@ -401,25 +430,17 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
 
         await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: '2015-01-01' })
         await expect(
-          dialog.getByText('Učenik kreiran'),
-          'first creation succeeds',
+          page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+          'first creation → NEW account toast',
         ).toBeVisible({ timeout: 10000 })
-        await expect(
-          dialog.getByText('Pristupni podaci'),
-          'green credentials box → it is a NEW account',
-        ).toBeVisible()
-        await page.keyboard.press('Escape')
+        await expect(dialog, 'dialog closes on success').toBeHidden({ timeout: 10000 })
 
         await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: '2010-12-31' })
         await expect(
-          dialog.getByText('Učenik kreiran'),
-          'second creation (different DOB) succeeds',
+          page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+          'second creation (different DOB) → also a NEW account toast',
         ).toBeVisible({ timeout: 10000 })
-        await expect(
-          dialog.getByText('Pristupni podaci'),
-          'green credentials box → also a NEW account',
-        ).toBeVisible()
-        await page.keyboard.press('Escape')
+        await expect(dialog, 'dialog closes on success').toBeHidden({ timeout: 10000 })
 
         await page.goto(
           `${BASE}/admin/ucenici?search=${encodeURIComponent(sharedName.firstName)}`,
@@ -438,21 +459,16 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
 
         await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: DEDUP_DOB })
         await expect(
-          dialog.getByText('Učenik kreiran'),
-          'first creation succeeds',
+          page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+          'first creation → NEW account toast',
         ).toBeVisible({ timeout: 10000 })
-        await expect(
-          dialog.getByText('Pristupni podaci'),
-          'first creation → NEW account',
-        ).toBeVisible()
-        await page.keyboard.press('Escape')
+        await expect(dialog, 'dialog closes on success').toBeHidden({ timeout: 10000 })
 
         await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: DEDUP_DOB })
         await expect(
-          dialog.getByText('Pronađen je postojeći račun za ovo dijete.'),
-          'second creation surfaces "existing account found" message',
+          page.getByText('Postojeći učenik pronađen i ažuriran.'),
+          'second creation surfaces the "existing account" toast',
         ).toBeVisible({ timeout: 10000 })
-        await page.keyboard.press('Escape')
 
         await page.goto(
           `${BASE}/admin/ucenici?search=${encodeURIComponent(sharedName.firstName)}`,
@@ -479,33 +495,29 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
           lastName: baseLast,
           dateOfBirth: '2014-03-03',
         })
-        await expect(
-          dialog.getByText('Učenik kreiran'),
-          'first creation succeeds',
-        ).toBeVisible({ timeout: 10000 })
-        const firstUsername = await dialog
-          .locator('p', { hasText: 'Korisničko ime:' })
-          .first()
-          .innerText()
-        await page.keyboard.press('Escape')
+        await expect(dialog, 'first creation closes the dialog').toBeHidden({ timeout: 10000 })
 
         await createStudentManuallyViaDialog(page, {
           firstName: baseFirst,
           lastName: baseLast,
           dateOfBirth: '2014-04-04',
         })
-        await expect(
-          dialog.getByText('Učenik kreiran'),
-          'second creation succeeds (different DOB)',
-        ).toBeVisible({ timeout: 10000 })
-        const secondUsername = await dialog
-          .locator('p', { hasText: 'Korisničko ime:' })
-          .first()
-          .innerText()
+        await expect(dialog, 'second creation (different DOB) closes the dialog').toBeHidden({
+          timeout: 10000,
+        })
 
-        expect(firstUsername, 'colliding usernames are disambiguated').not.toBe(secondUsername)
-        expect(secondUsername, 'second username ends with numeric suffix "2"').toMatch(/2\s*$/)
-        await page.keyboard.press('Escape')
+        // Usernames are read off the detail pages now that the result modal is gone.
+        const usernames = await readGeneratedUsernames(
+          page,
+          baseLast,
+          new RegExp(`${baseFirst} ${baseLast}`),
+        )
+        expect(usernames, 'two colliding-name students were created').toHaveLength(2)
+        expect(usernames[0], 'colliding usernames are disambiguated').not.toBe(usernames[1])
+        expect(
+          usernames.some((u) => /2\s*$/.test(u)),
+          'one of the two usernames ends with the numeric suffix "2"',
+        ).toBe(true)
       })
 
       await test.step('E3 — diacritics: Šime Čović → ASCII letters (no š/č)', async () => {
@@ -516,15 +528,15 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
           lastName,
           dateOfBirth: '2013-07-07',
         })
-        await expect(
-          dialog.getByText('Učenik kreiran'),
-          'diacritic name creation succeeds',
-        ).toBeVisible({ timeout: 10000 })
-        const rawLine = await dialog
-          .locator('p', { hasText: 'Korisničko ime:' })
-          .first()
-          .innerText()
-        const username = rawLine.replace(/^[^:]*:\s*/, '').trim()
+        await expect(dialog, 'diacritic-name creation closes the dialog').toBeHidden({
+          timeout: 10000,
+        })
+
+        const [username] = await readGeneratedUsernames(
+          page,
+          lastName,
+          new RegExp(`${firstName} ${lastName}`),
+        )
         expect(username, 'no Croatian š/č in the generated username').not.toMatch(/[šč]/i)
         expect(
           username.toLowerCase(),
@@ -548,6 +560,8 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       await page.getByRole('button', { name: /Odbij/ }).click()
       const declineDialog = page.locator('[role="dialog"]')
       await expect(declineDialog).toBeVisible()
+      // The confirm button is gated on a decline reason (min 3 chars).
+      await declineDialog.locator('#decline-reason').fill('Nema slobodnih mjesta u grupi.')
       // Confirm button label in the decline dialog
       await declineDialog.getByRole('button', { name: /Odbij/ }).click()
       await expect(declineDialog).toBeHidden({ timeout: 10000 })
@@ -556,25 +570,6 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       await expect(
         page.getByRole('button', { name: 'Kreiraj račun i upiši' }),
       ).toHaveCount(0)
-    })
-
-    // E5 — clipboard: the "Kopiraj podatke" button should fire a success toast
-    test('E5 — copy credentials button shows a success toast', async ({ page, context }) => {
-      // Grant clipboard permissions so navigator.clipboard.writeText resolves
-      await context.grantPermissions(['clipboard-read', 'clipboard-write'])
-      await loginAsAdmin(page)
-
-      await createStudentManuallyViaDialog(page, {
-        firstName: `Clip${RUN_ID}`,
-        lastName: `Board${RUN_ID}`,
-        dateOfBirth: '2012-02-02',
-      })
-      const dialog = page.locator('[role="dialog"]')
-      await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 10000 })
-
-      await dialog.getByRole('button', { name: 'Kopiraj podatke' }).click()
-      // Sonner toast with success message
-      await expect(page.getByText('Podaci kopirani.')).toBeVisible({ timeout: 5000 })
     })
   })
 })

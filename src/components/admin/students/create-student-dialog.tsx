@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { UserPlus, Copy, ExternalLink } from 'lucide-react'
+import { UserPlus } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
 import { createStudentManually } from '@/actions/admin/student'
 import { getGroupsForCourseInSelectedYear } from '@/actions/admin/inquiry'
@@ -87,12 +86,6 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
   const [loadingGroups, setLoadingGroups] = useState(false)
 
   const [isPending, startTransition] = useTransition()
-  const [result, setResult] = useState<{
-    username: string
-    password: string
-    isExisting: boolean
-    studentId: string
-  } | null>(null)
 
   const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null
   const courseModules = selectedGroup?.course.modules ?? []
@@ -115,7 +108,6 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
     setSelectedGroupId('')
     setSelectedScheduleIds([])
     setGroups([])
-    setResult(null)
   }
 
   const handleCourseChange = async (courseId: string) => {
@@ -191,12 +183,18 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
             : undefined,
       })
       if (res.success) {
-        setResult(res)
-        toast.success(
-          res.isExisting
-            ? 'Postojeći učenik pronađen i ažuriran.'
-            : 'Račun učenika kreiran.',
-        )
+        if (res.emailFailed) {
+          toast.warning(
+            'Račun kreiran, ali slanje e-maila nije uspjelo — pristupni podaci su dostupni na profilu učenika.',
+          )
+        } else {
+          toast.success(
+            res.isExisting
+              ? 'Postojeći učenik pronađen i ažuriran.'
+              : 'Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.',
+          )
+        }
+        setOpen(false)
         router.refresh()
       } else {
         toast.error(res.error ?? 'Greška pri kreiranju.')
@@ -207,13 +205,6 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
         }
       }
     })
-  }
-
-  const copyCredentials = () => {
-    if (!result) return
-    const text = `Korisničko ime: ${result.username}\nLozinka: ${result.password}`
-    navigator.clipboard.writeText(text)
-    toast.success('Podaci kopirani.')
   }
 
   return (
@@ -232,63 +223,13 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
       </DialogTrigger>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {result ? 'Učenik kreiran' : 'Kreiraj učenika'}
-          </DialogTitle>
+          <DialogTitle>Kreiraj učenika</DialogTitle>
           <DialogDescription>
-            {(() => {
-              if (!result) return 'Unesite podatke djeteta. Upis u grupu i roditeljski podaci su neobavezni.'
-              return result.isExisting
-                ? 'Pronađen je postojeći račun za ovo dijete.'
-                : 'Novi račun je uspješno kreiran.'
-            })()}
+            Unesite podatke djeteta. Upis u grupu i roditeljski podaci su neobavezni.
           </DialogDescription>
         </DialogHeader>
 
-        {result ? (
-          <div className="space-y-4 py-2">
-            {!result.isExisting && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <p className="text-sm font-medium text-green-800 mb-2">
-                  Pristupni podaci
-                </p>
-                <div className="font-mono text-sm text-gray-800 space-y-1">
-                  <p>
-                    <span className="text-gray-500">Korisničko ime:</span>{' '}
-                    {result.username}
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Lozinka:</span>{' '}
-                    {result.password}
-                  </p>
-                </div>
-                <button
-                  onClick={copyCredentials}
-                  className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200 transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  Kopiraj podatke
-                </button>
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <Link
-                href={`/admin/ucenici/${result.studentId}`}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded-lg hover:bg-cyan-100 transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Profil učenika
-              </Link>
-              <button
-                onClick={() => setOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Zatvori
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-5">
+        <div className="space-y-5">
             {/* Child fields */}
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -567,8 +508,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
                 {isPending ? 'Kreiram...' : 'Kreiraj učenika'}
               </button>
             </DialogFooter>
-          </div>
-        )}
+        </div>
       </DialogContent>
     </Dialog>
   )
