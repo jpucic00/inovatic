@@ -49,7 +49,18 @@ export type StudentRow = {
 }
 
 type CreateStudentResult =
-  | { success: true; username: string; password: string; isExisting: boolean; studentId: string }
+  | {
+      success: true
+      username: string
+      password: string
+      isExisting: boolean
+      studentId: string
+      // Set only when a credentials email was attempted (RESEND_API_KEY present
+      // + recipient/group known) but the send threw. The account is created
+      // regardless; the dialog uses this to warn the admin that the password
+      // must be read off the student profile.
+      emailFailed?: true
+    }
   | { success: false; error: string; code?: 'GROUP_FULL' }
 
 const DIACRITICS_MAP: Record<string, string> = {
@@ -351,11 +362,20 @@ export async function createStudentFromInquiry(
     return { success: false, error: 'Grupa nije pronađena.' }
   }
 
+  // The account is already committed (the tx above). A credentials-email
+  // failure must NOT be reported as a creation failure: the admin would see an
+  // error, be unable to retry (the inquiry is already ACCOUNT_CREATED), and the
+  // student would be orphaned. Swallow, flag, and fall through to the success
+  // path — the password stays readable on the student profile.
+  let emailFailed = false
   try {
     await sendInquiryCredentialsEmail(inquiry, core)
   } catch (err) {
-    console.error('createStudentFromInquiry failed:', err)
-    return { success: false, error: 'Greška pri kreiranju računa.' }
+    emailFailed = true
+    console.error(
+      'createStudentFromInquiry: credentials email failed (account still created):',
+      describeEmailError(err),
+    )
   }
 
   revalidatePath('/admin/upiti')
@@ -368,7 +388,17 @@ export async function createStudentFromInquiry(
     password: core.password,
     isExisting: core.isExisting,
     studentId: core.user.id,
+    ...(emailFailed ? { emailFailed: true } : {}),
   }
+}
+
+/**
+ * Reduce a thrown email error to a safe log token. Resend rejections can carry
+ * request context (recipient, rendered body); we never want the API key or any
+ * email content in logs, so surface only the error's name.
+ */
+function describeEmailError(err: unknown): string {
+  return err instanceof Error ? err.name : 'UnknownError'
 }
 
 type InquiryEmailContext = {
@@ -449,16 +479,19 @@ export async function createStudentManually(
     return { success: false, error: 'Greška pri kreiranju učenika.' }
   }
 
-  try {
-    // Send credentials email only when we have both a parent email AND
-    // initial group assignment. For new accounts only (skip deduped existing).
-    const parentEmail = data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null
-    if (
-      !core.isExisting &&
-      parentEmail &&
-      core.group &&
-      process.env.RESEND_API_KEY
-    ) {
+  // Send credentials email only when we have both a parent email AND initial
+  // group assignment. For new accounts only (skip deduped existing). The
+  // student row is already committed (the tx above), so a send failure is
+  // swallowed-and-flagged rather than surfaced as a creation failure.
+  let emailFailed = false
+  const parentEmail = data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null
+  if (
+    !core.isExisting &&
+    parentEmail &&
+    core.group &&
+    process.env.RESEND_API_KEY
+  ) {
+    try {
       const childName = `${data.firstName} ${data.lastName}`.trim()
       const schedule = formatGroupSchedule({
         isCustom: core.group.course.isCustom,
@@ -484,21 +517,25 @@ export async function createStudentManually(
           locationName: core.group.location.name,
         }),
       })
+    } catch (err) {
+      emailFailed = true
+      console.error(
+        'createStudentManually: credentials email failed (student still created):',
+        describeEmailError(err),
+      )
     }
+  }
 
-    revalidatePath('/admin/ucenici')
-    revalidatePath(`/admin/ucenici/${core.user.id}`)
+  revalidatePath('/admin/ucenici')
+  revalidatePath(`/admin/ucenici/${core.user.id}`)
 
-    return {
-      success: true,
-      username: core.user.username ?? '',
-      password: core.password,
-      isExisting: core.isExisting,
-      studentId: core.user.id,
-    }
-  } catch (err) {
-    console.error('createStudentManually failed:', err)
-    return { success: false, error: 'Greška pri kreiranju učenika.' }
+  return {
+    success: true,
+    username: core.user.username ?? '',
+    password: core.password,
+    isExisting: core.isExisting,
+    studentId: core.user.id,
+    ...(emailFailed ? { emailFailed: true } : {}),
   }
 }
 

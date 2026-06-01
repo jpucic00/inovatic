@@ -1,6 +1,7 @@
-import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import type { Mock } from 'vitest'
 import { db } from '@/lib/db'
+import { resend } from '@/lib/email'
 import { mockSession } from './setup'
 import {
   createAdmin,
@@ -411,5 +412,173 @@ describe('group pickers — scope by selected school year', () => {
     setSelectedYearCookie(undefined)
     res = await getGroupsForCourse(radionica.id)
     expect(res.map((g) => g.id)).toEqual([currentGroup.id])
+  })
+})
+
+describe('createStudent* — Resend failure is non-fatal', () => {
+  // The file's beforeAll deletes RESEND_API_KEY so the email branch is normally
+  // skipped. Here we set a dummy key + spy on resend.emails.send so the branch
+  // actually runs without touching the network, then restore both per test.
+  let sendSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    process.env.RESEND_API_KEY = 'test_resend_key'
+    sendSpy = vi
+      .spyOn(resend.emails, 'send')
+      .mockResolvedValue({ data: { id: 'sent' }, error: null } as Awaited<
+        ReturnType<typeof resend.emails.send>
+      >)
+  })
+
+  afterEach(() => {
+    sendSpy.mockRestore()
+    delete process.env.RESEND_API_KEY
+  })
+
+  async function makeRadionicaGroup() {
+    const location = await createLocation()
+    const radionica = await createCourse({ isCustom: true })
+    const group = await createGroup({
+      courseId: radionica.id,
+      locationId: location.id,
+      maxStudents: 5,
+    })
+    return { radionica, group }
+  }
+
+  it('createStudentFromInquiry: email throw → account still created + emailFailed flag', async () => {
+    sendSpy.mockRejectedValue(new Error('boom'))
+    const admin = await createAdmin()
+    const { radionica, group } = await makeRadionicaGroup()
+
+    const inquiry = await db.inquiry.create({
+      data: {
+        parentName: 'Mail Fail Parent',
+        parentEmail: `mailfail-${Date.now()}@example.local`,
+        parentPhone: '+38500003',
+        childFirstName: 'Mail',
+        childLastName: 'Fail',
+        childDateOfBirth: '2015-01-01',
+        consentGivenAt: new Date(),
+        courseId: radionica.id,
+        scheduledGroupId: group.id,
+        status: 'NEW',
+      },
+    })
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const res = await createStudentFromInquiry(inquiry.id, group.id)
+
+    expect(res.success).toBe(true)
+    if (res.success) {
+      expect(res.emailFailed).toBe(true)
+      expect(res.studentId).toBeDefined()
+    }
+    expect(sendSpy).toHaveBeenCalledTimes(1)
+
+    // Success-path contract held despite the throw: account + enrollment exist,
+    // inquiry flipped to ACCOUNT_CREATED and back-references the student.
+    const refreshed = await db.inquiry.findUnique({ where: { id: inquiry.id } })
+    expect(refreshed?.status).toBe('ACCOUNT_CREATED')
+    expect(refreshed?.assignedGroupId).toBe(group.id)
+    if (res.success) {
+      expect(refreshed?.studentId).toBe(res.studentId)
+      const enrollments = await db.enrollment.count({
+        where: { userId: res.studentId, scheduledGroupId: group.id },
+      })
+      expect(enrollments).toBe(1)
+    }
+  })
+
+  it('createStudentFromInquiry: email succeeds → success path unchanged (no emailFailed)', async () => {
+    const admin = await createAdmin()
+    const { radionica, group } = await makeRadionicaGroup()
+
+    const inquiry = await db.inquiry.create({
+      data: {
+        parentName: 'Mail OK Parent',
+        parentEmail: `mailok-${Date.now()}@example.local`,
+        parentPhone: '+38500004',
+        childFirstName: 'Mail',
+        childLastName: 'Ok',
+        childDateOfBirth: '2015-03-03',
+        consentGivenAt: new Date(),
+        courseId: radionica.id,
+        scheduledGroupId: group.id,
+        status: 'NEW',
+      },
+    })
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const res = await createStudentFromInquiry(inquiry.id, group.id)
+
+    expect(res.success).toBe(true)
+    if (res.success) expect(res.emailFailed).toBeUndefined()
+    expect(sendSpy).toHaveBeenCalledTimes(1)
+
+    const refreshed = await db.inquiry.findUnique({ where: { id: inquiry.id } })
+    expect(refreshed?.status).toBe('ACCOUNT_CREATED')
+  })
+
+  it('createStudentManually: email throw → student still created + emailFailed flag', async () => {
+    sendSpy.mockRejectedValue(new Error('boom'))
+    const admin = await createAdmin()
+    const { group } = await makeRadionicaGroup()
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const res = await createStudentManually({
+      firstName: 'Manual',
+      lastName: 'Mailfail',
+      dateOfBirth: '2015-02-02',
+      parentName: 'Parent',
+      parentEmail: `manual-mailfail-${Date.now()}@example.local`,
+      parentPhone: null,
+      childSchool: null,
+      groupId: group.id,
+      moduleScheduleIds: [],
+    })
+
+    expect(res.success).toBe(true)
+    if (res.success) {
+      expect(res.emailFailed).toBe(true)
+      expect(res.studentId).toBeDefined()
+    }
+    expect(sendSpy).toHaveBeenCalledTimes(1)
+
+    const created = await db.user.findFirst({
+      where: { firstName: 'Manual', lastName: 'Mailfail' },
+    })
+    expect(created).not.toBeNull()
+    const enrollments = await db.enrollment.count({
+      where: { userId: created?.id ?? '', scheduledGroupId: group.id },
+    })
+    expect(enrollments).toBe(1)
+  })
+
+  it('createStudentManually: email succeeds → success path unchanged (no emailFailed)', async () => {
+    const admin = await createAdmin()
+    const { group } = await makeRadionicaGroup()
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const res = await createStudentManually({
+      firstName: 'Manual',
+      lastName: 'Mailok',
+      dateOfBirth: '2015-04-04',
+      parentName: 'Parent',
+      parentEmail: `manual-mailok-${Date.now()}@example.local`,
+      parentPhone: null,
+      childSchool: null,
+      groupId: group.id,
+      moduleScheduleIds: [],
+    })
+
+    expect(res.success).toBe(true)
+    if (res.success) expect(res.emailFailed).toBeUndefined()
+    expect(sendSpy).toHaveBeenCalledTimes(1)
+
+    const created = await db.user.findFirst({
+      where: { firstName: 'Manual', lastName: 'Mailok' },
+    })
+    expect(created).not.toBeNull()
   })
 })
