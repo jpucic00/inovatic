@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowDownToLine, ArrowUpFromLine, Trash2, X } from 'lucide-react'
@@ -209,9 +209,30 @@ export function HolidayCalendar({
   const [editing, setEditing] = useState<DialogState | null>(null)
   const [name, setName] = useState('')
   const [attendanceConflict, setAttendanceConflict] = useState<number | null>(null)
-  // Cell key staged as the start of a range — set on first single click,
-  // consumed by the second click on a different empty cell.
+  // Cell key staged as the start of a range — set on first single click that
+  // *isn't* part of a double-click, consumed by the next click on another cell.
   const [rangeStart, setRangeStart] = useState<string | null>(null)
+  // Click-vs-double-click disambiguation. The first click on an empty cell
+  // doesn't commit `rangeStart` immediately — it goes into a ref and a 250 ms
+  // timer. If a second click arrives in time we resolve it without ever
+  // showing the banner (so the calendar doesn't shift mid-action). If not,
+  // the timer fires and the banner takes over for slow-path range selection.
+  const pendingClickRef = useRef<CellState | null>(null)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function clearPendingClick() {
+    if (clickTimerRef.current !== null) {
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+    }
+    pendingClickRef.current = null
+  }
+
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current !== null) clearTimeout(clickTimerRef.current)
+    }
+  }, [])
 
   const months = useMemo(() => monthsForSchoolYear(schoolYear), [schoolYear])
 
@@ -256,6 +277,7 @@ export function HolidayCalendar({
   const isRange = editing !== null && editing.startKey !== editing.endKey
 
   function openSingle(cell: CellState) {
+    clearPendingClick()
     setRangeStart(null)
     const holidayKeys = new Set(holidaysByDate.keys())
     const block = findHolidayBlock(cell.key, holidayKeys)
@@ -274,6 +296,7 @@ export function HolidayCalendar({
   }
 
   function openRange(a: CellState, b: CellState) {
+    clearPendingClick()
     setRangeStart(null)
     const [start, end] = a.key < b.key ? [a, b] : [b, a]
     setEditing({
@@ -298,31 +321,52 @@ export function HolidayCalendar({
       openSingle(cell)
       return
     }
-    // No range pending yet → stage this cell as start.
-    if (rangeStart === null) {
+    // Second click inside the disambiguation window: resolve without ever
+    // letting the rangeStart banner appear (so the calendar doesn't shift).
+    const pending = pendingClickRef.current
+    if (pending !== null) {
+      if (pending.key === cell.key) {
+        // Same cell twice quickly → single-day (this is the "double-click"
+        // affordance; works regardless of whether the browser dblclick fires).
+        openSingle(cell)
+      } else {
+        // Two different cells in quick succession → range, no banner flash.
+        openRange(pending, cell)
+      }
+      return
+    }
+    // Range start already committed via the banner (slow-path follow-up click).
+    if (rangeStart !== null) {
+      if (rangeStart === cell.key) {
+        openSingle(cell)
+        return
+      }
+      const startCell = cellsByKey.get(rangeStart)
+      if (!startCell) {
+        // Staged cell belonged to a different month rendering pass — fall
+        // back to a single-day open so the user isn't stuck.
+        openSingle(cell)
+        return
+      }
+      openRange(startCell, cell)
+      return
+    }
+    // Fresh single click — wait briefly to see if a second click follows.
+    // If it does, handleCellClick re-enters via `pending` and resolves
+    // directly; if not, the timer fires and we stage the banner.
+    pendingClickRef.current = cell
+    clickTimerRef.current = setTimeout(() => {
       setRangeStart(cell.key)
-      return
-    }
-    // Clicking the staged cell again commits as single-day (also makes the
-    // double-click shortcut work — the browser fires two clicks before
-    // dblclick, so the second click lands here and opens the dialog).
-    if (rangeStart === cell.key) {
-      openSingle(cell)
-      return
-    }
-    // Different empty cell → commit the range.
-    const startCell = cellsByKey.get(rangeStart)
-    if (!startCell) {
-      // Range start belonged to a different month rendering pass — fall back
-      // to a single-day open on the current cell so the user isn't stuck.
-      openSingle(cell)
-      return
-    }
-    openRange(startCell, cell)
+      pendingClickRef.current = null
+      clickTimerRef.current = null
+    }, 250)
   }
 
   function handleCellDoubleClick(cell: CellState) {
     if (archived) return
+    // Safety net for browsers/OSs where dblclick fires but our click-handler
+    // disambiguation missed it. openSingle is idempotent so calling it twice
+    // (once via the second click, once via dblclick) is harmless.
     openSingle(cell)
   }
 
