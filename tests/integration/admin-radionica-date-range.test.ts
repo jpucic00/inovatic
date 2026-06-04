@@ -193,7 +193,7 @@ describe('getGroupAttendance — radionica session enumeration', () => {
     mockSession({ id: teacher.id, role: 'TEACHER' })
 
     const data = await getGroupAttendance(group.id)
-    expect(data.isCustom).toBe(true)
+    if (data.kind !== 'custom') throw new Error('expected custom kind')
     expect(data.dateStart).toBe('2026-07-15')
     expect(data.dateEnd).toBe('2026-07-19')
     expect(data.expectedSessions).toEqual([
@@ -215,10 +215,11 @@ describe('getGroupAttendance — radionica session enumeration', () => {
     mockSession({ id: teacher.id, role: 'TEACHER' })
 
     const data = await getGroupAttendance(group.id)
-    expect(data.isCustom).toBe(false)
+    if (data.kind !== 'standard') throw new Error('expected standard kind')
     expect(data.dateStart).toBeNull()
     expect(data.dateEnd).toBeNull()
-    // No module schedules → no expected sessions, but the action shouldn't throw.
-    expect(data.expectedSessions).toEqual([])
+    // No course modules → no sections, but the action shouldn't throw.
+    expect(data.sections).toEqual([])
+    expect(data.otherDates).toEqual([])
   })
 })

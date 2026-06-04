@@ -4,11 +4,17 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
 import {
-  computeExpectedSessions,
   computeRadionicaSessions,
   fromDateKey,
+  todayUtc,
   toDateKey,
 } from '@/lib/session-dates'
+import {
+  getActiveModuleForGroup,
+  getGroupModuleArc,
+  type GroupModuleArcEntry,
+} from '@/lib/group-module-arc'
+import { assignAdhocDateToSection } from '@/lib/attendance-sections'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import {
   bulkMarkSessionSchema,
@@ -32,29 +38,58 @@ export type AttendanceRecord = {
   recordedByDeleted: boolean
 }
 
-type GroupAttendance = {
+export type AttendanceModuleSection = {
+  /** FK target for `ModuleEnrollment.moduleScheduleId`. Null = placeholder safety-net for a module without a schedule row. */
+  moduleScheduleId: string | null
+  moduleId: string
+  /** 1-based ordinal by sortOrder. */
+  moduleIndex: number
+  moduleTitle: string
+  /** 7 race-ahead dates (0 for placeholder), YYYY-MM-DD ascending. */
+  expectedSessions: string[]
+  /** Record-only dates that land inside this module's [firstSession, lastSession] window. */
+  adhocSessions: string[]
+  /** Enrollment IDs of students in this module's ModuleEnrollment. */
+  enrolledEnrollmentIds: string[]
+  firstSession: string | null
+  lastSession: string | null
+}
+
+type GroupAttendanceBase = {
   groupId: string
   schoolYear: string
-  isCustom: boolean
   dayOfWeek: string | null
   dateStart: string | null
   dateEnd: string | null
   startTime: string | null
   endTime: string | null
-  expectedSessions: string[] // YYYY-MM-DD, ascending
-  extraSessions: string[] // sessionDates with records that fall outside expectedSessions
   roster: AttendanceRosterRow[]
   records: AttendanceRecord[]
 }
 
+export type GroupAttendance =
+  | (GroupAttendanceBase & {
+      kind: 'custom'
+      expectedSessions: string[]
+      extraSessions: string[]
+    })
+  | (GroupAttendanceBase & {
+      kind: 'standard'
+      sections: AttendanceModuleSection[]
+      /** Record-only dates that don't land inside any module window. */
+      otherDates: string[]
+      /** Pre-computed initial selection so the component stays dumb. */
+      defaultSelectedDate: string
+    })
+
 /**
- * Returns everything the Dolazak tab needs to render: the roster for the
- * current school year, the expected weekly session dates implied by the
- * group's schedule + module windows, plus existing Attendance rows.
- * Dates on records that aren't in the expected list (e.g. makeup sessions
- * recorded manually) surface in `extraSessions` so the UI can still show them.
+ * Returns everything the Dolazak tab needs. For standard programs the dates
+ * are sliced into 4 race-ahead module sections (per-group, holiday-aware via
+ * `loadHolidayDateKeys`); for radionice the flat list is preserved.
  */
-export async function getGroupAttendance(groupId: string): Promise<GroupAttendance> {
+export async function getGroupAttendance(
+  groupId: string,
+): Promise<GroupAttendance> {
   await assertTeacherOwnsGroup(groupId)
 
   const group = await db.scheduledGroup.findUniqueOrThrow({
@@ -68,36 +103,33 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
       startTime: true,
       endTime: true,
       courseId: true,
-      course: { select: { isCustom: true } },
+      course: {
+        select: {
+          isCustom: true,
+          modules: {
+            select: {
+              id: true,
+              title: true,
+              sortOrder: true,
+              schedules: {
+                select: {
+                  id: true,
+                  schoolYear: true,
+                  startDate: true,
+                  endDate: true,
+                },
+              },
+            },
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      },
     },
   })
 
   const schoolYear = group.schoolYear
   const isCustom = group.course.isCustom
-
-  const [schedules, holidayDates] = await Promise.all([
-    isCustom
-      ? Promise.resolve([])
-      : db.moduleSchedule.findMany({
-          where: { schoolYear, module: { courseId: group.courseId } },
-          select: { startDate: true, endDate: true },
-        }),
-    loadHolidayDateKeys(schoolYear),
-  ])
-
-  const expectedDates = isCustom
-    ? computeRadionicaSessions({
-        dateStart: group.dateStart,
-        dateEnd: group.dateEnd,
-        holidayDates,
-      })
-    : computeExpectedSessions({
-        dayOfWeek: group.dayOfWeek,
-        moduleWindows: schedules.map((s) => ({ startDate: s.startDate, endDate: s.endDate })),
-        holidayDates,
-      })
-  const expectedSessions = expectedDates.map(toDateKey)
-  const expectedSet = new Set(expectedSessions)
+  const holidayDates = await loadHolidayDateKeys(schoolYear)
 
   const enrollments = await db.enrollment.findMany({
     where: { scheduledGroupId: groupId, schoolYear },
@@ -106,10 +138,15 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
       user: {
         select: { id: true, firstName: true, lastName: true },
       },
+      moduleEnrollments: {
+        select: { moduleScheduleId: true },
+      },
       attendances: {
         orderBy: { sessionDate: 'asc' },
         include: {
-          recordedBy: { select: { firstName: true, lastName: true, deletedAt: true } },
+          recordedBy: {
+            select: { firstName: true, lastName: true, deletedAt: true },
+          },
         },
       },
     },
@@ -123,14 +160,11 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
   }))
 
   const records: AttendanceRecord[] = []
-  const extraSet = new Set<string>()
-
   for (const e of enrollments) {
     for (const a of e.attendances) {
-      const key = toDateKey(a.sessionDate)
       records.push({
         enrollmentId: e.id,
-        sessionDate: key,
+        sessionDate: toDateKey(a.sessionDate),
         present: a.present,
         note: a.note,
         recordedBy: a.recordedBy
@@ -138,24 +172,136 @@ export async function getGroupAttendance(groupId: string): Promise<GroupAttendan
           : null,
         recordedByDeleted: a.recordedBy?.deletedAt != null,
       })
-      if (!expectedSet.has(key)) extraSet.add(key)
     }
   }
 
-  return {
+  const base: GroupAttendanceBase = {
     groupId: group.id,
     schoolYear,
-    isCustom,
     dayOfWeek: group.dayOfWeek,
     dateStart: group.dateStart,
     dateEnd: group.dateEnd,
     startTime: group.startTime,
     endTime: group.endTime,
-    expectedSessions,
-    extraSessions: Array.from(extraSet).sort((a, b) => a.localeCompare(b)),
     roster,
     records,
   }
+
+  if (isCustom) {
+    const expectedDates = computeRadionicaSessions({
+      dateStart: group.dateStart,
+      dateEnd: group.dateEnd,
+      holidayDates,
+    })
+    const expectedSessions = expectedDates.map(toDateKey)
+    const expectedSet = new Set(expectedSessions)
+    const extraSet = new Set<string>()
+    for (const r of records) {
+      if (!expectedSet.has(r.sessionDate)) extraSet.add(r.sessionDate)
+    }
+    return {
+      ...base,
+      kind: 'custom',
+      expectedSessions,
+      extraSessions: Array.from(extraSet).sort((a, b) => a.localeCompare(b)),
+    }
+  }
+
+  // Standard branch: build race-ahead arc, then map to sections.
+  const modulesForArc = group.course.modules.map((m) => {
+    const schedule = m.schedules.find((s) => s.schoolYear === schoolYear)
+    return {
+      id: m.id,
+      title: m.title,
+      sortOrder: m.sortOrder,
+      schedule: schedule
+        ? { id: schedule.id, startDate: schedule.startDate, endDate: schedule.endDate }
+        : null,
+    }
+  })
+  const arc = getGroupModuleArc({
+    dayOfWeek: group.dayOfWeek,
+    modules: modulesForArc,
+    holidayDates,
+  })
+  const arcByModuleId = new Map(arc.map((e) => [e.moduleId, e]))
+
+  const sections: AttendanceModuleSection[] = group.course.modules.map((m, idx) => {
+    const arcEntry = arcByModuleId.get(m.id) ?? null
+    const enrolledEnrollmentIds = arcEntry
+      ? enrollments
+          .filter((e) =>
+            e.moduleEnrollments.some(
+              (me) => me.moduleScheduleId === arcEntry.moduleScheduleId,
+            ),
+          )
+          .map((e) => e.id)
+      : []
+    return {
+      moduleScheduleId: arcEntry?.moduleScheduleId ?? null,
+      moduleId: m.id,
+      moduleIndex: idx + 1,
+      moduleTitle: m.title,
+      expectedSessions: arcEntry ? arcEntry.sessionDates.map(toDateKey) : [],
+      adhocSessions: [],
+      enrolledEnrollmentIds,
+      firstSession: arcEntry ? toDateKey(arcEntry.firstSession) : null,
+      lastSession: arcEntry ? toDateKey(arcEntry.lastSession) : null,
+    }
+  })
+
+  // Bucket record-only dates (Attendance rows whose date isn't in any module's
+  // expected list) into the matching section, or surface as "Ostali termini".
+  const expectedSet = new Set<string>()
+  for (const s of sections) for (const d of s.expectedSessions) expectedSet.add(d)
+  const otherSet = new Set<string>()
+  for (const r of records) {
+    if (expectedSet.has(r.sessionDate)) continue
+    const idx = assignAdhocDateToSection(r.sessionDate, sections)
+    if (idx === null) otherSet.add(r.sessionDate)
+    else if (!sections[idx].adhocSessions.includes(r.sessionDate)) {
+      sections[idx].adhocSessions.push(r.sessionDate)
+    }
+  }
+  for (const s of sections) s.adhocSessions.sort((a, b) => a.localeCompare(b))
+
+  return {
+    ...base,
+    kind: 'standard',
+    sections,
+    otherDates: Array.from(otherSet).sort((a, b) => a.localeCompare(b)),
+    defaultSelectedDate: pickDefaultSelectedDate(arc, sections),
+  }
+}
+
+function pickDefaultSelectedDate(
+  arc: GroupModuleArcEntry[],
+  sections: AttendanceModuleSection[],
+): string {
+  const today = toDateKey(todayUtc())
+  if (arc.length > 0) {
+    const state = getActiveModuleForGroup(arc, todayUtc())
+    const inProgress = state.inProgressModule
+    if (inProgress) {
+      const dates = inProgress.sessionDates.map(toDateKey)
+      if (dates.includes(today)) return today
+      const past = dates.filter((d) => d <= today)
+      if (past.length > 0) return past.at(-1)!
+      return dates[0]
+    }
+    if (state.lastCompletedModule) {
+      const dates = state.lastCompletedModule.sessionDates.map(toDateKey)
+      const past = dates.filter((d) => d <= today)
+      return past.at(-1) ?? dates.at(-1) ?? today
+    }
+    if (state.nextEnrollingModule) {
+      return toDateKey(state.nextEnrollingModule.firstSession)
+    }
+  }
+  for (const s of sections) {
+    if (s.expectedSessions.length > 0) return s.expectedSessions[0]
+  }
+  return today
 }
 
 /**

@@ -10,19 +10,5 @@ export default async function TeacherGroupDolazakPage({
   const { groupId } = await params
   const data = await getGroupAttendance(groupId)
 
-  return (
-    <AttendanceMarker
-      groupId={data.groupId}
-      isCustom={data.isCustom}
-      dayOfWeek={data.dayOfWeek}
-      dateStart={data.dateStart}
-      dateEnd={data.dateEnd}
-      startTime={data.startTime}
-      endTime={data.endTime}
-      expectedSessions={data.expectedSessions}
-      extraSessions={data.extraSessions}
-      roster={data.roster}
-      records={data.records}
-    />
-  )
+  return <AttendanceMarker {...data} />
 }

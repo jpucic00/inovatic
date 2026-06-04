@@ -104,9 +104,20 @@ export async function seedStudentInGroup(
 
   const group = await db.scheduledGroup.findUnique({
     where: { id: groupId },
-    select: { schoolYear: true },
+    select: { schoolYear: true, courseId: true },
   })
   if (!group) throw new Error(`seedStudentInGroup: group ${groupId} not found`)
+
+  // Mirror the admin UI ("Kreiraj učenika" defaults to "Svi moduli"): enroll
+  // the student in every ModuleSchedule for the group's course + school year.
+  // Without this, the per-module attendance filter would hide the student.
+  const moduleSchedules = await db.moduleSchedule.findMany({
+    where: {
+      schoolYear: group.schoolYear,
+      module: { courseId: group.courseId },
+    },
+    select: { id: true },
+  })
 
   const result = await db.$transaction(async (tx) => {
     const user = await tx.user.create({
@@ -125,13 +136,18 @@ export async function seedStudentInGroup(
         role: 'STUDENT',
       },
     })
-    await tx.enrollment.create({
+    const enrollment = await tx.enrollment.create({
       data: {
         userId: user.id,
         scheduledGroupId: groupId,
         schoolYear: group.schoolYear,
       },
     })
+    for (const ms of moduleSchedules) {
+      await tx.moduleEnrollment.create({
+        data: { enrollmentId: enrollment.id, moduleScheduleId: ms.id },
+      })
+    }
     return user
   })
 

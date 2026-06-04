@@ -372,15 +372,34 @@ describe('getGroupAttendance — honours holidays', () => {
 
     mockSession({ id: teacher.id, role: 'TEACHER' })
     const before = await getGroupAttendance(group.id)
-    expect(before.expectedSessions).toEqual(['2027-01-04', '2027-01-11', '2027-01-18', '2027-01-25'])
+    if (before.kind !== 'standard') throw new Error('expected standard kind')
+    // Race-ahead arc: 7 Mondays from the module's startDate, regardless of endDate.
+    expect(before.sections[0].expectedSessions).toEqual([
+      '2027-01-04',
+      '2027-01-11',
+      '2027-01-18',
+      '2027-01-25',
+      '2027-02-01',
+      '2027-02-08',
+      '2027-02-15',
+    ])
 
-    // Mark Jan 11 as a holiday.
+    // Mark Jan 11 as a holiday — the arc should skip it and push the 7th session one week out.
     mockSession({ id: admin.id, role: 'ADMIN' })
     await upsertHoliday({ schoolYear: SY, date: '2027-01-11', name: 'Test praznik' })
 
     mockSession({ id: teacher.id, role: 'TEACHER' })
     const after = await getGroupAttendance(group.id)
-    expect(after.expectedSessions).toEqual(['2027-01-04', '2027-01-18', '2027-01-25'])
+    if (after.kind !== 'standard') throw new Error('expected standard kind')
+    expect(after.sections[0].expectedSessions).toEqual([
+      '2027-01-04',
+      '2027-01-18',
+      '2027-01-25',
+      '2027-02-01',
+      '2027-02-08',
+      '2027-02-15',
+      '2027-02-22',
+    ])
   })
 })
 
