@@ -20,6 +20,7 @@ import {
 } from '@/lib/group-capacity'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
+import { studentIdentityWhere } from '@/lib/student-match'
 import { AccountCredentialsEmail } from '../../../emails/account-credentials'
 import { formatGroupSchedule } from '@/lib/format'
 import type { PaginatedResult } from './inquiry'
@@ -162,14 +163,10 @@ async function findOrCreateStudent(
   tx: TxClient,
   input: CoreInput,
 ): Promise<{ user: { id: string; username: string | null }; password: string; isExisting: boolean }> {
-  const existingStudent = input.dateOfBirth
+  const identityWhere = studentIdentityWhere(input)
+  const existingStudent = identityWhere
     ? await tx.user.findFirst({
-        where: {
-          role: 'STUDENT',
-          firstName: { equals: input.firstName, mode: 'insensitive' },
-          lastName: { equals: input.lastName, mode: 'insensitive' },
-          dateOfBirth: input.dateOfBirth,
-        },
+        where: identityWhere,
         select: { id: true, username: true, plainPassword: true },
       })
     : null
@@ -412,7 +409,10 @@ export async function createStudentFromInquiry(
   }
 
   revalidatePath('/admin/upiti')
-  revalidatePath(`/admin/upiti/${inquiryId}`)
+  // Creating this student may make OTHER inquiries with the same child identity
+  // read as "Ponovni upis", so revalidate every inquiry detail page, not just
+  // the one we processed.
+  revalidatePath('/admin/upiti/[id]', 'page')
   revalidatePath('/admin/ucenici')
 
   return {
@@ -568,6 +568,9 @@ export async function createStudentManually(
 
   revalidatePath('/admin/ucenici')
   revalidatePath(`/admin/ucenici/${core.user.id}`)
+  // A newly created student can flip matching inquiries to "Ponovni upis".
+  revalidatePath('/admin/upiti')
+  revalidatePath('/admin/upiti/[id]', 'page')
 
   return {
     success: true,
@@ -865,6 +868,10 @@ export async function deleteStudent(studentId: string): Promise<AdminActionResul
     await db.user.delete({ where: { id: studentId } })
 
     revalidatePath('/admin/ucenici')
+    // Removing the student drops the "Ponovni upis" match from any inquiry that
+    // pointed at this child identity.
+    revalidatePath('/admin/upiti')
+    revalidatePath('/admin/upiti/[id]', 'page')
     return { success: true }
   } catch (err) {
     console.error('deleteStudent failed:', err)

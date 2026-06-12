@@ -128,7 +128,7 @@ describe('createStudentManually — capacity guardrail', () => {
     const res = await createStudentManually({
       firstName: 'Petar',
       lastName: 'Kapacitet',
-      dateOfBirth: null,
+      dateOfBirth: '2015-03-03',
       parentName: null,
       parentEmail: null,
       parentPhone: null,
@@ -337,7 +337,7 @@ describe('archived-school-year guard — enrollment-creating actions', () => {
     const res = await createStudentManually({
       firstName: 'Arhiv',
       lastName: 'Reject',
-      dateOfBirth: null,
+      dateOfBirth: '2015-04-04',
       parentName: null,
       parentEmail: null,
       parentPhone: null,

@@ -6,6 +6,8 @@ import { db } from '@/lib/db'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { StatCard } from '@/components/admin/stat-card'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
+import { ReturningInquiryBadge } from '@/components/admin/inquiries/returning-inquiry-badge'
+import { flagReturningInquiries } from '@/lib/returning-inquiry'
 
 export const metadata: Metadata = {
   title: 'Admin – Nadzorna ploča',
@@ -25,10 +27,12 @@ export default async function AdminDashboard() {
     db.inquiry.groupBy({
       by: ['status'],
       _count: { status: true },
+      where: { schoolYear },
     }),
     db.user.count({ where: { role: 'STUDENT' } }),
     db.scheduledGroup.count({ where: { schoolYear } }),
     db.inquiry.findMany({
+      where: { schoolYear },
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: {
@@ -36,6 +40,8 @@ export default async function AdminDashboard() {
         parentName: true,
         childFirstName: true,
         childLastName: true,
+        childDateOfBirth: true,
+        studentId: true,
         status: true,
         createdAt: true,
       },
@@ -43,7 +49,7 @@ export default async function AdminDashboard() {
     db.inquiry.groupBy({
       by: ['referralSource'],
       _count: { referralSource: true },
-      where: { referralSource: { not: null } },
+      where: { schoolYear, referralSource: { not: null } },
       orderBy: { _count: { referralSource: 'desc' } },
       take: 5,
     }),
@@ -59,6 +65,8 @@ export default async function AdminDashboard() {
   )
 
   const totalInquiries = inquiryStats.reduce((sum, s) => sum + s._count.status, 0)
+
+  const recentWithFlag = await flagReturningInquiries(recentInquiries)
 
   return (
     <div>
@@ -111,19 +119,22 @@ export default async function AdminDashboard() {
           </div>
 
           <div className="bg-white rounded-xl border divide-y">
-            {recentInquiries.length === 0 ? (
+            {recentWithFlag.length === 0 ? (
               <p className="px-5 py-8 text-sm text-gray-400 italic text-center">Nema upita.</p>
             ) : (
-              recentInquiries.map((inquiry) => (
+              recentWithFlag.map((inquiry) => (
                 <Link
                   key={inquiry.id}
                   href={`/admin/upiti/${inquiry.id}`}
                   className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {inquiry.childFirstName} {inquiry.childLastName}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {inquiry.childFirstName} {inquiry.childLastName}
+                      </p>
+                      {inquiry.isReturning && <ReturningInquiryBadge />}
+                    </div>
                     <p className="text-xs text-gray-500 truncate">{inquiry.parentName}</p>
                   </div>
                   <div className="flex items-center gap-3 ml-4 shrink-0">

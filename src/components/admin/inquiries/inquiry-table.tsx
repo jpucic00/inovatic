@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Eye } from 'lucide-react'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { InquiryStatusBadge } from './inquiry-status-badge'
+import { ReturningInquiryBadge } from './returning-inquiry-badge'
 import { formatChildName } from '@/lib/format'
 import { GRADE_LABELS, GRADE_SORT_KEY, type Grade } from '@/lib/inquiry-status'
 
@@ -18,6 +19,7 @@ type InquiryRow = {
   childGrade: string | null
   locationPref: string | null
   status: string
+  isReturning?: boolean
   createdAt: Date
 }
 
@@ -86,7 +88,12 @@ const columns: ColumnDef<InquiryRow>[] = [
     header: 'Status',
     sortable: true,
     sortValue: (row) => row.status,
-    cell: (row) => <InquiryStatusBadge status={row.status} />,
+    cell: (row) => (
+      <div className="flex flex-col items-start gap-1">
+        <InquiryStatusBadge status={row.status} />
+        {row.isReturning && <ReturningInquiryBadge />}
+      </div>
+    ),
   },
   {
     key: 'actions',

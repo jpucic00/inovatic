@@ -219,6 +219,7 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       await createStudentManuallyViaDialog(page, {
         firstName: searchName,
         lastName: `Pretraga${RUN_ID}`,
+        dateOfBirth: '2015-09-09',
       })
       // Result modal dropped — the dialog closes itself on success.
       await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 })
@@ -242,7 +243,7 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 })
     })
 
-    test('submit button is disabled until firstName and lastName are filled', async ({ page }) => {
+    test('submit button is disabled until firstName, lastName and date of birth are filled', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/ucenici`)
       await page.getByRole('button', { name: 'Kreiraj učenika' }).click()
@@ -253,6 +254,11 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       await expect(submit).toBeDisabled()
       await page.locator('#create-student-first').fill('Ana')
       await page.locator('#create-student-last').fill('Test')
+      // Date of birth is now required, so names alone keep submit disabled.
+      await expect(submit).toBeDisabled()
+      const dob = page.locator('#create-student-dob')
+      await dob.fill('10.04.2017')
+      await dob.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
       await expect(submit).toBeEnabled()
     })
   })
@@ -384,6 +390,7 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       const disposable = {
         firstName: `Trošen${RUN_ID}`,
         lastName: `Brišemo${RUN_ID}`,
+        dateOfBirth: '2015-10-10',
       }
       await createStudentManuallyViaDialog(page, disposable)
       // Result modal dropped — dialog closes on success; reach the profile via

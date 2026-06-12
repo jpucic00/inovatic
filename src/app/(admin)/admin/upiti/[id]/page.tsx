@@ -1,10 +1,16 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Check } from 'lucide-react'
+import { ArrowLeft, Check, RotateCcw } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
-import { getInquiry, getInquiryCourses, getGroupsForCourse } from '@/actions/admin/inquiry'
+import {
+  getInquiry,
+  getInquiryCourses,
+  getGroupsForCourse,
+  getReturningStudentInfo,
+} from '@/actions/admin/inquiry'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
+import { ReturningInquiryBadge } from '@/components/admin/inquiries/returning-inquiry-badge'
 import { DeclineDialog } from '@/components/admin/inquiries/decline-dialog'
 import { DeleteDialog } from '@/components/admin/inquiries/delete-dialog'
 import { SendScheduleDialog } from '@/components/admin/inquiries/send-schedule-dialog'
@@ -145,6 +151,23 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   const courseGroups = groupsForInitial.map(toGroupOption)
   const allCourses = await getInquiryCourses()
 
+  // Returning-student detection: a child (name + DOB) already in the system,
+  // other than the account this inquiry itself created.
+  const returningStudent = await getReturningStudentInfo({
+    firstName: inquiry.childFirstName,
+    lastName: inquiry.childLastName,
+    dateOfBirth: inquiry.childDateOfBirth,
+    excludeStudentId: inquiry.studentId,
+  })
+
+  const returningDob = returningStudent?.dateOfBirth
+    ? new Date(returningStudent.dateOfBirth).toLocaleDateString('hr-HR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+    : null
+
   const birthInfo: React.ReactNode = inquiry.childDateOfBirth
     ? new Date(inquiry.childDateOfBirth).toLocaleDateString('hr-HR', {
         day: '2-digit',
@@ -194,7 +217,10 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
             })}
           </p>
         </div>
-        <InquiryStatusBadge status={inquiry.status} className="text-sm px-3 py-1" />
+        <div className="flex items-center gap-2 shrink-0">
+          {returningStudent && <ReturningInquiryBadge className="text-sm px-3 py-1" />}
+          <InquiryStatusBadge status={inquiry.status} className="text-sm px-3 py-1" />
+        </div>
       </div>
 
       {/* Status timeline */}
@@ -262,6 +288,64 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
           />
         </dl>
       </div>
+
+      {/* Returning student (child already in the system) */}
+      {returningStudent && (
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-6 mb-6">
+          <div className="flex items-start gap-3">
+            <RotateCcw className="w-5 h-5 text-violet-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <h2 className="text-sm font-semibold text-violet-900">
+                Ponovni upis — dijete je već u sustavu
+              </h2>
+              <p className="text-sm text-violet-800 mt-1">
+                Učenik{' '}
+                <span className="font-medium">
+                  {returningStudent.firstName} {returningStudent.lastName}
+                </span>
+                {returningDob ? ` (r. ${returningDob})` : ''} već je u sustavu.
+                Prije upisa u novu grupu provjerite u koje je grupe dijete već
+                upisano.
+              </p>
+
+              {returningStudent.history.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {returningStudent.history.map((h) => (
+                    <div key={h.schoolYear}>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                        {h.schoolYear}
+                      </div>
+                      <ul className="mt-0.5 space-y-0.5">
+                        {h.groups.map((g) => (
+                          <li
+                            key={`${g.courseTitle}|${g.groupName ?? ''}|${g.locationName}`}
+                            className="text-sm text-gray-800"
+                          >
+                            {[g.courseTitle, g.groupName, g.locationName]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm italic text-violet-700">
+                  Bez prijašnjih upisa u grupe.
+                </p>
+              )}
+
+              <Link
+                href={`/admin/ucenici/${returningStudent.id}`}
+                className="inline-block mt-4 text-sm text-cyan-700 hover:underline font-medium"
+              >
+                Pogledaj profil učenika →
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Child info */}
       <div className="bg-white rounded-xl border p-6 mb-6">

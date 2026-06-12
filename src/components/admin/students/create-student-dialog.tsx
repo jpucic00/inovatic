@@ -94,7 +94,10 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
     .map(getScheduleId)
     .filter((id): id is string => id !== null)
 
-  const canSubmit = firstName.trim().length >= 2 && lastName.trim().length >= 2
+  const canSubmit =
+    firstName.trim().length >= 2 &&
+    lastName.trim().length >= 2 &&
+    dateOfBirth.trim().length > 0
 
   const reset = () => {
     setFirstName('')
@@ -159,7 +162,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
 
   const handleSubmit = () => {
     if (!canSubmit) {
-      toast.error('Ime i prezime djeteta su obavezni.')
+      toast.error('Ime, prezime i datum rođenja djeteta su obavezni.')
       return
     }
     // Require at least one module for standard courses when a group is chosen
@@ -171,7 +174,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
       const res = await createStudentManually({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        dateOfBirth: dateOfBirth || null,
+        dateOfBirth: dateOfBirth.trim(),
         parentName: parentName.trim() || null,
         parentEmail: parentEmail.trim() || null,
         parentPhone: parentPhone.trim() || null,
@@ -271,7 +274,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
                     htmlFor="create-student-dob"
                     className="block text-xs font-medium text-gray-600 mb-1"
                   >
-                    Datum rođenja
+                    Datum rođenja *
                   </label>
                   <DateInput
                     id="create-student-dob"

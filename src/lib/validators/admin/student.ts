@@ -8,7 +8,9 @@ export const createStudentSchema = z.object({
 export const createStudentManuallySchema = z.object({
   firstName: z.string().min(2),
   lastName: z.string().min(2),
-  dateOfBirth: z.string().optional().nullable(),
+  // Required: DOB is the disambiguator that makes returning-student detection
+  // reliable, so every student record must carry one.
+  dateOfBirth: z.string().min(1, 'Unesite datum rođenja'),
   parentName: z.string().optional().nullable(),
   parentEmail: z
     .union([z.literal(''), z.string().email()])

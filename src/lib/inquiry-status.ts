@@ -10,6 +10,11 @@ export const INQUIRY_STATUS_COLORS: Record<string, string> = {
   DECLINED: 'bg-gray-100 text-gray-600 border-gray-200',
 }
 
+// Label for the derived "returning student" marker (a child whose name + DOB
+// already match an existing student). Rendered alongside — not instead of — the
+// lifecycle status, since it is orthogonal to NEW / ACCOUNT_CREATED / DECLINED.
+export const RETURNING_INQUIRY_LABEL = 'Ponovni upis'
+
 export const COURSE_LEVEL_LABELS: Record<string, string> = {
   SLR_1: 'SLR 1',
   SLR_2: 'SLR 2',

@@ -23,11 +23,24 @@ describe('createStudentSchema', () => {
 })
 
 describe('createStudentManuallySchema', () => {
-  const minimal = { firstName: 'Luka', lastName: 'Horvat' }
+  const minimal = { firstName: 'Luka', lastName: 'Horvat', dateOfBirth: '2015-06-15' }
 
-  it('accepts minimal payload (firstName + lastName)', () => {
+  it('accepts minimal payload (firstName + lastName + dateOfBirth)', () => {
     const result = createStudentManuallySchema.parse(minimal)
     expect(result.firstName).toBe('Luka')
+  })
+
+  it('rejects a missing dateOfBirth', () => {
+    const result = createStudentManuallySchema.safeParse({
+      firstName: 'Luka',
+      lastName: 'Horvat',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an empty dateOfBirth', () => {
+    const result = createStudentManuallySchema.safeParse({ ...minimal, dateOfBirth: '' })
+    expect(result.success).toBe(false)
   })
 
   it('accepts all optional fields populated', () => {

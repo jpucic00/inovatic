@@ -10,6 +10,8 @@ import {
   type Attendance,
   type CourseModule,
   type Enrollment,
+  type Inquiry,
+  InquiryStatus,
   type Location,
   type Material,
   MaterialScope,
@@ -32,6 +34,7 @@ async function createUser(
     username: string
     firstName: string
     lastName: string
+    dateOfBirth: string | null
     password: string
     role: UserRole
     phone: string
@@ -47,6 +50,7 @@ async function createUser(
       username: overrides.username ?? `${role.toLowerCase()}_${id}`,
       firstName: overrides.firstName ?? 'Test',
       lastName: overrides.lastName ?? `User${id}`,
+      dateOfBirth: overrides.dateOfBirth ?? null,
       passwordHash: await bcrypt.hash(password, HASH_ROUNDS),
       role,
       phone: overrides.phone,
@@ -165,6 +169,45 @@ export async function createEnrollment(
       userId: studentId,
       scheduledGroupId,
       schoolYear: overrides.schoolYear ?? '2026/2027',
+    },
+  })
+}
+
+type CreateInquiryOverrides = {
+  parentName?: string
+  parentEmail?: string
+  parentPhone?: string
+  childFirstName?: string
+  childLastName?: string
+  childDateOfBirth?: string | null
+  childGrade?: string | null
+  courseId?: string | null
+  scheduledGroupId?: string | null
+  assignedGroupId?: string | null
+  status?: InquiryStatus
+  /** Denormalized school year (server-derived in prod). Defaults to null. */
+  schoolYear?: string | null
+}
+
+export async function createInquiry(
+  overrides: CreateInquiryOverrides = {},
+): Promise<Inquiry> {
+  const id = uniq()
+  return db.inquiry.create({
+    data: {
+      parentName: overrides.parentName ?? `Roditelj ${id}`,
+      parentEmail: overrides.parentEmail ?? `inquiry-${id}@test.local`,
+      parentPhone: overrides.parentPhone ?? '+38591000000',
+      childFirstName: overrides.childFirstName ?? 'Dijete',
+      childLastName: overrides.childLastName ?? `Test${id}`,
+      childDateOfBirth: overrides.childDateOfBirth ?? '2015-06-12',
+      childGrade: overrides.childGrade ?? null,
+      courseId: overrides.courseId ?? null,
+      scheduledGroupId: overrides.scheduledGroupId ?? null,
+      assignedGroupId: overrides.assignedGroupId ?? null,
+      status: overrides.status ?? InquiryStatus.NEW,
+      schoolYear: overrides.schoolYear ?? null,
+      consentGivenAt: new Date(),
     },
   })
 }

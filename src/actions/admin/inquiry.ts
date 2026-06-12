@@ -8,12 +8,13 @@ import { declineInquirySchema } from '@/lib/validators/admin/inquiry'
 import type { AdminActionResult } from '@/lib/action-types'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
-import { schoolYearDateRange } from '@/lib/school-year'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { computeGroupCapacity } from '@/lib/group-capacity'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { formatGroupSchedule } from '@/lib/format'
 import type { Grade } from '@/lib/inquiry-status'
+import { studentIdentityWhere } from '@/lib/student-match'
+import { flagReturningInquiries } from '@/lib/returning-inquiry'
 
 type InquiryFilters = {
   status?: InquiryStatus | 'ALL'
@@ -38,16 +39,20 @@ function courseIdFilter(courseId: string | undefined) {
   return {}
 }
 
+type InquiryListRow = Awaited<ReturnType<typeof db.inquiry.findMany>>[number] & {
+  isReturning: boolean
+}
+
 export async function getInquiries(
   filters: InquiryFilters = {},
-): Promise<PaginatedResult<Awaited<ReturnType<typeof db.inquiry.findMany>>[number]>> {
+): Promise<PaginatedResult<InquiryListRow>> {
   await requireAdmin()
 
   const { status, search, courseId, grade, page = 1, pageSize = 20 } = filters
-  const { gte, lt } = schoolYearDateRange(await getSelectedSchoolYear())
+  const schoolYear = await getSelectedSchoolYear()
 
   const where = {
-    createdAt: { gte, lt },
+    schoolYear,
     ...(status && status !== 'ALL' ? { status } : {}),
     ...(courseIdFilter(courseId)),
     ...(grade ? { childGrade: grade } : {}),
@@ -73,7 +78,84 @@ export async function getInquiries(
     db.inquiry.count({ where }),
   ])
 
-  return { data, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
+  const enriched = await flagReturningInquiries(data)
+  return { data: enriched, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
+}
+
+type ReturningStudentInfo = {
+  id: string
+  firstName: string
+  lastName: string
+  dateOfBirth: string | null
+  history: {
+    schoolYear: string
+    groups: { courseTitle: string; groupName: string | null; locationName: string }[]
+  }[]
+}
+
+/**
+ * Returns the existing student matching this inquiry's child identity (firstName
+ * + lastName + dateOfBirth), with their enrollment history grouped by school
+ * year (newest first), or `null` when there is no DOB, no match, or the only
+ * match is the student this inquiry itself created (`excludeStudentId`).
+ */
+export async function getReturningStudentInfo(input: {
+  firstName: string
+  lastName: string
+  dateOfBirth?: string | null
+  excludeStudentId?: string | null
+}): Promise<ReturningStudentInfo | null> {
+  await requireAdmin()
+
+  const where = studentIdentityWhere(input)
+  if (!where) return null
+
+  const student = await db.user.findFirst({
+    where,
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      dateOfBirth: true,
+      enrollments: {
+        select: {
+          schoolYear: true,
+          scheduledGroup: {
+            select: {
+              name: true,
+              course: { select: { title: true } },
+              location: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!student) return null
+  if (input.excludeStudentId && student.id === input.excludeStudentId) return null
+
+  const byYear = new Map<string, ReturningStudentInfo['history'][number]['groups']>()
+  for (const e of student.enrollments) {
+    const list = byYear.get(e.schoolYear) ?? []
+    list.push({
+      courseTitle: e.scheduledGroup.course.title,
+      groupName: e.scheduledGroup.name,
+      locationName: e.scheduledGroup.location.name,
+    })
+    byYear.set(e.schoolYear, list)
+  }
+  const history = [...byYear.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([schoolYear, groups]) => ({ schoolYear, groups }))
+
+  return {
+    id: student.id,
+    firstName: student.firstName,
+    lastName: student.lastName,
+    dateOfBirth: student.dateOfBirth,
+    history,
+  }
 }
 
 export async function getInquiryCourses() {
