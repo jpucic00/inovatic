@@ -89,6 +89,9 @@ const WEEKDAY_INDEX_TO_NAME = [
   'Subota',
 ] as const
 
+/** Stable empty set so "no range preview" renders don't churn referential deps. */
+const EMPTY_KEY_SET: ReadonlySet<string> = new Set()
+
 function utcMidnight(y: number, m: number, d: number): Date {
   return new Date(Date.UTC(y, m, d))
 }
@@ -212,6 +215,9 @@ export function HolidayCalendar({
   // Cell key staged as the start of a range — set on first single click that
   // *isn't* part of a double-click, consumed by the next click on another cell.
   const [rangeStart, setRangeStart] = useState<string | null>(null)
+  // While a range start is staged, the cell currently under the cursor — it
+  // drives the live "what you'd select" preview band between the two clicks.
+  const [hoverKey, setHoverKey] = useState<string | null>(null)
   // Click-vs-double-click disambiguation. The first click on an empty cell
   // doesn't commit `rangeStart` immediately — it goes into a ref and a 250 ms
   // timer. If a second click arrives in time we resolve it without ever
@@ -274,11 +280,69 @@ export function HolidayCalendar({
   }, [lastSessionDateByWeekday])
   const today = useMemo(todayUtcMidnight, [])
 
+  // Build every month's cell grid once, keyed only on the painted data (not on
+  // the transient rangeStart/hoverKey). Moving the mouse during a range pick
+  // then never rebuilds the grids — it only flips boolean props on the cells.
+  const monthGrids = useMemo(() => {
+    const ctx = {
+      today,
+      sessionDateSet,
+      lastSessionDateSet,
+      holidaysByDate,
+      markersByDate,
+      workshopsByDate,
+    }
+    return months.map((m) => ({ ...m, cells: buildMonthGrid(m.year, m.month, ctx) }))
+  }, [
+    months,
+    today,
+    sessionDateSet,
+    lastSessionDateSet,
+    holidaysByDate,
+    markersByDate,
+    workshopsByDate,
+  ])
+
+  // One global key→cell lookup so a staged range start resolves regardless of
+  // which month grid it was clicked in — cross-month ranges included.
+  const cellsByKey = useMemo(() => {
+    const map = new Map<string, CellState>()
+    for (const g of monthGrids) {
+      for (const c of g.cells) {
+        if (c.inMonth) map.set(c.key, c)
+      }
+    }
+    return map
+  }, [monthGrids])
+
+  // While a start is staged, the hovered cell defines the prospective
+  // [start, end] band. Ordered low→high so it reads the same whether the user
+  // hovers before or after the anchor day.
+  const previewRange = useMemo(() => {
+    if (!rangeStart || !hoverKey || rangeStart === hoverKey) return null
+    return rangeStart < hoverKey
+      ? { start: rangeStart, end: hoverKey }
+      : { start: hoverKey, end: rangeStart }
+  }, [rangeStart, hoverKey])
+
+  const previewKeys = useMemo<ReadonlySet<string>>(() => {
+    if (!previewRange) return EMPTY_KEY_SET
+    const set = new Set<string>()
+    let cur = previewRange.start
+    // Cap the walk at a full school year so a stray hover can't spin forever.
+    for (let i = 0; i < 400 && cur <= previewRange.end; i++) {
+      set.add(cur)
+      cur = shiftDateKey(cur, 1)
+    }
+    return set
+  }, [previewRange])
+
   const isRange = editing !== null && editing.startKey !== editing.endKey
 
   function openSingle(cell: CellState) {
     clearPendingClick()
     setRangeStart(null)
+    setHoverKey(null)
     const holidayKeys = new Set(holidaysByDate.keys())
     const block = findHolidayBlock(cell.key, holidayKeys)
     setEditing({
@@ -298,6 +362,7 @@ export function HolidayCalendar({
   function openRange(a: CellState, b: CellState) {
     clearPendingClick()
     setRangeStart(null)
+    setHoverKey(null)
     const [start, end] = a.key < b.key ? [a, b] : [b, a]
     setEditing({
       startKey: start.key,
@@ -313,7 +378,7 @@ export function HolidayCalendar({
     setAttendanceConflict(null)
   }
 
-  function handleCellClick(cell: CellState, cellsByKey: Map<string, CellState>) {
+  function handleCellClick(cell: CellState) {
     if (archived) return
     // Clicking an existing holiday always opens the edit dialog and drops
     // any pending range start — keeps editing flow predictable.
@@ -368,6 +433,18 @@ export function HolidayCalendar({
     // disambiguation missed it. openSingle is idempotent so calling it twice
     // (once via the second click, once via dblclick) is harmless.
     openSingle(cell)
+  }
+
+  function cancelRange() {
+    setRangeStart(null)
+    setHoverKey(null)
+  }
+
+  // Only track hover once a start is staged — keeps the grid from re-rendering
+  // on every mouse move when no range selection is in progress.
+  function handleCellHover(cell: CellState) {
+    if (!rangeStart || !cell.inMonth) return
+    setHoverKey(cell.key)
   }
 
   function closeDialog() {
@@ -439,69 +516,113 @@ export function HolidayCalendar({
   // the rangeStart cell may live in any of the 12 month grids.
   const rangeStartDate = rangeStart ? fromDateKey(rangeStart) : null
 
-  const gridCtx = {
-    today,
-    sessionDateSet,
-    lastSessionDateSet,
-    holidaysByDate,
-    markersByDate,
-    workshopsByDate,
+  let dialogTitle = ''
+  if (editing?.existingHoliday) {
+    dialogTitle = `Praznik — ${formatDate(editing.startDate, 'long')}`
+  } else if (editing && isRange) {
+    dialogTitle = `Označi raspon — ${formatDate(editing.startDate)} – ${formatDate(editing.endDate)} (${dayCount(editing.startKey, editing.endKey)} dana)`
+  } else if (editing) {
+    dialogTitle = `Označi kao praznik — ${formatDate(editing.startDate, 'long')}`
   }
+
+  const editableDescription = isRange
+    ? 'Svi dani u rasponu bit će označeni kao praznik i izuzeti iz evidencije dolaska.'
+    : 'Dani označeni kao praznik nisu uključeni u evidenciju dolaska.'
+  const dialogDescription = archived
+    ? 'Pregled arhivirane školske godine — izmjene nisu dozvoljene.'
+    : editableDescription
+
+  const newHolidaySaveLabel = isRange ? 'Spremi raspon' : 'Spremi'
+  let saveLabel = editing?.existingHoliday ? 'Ažuriraj' : newHolidaySaveLabel
+  if (attendanceConflict !== null) saveLabel = 'Da, obriši dolaske i spremi'
 
   return (
     <>
-      {rangeStart && rangeStartDate && !archived && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-sm text-cyan-900">
-          <span>
-            Početak raspona: <strong>{formatDate(rangeStartDate)}</strong>. Kliknite još jedan
-            dan za raspon ili dvoklik za samo ovaj dan.
-          </span>
-          <button
-            type="button"
-            onClick={() => setRangeStart(null)}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-cyan-800 hover:bg-cyan-100"
-          >
-            <X className="h-3.5 w-3.5" />
-            Odustani
-          </button>
+      {/*
+        Always rendered (when editable) so its presence never shifts the
+        calendar grid below it. Clicking the first range day only swaps the
+        bar's *content* — idle hint → active "range start" message — keeping a
+        constant height, so cells stay put under the cursor mid-selection.
+      */}
+      {!archived && (
+        <div
+          className={cn(
+            'flex min-h-11 items-center justify-between gap-3 rounded-md border px-4 py-2.5 text-sm transition-colors',
+            rangeStart && rangeStartDate
+              ? 'border-cyan-200 bg-cyan-50 text-cyan-900'
+              : 'border-gray-200 bg-gray-50 text-gray-600',
+          )}
+        >
+          {rangeStart && rangeStartDate ? (
+            <>
+              {previewRange ? (
+                <span>
+                  Raspon:{' '}
+                  <strong>
+                    {formatDate(fromDateKey(previewRange.start))} –{' '}
+                    {formatDate(fromDateKey(previewRange.end))}
+                  </strong>{' '}
+                  ({dayCount(previewRange.start, previewRange.end)} dana) — kliknite za potvrdu.
+                </span>
+              ) : (
+                <span>
+                  Početak raspona: <strong>{formatDate(rangeStartDate)}</strong> Kliknite drugi
+                  dan za raspon ili dvoklik za samo taj dan.
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={cancelRange}
+                className="inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs font-medium text-cyan-800 hover:bg-cyan-100"
+              >
+                <X className="h-3.5 w-3.5" />
+                Odustani
+              </button>
+            </>
+          ) : (
+            <span>
+              Kliknite dan da ga označite kao praznik ili dva dana za raspon. Dvoklik označava
+              samo jedan dan.
+            </span>
+          )}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {months.map(({ year, month, label }) => {
-          const cells = buildMonthGrid(year, month, gridCtx)
-          // Lookup so range-commit can resolve a key into a cell regardless
-          // of which month grid the user originally clicked in.
-          const cellsByKey = new Map(cells.filter((c) => c.inMonth).map((c) => [c.key, c]))
-          return (
-            <section
-              key={`${year}-${month}`}
-              className="rounded-lg border border-gray-200 bg-white p-3 shadow-xs"
-            >
-              <h3 className="mb-2 text-sm font-semibold capitalize text-gray-900">{label}</h3>
-              <div className="grid grid-cols-7 gap-0.5">
-                {WEEKDAY_LABELS_HEADER.map((label) => (
-                  <div
-                    key={label}
-                    className="py-1 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500"
-                  >
-                    {label}
-                  </div>
-                ))}
-                {cells.map((cell) => (
-                  <DayCell
-                    key={cell.key}
-                    cell={cell}
-                    disabled={archived}
-                    isRangeStart={rangeStart === cell.key && cell.inMonth}
-                    onClick={() => handleCellClick(cell, cellsByKey)}
-                    onDoubleClick={() => handleCellDoubleClick(cell)}
-                  />
-                ))}
-              </div>
-            </section>
-          )
-        })}
+      <div
+        className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3"
+        onMouseLeave={() => setHoverKey(null)}
+      >
+        {monthGrids.map(({ year, month, label, cells }) => (
+          <section
+            key={`${year}-${month}`}
+            className="rounded-lg border border-gray-200 bg-white p-3 shadow-xs"
+          >
+            <h3 className="mb-2 text-sm font-semibold capitalize text-gray-900">{label}</h3>
+            <div className="grid grid-cols-7 gap-0.5">
+              {WEEKDAY_LABELS_HEADER.map((wlabel) => (
+                <div
+                  key={wlabel}
+                  className="py-1 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500"
+                >
+                  {wlabel}
+                </div>
+              ))}
+              {cells.map((cell) => (
+                <DayCell
+                  key={cell.key}
+                  cell={cell}
+                  disabled={archived}
+                  isRangeStart={rangeStart === cell.key && cell.inMonth}
+                  inPreviewRange={cell.inMonth && previewKeys.has(cell.key)}
+                  isPreviewEnd={cell.inMonth && hoverKey === cell.key && rangeStart !== cell.key}
+                  onClick={() => handleCellClick(cell)}
+                  onDoubleClick={() => handleCellDoubleClick(cell)}
+                  onMouseEnter={() => handleCellHover(cell)}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
 
       <CalendarLegend />
@@ -509,22 +630,8 @@ export function HolidayCalendar({
       <Dialog open={editing !== null} onOpenChange={(o) => !o && closeDialog()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editing?.existingHoliday
-                ? `Praznik — ${formatDate(editing.startDate, 'long')}`
-                : isRange && editing
-                  ? `Označi raspon — ${formatDate(editing.startDate)} – ${formatDate(editing.endDate)} (${dayCount(editing.startKey, editing.endKey)} dana)`
-                  : editing
-                    ? `Označi kao praznik — ${formatDate(editing.startDate, 'long')}`
-                    : ''}
-            </DialogTitle>
-            <DialogDescription>
-              {archived
-                ? 'Pregled arhivirane školske godine — izmjene nisu dozvoljene.'
-                : isRange
-                  ? 'Svi dani u rasponu bit će označeni kao praznik i izuzeti iz evidencije dolaska.'
-                  : 'Dani označeni kao praznik nisu uključeni u evidenciju dolaska.'}
-            </DialogDescription>
+            <DialogTitle>{dialogTitle}</DialogTitle>
+            <DialogDescription>{dialogDescription}</DialogDescription>
           </DialogHeader>
 
           {editing?.existingHoliday &&
@@ -543,8 +650,8 @@ export function HolidayCalendar({
 
           {editing && editing.markers.length > 0 && (
             <ul className="space-y-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
-              {editing.markers.map((m, idx) => (
-                <li key={idx} className="flex items-center gap-1.5">
+              {editing.markers.map((m) => (
+                <li key={`${m.kind}-${m.moduleIndex}-${m.label}`} className="flex items-center gap-1.5">
                   {m.kind === 'start' ? (
                     <ArrowUpFromLine className="h-3 w-3 text-emerald-600" aria-hidden />
                   ) : (
@@ -620,17 +727,11 @@ export function HolidayCalendar({
               {!archived && (
                 <Button
                   type="button"
-                  variant={attendanceConflict !== null ? 'destructive' : 'default'}
+                  variant={attendanceConflict === null ? 'default' : 'destructive'}
                   onClick={() => handleSave(attendanceConflict !== null)}
                   disabled={isPending}
                 >
-                  {attendanceConflict !== null
-                    ? 'Da, obriši dolaske i spremi'
-                    : editing?.existingHoliday
-                      ? 'Ažuriraj'
-                      : isRange
-                        ? 'Spremi raspon'
-                        : 'Spremi'}
+                  {saveLabel}
                 </Button>
               )}
             </div>
@@ -645,14 +746,20 @@ function DayCell({
   cell,
   disabled,
   isRangeStart,
+  inPreviewRange,
+  isPreviewEnd,
   onClick,
   onDoubleClick,
+  onMouseEnter,
 }: Readonly<{
   cell: CellState
   disabled: boolean
   isRangeStart: boolean
+  inPreviewRange: boolean
+  isPreviewEnd: boolean
   onClick: () => void
   onDoubleClick: () => void
+  onMouseEnter: () => void
 }>) {
   const { inMonth, isToday, isSessionDate, isLastSessionDate, holiday, markers, workshops, date, weekday } = cell
 
@@ -662,12 +769,15 @@ function DayCell({
   const endBadges = uniqByIndex(markers.filter((m) => m.kind === 'end'))
   const showLastRing = isLastSessionDate && inMonth && !holiday
   const hasWorkshops = inMonth && workshops.length > 0
+  const holidayNameSuffix = holiday?.name ? `: ${holiday.name}` : ''
+  const holidayTitle = holiday ? `Praznik${holidayNameSuffix}` : ''
 
   return (
     <button
       type="button"
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      onMouseEnter={onMouseEnter}
       disabled={disabled && !holiday && markers.length === 0}
       data-date={cell.key}
       data-holiday={holiday ? 'true' : 'false'}
@@ -676,7 +786,7 @@ function DayCell({
       data-session={isSessionDate ? 'true' : 'false'}
       data-last-session={isLastSessionDate ? 'true' : 'false'}
       title={[
-        holiday ? `Praznik${holiday.name ? `: ${holiday.name}` : ''}` : '',
+        holidayTitle,
         showLastRing ? 'Zadnja radionica (28. po redu)' : '',
         ...workshops.map((w) => `Radionica: ${w}`),
         ...markers.map((m) => m.tooltip),
@@ -687,14 +797,16 @@ function DayCell({
         'relative h-20 rounded-md border p-1 text-left text-xs transition-colors',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500',
         !inMonth && 'border-transparent bg-transparent text-gray-300',
-        inMonth && !holiday && !isSessionDate && !hasWorkshops && 'border-gray-100 bg-white text-gray-600 hover:bg-gray-50',
-        inMonth && !holiday && !isSessionDate && hasWorkshops && 'border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100',
-        inMonth && !holiday && isSessionDate && 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
-        inMonth && holiday && 'border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200',
+        // The range-preview band overrides the base colors so the prospective
+        // selection reads clearly while picking the second day.
+        inMonth && inPreviewRange && 'border-cyan-300 bg-cyan-100 text-cyan-900',
+        inMonth && !inPreviewRange && !holiday && !isSessionDate && !hasWorkshops && 'border-gray-100 bg-white text-gray-600 hover:bg-gray-50',
+        inMonth && !inPreviewRange && !holiday && !isSessionDate && hasWorkshops && 'border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100',
+        inMonth && !inPreviewRange && !holiday && isSessionDate && 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
+        inMonth && !inPreviewRange && holiday && 'border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200',
         showLastRing && 'ring-2 ring-inset ring-emerald-700',
-        isToday && inMonth && !isRangeStart && 'ring-2 ring-cyan-500',
-        isRangeStart && 'ring-2 ring-cyan-600 ring-offset-1',
-        weekday === 0 && inMonth && !holiday && !hasWorkshops && 'text-gray-400',
+        isToday && inMonth && !isRangeStart && !isPreviewEnd && 'ring-2 ring-inset ring-cyan-500',
+        weekday === 0 && inMonth && !inPreviewRange && !holiday && !hasWorkshops && 'text-gray-400',
         disabled && 'cursor-default',
       )}
       aria-label={`${date.getUTCDate()}. ${date.getUTCMonth() + 1}. ${date.getUTCFullYear()}${holiday ? ' — praznik' : ''}${showLastRing ? ' — zadnja radionica' : ''}${isRangeStart ? ' — početak raspona' : ''}`}
@@ -743,6 +855,24 @@ function DayCell({
           {holiday.name}
         </span>
       )}
+
+      {/*
+        Selection rings are inset overlays (not ring-offset on the button) so
+        they hug the cell edge cleanly — no offset halo, no clipping by the
+        neighbouring cell or the month card.
+      */}
+      {isRangeStart && (
+        <span
+          className="pointer-events-none absolute inset-0 rounded-md ring-2 ring-inset ring-cyan-600"
+          aria-hidden
+        />
+      )}
+      {isPreviewEnd && !isRangeStart && (
+        <span
+          className="pointer-events-none absolute inset-0 rounded-md ring-2 ring-inset ring-cyan-500"
+          aria-hidden
+        />
+      )}
     </button>
   )
 }
@@ -788,42 +918,46 @@ function CalendarLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs text-gray-600">
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-3 rounded border border-emerald-200 bg-emerald-50" />
+        <span className="inline-block h-3 w-3 rounded border border-emerald-200 bg-emerald-50" />{' '}
         Radionica
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-3 rounded border border-rose-200 bg-rose-50" />
+        <span className="inline-block h-3 w-3 rounded border border-rose-200 bg-rose-50" />{' '}
         Radionica (cijeli dan)
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-3 rounded border border-sky-300 bg-sky-100" />
+        <span className="inline-block h-3 w-3 rounded border border-sky-300 bg-sky-100" />{' '}
         Praznik
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-flex items-center gap-0.5 rounded-sm border border-emerald-400 bg-emerald-100 px-1 py-px text-[9px] font-semibold leading-none text-emerald-900">
           M1 <ArrowUpFromLine className="h-2 w-2" />
-        </span>
+        </span>{' '}
         Početak modula
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-flex items-center gap-0.5 rounded-sm border border-orange-400 bg-orange-100 px-1 py-px text-[9px] font-semibold leading-none text-orange-900">
           M1 <ArrowDownToLine className="h-2 w-2" />
-        </span>
+        </span>{' '}
         Kraj modula
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-flex items-center rounded-sm border border-emerald-700 bg-white px-1 py-px text-[9px] font-semibold leading-none text-emerald-900">
           28.
-        </span>
+        </span>{' '}
         28. radionica (zadnja)
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-3 rounded ring-2 ring-cyan-500" />
+        <span className="inline-block h-3 w-3 rounded ring-2 ring-cyan-500" />{' '}
         Danas
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-3 rounded ring-2 ring-cyan-600 ring-offset-1" />
+        <span className="inline-block h-3 w-3 rounded ring-2 ring-inset ring-cyan-600" />{' '}
         Početak raspona
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block h-3 w-3 rounded border border-cyan-300 bg-cyan-100" />{' '}
+        Raspon (odabir)
       </span>
     </div>
   )
