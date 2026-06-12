@@ -14,7 +14,6 @@ import { DeleteEnrollmentButton } from '@/components/admin/students/delete-enrol
 import { DeleteStudentDialog } from '@/components/admin/students/delete-student-dialog'
 import { AddEnrollmentDialog } from '@/components/admin/students/add-enrollment-dialog'
 import { ManageEnrollmentModules } from '@/components/admin/students/manage-enrollment-modules'
-import { CopyCredentials } from './copy-credentials'
 import { CopyButton } from './copy-button'
 
 type StudentWithRelations = NonNullable<Awaited<ReturnType<typeof getStudent>>>
@@ -108,27 +107,31 @@ export function StudentDetailView({
         <dl>
           <DetailRow
             label="Korisničko ime"
-            value={<span className="font-mono">{student.username ?? '—'}</span>}
+            value={
+              student.username ? (
+                <div className="flex items-center gap-2">
+                  <span className="font-mono">{student.username}</span>
+                  <CopyButton value={student.username} label="korisničko ime" />
+                </div>
+              ) : (
+                <span className="font-mono">—</span>
+              )
+            }
           />
           <DetailRow
             label="Lozinka"
             value={
               student.plainPassword ? (
-                <span className="font-mono">{student.plainPassword}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono">{student.plainPassword}</span>
+                  <CopyButton value={student.plainPassword} label="lozinku" />
+                </div>
               ) : (
                 <span className="text-gray-400 italic">Nije dostupna</span>
               )
             }
           />
         </dl>
-        {student.username && student.plainPassword && (
-          <div className="mt-3">
-            <CopyCredentials
-              username={student.username}
-              password={student.plainPassword}
-            />
-          </div>
-        )}
       </div>
 
       {/* Child + parent info */}

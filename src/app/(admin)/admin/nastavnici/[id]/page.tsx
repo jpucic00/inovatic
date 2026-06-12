@@ -11,7 +11,6 @@ import { EditTeacherDialog } from '@/components/admin/teachers/edit-teacher-dial
 import { ResetPasswordButton } from '@/components/admin/teachers/reset-password-button'
 import { DeleteTeacherDialog } from '@/components/admin/teachers/delete-teacher-dialog'
 import { TeacherAssignmentPanel } from '@/components/admin/teachers/teacher-assignment-panel'
-import { CopyTeacherCredentials } from '@/components/admin/teachers/copy-teacher-credentials'
 import { CopyButton } from '@/components/shared/copy-button'
 
 export const metadata: Metadata = { title: 'Admin – Nastavnik' }
@@ -128,13 +127,21 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
         <dl>
           <DetailRow
             label="E-mail za prijavu"
-            value={<span className="font-mono">{teacher.email}</span>}
+            value={
+              <div className="flex items-center gap-2">
+                <span className="font-mono">{teacher.email}</span>
+                <CopyButton value={teacher.email} label="e-mail za prijavu" />
+              </div>
+            }
           />
           <DetailRow
             label="Trenutna lozinka"
             value={
               teacher.plainPassword ? (
-                <span className="font-mono">{teacher.plainPassword}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono">{teacher.plainPassword}</span>
+                  <CopyButton value={teacher.plainPassword} label="lozinku" />
+                </div>
               ) : (
                 <span className="text-gray-400 italic">
                   Nije dostupna (nastavnik ju je promijenio)
@@ -143,14 +150,6 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
             }
           />
         </dl>
-        {teacher.plainPassword && (
-          <div className="mt-3">
-            <CopyTeacherCredentials
-              email={teacher.email}
-              password={teacher.plainPassword}
-            />
-          </div>
-        )}
       </div>
 
       {/* Assignments */}
