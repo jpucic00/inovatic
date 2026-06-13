@@ -1307,17 +1307,24 @@ async function main() {
   })
   console.log(`✅ Admin created: ${admin.email}`)
 
-  // ── Second admin ─────────────────────────────────────────────────────────────
-  const slava = await prisma.user.create({
-    data: {
-      email: 'slava.jurcevic@gmail.com',
-      passwordHash: adminPassword,
-      firstName: 'Slavica',
-      lastName: 'Jurčević',
-      role: UserRole.ADMIN,
-    },
-  })
-  console.log(`✅ Admin created: ${slava.email}`)
+  // ── Association admins ───────────────────────────────────────────────────────
+  const orgAdmins = [
+    { email: 'jozo.pivac@udruga-inovatic.hr', firstName: 'Jozo', lastName: 'Pivac' },
+    { email: 'bruno.beslic@udruga-inovatic.hr', firstName: 'Bruno', lastName: 'Bešlić' },
+    { email: 'slavica.jurcevic@udruga-inovatic.hr', firstName: 'Slavica', lastName: 'Jurčević' },
+  ]
+  for (const a of orgAdmins) {
+    const created = await prisma.user.create({
+      data: {
+        email: a.email,
+        passwordHash: adminPassword,
+        firstName: a.firstName,
+        lastName: a.lastName,
+        role: UserRole.ADMIN,
+      },
+    })
+    console.log(`✅ Admin created: ${created.email}`)
+  }
 
   // ── Locations ────────────────────────────────────────────────────────────────
   const velebitska = await prisma.location.create({
@@ -7897,9 +7904,11 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
   console.log('')
   console.log('🎉 Seed complete!')
   console.log('')
-  console.log('Demo accounts:')
-  console.log('  Admin:   jpucic00@gmail.com       / admin123')
-  console.log('  Admin:   slava.jurcevic@gmail.com / admin123')
+  console.log('Demo accounts (all password: admin123):')
+  console.log('  Admin: jpucic00@gmail.com')
+  console.log('  Admin: jozo.pivac@udruga-inovatic.hr')
+  console.log('  Admin: bruno.beslic@udruga-inovatic.hr')
+  console.log('  Admin: slavica.jurcevic@udruga-inovatic.hr')
 }
 
 main()
