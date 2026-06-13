@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, CalendarDays, TriangleAlert } from 'lucide-react'
+import { Popover as PopoverPrimitive } from 'radix-ui'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/shared/logo'
 import { logoutAction } from '@/actions/logout'
@@ -50,35 +51,67 @@ function NavLinks({
             const isActive = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href)
             const needsPlanning = href === '/admin/skolska-godina' && calendarNeedsPlanning
             return (
-              <Link
-                key={href}
-                href={href}
-                onClick={onNavigate}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
-                  isActive
-                    ? 'bg-gray-800 text-white'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-                {needsPlanning && (
-                  <span
-                    className="ml-auto inline-flex shrink-0 text-amber-400"
-                    role="img"
-                    aria-label="Školska godina nije isplanirana"
-                    title="Označite praznike i isplanirajte module za ovu školsku godinu — godina još nije spremna za rad s grupama."
-                  >
-                    <TriangleAlert className="h-4 w-4" aria-hidden />
-                  </span>
-                )}
-              </Link>
+              <div key={href} className="relative">
+                <Link
+                  href={href}
+                  onClick={onNavigate}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
+                    needsPlanning && 'pr-9',
+                    isActive
+                      ? 'bg-gray-800 text-white'
+                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </Link>
+                {/* Sibling, not a child of the Link: keeps it valid HTML and gives
+                    the warning its own click target (tapping it opens the hint
+                    instead of navigating to the calendar). */}
+                {needsPlanning && <PlanningWarning />}
+              </div>
             )
           })}
         </div>
       ))}
     </>
+  )
+}
+
+const PLANNING_WARNING_MESSAGE =
+  'Označite praznike i isplanirajte module za ovu školsku godinu — godina još nije spremna za rad s grupama.'
+
+// Warning marker on the Kalendar link. Hover shows the native tooltip; clicking
+// (or tapping, on mobile where hover doesn't exist) opens a Radix popover with
+// the hint. Portaled, so it escapes the sidebar's overflow-y-auto clip and
+// floats to the side over the main content instead of bleeding over nav text.
+function PlanningWarning() {
+  return (
+    <PopoverPrimitive.Root>
+      <PopoverPrimitive.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Školska godina nije isplanirana"
+          title={PLANNING_WARNING_MESSAGE}
+          className="absolute right-2 top-1/2 flex -translate-y-1/2 rounded-sm text-amber-400 transition-colors hover:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50"
+        >
+          <TriangleAlert className="h-4 w-4" />
+        </button>
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          side="right"
+          align="center"
+          sideOffset={10}
+          collisionPadding={12}
+          className="z-50 w-60 rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-xs leading-relaxed text-gray-100 shadow-xl"
+        >
+          {PLANNING_WARNING_MESSAGE}
+          <PopoverPrimitive.Arrow className="fill-gray-700" />
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   )
 }
 
