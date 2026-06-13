@@ -15,14 +15,13 @@ type TabDef = { id: string; label: string }
 export function MaterialFilterTabs({ rows, modules, inGroupId, isCustom }: Readonly<Props>) {
   const tabs = useMemo<TabDef[]>(() => {
     const result: TabDef[] = [{ id: '__all__', label: 'Svi' }]
-    if (isCustom) {
-      if (rows.some((r) => r.scope === 'COURSE')) {
-        result.push({ id: '__course__', label: 'Radionica' })
-      }
-    } else {
+    if (!isCustom) {
       for (const m of modules) {
         result.push({ id: m.id, label: m.title })
       }
+    }
+    if (rows.some((r) => r.scope === 'COURSE')) {
+      result.push({ id: '__course__', label: 'Cijeli program' })
     }
     if (rows.some((r) => r.scope === 'GROUP')) {
       result.push({ id: '__group__', label: 'Grupa' })

@@ -32,16 +32,20 @@ const COURSE_SEARCH = 'Robotike 1'
 const MAX_CAPACITY = 10
 const STD_GROUP_NAME = `Test M-Grupa ${RUN_ID}`
 
-// Deterministic dates for the 3-state scenario (relative to today 2026-04-15):
-//  - Module 1 (Završen): 2025-09-01 → 2026-02-01
-//  - Module 2 (Aktivan): 2026-03-01 → 2026-05-31
-//  - Module 3 (Nadolazi): 2026-06-01 → 2026-09-30
-//  - Module 4 (Nadolazi): 2026-10-01 → 2027-01-31
+// Deterministic 3-state windows computed against the real run date so the
+// spec doesn't rot as time passes: M1 fully past (Završen), M2 spanning
+// today (Aktivan), M3/M4 in the future (Nadolazi). Wide ±30-day margins make
+// UTC-vs-local off-by-one irrelevant.
+const isoDay = (offsetDays: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  return d.toISOString().slice(0, 10)
+}
 const SHIFT_DATES = [
-  { startDate: '2025-09-01', endDate: '2026-02-01' },
-  { startDate: '2026-03-01', endDate: '2026-05-31' },
-  { startDate: '2026-06-01', endDate: '2026-09-30' },
-  { startDate: '2026-10-01', endDate: '2027-01-31' },
+  { startDate: isoDay(-200), endDate: isoDay(-50) },
+  { startDate: isoDay(-30), endDate: isoDay(30) },
+  { startDate: isoDay(31), endDate: isoDay(120) },
+  { startDate: isoDay(121), endDate: isoDay(200) },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -55,13 +59,27 @@ async function loginAsAdmin(page: Page) {
 }
 
 /**
- * Locates the ModuleDatesTable wrapping SLR 1 and returns its scoped locator.
- * Scoped to the outer div.rounded-lg that contains both the header (h3) and
- * the modules table.
+ * Navigates to the SLR 1 program detail page (the module-dates table moved off
+ * the /admin/programi list onto the per-program detail page). Clicks the SLR 1
+ * card and waits for the /admin/programi/[courseId] URL.
+ */
+async function gotoSlrProgramDetail(page: Page) {
+  await page.goto(`${BASE}/admin/programi`)
+  await page
+    .locator('a[href^="/admin/programi/"]', { hasText: COURSE_SEARCH })
+    .first()
+    .click()
+  await page.waitForURL(/\/admin\/programi\/[^/?#]+$/, { timeout: 15000 })
+}
+
+/**
+ * Locates the SLR 1 ModuleDatesTable on the program detail page. Scoped to the
+ * "Moduli i datumi" section, which holds the single module-dates table.
+ * Callers must already be on the detail page (use gotoSlrProgramDetail first).
  */
 function slrTable(page: Page) {
-  return page.locator('div.rounded-lg').filter({
-    has: page.locator('h3', { hasText: COURSE_SEARCH }),
+  return page.locator('section').filter({
+    has: page.getByRole('heading', { level: 2, name: 'Moduli i datumi' }),
   })
 }
 
@@ -175,8 +193,12 @@ async function createStudentAndEnroll(
   await allModulesCheckbox.check()
 
   await dialog.getByRole('button', { name: 'Kreiraj učenika' }).click()
-  await expect(dialog.getByText('Učenik kreiran')).toBeVisible({ timeout: 15000 })
-  await page.keyboard.press('Escape')
+  // The post-create credentials modal was dropped — success is a toast and
+  // the dialog closes on its own.
+  await expect(
+    page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+  ).toBeVisible({ timeout: 15000 })
+  await expect(dialog).toBeHidden({ timeout: 10000 })
 }
 
 /**
@@ -189,7 +211,7 @@ async function shiftModuleDates(
   startDate: string,
   endDate: string,
 ) {
-  await page.goto(`${BASE}/admin/programi`)
+  await gotoSlrProgramDetail(page)
   const table = slrTable(page)
   await expect(table).toBeVisible()
 
@@ -210,7 +232,7 @@ async function shiftModuleDates(
  * rendered "dd.mm.yyyy." strings back to "yyyy-mm-dd".
  */
 async function snapshotModuleDates(page: Page): Promise<{ startDate: string; endDate: string }[]> {
-  await page.goto(`${BASE}/admin/programi`)
+  await gotoSlrProgramDetail(page)
   const table = slrTable(page)
   await expect(table).toBeVisible()
 
@@ -307,7 +329,7 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       page,
     }) => {
       await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/programi`)
+      await gotoSlrProgramDetail(page)
       const table = slrTable(page)
       await expect(table.getByText('Modul', { exact: true })).toBeVisible()
       await expect(table.getByText('Početak', { exact: true })).toBeVisible()
@@ -318,7 +340,7 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
 
     test('Polaznici link navigates to students filtered by scheduleId', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/programi`)
+      await gotoSlrProgramDetail(page)
       const table = slrTable(page)
       const firstPolazniciLink = table.locator('a[href*="scheduleId="]').first()
       await expect(firstPolazniciLink).toBeVisible()
@@ -397,11 +419,11 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       page,
     }) => {
       // The "Završi modul" bulk action moved from the group detail
-      // ModuleEnrollmentPanel to the ModuleDatesTable on /admin/programi,
-      // and was renamed to just "Završi". It only shows on rows whose
-      // status is Aktivan.
+      // ModuleEnrollmentPanel to the ModuleDatesTable, now on the per-program
+      // detail page, and was renamed to just "Završi". It only shows on rows
+      // whose status is Aktivan.
       await loginAsAdmin(page)
-      await page.goto(`${BASE}/admin/programi`)
+      await gotoSlrProgramDetail(page)
       const table = slrTable(page)
       await expect(table).toBeVisible()
 
@@ -442,15 +464,17 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       const switcher = page.getByLabel('Odaberi školsku godinu')
       const nextYearLabel = '2026/2027'
 
-      // Register the next year only if it does not already exist.
+      // Register the next year only if it does not already exist. When a
+      // previous run left it registered, select it from the dropdown instead —
+      // the create path auto-switches, so both paths end on the next year.
       await switcher.click()
-      const alreadyExists = await page
-        .getByRole('option', { name: new RegExp(nextYearLabel) })
-        .isVisible()
-        .catch(() => false)
-      await page.keyboard.press('Escape')
+      const nextOption = page.getByRole('option', { name: new RegExp(nextYearLabel) })
+      const alreadyExists = await nextOption.isVisible().catch(() => false)
 
-      if (!alreadyExists) {
+      if (alreadyExists) {
+        await nextOption.click()
+      } else {
+        await page.keyboard.press('Escape')
         await page.getByLabel('Nova školska godina').click()
         await page
           .getByRole('button', { name: new RegExp(`Kreiraj ${nextYearLabel}`) })
@@ -460,7 +484,7 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
         ).toBeVisible({ timeout: 10000 })
       }
 
-      // After creation the switcher reflects the newly created year.
+      // Both paths end with the switcher on the newly selected/created year.
       await expect(switcher).toContainText(nextYearLabel)
     })
 
@@ -482,6 +506,7 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       await expect(switcher).toContainText('2025/2026')
 
       // SLR 1 table renders one row per module (4) for the selected year.
+      await gotoSlrProgramDetail(page)
       const table = slrTable(page)
       await expect(table.locator('tbody tr')).toHaveCount(4)
     })

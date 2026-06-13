@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Users, LogOut, BookOpen } from 'lucide-react'
+import { Users, LogOut } from 'lucide-react'
 import { Toaster } from '@/components/ui/toaster'
 import { requireTeacher } from '@/lib/auth-guard'
 import { logoutAction } from '@/actions/logout'
@@ -19,10 +19,6 @@ export default async function TeacherLayout({ children }: Readonly<{ children: R
             <Link href="/nastavnik" className="text-sm text-gray-500 hover:text-cyan-500 flex items-center gap-1.5">
               <Users className="w-4 h-4" />
               Moje grupe
-            </Link>
-            <Link href="/nastavnik/materijali" className="text-sm text-gray-500 hover:text-cyan-500 flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4" />
-              Materijali
             </Link>
             <form action={logoutAction}>
               <button type="submit" className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1.5">

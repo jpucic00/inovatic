@@ -70,6 +70,7 @@ export async function closeModuleSchedule(
     for (const g of schedule.module.course.scheduledGroups) {
       revalidatePath(`/admin/grupe/${g.id}`)
     }
+    revalidatePath('/admin/programi', 'layout')
   } catch (err) {
     console.error('closeModuleSchedule failed:', err)
     return { success: false, error: 'Greška pri zatvaranju modula.' }

@@ -1,0 +1,156 @@
+'use server'
+
+import { notFound } from 'next/navigation'
+import { db } from '@/lib/db'
+import { requireAdmin } from '@/lib/auth-guard'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
+import type { StaffMaterialRow } from '@/components/material/staff-material-list'
+
+type ProgramModuleSection = {
+  module: { id: string; title: string }
+  materials: StaffMaterialRow[]
+}
+
+type ProgramModuleDate = {
+  id: string
+  title: string
+  sortOrder: number
+  scheduleId: string | null
+  startDate: Date | null
+  endDate: Date | null
+  enrollmentCount: number
+}
+
+type ProgramDetail = {
+  course: {
+    id: string
+    title: string
+    level: string | null
+    isCustom: boolean
+    ageMin: number
+    ageMax: number
+    equipment: string | null
+    groupCount: number
+  }
+  selectedYear: string
+  /** Module date rows for ModuleDatesTable (standard programs only). */
+  moduleDates: ProgramModuleDate[]
+  /** COURSE-scoped "whole program" materials. */
+  courseMaterials: StaffMaterialRow[]
+  /** Per-module MODULE-scoped materials (standard programs only). */
+  moduleSections: ProgramModuleSection[]
+}
+
+/**
+ * Everything the admin program-detail page needs: course info, this year's
+ * module dates, and the program's materials (COURSE + per-module MODULE).
+ * Admin-only. Materials carry no per-group hide context here.
+ */
+export async function getProgramDetail(courseId: string): Promise<ProgramDetail> {
+  await requireAdmin()
+  const year = await getSelectedSchoolYear()
+
+  const course = await db.course.findUnique({
+    where: { id: courseId },
+    select: {
+      id: true,
+      title: true,
+      level: true,
+      isCustom: true,
+      ageMin: true,
+      ageMax: true,
+      equipment: true,
+      _count: { select: { scheduledGroups: true } },
+      modules: {
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          sortOrder: true,
+          schedules: {
+            where: { schoolYear: year },
+            select: {
+              id: true,
+              startDate: true,
+              endDate: true,
+              _count: { select: { moduleEnrollments: true } },
+            },
+          },
+        },
+      },
+    },
+  })
+  if (!course) notFound()
+
+  const moduleIds = course.modules.map((m) => m.id)
+  const moduleTitles = new Map(course.modules.map((m) => [m.id, m.title]))
+
+  const materials = await db.material.findMany({
+    where: {
+      OR: [
+        { scope: 'COURSE', courseId: course.id },
+        ...(moduleIds.length > 0 ? [{ scope: 'MODULE' as const, moduleId: { in: moduleIds } }] : []),
+      ],
+    },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    include: {
+      uploadedBy: { select: { firstName: true, lastName: true, deletedAt: true } },
+    },
+  })
+
+  const toRow = (m: (typeof materials)[number]): StaffMaterialRow => ({
+    id: m.id,
+    title: m.title,
+    description: m.description,
+    type: m.type,
+    scope: m.scope,
+    fileUrl: m.fileUrl,
+    externalUrl: m.externalUrl,
+    fileSize: m.fileSize,
+    mimeType: m.mimeType,
+    sortOrder: m.sortOrder,
+    moduleId: m.moduleId ?? null,
+    moduleTitle: m.scope === 'MODULE' && m.moduleId ? moduleTitles.get(m.moduleId) ?? null : null,
+    courseTitle: m.scope === 'COURSE' ? course.title : null,
+    groupName: null,
+    hiddenInThisGroup: false,
+    uploadedBy: m.uploadedBy ? `${m.uploadedBy.firstName} ${m.uploadedBy.lastName}` : null,
+    uploadedByDeleted: m.uploadedBy?.deletedAt != null,
+  })
+
+  const courseMaterials = materials.filter((m) => m.scope === 'COURSE').map(toRow)
+  const moduleSections: ProgramModuleSection[] = course.modules.map((mod) => ({
+    module: { id: mod.id, title: mod.title },
+    materials: materials.filter((m) => m.scope === 'MODULE' && m.moduleId === mod.id).map(toRow),
+  }))
+
+  const moduleDates: ProgramModuleDate[] = course.modules.map((mod) => {
+    const schedule = mod.schedules[0] ?? null
+    return {
+      id: mod.id,
+      title: mod.title,
+      sortOrder: mod.sortOrder,
+      scheduleId: schedule?.id ?? null,
+      startDate: schedule?.startDate ?? null,
+      endDate: schedule?.endDate ?? null,
+      enrollmentCount: schedule?._count.moduleEnrollments ?? 0,
+    }
+  })
+
+  return {
+    course: {
+      id: course.id,
+      title: course.title,
+      level: course.level,
+      isCustom: course.isCustom,
+      ageMin: course.ageMin,
+      ageMax: course.ageMax,
+      equipment: course.equipment,
+      groupCount: course._count.scheduledGroups,
+    },
+    selectedYear: year,
+    moduleDates,
+    courseMaterials,
+    moduleSections,
+  }
+}

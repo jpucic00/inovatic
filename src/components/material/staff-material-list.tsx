@@ -23,6 +23,14 @@ export type StaffMaterialRow = {
   hiddenInThisGroup?: boolean
   uploadedBy?: string | null
   uploadedByDeleted?: boolean
+  /** Id of the user who uploaded this material. */
+  uploadedById?: string | null
+  /**
+   * Whether the current viewer may edit/delete this row. When `false`, only a
+   * hide toggle (for inherited MODULE/COURSE rows) is shown. Defaults to `true`
+   * when omitted (e.g. the admin program page, where admin owns everything).
+   */
+  canEdit?: boolean
 }
 
 interface Props {
@@ -34,7 +42,7 @@ interface Props {
 
 const SCOPE_LABEL: Record<MaterialScope, string> = {
   MODULE: 'Modul',
-  COURSE: 'Radionica',
+  COURSE: 'Cijeli program',
   GROUP: 'Grupa',
 }
 
@@ -124,16 +132,20 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
                   hidden={row.hiddenInThisGroup === true}
                 />
               ) : null}
-              <EditMaterialDialog
-                id={row.id}
-                title={row.title}
-                description={row.description}
-                sortOrder={row.sortOrder}
-                type={row.type}
-                fileUrl={row.fileUrl}
-                fileSize={row.fileSize}
-              />
-              <DeleteMaterialButton id={row.id} title={row.title} />
+              {row.canEdit !== false ? (
+                <>
+                  <EditMaterialDialog
+                    id={row.id}
+                    title={row.title}
+                    description={row.description}
+                    sortOrder={row.sortOrder}
+                    type={row.type}
+                    fileUrl={row.fileUrl}
+                    fileSize={row.fileSize}
+                  />
+                  <DeleteMaterialButton id={row.id} title={row.title} />
+                </>
+              ) : null}
             </div>
           </li>
         )

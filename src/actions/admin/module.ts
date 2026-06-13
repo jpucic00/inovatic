@@ -45,6 +45,6 @@ export async function upsertModuleSchedule(
     return { success: false, error: 'Greška pri spremanju datuma modula.' }
   }
 
-  revalidatePath('/admin/programi')
+  revalidatePath('/admin/programi', 'layout')
   return { success: true }
 }

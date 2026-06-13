@@ -188,6 +188,70 @@ describe('createMaterialSchema — type/URL pairing rules', () => {
   })
 })
 
+describe('createMaterialSchema — ROBOCAMP type', () => {
+  const moduleBase = { ...baseFields, scope: 'MODULE' as const, moduleId: 'm1' }
+
+  it('accepts ROBOCAMP with an elearning.robocamp.eu externalUrl', () => {
+    const result = createMaterialSchema.parse({
+      ...moduleBase,
+      type: 'ROBOCAMP',
+      fileUrl: null,
+      externalUrl: 'https://elearning.robocamp.eu/course/123',
+    })
+    expect(result.type).toBe('ROBOCAMP')
+    expect(result.externalUrl).toBe('https://elearning.robocamp.eu/course/123')
+  })
+
+  it('rejects ROBOCAMP without externalUrl', () => {
+    const result = createMaterialSchema.safeParse({
+      ...moduleBase,
+      type: 'ROBOCAMP',
+      fileUrl: null,
+      externalUrl: null,
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes('externalUrl'))).toBe(true)
+    }
+  })
+
+  it('rejects ROBOCAMP with a non-robocamp host', () => {
+    const result = createMaterialSchema.safeParse({
+      ...moduleBase,
+      type: 'ROBOCAMP',
+      fileUrl: null,
+      externalUrl: 'https://www.youtube.com/watch?v=x',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('robocamp'))).toBe(true)
+    }
+  })
+
+  it('rejects ROBOCAMP with a fileUrl', () => {
+    const result = createMaterialSchema.safeParse({
+      ...moduleBase,
+      type: 'ROBOCAMP',
+      fileUrl: 'https://res.cloudinary.com/x/raw/upload/v1/x.pdf',
+      externalUrl: 'https://elearning.robocamp.eu/course/123',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes('fileUrl'))).toBe(true)
+    }
+  })
+
+  it('rejects ROBOCAMP that looks like robocamp but on a different host', () => {
+    const result = createMaterialSchema.safeParse({
+      ...moduleBase,
+      type: 'ROBOCAMP',
+      fileUrl: null,
+      externalUrl: 'https://elearning.robocamp.eu.evil.com/course/123',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
 describe('updateMaterialSchema', () => {
   it('accepts an id-only update (no type → skip pairing check)', () => {
     const result = updateMaterialSchema.parse({ id: 'm1' })

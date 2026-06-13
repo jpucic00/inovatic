@@ -1,4 +1,4 @@
-import { FileText, Presentation, Video, Link2 } from 'lucide-react'
+import { FileText, Presentation, Video, Link2, Gamepad2 } from 'lucide-react'
 import type { MaterialType } from '@prisma/client'
 
 const MATERIAL_TYPE_LABEL: Record<MaterialType, string> = {
@@ -6,6 +6,7 @@ const MATERIAL_TYPE_LABEL: Record<MaterialType, string> = {
   PRESENTATION: 'Prezentacija',
   VIDEO: 'Video',
   LINK: 'Poveznica',
+  ROBOCAMP: 'RoboCamp',
 }
 
 interface Props {
@@ -24,6 +25,8 @@ function MaterialTypeIcon({ type, className }: Readonly<Props>) {
       return <Video className={c} />
     case 'LINK':
       return <Link2 className={c} />
+    case 'ROBOCAMP':
+      return <Gamepad2 className={c} />
   }
 }
 

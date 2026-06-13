@@ -1,10 +1,15 @@
 import Link from 'next/link'
-import { FileText, Presentation, Video, Link2 } from 'lucide-react'
-import type { GroupMaterialsView, MaterialItem } from '@/actions/student/materials'
-import type { MaterialType } from '@prisma/client'
-import { isRobocampUrl } from '@/lib/robocamp-proxy'
+import { FileText, Presentation, Link2, Gamepad2, Video } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type {
+  GroupMaterialsView,
+  KindBuckets,
+  MaterialItem,
+  ModuleMaterialGroup,
+} from '@/lib/group-materials-view'
+import { bucketsAreEmpty } from '@/lib/group-materials-view'
 import { RobocampEmbed } from '@/components/material/robocamp-embed'
-import { VideoEmbed } from '@/components/material/video-embed'
+import { CompactMediaCard } from './compact-media-card'
 
 function formatBytes(bytes: number | null): string | null {
   if (bytes == null || bytes <= 0) return null
@@ -13,26 +18,7 @@ function formatBytes(bytes: number | null): string | null {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const TYPE_LABEL: Record<MaterialType, string> = {
-  DOCUMENT: 'Dokument',
-  PRESENTATION: 'Prezentacija',
-  VIDEO: 'Video',
-  LINK: 'Poveznica',
-}
-
-function TypeIcon({ type, className }: Readonly<{ type: MaterialType; className?: string }>) {
-  const common = className ?? 'w-6 h-6'
-  switch (type) {
-    case 'DOCUMENT':
-      return <FileText className={common} />
-    case 'PRESENTATION':
-      return <Presentation className={common} />
-    case 'VIDEO':
-      return <Video className={common} />
-    case 'LINK':
-      return <Link2 className={common} />
-  }
-}
+// ─── Compact rows for documents + links ──────────────────────────────────────
 
 function resolveHref(item: MaterialItem): string | null {
   if (item.externalUrl) return item.externalUrl
@@ -40,111 +26,167 @@ function resolveHref(item: MaterialItem): string | null {
   return null
 }
 
-function MaterialTile({ item }: Readonly<{ item: MaterialItem }>) {
+function MaterialRow({ item, icon: Icon }: Readonly<{ item: MaterialItem; icon: LucideIcon }>) {
   const href = resolveHref(item)
   const size = formatBytes(item.fileSize)
 
-  const header = (
-    <div className="flex items-start gap-4 p-4 sm:p-5 rounded-lg border border-gray-200 bg-white hover:border-cyan-400 hover:shadow-sm transition">
-      <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-md bg-cyan-50 text-cyan-600">
-        <TypeIcon type={item.type} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-base font-semibold text-gray-900 truncate">{item.title}</h3>
-          <span className="text-xs text-gray-500 whitespace-nowrap">{TYPE_LABEL[item.type]}{size ? ` · ${size}` : ''}</span>
-        </div>
+  const inner = (
+    <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:border-cyan-400 hover:shadow-sm transition">
+      <span className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-md bg-cyan-50 text-cyan-600">
+        <Icon className="w-4 h-4" />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-semibold text-gray-900 truncate">{item.title}</span>
         {item.description ? (
-          <p className="text-sm text-gray-600 mt-1 line-clamp-2">{item.description}</p>
+          <span className="block text-xs text-gray-500 mt-0.5 line-clamp-1">{item.description}</span>
         ) : null}
-      </div>
+      </span>
+      {size ? <span className="text-xs text-gray-400 whitespace-nowrap">{size}</span> : null}
     </div>
   )
 
-  if (item.externalUrl && isRobocampUrl(item.externalUrl)) {
-    return (
-      <div className="space-y-3">
-        {header}
-        <RobocampEmbed url={item.externalUrl} title={item.title} />
-      </div>
-    )
-  }
-
-  if (item.type === 'VIDEO') {
-    let videoContent: React.ReactNode = null
-    if (item.externalUrl) {
-      videoContent = <VideoEmbed url={item.externalUrl} title={item.title} />
-    } else if (item.fileUrl) {
-      videoContent = (
-        <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ paddingTop: '56.25%' }}>
-          <video
-            controls
-            preload="metadata"
-            className="absolute inset-0 w-full h-full"
-            src={item.fileUrl}
-          >
-            <track kind="captions" />
-          </video>
-        </div>
-      )
-    }
-
-    if (!videoContent) {
-      return <div aria-disabled className="opacity-70">{header}</div>
-    }
-
-    return (
-      <div className="space-y-3">
-        {header}
-        {videoContent}
-      </div>
-    )
-  }
-
-  if (!href) {
-    return <div aria-disabled className="opacity-70">{header}</div>
-  }
-
+  if (!href) return <div aria-disabled className="opacity-70">{inner}</div>
   return (
     <Link href={href} target="_blank" rel="noopener noreferrer" className="block">
-      {header}
+      {inner}
     </Link>
   )
 }
 
-function ModuleSection({
-  title,
-  isActive,
-  materials,
-}: Readonly<{
-  title: string
-  isActive: boolean
-  materials: MaterialItem[]
-}>) {
-  if (materials.length === 0) return null
+// ─── Kind-separated blocks for a bucket set ──────────────────────────────────
 
+function KindGroup({
+  label,
+  icon: Icon,
+  children,
+}: Readonly<{ label: string; icon: LucideIcon; children: React.ReactNode }>) {
   return (
-    <section className="mb-8" data-active-module={isActive || undefined}>
-      <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        {isActive ? (
-          <span className="text-xs font-medium text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-full">Aktivan modul</span>
-        ) : null}
-      </div>
-      <div className="space-y-3">
-        {materials.map((m) => (
-          <MaterialTile key={m.id} item={m} />
+    <div>
+      <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+        <Icon className="w-3.5 h-3.5" />
+        {label}
+      </h4>
+      {children}
+    </div>
+  )
+}
+
+function KindBlocks({
+  buckets,
+  skipRobocamp = false,
+}: Readonly<{ buckets: KindBuckets; skipRobocamp?: boolean }>) {
+  return (
+    <div className="space-y-5">
+      {!skipRobocamp && buckets.robocamp.length > 0 ? (
+        <KindGroup label="Interaktivni vodiči" icon={Gamepad2}>
+          <div className="space-y-2">
+            {buckets.robocamp.map((m) => (
+              <CompactMediaCard key={m.id} item={m} kind="robocamp" />
+            ))}
+          </div>
+        </KindGroup>
+      ) : null}
+      {buckets.videos.length > 0 ? (
+        <KindGroup label="Videi" icon={Video}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {buckets.videos.map((m) => (
+              <CompactMediaCard key={m.id} item={m} kind="video" />
+            ))}
+          </div>
+        </KindGroup>
+      ) : null}
+      {buckets.docs.length > 0 ? (
+        <KindGroup label="Dokumenti" icon={FileText}>
+          <div className="space-y-2">
+            {buckets.docs.map((m) => (
+              <MaterialRow key={m.id} item={m} icon={m.type === 'PRESENTATION' ? Presentation : FileText} />
+            ))}
+          </div>
+        </KindGroup>
+      ) : null}
+      {buckets.links.length > 0 ? (
+        <KindGroup label="Poveznice" icon={Link2}>
+          <div className="space-y-2">
+            {buckets.links.map((m) => (
+              <MaterialRow key={m.id} item={m} icon={Link2} />
+            ))}
+          </div>
+        </KindGroup>
+      ) : null}
+    </div>
+  )
+}
+
+/** Visible item count, treating robocamp as hidden when it's skipped (featured). */
+function visibleCount(buckets: KindBuckets, skipRobocamp: boolean): number {
+  return (
+    buckets.videos.length +
+    buckets.docs.length +
+    buckets.links.length +
+    (skipRobocamp ? 0 : buckets.robocamp.length)
+  )
+}
+
+// ─── Sections ────────────────────────────────────────────────────────────────
+
+function FeaturedRobocamp({ items }: Readonly<{ items: MaterialItem[] }>) {
+  if (items.length === 0) return null
+  return (
+    <section className="rounded-xl border border-cyan-200 bg-cyan-50/40 p-4 sm:p-5">
+      <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-3">
+        <Gamepad2 className="w-5 h-5 text-cyan-600" />
+        Interaktivni vodiči
+      </h2>
+      <div className="space-y-4">
+        {items.map((item) => (
+          <div key={item.id}>
+            <h3 className="text-base font-semibold text-gray-900 mb-1.5">{item.title}</h3>
+            {item.description ? (
+              <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+            ) : null}
+            {item.externalUrl ? <RobocampEmbed url={item.externalUrl} title={item.title} /> : null}
+          </div>
         ))}
       </div>
     </section>
   )
 }
 
-export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
-  const hasAnyModuleMaterial = view.moduleSections.some((s) => s.materials.length > 0)
-  const hasGroupMaterials = view.groupMaterials.length > 0
+function Section({
+  title,
+  isActive,
+  buckets,
+  skipRobocamp = false,
+}: Readonly<{ title: string; isActive?: boolean; buckets: KindBuckets; skipRobocamp?: boolean }>) {
+  if (visibleCount(buckets, skipRobocamp) === 0) return null
+  return (
+    <section data-active-module={isActive || undefined}>
+      <div className="flex items-center gap-2 mb-3">
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        {isActive ? (
+          <span className="text-xs font-medium text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-full">
+            Aktivan modul
+          </span>
+        ) : null}
+      </div>
+      <KindBlocks buckets={buckets} skipRobocamp={skipRobocamp} />
+    </section>
+  )
+}
 
-  if (!hasAnyModuleMaterial && !hasGroupMaterials) {
+// ─── Root ────────────────────────────────────────────────────────────────────
+
+export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
+  const isCustom = view.group.course.isCustom
+
+  const hasAny =
+    view.featuredRobocamp.length > 0 ||
+    view.moduleSections.some((s) => !bucketsAreEmpty(s.buckets)) ||
+    !bucketsAreEmpty(view.programMaterials) ||
+    !bucketsAreEmpty(view.groupMaterials) ||
+    !bucketsAreEmpty(view.radionicaMaterials)
+
+  if (!hasAny) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center">
         <p className="text-gray-500">Još nema materijala za ovu grupu.</p>
@@ -152,42 +194,35 @@ export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
     )
   }
 
-  if (view.group.course.isCustom) {
+  if (isCustom) {
     return (
-      <div className="space-y-3">
-        {view.groupMaterials.map((m) => (
-          <MaterialTile key={m.id} item={m} />
-        ))}
+      <div className="space-y-8">
+        <FeaturedRobocamp items={view.featuredRobocamp} />
+        <Section title="Materijali" buckets={view.radionicaMaterials} skipRobocamp />
       </div>
     )
   }
 
-  const activeFirst = [...view.moduleSections].sort((a, b) => {
+  const activeFirst: ModuleMaterialGroup[] = [...view.moduleSections].sort((a, b) => {
     if (a.isActive && !b.isActive) return -1
     if (!a.isActive && b.isActive) return 1
     return a.sortOrder - b.sortOrder
   })
 
   return (
-    <div>
+    <div className="space-y-8">
+      <FeaturedRobocamp items={view.featuredRobocamp} />
       {activeFirst.map((section) => (
-        <ModuleSection
+        <Section
           key={section.moduleId}
           title={section.title}
           isActive={section.isActive}
-          materials={section.materials}
+          buckets={section.buckets}
+          skipRobocamp={section.isActive}
         />
       ))}
-      {hasGroupMaterials ? (
-        <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Materijali grupe</h2>
-          <div className="space-y-3">
-            {view.groupMaterials.map((m) => (
-              <MaterialTile key={m.id} item={m} />
-            ))}
-          </div>
-        </section>
-      ) : null}
+      <Section title="Za cijeli program" buckets={view.programMaterials} />
+      <Section title="Materijali grupe" buckets={view.groupMaterials} />
     </div>
   )
 }

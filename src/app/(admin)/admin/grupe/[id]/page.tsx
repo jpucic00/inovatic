@@ -10,6 +10,7 @@ import { ModuleEnrollmentPanel } from '@/components/admin/groups/module-enrollme
 import { GroupTeachersPanel } from '@/components/admin/groups/group-teachers-panel'
 import { GroupInfoPanel } from '@/components/admin/groups/group-info-panel'
 import { GroupGalleryPanel } from '@/components/admin/groups/group-gallery-panel'
+import { GroupMaterialsPanel } from '@/components/admin/groups/group-materials-panel'
 import { isArchivedYear } from '@/lib/school-year'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 import { loadHolidayDateKeys } from '@/lib/holidays'
@@ -176,6 +177,8 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
           )}
         </div>
       )}
+
+      <GroupMaterialsPanel groupId={group.id} editable={editable} />
 
       <GroupGalleryPanel groupId={group.id} editable={editable} />
     </div>

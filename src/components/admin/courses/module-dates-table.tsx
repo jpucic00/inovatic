@@ -34,6 +34,8 @@ interface ModuleDatesTableProps {
   modules: Module[]
   selectedYear: string
   editable: boolean
+  /** Hide the course title/level header block (when the page already shows it). */
+  hideHeader?: boolean
 }
 
 function formatDate(d: Date | null): string {
@@ -210,11 +212,13 @@ export function ModuleDatesTable({
   modules,
   selectedYear,
   editable,
+  hideHeader,
 }: Readonly<ModuleDatesTableProps>) {
   if (modules.length === 0) return null
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5 mb-4">
+      {!hideHeader && (
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <Calendar className="w-5 h-5 text-cyan-600 shrink-0" />
@@ -242,6 +246,7 @@ export function ModuleDatesTable({
           {course.groupCount} {course.groupCount >= 2 && course.groupCount <= 4 ? 'grupe' : 'grupa'}
         </Link>
       </div>
+      )}
       <div className="overflow-x-auto -mx-5 px-5">
       <table className="w-full">
         <thead>

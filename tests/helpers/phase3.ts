@@ -267,6 +267,46 @@ export async function addLinkMaterial(
   await expect(page.getByText(title)).toBeVisible({ timeout: 15000 })
 }
 
+/** Resolves the courseId for a group by following its card on /admin/programi. */
+export async function getCourseIdForGroup(page: Page, groupId: string): Promise<string> {
+  const title = await getGroupCourseTitle(page, groupId)
+  await page.goto(`${BASE}/admin/programi`)
+  const href = await page
+    .locator('a[href^="/admin/programi/"]', { hasText: title })
+    .first()
+    .getAttribute('href')
+  const m = href?.match(/\/admin\/programi\/([^/?#]+)/)
+  if (!m) throw new Error(`No program detail link for course "${title}"`)
+  return m[1]
+}
+
+/**
+ * Adds a LINK material on the admin program detail page, in the section whose
+ * heading matches `sectionHeading` ("Materijali za cijeli program" for COURSE,
+ * or a module title for MODULE). Program/module materials are admin-only and
+ * live here, not on the group tab.
+ */
+export async function addMaterialOnProgramPage(
+  page: Page,
+  courseId: string,
+  sectionHeading: string | RegExp,
+  title: string,
+  url: string,
+) {
+  await page.goto(`${BASE}/admin/programi/${courseId}`)
+  const section = page.locator('section').filter({
+    has: page.getByRole('heading', { name: sectionHeading }),
+  })
+  await section.getByRole('button', { name: 'Dodaj' }).first().click()
+  const dialog = page.locator('[role="dialog"]')
+  await dialog.locator('#material-title').fill(title)
+  await dialog.locator('label', { hasText: 'Poveznica' }).click()
+  await dialog.locator('#material-external-url').fill(url)
+  await dialog.getByRole('button', { name: 'Spremi' }).click()
+  await expect(dialog).toBeHidden({ timeout: 10000 })
+  await expect(page.getByText(title)).toBeVisible({ timeout: 15000 })
+}
+
 let cloudinaryConfigured = false
 function configureCloudinaryOnce() {
   if (cloudinaryConfigured) return

@@ -32,17 +32,13 @@ async function validateScopeConsistency(
       return { success: false, error: 'Radionica nema module — koristite COURSE razinu.' }
     }
   } else if (data.scope === 'COURSE') {
+    // COURSE = "whole program" materials. Valid on both standard programs
+    // (visible across every module) and radionice (their only material level).
     const course = await db.course.findUnique({
       where: { id: data.courseId },
-      select: { isCustom: true },
+      select: { id: true },
     })
     if (!course) return { success: false, error: 'Program nije pronađen.' }
-    if (!course.isCustom) {
-      return {
-        success: false,
-        error: 'COURSE razina je samo za radionice. Standardni programi koriste MODULE.',
-      }
-    }
   }
   return null
 }
@@ -69,6 +65,12 @@ export async function createMaterial(
     }
   }
   const data = parsed.data
+
+  // Teachers may only add GROUP-level materials to their own groups. Program
+  // curriculum (MODULE/COURSE) is admin-owned.
+  if (session.user.role === 'TEACHER' && data.scope !== 'GROUP') {
+    return { success: false, error: 'Nastavnici mogu dodavati materijale samo na razini grupe.' }
+  }
 
   const scopeError = await validateScopeConsistency(data)
   if (scopeError) return scopeError
@@ -125,7 +127,14 @@ export async function updateMaterial(
 
   const existing = await db.material.findUnique({
     where: { id: data.id },
-    select: { scope: true, moduleId: true, courseId: true, scheduledGroupId: true, fileUrl: true },
+    select: {
+      scope: true,
+      moduleId: true,
+      courseId: true,
+      scheduledGroupId: true,
+      fileUrl: true,
+      uploadedById: true,
+    },
   })
   if (!existing) return { success: false, error: 'Materijal nije pronađen.' }
 
@@ -134,6 +143,10 @@ export async function updateMaterial(
 
   if (!(await canManageMaterial(session, target))) {
     return { success: false, error: 'Nemate dopuštenje za uređivanje ovog materijala.' }
+  }
+  // Teachers may only edit materials they uploaded (mirrors comment ownership).
+  if (session.user.role === 'TEACHER' && existing.uploadedById !== session.user.id) {
+    return { success: false, error: 'Možete uređivati samo materijale koje ste sami dodali.' }
   }
 
   const replacingFile =
@@ -183,6 +196,7 @@ export async function deleteMaterial(id: string): Promise<AdminActionResult> {
       courseId: true,
       scheduledGroupId: true,
       fileUrl: true,
+      uploadedById: true,
     },
   })
   if (!existing) return { success: false, error: 'Materijal nije pronađen.' }
@@ -191,6 +205,10 @@ export async function deleteMaterial(id: string): Promise<AdminActionResult> {
   if (!target) return { success: false, error: 'Materijal ima neispravnu razinu.' }
   if (!(await canManageMaterial(session, target))) {
     return { success: false, error: 'Nemate dopuštenje za brisanje ovog materijala.' }
+  }
+  // Teachers may only delete materials they uploaded — never admin curriculum.
+  if (session.user.role === 'TEACHER' && existing.uploadedById !== session.user.id) {
+    return { success: false, error: 'Možete brisati samo materijale koje ste sami dodali.' }
   }
 
   try {
@@ -267,7 +285,8 @@ export async function setMaterialHidden(
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function revalidateMaterialPaths() {
-  revalidatePath('/admin/materijali')
+  revalidatePath('/admin/programi', 'layout')
+  revalidatePath('/admin/grupe', 'layout')
   revalidatePath('/nastavnik/materijali')
   revalidatePath('/nastavnik/grupa', 'layout')
   revalidatePath('/portal/grupa', 'layout')

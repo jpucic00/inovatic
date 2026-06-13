@@ -14,7 +14,8 @@ type MaterialScopeContext = {
 /**
  * Produces a Prisma `where` clause for the union of:
  *   - MODULE-scoped materials for any module in this course (standard programs)
- *   - COURSE-scoped materials for this course (radionice only — `isCustom=true`)
+ *   - COURSE-scoped materials for this course — "whole program" materials,
+ *     valid on both standard programs (across all modules) and radionice
  *   - GROUP-scoped materials for this specific ScheduledGroup
  * minus any rows hidden for this group via MaterialGroupHide.
  *
@@ -24,14 +25,11 @@ type MaterialScopeContext = {
 export function buildEffectiveMaterialsWhere(ctx: MaterialScopeContext): Prisma.MaterialWhereInput {
   const scopeBranches: Prisma.MaterialWhereInput[] = [
     { scope: 'GROUP', scheduledGroupId: ctx.scheduledGroupId },
+    { scope: 'COURSE', courseId: ctx.courseId },
   ]
 
   if (ctx.moduleIds.length > 0) {
     scopeBranches.push({ scope: 'MODULE', moduleId: { in: ctx.moduleIds } })
-  }
-
-  if (ctx.courseIsCustom) {
-    scopeBranches.push({ scope: 'COURSE', courseId: ctx.courseId })
   }
 
   return {

@@ -39,6 +39,7 @@ enum MaterialType {
   PRESENTATION
   VIDEO
   LINK
+  ROBOCAMP
 }
 
 enum MaterialScope {

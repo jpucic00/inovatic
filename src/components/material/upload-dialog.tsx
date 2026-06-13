@@ -16,6 +16,7 @@ import {
 import { createMaterial } from '@/actions/material/crud'
 import type { MaterialType } from '@prisma/client'
 import { isAllowedExternalVideoUrl } from '@/lib/validators/material'
+import { isRobocampUrl } from '@/lib/robocamp-proxy'
 import { formatBytes } from './material-type-badge'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ interface UploadMaterialDialogProps {
 // ─── Implementation ─────────────────────────────────────────────────────────
 
 const TYPE_OPTIONS: { value: MaterialType; label: string }[] = [
+  { value: 'ROBOCAMP', label: 'RoboCamp' },
   { value: 'DOCUMENT', label: 'Dokument' },
   { value: 'PRESENTATION', label: 'Prezentacija' },
   { value: 'VIDEO', label: 'Video' },
@@ -65,7 +67,7 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
   const [uploading, setUploading] = useState(false)
 
   const needsFileUpload = type === 'DOCUMENT' || type === 'PRESENTATION' || (type === 'VIDEO' && videoMode === 'upload')
-  const needsExternalUrl = type === 'LINK' || (type === 'VIDEO' && videoMode === 'url')
+  const needsExternalUrl = type === 'LINK' || type === 'ROBOCAMP' || (type === 'VIDEO' && videoMode === 'url')
 
   const canSubmit = (() => {
     if (title.trim().length < 2) return false
@@ -73,6 +75,7 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
     if (needsExternalUrl) {
       if (!externalUrl.trim()) return false
       if (type === 'VIDEO' && !isAllowedExternalVideoUrl(externalUrl.trim())) return false
+      if (type === 'ROBOCAMP' && !isRobocampUrl(externalUrl.trim())) return false
     }
     return true
   })()
@@ -196,7 +199,7 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
           </Field>
 
           <Field label="Tip">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {TYPE_OPTIONS.map((opt) => (
                 <label
                   key={opt.value}
@@ -276,7 +279,22 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
               />
             </Field>
           )}
-          {type !== 'VIDEO' && type !== 'LINK' && (
+          {type === 'ROBOCAMP' && (
+            <Field label="RoboCamp poveznica">
+              <input
+                id="material-external-url"
+                type="url"
+                value={externalUrl}
+                onChange={(e) => setExternalUrl(e.target.value)}
+                placeholder="https://elearning.robocamp.eu/…"
+                className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              />
+              <p className="mt-1.5 text-xs text-gray-500">
+                Interaktivni vodič — poveznica mora biti sa elearning.robocamp.eu.
+              </p>
+            </Field>
+          )}
+          {(type === 'DOCUMENT' || type === 'PRESENTATION') && (
             <Field label="Datoteka">
               <FileInput
                 uploading={uploading}

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isRobocampUrl } from '@/lib/robocamp-proxy'
 
 // ─── Shared core fields ──────────────────────────────────────────────────────
 
@@ -10,7 +11,7 @@ const commonCreate = {
     .union([z.literal(''), z.string().max(2000)])
     .optional()
     .nullable(),
-  type: z.enum(['DOCUMENT', 'PRESENTATION', 'VIDEO', 'LINK']),
+  type: z.enum(['DOCUMENT', 'PRESENTATION', 'VIDEO', 'LINK', 'ROBOCAMP']),
   fileUrl: urlOrEmpty,
   externalUrl: urlOrEmpty,
   fileSize: z.number().int().nonnegative().optional().nullable(),
@@ -59,7 +60,7 @@ export const updateMaterialSchema = z
       .union([z.literal(''), z.string().max(2000)])
       .optional()
       .nullable(),
-    type: z.enum(['DOCUMENT', 'PRESENTATION', 'VIDEO', 'LINK']).optional(),
+    type: z.enum(['DOCUMENT', 'PRESENTATION', 'VIDEO', 'LINK', 'ROBOCAMP']).optional(),
     fileUrl: urlOrEmpty,
     externalUrl: urlOrEmpty,
     fileSize: z.number().int().nonnegative().optional().nullable(),
@@ -101,11 +102,40 @@ function nonEmpty(v: string | null | undefined): v is string {
 }
 
 function validateTypeUrlPairing(
-  val: { type: 'DOCUMENT' | 'PRESENTATION' | 'VIDEO' | 'LINK'; fileUrl?: string | null; externalUrl?: string | null },
+  val: {
+    type: 'DOCUMENT' | 'PRESENTATION' | 'VIDEO' | 'LINK' | 'ROBOCAMP'
+    fileUrl?: string | null
+    externalUrl?: string | null
+  },
   ctx: z.RefinementCtx,
 ) {
   const hasFile = nonEmpty(val.fileUrl)
   const hasExternal = nonEmpty(val.externalUrl)
+
+  if (val.type === 'ROBOCAMP') {
+    // Interactive RoboCamp tutorial: an externalUrl on the RoboCamp host, no file.
+    if (!hasExternal) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Unesite RoboCamp poveznicu.',
+        path: ['externalUrl'],
+      })
+    } else if (!isRobocampUrl(val.externalUrl as string)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Poveznica mora biti sa elearning.robocamp.eu.',
+        path: ['externalUrl'],
+      })
+    }
+    if (hasFile) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'RoboCamp materijal nema priloženu datoteku.',
+        path: ['fileUrl'],
+      })
+    }
+    return
+  }
 
   if (val.type === 'VIDEO') {
     // Exactly one of fileUrl OR externalUrl; externalUrl must be YT/Vimeo.

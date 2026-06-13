@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
+import { buildGroupMaterialsView, type GroupMaterialsView } from '@/lib/group-materials-view'
 import type { StaffMaterialRow } from '@/components/material/staff-material-list'
 
 /**
@@ -11,7 +12,7 @@ import type { StaffMaterialRow } from '@/components/material/staff-material-list
  * manage them.
  */
 export async function getStaffGroupMaterials(groupId: string): Promise<StaffMaterialRow[]> {
-  await assertTeacherOwnsGroup(groupId)
+  const { session, isAdmin } = await assertTeacherOwnsGroup(groupId)
 
   const group = await db.scheduledGroup.findUniqueOrThrow({
     where: { id: groupId },
@@ -29,8 +30,8 @@ export async function getStaffGroupMaterials(groupId: string): Promise<StaffMate
     where: {
       OR: [
         { scope: 'GROUP', scheduledGroupId: group.id },
+        { scope: 'COURSE', courseId: group.course.id },
         ...(moduleIds.length > 0 ? [{ scope: 'MODULE' as const, moduleId: { in: moduleIds } }] : []),
-        ...(group.course.isCustom ? [{ scope: 'COURSE' as const, courseId: group.course.id }] : []),
       ],
     },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -61,6 +62,10 @@ export async function getStaffGroupMaterials(groupId: string): Promise<StaffMate
     hiddenInThisGroup: m.hiddenInGroups.length > 0,
     uploadedBy: m.uploadedBy ? `${m.uploadedBy.firstName} ${m.uploadedBy.lastName}` : null,
     uploadedByDeleted: m.uploadedBy?.deletedAt != null,
+    uploadedById: m.uploadedById,
+    // Inherited MODULE/COURSE program materials are hide-only in a group (edit
+    // them on the program page). GROUP materials: admin always; teacher only own.
+    canEdit: m.scope === 'GROUP' && (isAdmin || m.uploadedById === session.user.id),
   }))
 }
 
@@ -90,4 +95,15 @@ export async function getGroupUploadTargets(groupId: string) {
     isCustom: group.course.isCustom,
     modules: group.course.modules,
   }
+}
+
+/**
+ * The exact post-hide view a STUDENT of this group sees, for the teacher
+ * "scene view" (Pregled) tab. Gated by group ownership (ADMIN bypasses).
+ */
+export async function getGroupMaterialsViewForStaff(
+  groupId: string,
+): Promise<GroupMaterialsView> {
+  await assertTeacherOwnsGroup(groupId)
+  return buildGroupMaterialsView(groupId)
 }

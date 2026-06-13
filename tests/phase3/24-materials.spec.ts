@@ -4,7 +4,9 @@ import {
   loginAsAdmin,
   loginWithEmail,
   pickStandardGroupId,
+  getCourseIdForGroup,
   addLinkMaterial,
+  addMaterialOnProgramPage,
   cloudinaryAssetStatus,
   type TeacherData,
   type StudentData,
@@ -35,6 +37,7 @@ const STUDENT: StudentData = {
 
 const GROUP_LINK_TITLE = `Grupni LINK ${RUN_ID}`
 const MODULE_LINK_TITLE = `Modulni LINK ${RUN_ID}`
+const COURSE_LINK_TITLE = `Programski LINK ${RUN_ID}`
 type Seeded = {
   teacher: { email: string; password: string; teacherId: string }
   student: { email: string; password: string }
@@ -58,10 +61,11 @@ test.describe('Phase 3 Step 13 — Materials', () => {
     }
   })
 
-  // Lifecycle merge (was 6 tests: create GROUP, create MODULE, student sees
-  // both, hide MODULE, unhide MODULE, delete GROUP). Each original `expect()`
-  // is preserved as its own `test.step()` with a descriptive label.
-  test('material lifecycle: create GROUP+MODULE → student sees both → hide → unhide → delete GROUP', async ({
+  // Lifecycle: create GROUP (teacher) + program-wide COURSE (admin, program
+  // page) → student sees both → hide COURSE → unhide → delete GROUP. Uses
+  // COURSE (always visible) rather than MODULE (active-module-gated) so the
+  // student-visibility assertions are deterministic regardless of the calendar.
+  test('material lifecycle: GROUP + program-wide → student sees both → hide → unhide → delete', async ({
     page,
   }) => {
     if (!seeded) throw new Error('not seeded')
@@ -83,20 +87,33 @@ test.describe('Phase 3 Step 13 — Materials', () => {
       ).toBeVisible()
     })
 
-    await test.step('Teacher creates a MODULE-scope LINK material', async () => {
-      await addLinkMaterial(
-        page,
-        /Dodaj u modul:/,
-        MODULE_LINK_TITLE,
-        'https://example.com/module-resource',
-      )
+    await test.step('Teacher has no MODULE/COURSE (program) upload buttons', async () => {
       await expect(
-        page.getByText(MODULE_LINK_TITLE),
-        'MODULE material is visible in teacher list after create',
-      ).toBeVisible()
+        page.getByRole('button', { name: /Dodaj u modul:/ }),
+        'teacher cannot add program (MODULE) materials',
+      ).toHaveCount(0)
+      await expect(
+        page.getByRole('button', { name: /Dodaj u cijelu radionicu/ }),
+        'teacher cannot add program (COURSE) materials',
+      ).toHaveCount(0)
     })
 
-    await test.step('Student portal renders both GROUP and MODULE materials', async () => {
+    await test.step('Admin creates a program-wide (COURSE) material on the program page', async () => {
+      // Program/module materials are admin-only and live on the program detail
+      // page — not the group tab. COURSE (whole-program) materials are always
+      // visible to kids (unlike non-active modules), so they're deterministic.
+      await loginAsAdmin(page)
+      const courseId = await getCourseIdForGroup(page, seeded!.groupId)
+      await addMaterialOnProgramPage(
+        page,
+        courseId,
+        'Materijali za cijeli program',
+        COURSE_LINK_TITLE,
+        'https://example.com/program-wide',
+      )
+    })
+
+    await test.step('Student portal renders GROUP and program-wide materials', async () => {
       await loginWithEmail(page, seeded!.student.email, seeded!.student.password)
       await page.waitForURL(/\/portal/, { timeout: 30000 })
       await page.goto(`${BASE}/portal/grupa/${seeded!.groupId}`)
@@ -105,16 +122,16 @@ test.describe('Phase 3 Step 13 — Materials', () => {
         'student sees GROUP-scope material',
       ).toBeVisible()
       await expect(
-        page.getByText(MODULE_LINK_TITLE),
-        'student sees MODULE-scope material',
+        page.getByText(COURSE_LINK_TITLE),
+        'student sees program-wide material',
       ).toBeVisible()
     })
 
-    await test.step('Teacher hides the MODULE material — student loses MODULE, keeps GROUP', async () => {
+    await test.step('Teacher hides the program-wide material — student loses it, keeps GROUP', async () => {
       await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
       await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
       await page.goto(`${BASE}/nastavnik/grupa/${seeded!.groupId}/materijali`)
-      const row = page.locator('li', { has: page.getByText(MODULE_LINK_TITLE) })
+      const row = page.locator('li', { has: page.getByText(COURSE_LINK_TITLE) })
       await row.getByRole('button', { name: 'Sakrij u ovoj grupi' }).click()
       await expect(
         row.getByText('Sakriveno u grupi'),
@@ -125,8 +142,8 @@ test.describe('Phase 3 Step 13 — Materials', () => {
       await page.waitForURL(/\/portal/, { timeout: 30000 })
       await page.goto(`${BASE}/portal/grupa/${seeded!.groupId}`)
       await expect(
-        page.getByText(MODULE_LINK_TITLE),
-        'student no longer sees the hidden MODULE material',
+        page.getByText(COURSE_LINK_TITLE),
+        'student no longer sees the hidden program-wide material',
       ).toHaveCount(0)
       await expect(
         page.getByText(GROUP_LINK_TITLE),
@@ -134,11 +151,11 @@ test.describe('Phase 3 Step 13 — Materials', () => {
       ).toBeVisible()
     })
 
-    await test.step('Teacher unhides — student sees MODULE again', async () => {
+    await test.step('Teacher unhides — student sees the program-wide material again', async () => {
       await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
       await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
       await page.goto(`${BASE}/nastavnik/grupa/${seeded!.groupId}/materijali`)
-      const row = page.locator('li', { has: page.getByText(MODULE_LINK_TITLE) })
+      const row = page.locator('li', { has: page.getByText(COURSE_LINK_TITLE) })
       await row.getByRole('button', { name: 'Prikaži u ovoj grupi' }).click()
       await expect(
         row.getByText('Sakriveno u grupi'),
@@ -149,8 +166,8 @@ test.describe('Phase 3 Step 13 — Materials', () => {
       await page.waitForURL(/\/portal/, { timeout: 30000 })
       await page.goto(`${BASE}/portal/grupa/${seeded!.groupId}`)
       await expect(
-        page.getByText(MODULE_LINK_TITLE),
-        'student sees the MODULE material again after unhide',
+        page.getByText(COURSE_LINK_TITLE),
+        'student sees the program-wide material again after unhide',
       ).toBeVisible()
     })
 
@@ -211,21 +228,25 @@ test.describe('Phase 3 Step 13 — Materials', () => {
     })
   })
 
-  test('admin materials page lists existing materials with search + filters', async ({ page }) => {
+  test('admin program detail page hosts MODULE materials; /admin/materijali is removed', async ({ page }) => {
     if (!seeded) throw new Error('not seeded')
     await loginAsAdmin(page)
-    await page.goto(`${BASE}/admin/materijali?q=${encodeURIComponent(MODULE_LINK_TITLE)}`)
-    await expect(page.getByText(MODULE_LINK_TITLE)).toBeVisible()
-  })
 
-  // ── I6: Teacher "Moji materijali" page ─────────────────────────────────────
+    // The standalone materials page has been removed.
+    const resp = await page.goto(`${BASE}/admin/materijali`)
+    expect(resp?.status(), '/admin/materijali should no longer route').toBe(404)
 
-  test('teacher /nastavnik/materijali page lists materials from assigned groups', async ({ page }) => {
-    if (!seeded) throw new Error('not seeded')
-    await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
-    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-    await page.goto(`${BASE}/nastavnik/materijali`)
-    await expect(page.getByText(MODULE_LINK_TITLE)).toBeVisible()
+    // MODULE (per-module) materials are created and shown on the program detail
+    // page — the only place program curriculum is managed now.
+    const courseId = await getCourseIdForGroup(page, seeded.groupId)
+    await addMaterialOnProgramPage(
+      page,
+      courseId,
+      /^Modul 1/,
+      MODULE_LINK_TITLE,
+      'https://example.com/module-resource',
+    )
+    await expect(page.getByText(MODULE_LINK_TITLE)).toBeVisible({ timeout: 15000 })
   })
 
   // ── I7: setMaterialHidden rejects GROUP scope ──────────────────────────────
@@ -539,17 +560,21 @@ test.describe('Phase 3 Step 13 — COURSE-scope material on a radionica', () => 
     await page.close()
   })
 
-  test('teacher creates a COURSE-scope material on a radionica (covers canManageMaterial COURSE branch)', async ({
-    page,
-  }) => {
+  test('radionica COURSE material: teacher is blocked, admin adds it', async ({ page }) => {
     if (!radionicaSeeded) throw new Error('not seeded')
+
+    // Teacher: no program-level (COURSE) upload button.
     await loginWithEmail(page, radionicaSeeded.teacher.email, radionicaSeeded.teacher.password)
     await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
     await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupA}/materijali`)
+    await expect(page.getByRole('button', { name: /Dodaj u cijelu radionicu/ })).toHaveCount(0)
 
-    await addLinkMaterial(
+    // Admin: adds the COURSE material on the radionica's program detail page.
+    await loginAsAdmin(page)
+    await addMaterialOnProgramPage(
       page,
-      /Dodaj u cijelu radionicu/,
+      radionicaSeeded.courseId,
+      'Materijali za cijeli program',
       COURSE_MATERIAL_TITLE,
       'https://example.com/radionica-course-resource',
     )
@@ -568,25 +593,29 @@ test.describe('Phase 3 Step 13 — COURSE-scope material on a radionica', () => 
     await expect(page.getByText(COURSE_MATERIAL_TITLE)).toBeVisible()
   })
 
-  test('teacher deletes the COURSE material — gone from every group of the radionica', async ({
+  test('teacher cannot delete the admin COURSE material; admin deletes it from the program page', async ({
     page,
   }) => {
     if (!radionicaSeeded) throw new Error('not seeded')
 
-    page.on('dialog', (d) => d.accept())
-
+    // Teacher sees the inherited COURSE material but has no delete affordance.
     await loginWithEmail(page, radionicaSeeded.teacher.email, radionicaSeeded.teacher.password)
     await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
     await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupA}/materijali`)
+    const teacherRow = page.locator('li', { has: page.getByText(COURSE_MATERIAL_TITLE) })
+    await expect(teacherRow).toBeVisible()
+    await expect(teacherRow.getByRole('button', { name: 'Obriši materijal' })).toHaveCount(0)
 
-    const row = page.locator('li', { has: page.getByText(COURSE_MATERIAL_TITLE) })
-    await row.getByRole('button', { name: 'Obriši materijal' }).click()
-    await expect(row).toBeHidden({ timeout: 10000 })
-
-    // Admin re-checks both groups — material is gone from both.
+    // Admin deletes it on the program detail page (the curriculum home).
+    page.on('dialog', (d) => d.accept())
     await loginAsAdmin(page)
-    await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupA}/materijali`)
-    await expect(page.getByText(COURSE_MATERIAL_TITLE)).toHaveCount(0)
+    await page.goto(`${BASE}/admin/programi/${radionicaSeeded.courseId}`)
+    const adminRow = page.locator('li', { has: page.getByText(COURSE_MATERIAL_TITLE) })
+    await expect(adminRow).toBeVisible()
+    await adminRow.getByRole('button', { name: 'Obriši materijal' }).click()
+    await expect(adminRow).toBeHidden({ timeout: 10000 })
+
+    // Gone from every group of the radionica.
     await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupB}/materijali`)
     await expect(page.getByText(COURSE_MATERIAL_TITLE)).toHaveCount(0)
   })
