@@ -79,23 +79,21 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
   const now = new Date()
   const yearFloor = computeSchoolYear()
 
+  // The signup window now lives per (course, schoolYear) on
+  // CourseEnrollmentWindow. A group is publicly enrollable only when its
+  // program has an OPEN window for the group's own school year. Prisma can't
+  // correlate the window's schoolYear to each group's schoolYear in a single
+  // `where`, so resolve open windows first and gate groups on the composite key.
+  const openWindows = await db.courseEnrollmentWindow.findMany({
+    where: { enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
+    select: { courseId: true, schoolYear: true },
+  })
+  if (openWindows.length === 0) return []
+  const openKeys = new Set(openWindows.map((w) => `${w.courseId}::${w.schoolYear}`))
+  const openCourseIds = Array.from(new Set(openWindows.map((w) => w.courseId)))
+
   const groups = await db.scheduledGroup.findMany({
-    where: {
-      AND: [
-        {
-          OR: [
-            { enrollmentStart: null },
-            { enrollmentStart: { lte: now } },
-          ],
-        },
-        {
-          OR: [
-            { enrollmentEnd: null },
-            { enrollmentEnd: { gte: now } },
-          ],
-        },
-      ],
-    },
+    where: { courseId: { in: openCourseIds } },
     include: {
       course: {
         select: {
@@ -158,6 +156,8 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
 
   const courseMap = new Map<string, ActiveProgram>()
   for (const g of groups) {
+    // Gate on the group's own (course, year) window being open.
+    if (!openKeys.has(`${g.courseId}::${g.schoolYear}`)) continue
     const activeGroup = toActiveGroup(
       g,
       holidaysByYear.get(g.schoolYear) ?? new Set(),

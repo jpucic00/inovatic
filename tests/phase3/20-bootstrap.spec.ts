@@ -39,14 +39,8 @@ test.describe('Phase 3 Step 0 — Bootstrap (creates groups for downstream specs
       await dialog.locator('#create-startTime').fill('17:00')
       await dialog.locator('#create-endTime').fill('18:30')
 
-      const enrollStart = dialog.locator('#create-enrollmentStart')
-      await enrollStart.fill('01.01.2026')
-      await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-
-      const enrollEnd = dialog.locator('#create-enrollmentEnd')
-      await enrollEnd.fill('30.06.2026')
-      await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-
+      // Signup window moved to the program (per school year); phase-3 flows
+      // don't need the public form, so no window is set here.
       await dialog.getByRole('button', { name: 'Kreiraj grupu' }).click()
       await expect(page.getByText('Grupa kreirana.')).toBeVisible({ timeout: 15000 })
     }

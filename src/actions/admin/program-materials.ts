@@ -31,6 +31,9 @@ type ProgramDetail = {
     ageMax: number
     equipment: string | null
     groupCount: number
+    /** Selected-year public signup window (null when unset). */
+    enrollmentStart: Date | null
+    enrollmentEnd: Date | null
   }
   selectedYear: string
   /** Module date rows for ModuleDatesTable (standard programs only). */
@@ -61,6 +64,10 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       ageMax: true,
       equipment: true,
       _count: { select: { scheduledGroups: true } },
+      enrollmentWindows: {
+        where: { schoolYear: year },
+        select: { enrollmentStart: true, enrollmentEnd: true },
+      },
       modules: {
         orderBy: { sortOrder: 'asc' },
         select: {
@@ -147,6 +154,8 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       ageMax: course.ageMax,
       equipment: course.equipment,
       groupCount: course._count.scheduledGroups,
+      enrollmentStart: course.enrollmentWindows[0]?.enrollmentStart ?? null,
+      enrollmentEnd: course.enrollmentWindows[0]?.enrollmentEnd ?? null,
     },
     selectedYear: year,
     moduleDates,

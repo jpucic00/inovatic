@@ -104,10 +104,30 @@ model Course {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  modules         CourseModule[]
-  scheduledGroups ScheduledGroup[]
-  inquiries       Inquiry[]
-  materials       Material[]
+  modules           CourseModule[]
+  scheduledGroups   ScheduledGroup[]
+  inquiries         Inquiry[]
+  materials         Material[]
+  enrollmentWindows CourseEnrollmentWindow[]
+}
+
+// Per-school-year public signup window for a program. Keyed by
+// (courseId, schoolYear) so every group of that program/year inherits the
+// same window. A program is publicly enrollable only when this row exists
+// with both dates set and now is inside [enrollmentStart, enrollmentEnd].
+model CourseEnrollmentWindow {
+  id              String    @id @default(cuid())
+  courseId        String
+  schoolYear      String
+  enrollmentStart DateTime?
+  enrollmentEnd   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, schoolYear])
+  @@index([schoolYear])
 }
 
 model CourseModule {
@@ -194,8 +214,6 @@ model ScheduledGroup {
   endTime         String?
   schoolYear      String
   maxStudents     Int       @default(12)
-  enrollmentStart DateTime?
-  enrollmentEnd   DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

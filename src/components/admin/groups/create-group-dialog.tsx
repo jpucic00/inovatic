@@ -167,21 +167,9 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
             <input id="create-maxStudents" {...register('maxStudents')} type="number" min={1} max={50} className={adminInputClass} />
             {errors.maxStudents && <p className="text-xs text-red-600 mt-1">{errors.maxStudents.message}</p>}
           </div>
-          <div>
-            <span className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</span>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="create-enrollmentStart" className="text-xs text-gray-500 mb-1 block">Od</label>
-                <Controller name="enrollmentStart" control={control} render={({ field }) => <DateInput id="create-enrollmentStart" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
-                {errors.enrollmentStart && <p className="text-xs text-red-600 mt-1">{errors.enrollmentStart.message}</p>}
-              </div>
-              <div>
-                <label htmlFor="create-enrollmentEnd" className="text-xs text-gray-500 mb-1 block">Do</label>
-                <Controller name="enrollmentEnd" control={control} render={({ field }) => <DateInput id="create-enrollmentEnd" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
-                {errors.enrollmentEnd && <p className="text-xs text-red-600 mt-1">{errors.enrollmentEnd.message}</p>}
-              </div>
-            </div>
-          </div>
+          <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-md px-3 py-2">
+            Prozor upisa postavlja se na stranici programa i vrijedi za sve grupe tog programa.
+          </p>
           <TeacherMultiSelect
             teachers={teachers}
             selectedIds={teacherIds}

@@ -1,16 +1,22 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm, useWatch, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Pencil, MapPin, Clock, Calendar } from 'lucide-react'
+import { Pencil, MapPin, Clock, Calendar, ExternalLink } from 'lucide-react'
 import { createGroupSchema, type CreateGroupInput } from '@/lib/validators/admin/group'
 import { updateGroup } from '@/actions/admin/group'
 import { DAYS_HR } from '@/lib/format'
 import { adminInputClass, adminSelectClass } from '@/lib/admin-styles'
 import { DateInput } from '@/components/ui/date-input'
+import {
+  getEnrollmentWindowState,
+  ENROLLMENT_WINDOW_LABEL,
+  ENROLLMENT_WINDOW_COLOR,
+} from '@/lib/enrollment-window'
 
 type CourseOption = { id: string; title: string; isCustom: boolean }
 type LocationOption = { id: string; name: string }
@@ -41,11 +47,6 @@ interface Props {
   editable: boolean
 }
 
-function toDateInput(date: Date | null): string {
-  if (!date) return ''
-  return date.toISOString().slice(0, 10)
-}
-
 function DetailRow({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 py-3 border-b last:border-b-0">
@@ -53,21 +54,6 @@ function DetailRow({ label, value }: Readonly<{ label: string; value: React.Reac
       <dd className="text-sm text-gray-900">{value}</dd>
     </div>
   )
-}
-
-function enrollmentWindowStatus(
-  start: Date | null,
-  end: Date | null,
-): { label: string; color: string } {
-  if (!start && !end) return { label: 'Uvijek otvoreno', color: 'text-green-600' }
-  const now = new Date()
-  if (end && end < now) return { label: 'Zatvoreno', color: 'text-gray-500' }
-  if (start && start > now)
-    return {
-      label: `Otvara se ${start.toLocaleDateString('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`,
-      color: 'text-amber-600',
-    }
-  return { label: 'Otvoreno', color: 'text-green-600' }
 }
 
 function getCapacityColor(pct: number): string {
@@ -99,7 +85,7 @@ function GroupInfoView({
   editable,
   onEdit,
 }: Readonly<{ group: GroupForEdit; editable: boolean; onEdit: () => void }>) {
-  const windowStatus = enrollmentWindowStatus(group.enrollmentStart, group.enrollmentEnd)
+  const windowState = getEnrollmentWindowState(group.enrollmentStart, group.enrollmentEnd)
   const availableSpots = group.maxStudents - group.enrolledCount
   const pct = group.maxStudents > 0 ? group.enrolledCount / group.maxStudents : 0
   const capacityColor = getCapacityColor(pct)
@@ -166,8 +152,10 @@ function GroupInfoView({
           label="Prozor upisa"
           value={
             <div>
-              <span className={windowStatus.color}>{windowStatus.label}</span>
-              {(group.enrollmentStart || group.enrollmentEnd) && (
+              <span className={ENROLLMENT_WINDOW_COLOR[windowState]}>
+                {ENROLLMENT_WINDOW_LABEL[windowState]}
+              </span>
+              {windowState !== 'unset' && (
                 <p className="text-xs text-gray-400 mt-0.5">
                   {group.enrollmentStart &&
                     `Od: ${group.enrollmentStart.toLocaleDateString('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`}
@@ -176,6 +164,13 @@ function GroupInfoView({
                     `Do: ${group.enrollmentEnd.toLocaleDateString('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`}
                 </p>
               )}
+              <Link
+                href={`/admin/programi/${group.courseId}`}
+                className="inline-flex items-center gap-1 text-xs text-cyan-700 hover:underline mt-1"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Uredi u programu
+              </Link>
             </div>
           }
         />
@@ -259,8 +254,6 @@ function GroupInfoEdit({
       startTime: group.startTime ?? '',
       endTime: group.endTime ?? '',
       maxStudents: group.maxStudents,
-      enrollmentStart: toDateInput(group.enrollmentStart),
-      enrollmentEnd: toDateInput(group.enrollmentEnd),
     },
   })
 
@@ -368,21 +361,9 @@ function GroupInfoEdit({
           <input id="info-maxStudents" {...register('maxStudents')} type="number" min={1} max={50} className={adminInputClass} />
           {errors.maxStudents && <p className="text-xs text-red-600 mt-1">{errors.maxStudents.message}</p>}
         </div>
-        <div>
-          <span className="block text-sm font-medium text-gray-700 mb-1">Prozor upisa</span>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="info-enrollmentStart" className="text-xs text-gray-500 mb-1 block">Od</label>
-              <Controller name="enrollmentStart" control={control} render={({ field }) => <DateInput id="info-enrollmentStart" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
-              {errors.enrollmentStart && <p className="text-xs text-red-600 mt-1">{errors.enrollmentStart.message}</p>}
-            </div>
-            <div>
-              <label htmlFor="info-enrollmentEnd" className="text-xs text-gray-500 mb-1 block">Do</label>
-              <Controller name="enrollmentEnd" control={control} render={({ field }) => <DateInput id="info-enrollmentEnd" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
-              {errors.enrollmentEnd && <p className="text-xs text-red-600 mt-1">{errors.enrollmentEnd.message}</p>}
-            </div>
-          </div>
-        </div>
+        <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-md px-3 py-2">
+          Prozor upisa uređuje se na stranici programa i vrijedi za sve grupe tog programa.
+        </p>
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"

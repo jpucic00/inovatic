@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { getProgramDetail } from '@/actions/admin/program-materials'
 import { isArchivedYear } from '@/lib/school-year'
 import { ModuleDatesTable } from '@/components/admin/courses/module-dates-table'
+import { EnrollmentWindowEditor } from '@/components/admin/courses/enrollment-window-editor'
 import { UploadMaterialDialog } from '@/components/material/upload-dialog'
 import { StaffMaterialList } from '@/components/material/staff-material-list'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
@@ -64,6 +65,16 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
       </header>
 
       {!editable && <ArchivedYearBanner year={selectedYear} />}
+
+      <section className="mb-10">
+        <EnrollmentWindowEditor
+          courseId={course.id}
+          schoolYear={selectedYear}
+          enrollmentStart={course.enrollmentStart}
+          enrollmentEnd={course.enrollmentEnd}
+          editable={editable}
+        />
+      </section>
 
       {!course.isCustom && (
         <section className="mb-10">

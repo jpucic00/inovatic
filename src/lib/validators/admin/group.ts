@@ -13,8 +13,6 @@ export const createGroupSchema = z
     startTime: z.string().min(1, 'Unesite vrijeme početka'),
     endTime: z.string().min(1, 'Unesite vrijeme kraja'),
     maxStudents: z.coerce.number().int().min(1).max(50),
-    enrollmentStart: z.string().min(1, 'Unesite datum početka upisa'),
-    enrollmentEnd: z.string().min(1, 'Unesite datum kraja upisa'),
     teacherIds: z.array(z.string().min(1)).optional(),
   })
   .superRefine((data, ctx) => {
@@ -49,8 +47,6 @@ export const updateGroupSchema = z
     startTime: z.string().min(1, 'Unesite vrijeme početka').optional(),
     endTime: z.string().min(1, 'Unesite vrijeme kraja').optional(),
     maxStudents: z.coerce.number().int().min(1).max(50).optional(),
-    enrollmentStart: z.string().min(1, 'Unesite datum početka upisa').optional(),
-    enrollmentEnd: z.string().min(1, 'Unesite datum kraja upisa').optional(),
     teacherIds: z.array(z.string().min(1)).optional(),
   })
   .superRefine((data, ctx) => {

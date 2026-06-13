@@ -173,6 +173,35 @@ async function openInquiryDetail(page: Page, email: string) {
   await page.waitForURL(/\/admin\/upiti\/[a-z0-9]+/)
 }
 
+/**
+ * The signup window now lives on the PROGRAM (per school year), not the group
+ * dialog. Open a wide window for a group's program via the real UI path:
+ * group detail → "Uredi u programu" → the Prozor upisa editor. This makes every
+ * group of that program publicly enrollable for the current year.
+ */
+async function openProgramWindow(page: Page, groupName: string, isRadionica: boolean) {
+  await page.goto(`${BASE}/admin/grupe`)
+  if (isRadionica) {
+    await page.locator('button', { hasText: 'Radionice' }).last().click()
+  }
+  const row = page.locator('tr', { hasText: groupName }).first()
+  await row.locator('a', { hasText: groupName }).first().click()
+  await page.waitForURL(/\/admin\/grupe\/[a-z0-9]+$/)
+
+  await page.getByRole('link', { name: 'Uredi u programu' }).first().click()
+  await page.waitForURL(/\/admin\/programi\//)
+
+  await page.getByRole('button', { name: 'Uredi', exact: true }).first().click()
+  const start = page.locator('#window-start')
+  await start.fill('01.01.2025')
+  await start.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+  const end = page.locator('#window-end')
+  await end.fill('31.12.2027')
+  await end.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+  await page.getByRole('button', { name: 'Spremi' }).click()
+  await expect(page.getByText('Prozor upisa spremljen.')).toBeVisible({ timeout: 10000 })
+}
+
 // ─── Test suite ───────────────────────────────────────────────────────────────
 
 test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
@@ -293,21 +322,16 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       const maxInput = dialog.locator('input[type="number"][min="1"]')
       await maxInput.fill(String(MAX_SPOTS))
 
-      // Enrollment window is required by the schema; leave it wide open so
-      // public-form submissions downstream all land inside the window.
-      const enrollStart = dialog.locator('#create-enrollmentStart')
-      await enrollStart.fill('01.06.2025')
-      await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-      const enrollEnd = dialog.locator('#create-enrollmentEnd')
-      await enrollEnd.fill('30.06.2027')
-      await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
       // Assert on the group-table row — a bare text= match binds to the
       // weekly-grid lane entry, which lane-packing can hide when many groups
       // share the same slot.
       await expect(page.locator('tr', { hasText: STD_GROUP_NAME }).first()).toBeVisible({ timeout: 10000 })
+
+      // Open a wide signup window on the program so downstream public-form
+      // submissions land inside it.
+      await openProgramWindow(page, STD_GROUP_NAME, false)
     })
 
     test('create radionica group with 2 max spots', async ({ page }) => {
@@ -348,19 +372,15 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       const maxInput = dialog.locator('input[type="number"][min="1"]')
       await maxInput.fill(String(MAX_SPOTS))
 
-      // Enrollment window (required)
-      const enrollStart = dialog.locator('#create-enrollmentStart')
-      await enrollStart.fill('01.06.2025')
-      await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-      const enrollEnd = dialog.locator('#create-enrollmentEnd')
-      await enrollEnd.fill('30.06.2027')
-      await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
       // Radionica groups live under the dedicated "Radionice" tab.
       await page.locator('button', { hasText: 'Radionice' }).last().click()
       await expect(page.locator(`text=${RADIONICA_GROUP_NAME}`).first()).toBeVisible({ timeout: 10000 })
+
+      // Open the signup window on the radionica program so it is enrollable
+      // on its public /radionice/[slug] page.
+      await openProgramWindow(page, RADIONICA_GROUP_NAME, true)
     })
 
     test('group table shows enrollment counts and window status', async ({ page }) => {
@@ -372,8 +392,8 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await page.locator('button', { hasText: 'Radionice' }).last().click()
       await expect(page.locator(`text=${RADIONICA_GROUP_NAME}`).first()).toBeVisible()
       await page.locator('button', { hasText: 'Robotike 1' }).first().click()
-      // The enrollment window configured above (2025-06-01 → 2027-06-30) is
-      // currently open, so the badge should read "Otvoreno".
+      // The program window opened above (2025-01-01 → 2027-12-31) is currently
+      // open and inherited by every group, so the badge should read "Otvoreno".
       const stdRow = page.locator('tr', { hasText: STD_GROUP_NAME })
       await expect(stdRow.locator('text=Otvoreno')).toBeVisible()
     })
@@ -759,19 +779,13 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
 
       await dialog.locator('input[placeholder*="Grupa"]').fill(EMPTY_GROUP_NAME)
       // Radionica groups take a [dateStart, dateEnd] range — both required;
-      // a single-day workshop repeats the same date. Enrollment-window inputs
-      // are addressed by id so the order can't drift.
+      // a single-day workshop repeats the same date.
       await dialog.locator('input[type="date"]').nth(0).fill('2026-08-20')
       await dialog.locator('input[type="date"]').nth(1).fill('2026-08-20')
       await dialog.locator('input[placeholder="19:00"]').fill('10:00')
       await dialog.locator('input[placeholder="20:30"]').fill('12:00')
       await dialog.locator('input[type="number"][min="1"]').fill('2')
-      const enrollStart = dialog.locator('#create-enrollmentStart')
-      await enrollStart.fill('01.06.2025')
-      await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-      const enrollEnd = dialog.locator('#create-enrollmentEnd')
-      await enrollEnd.fill('30.06.2027')
-      await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+      // No signup window needed — this group exists only to test deletion.
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
 

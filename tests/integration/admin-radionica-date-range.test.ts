@@ -81,8 +81,6 @@ describe('createGroup — radionica date range', () => {
       startTime: '09:00',
       endTime: '11:00',
       maxStudents: 12,
-      enrollmentStart: '2026-06-01',
-      enrollmentEnd: '2026-07-10',
     })
     expect(res.success).toBe(true)
 
@@ -110,8 +108,6 @@ describe('createGroup — radionica date range', () => {
       startTime: '09:00',
       endTime: '11:00',
       maxStudents: 12,
-      enrollmentStart: '2026-06-01',
-      enrollmentEnd: '2026-07-10',
     })
     expect(res.success).toBe(false)
   })
@@ -132,8 +128,6 @@ describe('createGroup — radionica date range', () => {
       startTime: '09:00',
       endTime: '11:00',
       maxStudents: 12,
-      enrollmentStart: '2026-06-01',
-      enrollmentEnd: '2026-07-10',
     })
     expect(res.success).toBe(false)
   })

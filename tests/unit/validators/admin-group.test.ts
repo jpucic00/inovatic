@@ -8,8 +8,6 @@ const validGroup = {
   startTime: '17:00',
   endTime: '18:30',
   maxStudents: 12,
-  enrollmentStart: '2026-08-01',
-  enrollmentEnd: '2026-09-30',
 }
 
 describe('createGroupSchema', () => {
@@ -92,10 +90,6 @@ describe('createGroupSchema', () => {
 
   it('rejects maxStudents < 1', () => {
     expect(createGroupSchema.safeParse({ ...validGroup, maxStudents: 0 }).success).toBe(false)
-  })
-
-  it('rejects missing enrollmentStart', () => {
-    expect(createGroupSchema.safeParse({ ...validGroup, enrollmentStart: '' }).success).toBe(false)
   })
 })
 

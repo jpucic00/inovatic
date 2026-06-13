@@ -128,16 +128,9 @@ async function createStandardGroup(page: Page, groupName: string): Promise<strin
   const maxInput = dialog.locator('input[type="number"][min="1"]')
   await maxInput.fill(String(MAX_CAPACITY))
 
-  // Enrollment window is required by the createGroup schema. DateInput
-  // accepts dd.MM.yyyy in Croatian locale (task 49j2wma); fire blur so RHF
-  // commits the parsed value.
-  const enrollStart = dialog.locator('#create-enrollmentStart')
-  await enrollStart.fill('01.06.2025')
-  await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-  const enrollEnd = dialog.locator('#create-enrollmentEnd')
-  await enrollEnd.fill('30.06.2027')
-  await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-
+  // The signup window now lives on the program (per school year), not the
+  // group dialog. This test exercises admin module enrollment, not the public
+  // form, so no window is needed.
   await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
   await expect(dialog).not.toBeVisible({ timeout: 10000 })
 

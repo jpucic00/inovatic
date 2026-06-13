@@ -301,14 +301,7 @@ test.describe('Gallery — scope validation', () => {
     await page.fill('#create-schoolYear', '2025/2026')
     await page.fill('#create-maxStudents', '10')
 
-    const enrollStart = page.locator('#create-enrollmentStart')
-    await enrollStart.fill('01.01.2025.')
-    await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur')))
-
-    const enrollEnd = page.locator('#create-enrollmentEnd')
-    await enrollEnd.fill('31.12.2027.')
-    await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur')))
-
+    // Signup window moved to the program (per school year); not needed here.
     await page.getByRole('button', { name: 'Kreiraj grupu' }).click()
     await expect(page.getByText('Grupa kreirana.')).toBeVisible({ timeout: 10000 })
 

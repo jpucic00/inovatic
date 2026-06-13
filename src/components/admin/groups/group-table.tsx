@@ -14,6 +14,11 @@ import {
 } from '@/components/ui/dialog'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { deleteGroup } from '@/actions/admin/group'
+import {
+  getEnrollmentWindowState,
+  ENROLLMENT_WINDOW_LABEL,
+  ENROLLMENT_WINDOW_COLOR,
+} from '@/lib/enrollment-window'
 
 type Group = {
   id: string
@@ -147,15 +152,14 @@ function EnrollmentBadge({ group }: Readonly<{ group: Group }>) {
 }
 
 function EnrollmentWindowBadge({ group }: Readonly<{ group: Group }>) {
-  if (!group.enrollmentStart && !group.enrollmentEnd) {
-    return <span className="text-xs text-gray-400">Uvijek</span>
-  }
-  const now = new Date()
-  const started = !group.enrollmentStart || group.enrollmentStart <= now
-  const ended = group.enrollmentEnd && group.enrollmentEnd < now
-  if (ended) return <span className="text-xs text-gray-400">Zatvoreno</span>
-  if (started) return <span className="text-xs text-green-600 font-medium">Otvoreno</span>
-  return <span className="text-xs text-amber-600">Uskoro</span>
+  // Inherited from the program's window for this group's school year.
+  const state = getEnrollmentWindowState(group.enrollmentStart, group.enrollmentEnd)
+  const weight = state === 'open' ? 'font-medium' : ''
+  return (
+    <span className={`text-xs ${ENROLLMENT_WINDOW_COLOR[state]} ${weight}`}>
+      {ENROLLMENT_WINDOW_LABEL[state]}
+    </span>
+  )
 }
 
 function buildColumns(hideProgram: boolean, editable: boolean): ColumnDef<Group>[] {

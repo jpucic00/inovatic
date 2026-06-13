@@ -1474,6 +1474,26 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
 
   console.log('✅ Courses and modules created')
 
+  // ── Signup windows ───────────────────────────────────────────────────────────
+  // The public signup window lives per (course, school year). Open a wide
+  // current-year window for each standard program so groups created via the
+  // admin UI are immediately enrollable in dev. (mirrors computeSchoolYear)
+  const seedNow = new Date()
+  const seedMonth = seedNow.getMonth() + 1
+  const seedYear = seedNow.getFullYear()
+  const currentSchoolYear =
+    seedMonth >= 9 ? `${seedYear}/${seedYear + 1}` : `${seedYear - 1}/${seedYear}`
+  await prisma.courseEnrollmentWindow.createMany({
+    data: [slr1, slr2, slr3, slr4].map((c) => ({
+      courseId: c.id,
+      schoolYear: currentSchoolYear,
+      enrollmentStart: new Date(`${seedYear}-01-01`),
+      enrollmentEnd: new Date(`${seedYear + 1}-12-31`),
+    })),
+  })
+
+  console.log('✅ Signup windows created')
+
   // ── Tags ─────────────────────────────────────────────────────────────────────
   const [tagNatjecanja, tagRadionice, tagRezultati, tagObavijesti, tagEuProjekt] =
     await Promise.all([

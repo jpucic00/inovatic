@@ -30,7 +30,18 @@ export async function getGroups(filters: GroupFilters = {}) {
     where,
     orderBy: [{ course: { sortOrder: 'asc' } }, { createdAt: 'asc' }],
     include: {
-      course: { select: { id: true, title: true, level: true, isCustom: true } },
+      course: {
+        select: {
+          id: true,
+          title: true,
+          level: true,
+          isCustom: true,
+          enrollmentWindows: {
+            where: { schoolYear: year },
+            select: { enrollmentStart: true, enrollmentEnd: true },
+          },
+        },
+      },
       location: { select: { id: true, name: true } },
       teacherAssignments: { select: { userId: true } },
       _count: {
@@ -46,10 +57,17 @@ export async function getGroups(filters: GroupFilters = {}) {
     },
   })
 
-  return groups.map((g) => ({
-    ...g,
-    teacherIds: g.teacherAssignments.map((a) => a.userId),
-  }))
+  // The signup window now lives per (course, schoolYear); flatten this year's
+  // window onto each group row so the table badge shows the inherited window.
+  return groups.map((g) => {
+    const win = g.course.enrollmentWindows[0] ?? null
+    return {
+      ...g,
+      enrollmentStart: win?.enrollmentStart ?? null,
+      enrollmentEnd: win?.enrollmentEnd ?? null,
+      teacherIds: g.teacherAssignments.map((a) => a.userId),
+    }
+  })
 }
 
 export async function getGroupDetail(id: string) {
@@ -67,6 +85,10 @@ export async function getGroupDetail(id: string) {
     include: {
       course: {
         include: {
+          enrollmentWindows: {
+            where: { schoolYear: year },
+            select: { enrollmentStart: true, enrollmentEnd: true },
+          },
           modules: {
             orderBy: { sortOrder: 'asc' },
             select: {
@@ -128,8 +150,6 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
     startTime,
     endTime,
     maxStudents,
-    enrollmentStart,
-    enrollmentEnd,
     teacherIds,
   } = parsed.data
 
@@ -147,8 +167,6 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
           endTime,
           schoolYear,
           maxStudents: maxStudents ?? 12,
-          enrollmentStart: new Date(enrollmentStart),
-          enrollmentEnd: new Date(enrollmentEnd),
         },
       })
 
@@ -207,7 +225,7 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
   const parsed = updateGroupSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
-  const { id, courseId, locationId, name, dateStart, dateEnd, dayOfWeek, startTime, endTime, maxStudents, enrollmentStart, enrollmentEnd, teacherIds } = parsed.data
+  const { id, courseId, locationId, name, dateStart, dateEnd, dayOfWeek, startTime, endTime, maxStudents, teacherIds } = parsed.data
 
   const blocked = await archivedGroupError(id)
   if (blocked) return blocked
@@ -226,8 +244,6 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
           ...(startTime !== undefined && { startTime: startTime || null }),
           ...(endTime !== undefined && { endTime: endTime || null }),
           ...(maxStudents !== undefined && { maxStudents }),
-          ...(enrollmentStart !== undefined && { enrollmentStart: new Date(enrollmentStart) }),
-          ...(enrollmentEnd !== undefined && { enrollmentEnd: new Date(enrollmentEnd) }),
         },
       })
 

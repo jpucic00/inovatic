@@ -510,13 +510,7 @@ test.describe('Phase 3 Step 13 — COURSE-scope material on a radionica', () => 
       await gDialog.locator('#create-startTime').fill('17:00')
       await gDialog.locator('#create-endTime').fill('18:30')
 
-      const enrollStart = gDialog.locator('#create-enrollmentStart')
-      await enrollStart.fill('01.01.2026')
-      await enrollStart.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-      const enrollEnd = gDialog.locator('#create-enrollmentEnd')
-      await enrollEnd.fill('30.06.2026')
-      await enrollEnd.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
-
+      // Signup window moved to the program (per school year); not needed here.
       await gDialog.getByRole('button', { name: 'Kreiraj grupu' }).click()
       await expect(page.getByText('Grupa kreirana.')).toBeVisible({ timeout: 15000 })
     }

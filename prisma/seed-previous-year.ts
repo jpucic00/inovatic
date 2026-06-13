@@ -178,6 +178,21 @@ async function main() {
   }
   const createdGroups: CreatedGroup[] = []
 
+  // Signup window now lives per (course, school year), not per group. Open one
+  // window per distinct program used this year so the seeded groups inherit it.
+  const distinctCourseIds = Array.from(
+    new Set(GROUP_SPECS.map((s) => prereqs.courses[s.courseSlug].id)),
+  )
+  await prisma.courseEnrollmentWindow.createMany({
+    data: distinctCourseIds.map((courseId) => ({
+      courseId,
+      schoolYear: SCHOOL_YEAR,
+      enrollmentStart: ENROLLMENT_START,
+      enrollmentEnd: ENROLLMENT_END,
+    })),
+    skipDuplicates: true,
+  })
+
   for (let i = 0; i < GROUP_SPECS.length; i++) {
     const spec = GROUP_SPECS[i]
     const course = prereqs.courses[spec.courseSlug]
@@ -194,8 +209,6 @@ async function main() {
         endTime: spec.endTime,
         schoolYear: SCHOOL_YEAR,
         maxStudents: 12,
-        enrollmentStart: ENROLLMENT_START,
-        enrollmentEnd: ENROLLMENT_END,
       },
     })
 

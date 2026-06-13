@@ -50,6 +50,9 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
 
   const enrolledCount = group.enrollments.length
 
+  // Signup window is inherited from the program for this group's school year.
+  const window = group.course.enrollmentWindows[0] ?? null
+
   const groupForEdit = {
     id: group.id,
     courseId: group.courseId,
@@ -62,8 +65,8 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
     endTime: group.endTime,
     schoolYear: group.schoolYear,
     maxStudents: group.maxStudents,
-    enrollmentStart: group.enrollmentStart,
-    enrollmentEnd: group.enrollmentEnd,
+    enrollmentStart: window?.enrollmentStart ?? null,
+    enrollmentEnd: window?.enrollmentEnd ?? null,
     course: {
       id: group.course.id,
       title: group.course.title,
