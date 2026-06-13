@@ -3,7 +3,7 @@ import {
   computeSchoolYear,
   getNextSchoolYear,
   isArchivedYear,
-  schoolYearDateRange,
+  schoolYearNeedsPlanning,
 } from '@/lib/school-year'
 
 describe('computeSchoolYear', () => {
@@ -69,21 +69,34 @@ describe('isArchivedYear', () => {
   })
 })
 
-describe('schoolYearDateRange', () => {
-  it('spans Sept 1 to the next Sept 1', () => {
-    const { gte, lt } = schoolYearDateRange('2025/2026')
-    expect([gte.getFullYear(), gte.getMonth(), gte.getDate()]).toEqual([2025, 8, 1])
-    expect([lt.getFullYear(), lt.getMonth(), lt.getDate()]).toEqual([2026, 8, 1])
+describe('schoolYearNeedsPlanning', () => {
+  it('never flags an archived year, even when blank', () => {
+    expect(
+      schoolYearNeedsPlanning({ archived: true, datedModuleCount: 0, holidayCount: 0 }),
+    ).toBe(false)
   })
 
-  it('buckets an August date into the school year that is ending', () => {
-    const { gte, lt } = schoolYearDateRange('2025/2026')
-    const august = new Date(2026, 7, 15)
-    expect(august >= gte && august < lt).toBe(true)
+  it('flags a non-archived year with no module dates and no holidays', () => {
+    expect(
+      schoolYearNeedsPlanning({ archived: false, datedModuleCount: 0, holidayCount: 0 }),
+    ).toBe(true)
   })
 
-  it('excludes a September date (start of the next year)', () => {
-    const { lt } = schoolYearDateRange('2025/2026')
-    expect(new Date(2026, 8, 1) >= lt).toBe(true)
+  it('flags when module dates exist but holidays are missing', () => {
+    expect(
+      schoolYearNeedsPlanning({ archived: false, datedModuleCount: 16, holidayCount: 0 }),
+    ).toBe(true)
+  })
+
+  it('flags when holidays exist but module dates are missing', () => {
+    expect(
+      schoolYearNeedsPlanning({ archived: false, datedModuleCount: 0, holidayCount: 12 }),
+    ).toBe(true)
+  })
+
+  it('does not flag when both module dates and holidays are present', () => {
+    expect(
+      schoolYearNeedsPlanning({ archived: false, datedModuleCount: 16, holidayCount: 12 }),
+    ).toBe(false)
   })
 })

@@ -99,7 +99,7 @@ export function computeGroupCapacity(
           title: m.title,
           sortOrder: m.sortOrder,
           schedule:
-            schedule && schedule.startDate && schedule.endDate
+            schedule?.startDate && schedule.endDate
               ? {
                   id: schedule.id,
                   startDate: schedule.startDate,

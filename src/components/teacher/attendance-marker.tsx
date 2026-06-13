@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Loader2, Plus, Save, X } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
@@ -63,6 +64,32 @@ function initDraft(
     }
   }
   return draft
+}
+
+function makeDraftHandlers(setDraft: Dispatch<SetStateAction<Draft>>): {
+  togglePresent: (enrollmentId: string) => void
+  setNote: (enrollmentId: string, note: string) => void
+} {
+  return {
+    togglePresent: (enrollmentId) => {
+      setDraft((prev) => ({
+        ...prev,
+        [enrollmentId]: {
+          present: !prev[enrollmentId]?.present,
+          note: prev[enrollmentId]?.note ?? '',
+        },
+      }))
+    },
+    setNote: (enrollmentId, note) => {
+      setDraft((prev) => ({
+        ...prev,
+        [enrollmentId]: {
+          present: prev[enrollmentId]?.present ?? false,
+          note,
+        },
+      }))
+    },
+  }
 }
 
 function scheduleHint(
@@ -249,6 +276,7 @@ function RosterTable({
                     value={d.note}
                     onChange={(e) => onNote(r.enrollmentId, e.target.value)}
                     placeholder="npr. opravdano, zakasnio"
+                    aria-label={`Bilješka — ${r.lastName} ${r.firstName}`}
                     className="w-full px-2 py-1 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
                 </td>
@@ -336,25 +364,7 @@ function RadionicaAttendanceMarker({
     setNewDateInput('')
   }
 
-  const togglePresent = (enrollmentId: string) => {
-    setDraft((prev) => ({
-      ...prev,
-      [enrollmentId]: {
-        present: !prev[enrollmentId]?.present,
-        note: prev[enrollmentId]?.note ?? '',
-      },
-    }))
-  }
-
-  const setNote = (enrollmentId: string, note: string) => {
-    setDraft((prev) => ({
-      ...prev,
-      [enrollmentId]: {
-        present: prev[enrollmentId]?.present ?? false,
-        note,
-      },
-    }))
-  }
+  const { togglePresent, setNote } = makeDraftHandlers(setDraft)
 
   const handleSave = () => {
     const entries = roster.map((r) => ({
@@ -583,25 +593,7 @@ function StandardAttendanceMarker({
     setNewDateInput('')
   }
 
-  const togglePresent = (enrollmentId: string) => {
-    setDraft((prev) => ({
-      ...prev,
-      [enrollmentId]: {
-        present: !prev[enrollmentId]?.present,
-        note: prev[enrollmentId]?.note ?? '',
-      },
-    }))
-  }
-
-  const setNote = (enrollmentId: string, note: string) => {
-    setDraft((prev) => ({
-      ...prev,
-      [enrollmentId]: {
-        present: prev[enrollmentId]?.present ?? false,
-        note,
-      },
-    }))
-  }
+  const { togglePresent, setNote } = makeDraftHandlers(setDraft)
 
   const handleSave = () => {
     const entries = visibleRoster.map((r) => ({
@@ -637,12 +629,12 @@ function StandardAttendanceMarker({
   }
 
   const hint = scheduleHint(false, dayOfWeek, dateStart, dateEnd, startTime, endTime)
-  const sectionTitle =
-    selectedSection === 'other'
-      ? 'Ostali termini'
-      : selectedSection !== null
-        ? `Modul ${sections[selectedSection].moduleIndex}: ${sections[selectedSection].moduleTitle}`
-        : null
+  let sectionTitle: string | null = null
+  if (selectedSection === 'other') {
+    sectionTitle = 'Ostali termini'
+  } else if (selectedSection !== null) {
+    sectionTitle = `Modul ${sections[selectedSection].moduleIndex}: ${sections[selectedSection].moduleTitle}`
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">

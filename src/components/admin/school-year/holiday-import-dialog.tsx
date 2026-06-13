@@ -139,7 +139,7 @@ export function HolidayImportDialog({ schoolYear, archived }: Readonly<Props>) {
         return
       }
       toast.success(
-        `Učitano ${res.importedCount} ${res.importedCount === 1 ? 'praznik' : res.importedCount < 5 ? 'praznika' : 'praznika'}.`,
+        `Učitano ${res.importedCount} ${res.importedCount === 1 ? 'praznik' : 'praznika'}.`,
       )
       setOpen(false)
       setState({ status: 'idle' })

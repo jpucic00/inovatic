@@ -10,6 +10,7 @@ import {
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
 import { InquiryConfirmationEmail } from '../../emails/inquiry-confirmation'
+import { computeSchoolYear } from '@/lib/school-year'
 import { createElement } from 'react'
 
 type InquiryActionResult =
@@ -40,7 +41,18 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
 
   try {
     await runWithGroupCapacityGuard(async (tx) => {
-      if (scheduledGroupId) await assertGroupHasAvailableSpot(tx, scheduledGroupId)
+      // Derive the inquiry's school year server-side: the year of the chosen
+      // group (so future-year enrollments file under that year, not "now"),
+      // else the current computed year for group-less general inquiries.
+      let schoolYear = computeSchoolYear()
+      if (scheduledGroupId) {
+        await assertGroupHasAvailableSpot(tx, scheduledGroupId)
+        const group = await tx.scheduledGroup.findUnique({
+          where: { id: scheduledGroupId },
+          select: { schoolYear: true },
+        })
+        schoolYear = group?.schoolYear ?? schoolYear
+      }
       return tx.inquiry.create({
         data: {
           parentName,
@@ -53,6 +65,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
           childGrade: grade || null,
           courseId: courseId || null,
           scheduledGroupId: scheduledGroupId || null,
+          schoolYear,
           message: message || null,
           referralSource: referralSource || null,
           consentGivenAt: new Date(),

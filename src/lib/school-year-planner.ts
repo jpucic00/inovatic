@@ -263,13 +263,14 @@ export function computeWorkshopLabels(input: {
 
   const out: WorkshopLabel[] = []
   for (const [date, entry] of byDate) {
-    for (const title of [...entry.titles].sort()) {
+    for (const title of [...entry.titles].sort((a, b) => a.localeCompare(b))) {
       out.push({ date, title })
     }
   }
-  out.sort((a, b) =>
-    a.date === b.date ? a.title.localeCompare(b.title) : a.date < b.date ? -1 : 1,
-  )
+  out.sort((a, b) => {
+    if (a.date === b.date) return a.title.localeCompare(b.title)
+    return a.date < b.date ? -1 : 1
+  })
   return out
 }
 
@@ -353,7 +354,7 @@ export function computeModuleMarkers(input: {
   const out: ModuleMarker[] = []
   for (const g of grouped.values()) {
     const kindLabel = g.kind === 'start' ? 'početak' : 'kraj'
-    const courseList = [...g.courses].sort().join(', ')
+    const courseList = [...g.courses].sort((a, b) => a.localeCompare(b)).join(', ')
     const wday = SHORT_WEEKDAY[g.weekdayName] ?? g.weekdayName
     out.push({
       date: g.date,
@@ -364,16 +365,12 @@ export function computeModuleMarkers(input: {
     })
   }
   // Stable order: date ASC, then kind (start before end).
-  out.sort((a, b) =>
-    a.date === b.date
-      ? a.kind === b.kind
-        ? 0
-        : a.kind === 'start'
-          ? -1
-          : 1
-      : a.date < b.date
-        ? -1
-        : 1,
-  )
+  out.sort((a, b) => {
+    if (a.date === b.date) {
+      if (a.kind === b.kind) return 0
+      return a.kind === 'start' ? -1 : 1
+    }
+    return a.date < b.date ? -1 : 1
+  })
   return out
 }

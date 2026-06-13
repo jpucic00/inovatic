@@ -23,6 +23,13 @@ import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 import { studentIdentityWhere } from '@/lib/student-match'
 import { AccountCredentialsEmail } from '../../../emails/account-credentials'
 import { formatGroupSchedule } from '@/lib/format'
+import { computeSchoolYear } from '@/lib/school-year'
+import {
+  computeStudentPaymentStatus,
+  paymentStatusUserWhere,
+  type PaymentStatus,
+  type PaymentFilter,
+} from '@/lib/payment-status'
 import type { PaginatedResult } from './inquiry'
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
@@ -68,16 +75,24 @@ export type StudentRow = {
   username: string | null
   dateOfBirth: string | null
   createdAt: Date
+  paymentStatus: PaymentStatus
   enrollments: {
     id: string
+    schoolYear: string
+    fullYearPaidAt: Date | null
     scheduledGroup: {
       id: string
       name: string | null
       dayOfWeek: string | null
       startTime: string | null
-      course: { id: string; title: string }
+      course: { id: string; title: string; isCustom: boolean }
       location: { name: string }
     }
+    moduleEnrollments: {
+      id: string
+      paidAt: Date | null
+      moduleSchedule: { startDate: Date | null }
+    }[]
   }[]
 }
 
@@ -686,6 +701,7 @@ type StudentFilters = {
   courseId?: string
   groupId?: string
   scheduleId?: string
+  paymentStatus?: PaymentFilter
   page?: number
   pageSize?: number
 }
@@ -695,7 +711,10 @@ export async function getStudents(
 ): Promise<PaginatedResult<StudentRow>> {
   await requireAdmin()
 
-  const { search, courseId, groupId, scheduleId, page = 1, pageSize = 20 } = filters
+  const { search, courseId, groupId, scheduleId, paymentStatus, page = 1, pageSize = 20 } = filters
+
+  const now = new Date()
+  const currentYear = computeSchoolYear(now)
 
   const where = {
     role: 'STUDENT' as const,
@@ -719,6 +738,9 @@ export async function getStudents(
           },
         }
       : {}),
+    // AND-wrapped so it does not collide with the `enrollments` key claimed by
+    // the course/group/schedule filter spread above.
+    ...(paymentStatus ? { AND: [paymentStatusUserWhere(paymentStatus, currentYear, now)] } : {}),
   }
 
   const [data, total] = await Promise.all([
@@ -735,8 +757,15 @@ export async function getStudents(
           include: {
             scheduledGroup: {
               include: {
-                course: { select: { id: true, title: true } },
+                course: { select: { id: true, title: true, isCustom: true } },
                 location: { select: { name: true } },
+              },
+            },
+            moduleEnrollments: {
+              select: {
+                id: true,
+                paidAt: true,
+                moduleSchedule: { select: { startDate: true } },
               },
             },
           },
@@ -749,8 +778,13 @@ export async function getStudents(
     db.user.count({ where }),
   ])
 
+  const rows: StudentRow[] = data.map((u) => ({
+    ...u,
+    paymentStatus: computeStudentPaymentStatus(u.enrollments, currentYear, now),
+  })) as StudentRow[]
+
   return {
-    data: data as StudentRow[],
+    data: rows,
     total,
     page,
     pageSize,

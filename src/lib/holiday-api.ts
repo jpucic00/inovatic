@@ -71,8 +71,20 @@ async function fetchCategory(
   const url = `${API_BASE}${path}?countryIsoCode=${COUNTRY_ISO}&validFrom=${validFrom}&validTo=${validTo}&languageIsoCode=${LANGUAGE_ISO}`
   let res: Response
   try {
-    res = await fetch(url, { headers: { Accept: 'application/json' } })
+    res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10_000),
+    })
   } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.name === 'TimeoutError' || err.name === 'AbortError')
+    ) {
+      throw new HolidayApiError(
+        `Isteklo je vrijeme za dohvaćanje ${path}. Pokušajte ponovno.`,
+        err,
+      )
+    }
     throw new HolidayApiError(`Greška pri dohvaćanju ${path}.`, err)
   }
   if (!res.ok) {

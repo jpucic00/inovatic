@@ -12,6 +12,7 @@ interface StudentFiltersProps {
   currentSearch: string
   currentCourseId?: string
   currentGroupId?: string
+  currentPayment?: string
   courses?: CourseOption[]
   groups?: GroupOption[]
 }
@@ -20,6 +21,7 @@ export function StudentFilters({
   currentSearch,
   currentCourseId,
   currentGroupId,
+  currentPayment,
   courses,
   groups,
 }: Readonly<StudentFiltersProps>) {
@@ -43,8 +45,10 @@ export function StudentFilters({
     if (showFilters) {
       const courseId = overrides.courseId ?? currentCourseId ?? ''
       const groupId = overrides.groupId ?? currentGroupId ?? ''
+      const payment = overrides.payment ?? currentPayment ?? ''
       if (courseId) sp.set('courseId', courseId)
       if (groupId) sp.set('groupId', groupId)
+      if (payment) sp.set('payment', payment)
     }
 
     return sp.toString()
@@ -66,6 +70,12 @@ export function StudentFilters({
   const handleGroupChange = (groupId: string) => {
     startTransition(() => {
       router.push(`${pathname}?${buildParams({ groupId })}`)
+    })
+  }
+
+  const handlePaymentChange = (payment: string) => {
+    startTransition(() => {
+      router.push(`${pathname}?${buildParams({ payment })}`)
     })
   }
 
@@ -115,6 +125,16 @@ export function StudentFilters({
                 {g.name ?? g.course.title}
               </option>
             ))}
+          </select>
+
+          <select
+            value={currentPayment ?? ''}
+            onChange={(e) => handlePaymentChange(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Plaćanje: svi</option>
+            <option value="PENDING">Nije plaćeno</option>
+            <option value="PAID">Plaćeno</option>
           </select>
         </div>
       )}

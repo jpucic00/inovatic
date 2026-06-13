@@ -304,7 +304,10 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
 
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
-      await expect(page.locator(`text=${STD_GROUP_NAME}`).first()).toBeVisible({ timeout: 10000 })
+      // Assert on the group-table row — a bare text= match binds to the
+      // weekly-grid lane entry, which lane-packing can hide when many groups
+      // share the same slot.
+      await expect(page.locator('tr', { hasText: STD_GROUP_NAME }).first()).toBeVisible({ timeout: 10000 })
     })
 
     test('create radionica group with 2 max spots', async ({ page }) => {
@@ -331,10 +334,12 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       // Group name
       await dialog.locator('input[placeholder*="Grupa"]').fill(RADIONICA_GROUP_NAME)
 
-      // Radionica course: date input appears instead of day select. The
-      // radionica-date input is the first input[type="date"] in the dialog.
+      // Radionica course: a [dateStart, dateEnd] range replaces the day select.
+      // Both are required — a single-day workshop uses the same date twice.
+      // nth(0)/nth(1) are the native companions of #create-dateStart/#create-dateEnd.
       const dateInputs = dialog.locator('input[type="date"]')
       await dateInputs.nth(0).fill('2026-07-15')
+      await dateInputs.nth(1).fill('2026-07-15')
 
       await dialog.locator('input[placeholder="19:00"]').fill('10:00')
       await dialog.locator('input[placeholder="20:30"]').fill('12:00')
@@ -353,15 +358,20 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
 
       await dialog.locator('button', { hasText: 'Kreiraj grupu' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10000 })
+      // Radionica groups live under the dedicated "Radionice" tab.
+      await page.locator('button', { hasText: 'Radionice' }).last().click()
       await expect(page.locator(`text=${RADIONICA_GROUP_NAME}`).first()).toBeVisible({ timeout: 10000 })
     })
 
     test('group table shows enrollment counts and window status', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/grupe`)
-      // Both groups created above should be visible
-      await expect(page.locator(`text=${STD_GROUP_NAME}`).first()).toBeVisible()
+      // The standard group sits on its course tab (default); the radionica
+      // group is on the "Radionice" tab.
+      await expect(page.locator('tr', { hasText: STD_GROUP_NAME }).first()).toBeVisible()
+      await page.locator('button', { hasText: 'Radionice' }).last().click()
       await expect(page.locator(`text=${RADIONICA_GROUP_NAME}`).first()).toBeVisible()
+      await page.locator('button', { hasText: 'Robotike 1' }).first().click()
       // The enrollment window configured above (2025-06-01 → 2027-06-30) is
       // currently open, so the badge should read "Otvoreno".
       const stdRow = page.locator('tr', { hasText: STD_GROUP_NAME })
@@ -748,9 +758,11 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await locationSelect.selectOption({ index: 1 })
 
       await dialog.locator('input[placeholder*="Grupa"]').fill(EMPTY_GROUP_NAME)
-      // The radionica-date input is the first date input; enrollment-window
-      // inputs are addressed by id so the order can't drift.
-      await dialog.locator('input[type="date"]').first().fill('2026-08-20')
+      // Radionica groups take a [dateStart, dateEnd] range — both required;
+      // a single-day workshop repeats the same date. Enrollment-window inputs
+      // are addressed by id so the order can't drift.
+      await dialog.locator('input[type="date"]').nth(0).fill('2026-08-20')
+      await dialog.locator('input[type="date"]').nth(1).fill('2026-08-20')
       await dialog.locator('input[placeholder="19:00"]').fill('10:00')
       await dialog.locator('input[placeholder="20:30"]').fill('12:00')
       await dialog.locator('input[type="number"][min="1"]').fill('2')

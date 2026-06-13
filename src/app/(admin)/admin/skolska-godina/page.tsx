@@ -15,6 +15,10 @@ import {
 
 export const metadata: Metadata = { title: 'Admin – Školska godina' }
 
+function formatCourseLabel(course: { title: string; level: string | null }): string {
+  return course.level ? course.level.replace('_', ' ') : course.title
+}
+
 export default async function SchoolYearPage() {
   await requireAdmin()
 
@@ -88,10 +92,6 @@ export default async function SchoolYearPage() {
       orderBy: { dateStart: 'asc' },
     }),
   ])
-
-  function formatCourseLabel(course: { title: string; level: string | null }): string {
-    return course.level ? course.level.replace('_', ' ') : course.title
-  }
 
   function toCourseInput(
     course: (typeof standardCoursesRaw)[number],

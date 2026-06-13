@@ -17,8 +17,9 @@ const ADMIN_PASSWORD = 'admin123'
 const RUN_ID = Date.now().toString().slice(-8)
 const SY = '2030/2031'
 const WORKSHOP_TITLE = `Ljetna robotika ${RUN_ID}`
-// 3-day range in October (well inside school year SY) — easy to assert.
-const RANGE_KEYS = ['2030-10-13', '2030-10-14', '2030-10-15'] as const
+// Mon–Wed range in October (well inside school year SY) — easy to assert.
+// Must not start on a Sunday: computeWorkshopLabels skips Nedjelja by design.
+const RANGE_KEYS = ['2030-10-14', '2030-10-15', '2030-10-16'] as const
 
 let seeded: { courseId: string; groupId: string; locationId: string }
 

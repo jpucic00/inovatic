@@ -16,6 +16,8 @@ import {
   type Material,
   MaterialScope,
   MaterialType,
+  type ModuleEnrollment,
+  type ModuleSchedule,
   type ScheduledGroup,
   type TeacherAssignment,
   type User,
@@ -162,13 +164,46 @@ export async function createGroup(overrides: CreateGroupOverrides = {}): Promise
 export async function createEnrollment(
   studentId: string,
   scheduledGroupId: string,
-  overrides: Partial<{ schoolYear: string }> = {},
+  overrides: Partial<{ schoolYear: string; fullYearPaidAt: Date | null }> = {},
 ): Promise<Enrollment> {
   return db.enrollment.create({
     data: {
       userId: studentId,
       scheduledGroupId,
       schoolYear: overrides.schoolYear ?? '2026/2027',
+      fullYearPaidAt: overrides.fullYearPaidAt ?? null,
+    },
+  })
+}
+
+export async function createModuleSchedule(
+  moduleId: string,
+  overrides: Partial<{
+    schoolYear: string
+    startDate: Date | null
+    endDate: Date | null
+  }> = {},
+): Promise<ModuleSchedule> {
+  return db.moduleSchedule.create({
+    data: {
+      moduleId,
+      schoolYear: overrides.schoolYear ?? '2026/2027',
+      startDate: overrides.startDate ?? null,
+      endDate: overrides.endDate ?? null,
+    },
+  })
+}
+
+export async function createModuleEnrollment(
+  enrollmentId: string,
+  moduleScheduleId: string,
+  overrides: Partial<{ paidAt: Date | null }> = {},
+): Promise<ModuleEnrollment> {
+  return db.moduleEnrollment.create({
+    data: {
+      enrollmentId,
+      moduleScheduleId,
+      paidAt: overrides.paidAt ?? null,
     },
   })
 }

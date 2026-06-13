@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import type { StudentRow } from '@/actions/admin/student'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
+import { PaymentStatusBadge } from '@/components/admin/students/payment-status-badge'
+import { PAYMENT_STATUS_SORT_KEY } from '@/lib/payment-status'
 
 const columns: ColumnDef<StudentRow>[] = [
   {
@@ -52,6 +54,13 @@ const columns: ColumnDef<StudentRow>[] = [
         </div>
       )
     },
+  },
+  {
+    key: 'payment',
+    header: 'Plaćanje',
+    sortable: true,
+    sortValue: (row) => PAYMENT_STATUS_SORT_KEY[row.paymentStatus],
+    cell: (row) => <PaymentStatusBadge status={row.paymentStatus} />,
   },
   {
     key: 'createdAt',

@@ -240,6 +240,7 @@ model Inquiry {
   referralSource  String?
   consentGivenAt  DateTime?
   status          InquiryStatus @default(NEW)
+  schoolYear      String?
   declineReason   String?       @db.Text
   assignedGroupId String?
   studentId       String?
@@ -256,16 +257,21 @@ model Inquiry {
   @@index([assignedGroupId])
   @@index([courseId])
   @@index([studentId])
+  @@index([schoolYear])
 }
 
 
 model Enrollment {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   userId           String
   scheduledGroupId String
   schoolYear       String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  // Admin "whole school year paid" mark. Covers every module of this
+  // enrollment including ones added later; for radionice (course.isCustom,
+  // no modules) it doubles as the single paid mark. Null = not paid.
+  fullYearPaidAt   DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   scheduledGroup    ScheduledGroup     @relation(fields: [scheduledGroupId], references: [id])
@@ -276,11 +282,14 @@ model Enrollment {
 }
 
 model ModuleEnrollment {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   enrollmentId     String
   moduleScheduleId String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  // Admin per-module paid mark. Null = unpaid (or covered by the parent
+  // enrollment's fullYearPaidAt).
+  paidAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   enrollment     Enrollment     @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   moduleSchedule ModuleSchedule @relation(fields: [moduleScheduleId], references: [id], onDelete: Cascade)

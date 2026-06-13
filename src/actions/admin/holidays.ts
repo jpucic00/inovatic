@@ -429,7 +429,7 @@ export async function bulkImportHolidays(
         success: true,
         requiresConfirmation: true,
         attendanceCount: conflictRows.length,
-        conflictDates: Array.from(conflictDateSet).sort(),
+        conflictDates: Array.from(conflictDateSet).sort((a, b) => a.localeCompare(b)),
       }
     }
   }

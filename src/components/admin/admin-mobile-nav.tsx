@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, CalendarDays } from 'lucide-react'
+import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, CalendarDays, TriangleAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/shared/logo'
 import { logoutAction } from '@/actions/logout'
@@ -31,7 +31,11 @@ const navGroups = [
   },
 ]
 
-function NavLinks({ pathname, onNavigate }: Readonly<{ pathname: string; onNavigate?: () => void }>) {
+function NavLinks({
+  pathname,
+  calendarNeedsPlanning,
+  onNavigate,
+}: Readonly<{ pathname: string; calendarNeedsPlanning: boolean; onNavigate?: () => void }>) {
   return (
     <>
       {navGroups.map((group, groupIndex) => (
@@ -44,6 +48,7 @@ function NavLinks({ pathname, onNavigate }: Readonly<{ pathname: string; onNavig
           </p>
           {group.links.map(({ href, label, icon: Icon }) => {
             const isActive = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href)
+            const needsPlanning = href === '/admin/skolska-godina' && calendarNeedsPlanning
             return (
               <Link
                 key={href}
@@ -58,6 +63,16 @@ function NavLinks({ pathname, onNavigate }: Readonly<{ pathname: string; onNavig
               >
                 <Icon className="w-4 h-4" />
                 {label}
+                {needsPlanning && (
+                  <span
+                    className="ml-auto inline-flex shrink-0 text-amber-400"
+                    role="img"
+                    aria-label="Školska godina nije isplanirana"
+                    title="Označite praznike i isplanirajte module za ovu školsku godinu — godina još nije spremna za rad s grupama."
+                  >
+                    <TriangleAlert className="h-4 w-4" aria-hidden />
+                  </span>
+                )}
               </Link>
             )
           })}
@@ -92,6 +107,7 @@ interface AdminNavProps {
   years: string[]
   selectedYear: string
   currentYear: string
+  calendarNeedsPlanning: boolean
 }
 
 export function AdminDesktopSidebar({
@@ -99,6 +115,7 @@ export function AdminDesktopSidebar({
   years,
   selectedYear,
   currentYear,
+  calendarNeedsPlanning,
 }: Readonly<AdminNavProps>) {
   const pathname = usePathname()
 
@@ -109,7 +126,7 @@ export function AdminDesktopSidebar({
       </div>
       <SchoolYearSwitcher years={years} selectedYear={selectedYear} currentYear={currentYear} />
       <nav className="flex-1 py-4 px-2">
-        <NavLinks pathname={pathname} />
+        <NavLinks pathname={pathname} calendarNeedsPlanning={calendarNeedsPlanning} />
       </nav>
       <UserFooter userName={userName} />
     </aside>
@@ -121,6 +138,7 @@ export function AdminMobileNav({
   years,
   selectedYear,
   currentYear,
+  calendarNeedsPlanning,
 }: Readonly<AdminNavProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
@@ -158,7 +176,11 @@ export function AdminMobileNav({
           </div>
           <SchoolYearSwitcher years={years} selectedYear={selectedYear} currentYear={currentYear} />
           <div className="flex-1 py-4 px-2 overflow-y-auto">
-            <NavLinks pathname={pathname} onNavigate={() => setIsOpen(false)} />
+            <NavLinks
+              pathname={pathname}
+              calendarNeedsPlanning={calendarNeedsPlanning}
+              onNavigate={() => setIsOpen(false)}
+            />
           </div>
           <UserFooter userName={userName} />
         </dialog>

@@ -17,7 +17,7 @@ import type {
 export async function getStudentForTeacher(studentId: string) {
   await assertTeacherCanViewStudent(studentId)
 
-  return db.user.findUnique({
+  const student = await db.user.findUnique({
     where: { id: studentId, role: 'STUDENT' },
     include: {
       enrollments: {
@@ -83,6 +83,19 @@ export async function getStudentForTeacher(studentId: string) {
       },
     },
   })
+
+  if (!student) return null
+
+  // Payment data is admin-only. Scrub it at the boundary so it never ships in
+  // the teacher page's RSC payload, even though the UI is also gated by isAdmin.
+  return {
+    ...student,
+    enrollments: student.enrollments.map((e) => ({
+      ...e,
+      fullYearPaidAt: null,
+      moduleEnrollments: e.moduleEnrollments.map((me) => ({ ...me, paidAt: null })),
+    })),
+  }
 }
 
 /**

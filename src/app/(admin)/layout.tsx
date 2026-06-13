@@ -3,7 +3,8 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { AdminDesktopSidebar, AdminMobileNav } from '@/components/admin/admin-mobile-nav'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { getAllSchoolYears } from '@/actions/admin/school-year'
-import { computeSchoolYear } from '@/lib/school-year'
+import { computeSchoolYear, isArchivedYear, schoolYearNeedsPlanning } from '@/lib/school-year'
+import { db } from '@/lib/db'
 
 export default async function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const session = await requireAdmin()
@@ -15,6 +16,24 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
   ])
   const currentYear = computeSchoolYear()
 
+  // Drive the "plan the year" badge: the selected non-archived year needs
+  // planning when it has no standard-program module dates or no holidays yet.
+  const [datedModuleCount, holidayCount] = await Promise.all([
+    db.moduleSchedule.count({
+      where: {
+        schoolYear: selectedYear,
+        module: { course: { isCustom: false } },
+        OR: [{ startDate: { not: null } }, { endDate: { not: null } }],
+      },
+    }),
+    db.schoolYearHoliday.count({ where: { schoolYear: selectedYear } }),
+  ])
+  const calendarNeedsPlanning = schoolYearNeedsPlanning({
+    archived: isArchivedYear(selectedYear),
+    datedModuleCount,
+    holidayCount,
+  })
+
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminMobileNav
@@ -22,6 +41,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
         years={years}
         selectedYear={selectedYear}
         currentYear={currentYear}
+        calendarNeedsPlanning={calendarNeedsPlanning}
       />
 
       <div className="flex">
@@ -30,6 +50,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
           years={years}
           selectedYear={selectedYear}
           currentYear={currentYear}
+          calendarNeedsPlanning={calendarNeedsPlanning}
         />
 
         <div className="flex-1 flex flex-col min-w-0">

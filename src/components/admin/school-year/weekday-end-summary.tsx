@@ -80,13 +80,13 @@ export function WeekdayEndSummary({ summary }: Readonly<Props>) {
                     )
                   }
                   const ok = !cell.shortOfTarget && !cell.overflowsWindow
-                  const reason = cell.overflowsWindow
-                    ? 'Zadnja radionica je nakon kraja zadnjeg modula.'
-                    : cell.shortOfTarget
-                      ? `Manjak ${cell.target - cell.computedSessions} ${
-                          cell.target - cell.computedSessions === 1 ? 'radionice' : 'radionica'
-                        }.`
-                      : 'Cilj ostvaren unutar trajanja modula.'
+                  let reason = 'Cilj ostvaren unutar trajanja modula.'
+                  if (cell.overflowsWindow) {
+                    reason = 'Zadnja radionica je nakon kraja zadnjeg modula.'
+                  } else if (cell.shortOfTarget) {
+                    const missing = cell.target - cell.computedSessions
+                    reason = `Manjak ${missing} ${missing === 1 ? 'radionice' : 'radionica'}.`
+                  }
                   return (
                     <td
                       key={w.weekday}

@@ -8,6 +8,7 @@ import { StudentFilters } from '@/components/admin/students/student-filters'
 import { StudentTable } from '@/components/admin/students/student-table'
 import { CreateStudentDialog } from '@/components/admin/students/create-student-dialog'
 import { Pagination } from '@/components/admin/pagination'
+import { PAYMENT_FILTER_VALUES, type PaymentFilter } from '@/lib/payment-status'
 
 export const metadata: Metadata = { title: 'Admin – Učenici' }
 
@@ -25,6 +26,9 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
   const courseId = params.courseId ?? ''
   const groupId = params.groupId ?? ''
   const scheduleId = params.scheduleId ?? ''
+  const paymentStatus = PAYMENT_FILTER_VALUES.includes(params.payment as PaymentFilter)
+    ? (params.payment as PaymentFilter)
+    : undefined
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1)
 
   const isModuleView = !!scheduleId
@@ -36,6 +40,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
       courseId,
       groupId,
       scheduleId: scheduleId || undefined,
+      paymentStatus,
       page,
       pageSize: PAGE_SIZE,
     }),
@@ -80,6 +85,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
         {...(!isModuleView && {
           currentCourseId: courseId,
           currentGroupId: groupId,
+          currentPayment: paymentStatus ?? '',
           courses: courses.map((c) => ({ id: c.id, title: c.title })),
           groups: groups.map((g) => ({
             id: g.id,

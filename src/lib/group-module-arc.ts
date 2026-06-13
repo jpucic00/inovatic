@@ -64,7 +64,7 @@ export function getGroupModuleArc(input: {
   let cursor: Date | null = null
   for (let position = 0; position < sorted.length; position++) {
     const m = sorted[position]
-    if (!m.schedule || !m.schedule.startDate) break
+    if (!m.schedule?.startDate) break
     const anchor = cursor ?? utcMidnight(m.schedule.startDate)
     const sessions = collectWeekdaySessions(
       anchor,
@@ -132,7 +132,7 @@ export function getActiveModuleForGroup(
     if (entry.lastSession.getTime() < ms) {
       completed.push(entry)
     } else if (entry.firstSession.getTime() > ms) {
-      if (next === null) next = entry
+      next ??= entry
     } else {
       inProgress = entry
     }

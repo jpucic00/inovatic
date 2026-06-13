@@ -5,6 +5,7 @@ import { getStudent } from '@/actions/admin/student'
 import { getCourses } from '@/actions/admin/course'
 import { getStudentAttendance } from '@/actions/admin/attendance'
 import { createComment, deleteComment } from '@/actions/admin/student-comment'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import {
   StudentDetailView,
   buildCommentsPanelTabs,
@@ -20,10 +21,11 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
   await requireAdmin()
 
   const { id } = await params
-  const [student, courses, attendance] = await Promise.all([
+  const [student, courses, attendance, defaultYear] = await Promise.all([
     getStudent(id),
     getCourses(),
     getStudentAttendance(id),
+    getSelectedSchoolYear(),
   ])
 
   if (!student) notFound()
@@ -38,6 +40,8 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
       attendance={attendance}
       commentsPanelTabs={commentsPanelTabs}
       courses={courseOptions}
+      defaultYear={defaultYear}
+      selectedYear={defaultYear}
       backHref="/admin/ucenici"
       backLabel="Natrag na učenike"
       onCreateComment={createComment}

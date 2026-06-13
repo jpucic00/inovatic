@@ -15,12 +15,14 @@ export function isArchivedYear(year: string, now: Date = new Date()): boolean {
   return year < computeSchoolYear(now)
 }
 
-// Calendar window for a school year — Sept 1 to the next Sept 1 (exclusive).
-// Used to bucket date-stamped records (e.g. inquiries) into a school year.
-export function schoolYearDateRange(label: string): { gte: Date; lt: Date } {
-  const startYear = Number.parseInt(label.split('/')[0], 10)
-  return {
-    gte: new Date(startYear, 8, 1),
-    lt: new Date(startYear + 1, 8, 1),
-  }
+// A year still "needs planning" when it isn't archived and is missing either
+// of the two setup inputs: standard-program module dates (the planner output)
+// or marked holidays (a planner input + attendance exclusion). Drives the
+// "plan the year" badge on the admin Kalendar nav link.
+export function schoolYearNeedsPlanning(input: {
+  archived: boolean
+  datedModuleCount: number
+  holidayCount: number
+}): boolean {
+  return !input.archived && (input.datedModuleCount === 0 || input.holidayCount === 0)
 }

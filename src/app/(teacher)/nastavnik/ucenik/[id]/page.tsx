@@ -9,6 +9,7 @@ import {
   createTeacherComment,
   deleteTeacherComment,
 } from '@/actions/teacher/student-comment'
+import { computeSchoolYear } from '@/lib/school-year'
 import {
   StudentDetailView,
   buildCommentsPanelTabs,
@@ -47,6 +48,7 @@ export default async function TeacherStudentDetailPage({
       student={student}
       attendance={attendance}
       commentsPanelTabs={commentsPanelTabs}
+      defaultYear={computeSchoolYear()}
       backHref="/nastavnik"
       backLabel="Natrag na moje grupe"
       onCreateComment={createTeacherComment}
