@@ -3,47 +3,66 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, FolderOpen, CalendarDays } from 'lucide-react'
+import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/shared/logo'
 import { logoutAction } from '@/actions/logout'
 import { SchoolYearSwitcher } from '@/components/admin/school-year-switcher'
 
-const sidebarLinks = [
-  { href: '/admin', label: 'Nadzorna ploča', icon: LayoutDashboard },
-  { href: '/admin/upiti', label: 'Upiti', icon: Inbox },
-  { href: '/admin/ucenici', label: 'Učenici', icon: GraduationCap },
-  { href: '/admin/grupe', label: 'Grupe', icon: Users2 },
-  { href: '/admin/nastavnici', label: 'Nastavnici', icon: Users },
-  { href: '/admin/programi', label: 'Programi', icon: BookOpen },
-  { href: '/admin/lokacije', label: 'Lokacije', icon: MapPin },
-  { href: '/admin/materijali', label: 'Materijali', icon: FolderOpen },
-  { href: '/admin/skolska-godina', label: 'Školska godina', icon: CalendarDays },
-  { href: '/admin/novosti', label: 'Novosti', icon: Newspaper },
+const navGroups = [
+  {
+    label: 'Školska godina',
+    links: [
+      { href: '/admin/skolska-godina', label: 'Kalendar', icon: CalendarDays },
+      { href: '/admin/upiti', label: 'Upiti', icon: Inbox },
+      { href: '/admin/grupe', label: 'Grupe', icon: Users2 },
+      { href: '/admin/programi', label: 'Programi', icon: BookOpen },
+    ],
+  },
+  {
+    label: 'Općenito',
+    links: [
+      { href: '/admin', label: 'Nadzorna ploča', icon: LayoutDashboard },
+      { href: '/admin/ucenici', label: 'Učenici', icon: GraduationCap },
+      { href: '/admin/nastavnici', label: 'Nastavnici', icon: Users },
+      { href: '/admin/lokacije', label: 'Lokacije', icon: MapPin },
+      { href: '/admin/novosti', label: 'Novosti', icon: Newspaper },
+    ],
+  },
 ]
 
 function NavLinks({ pathname, onNavigate }: Readonly<{ pathname: string; onNavigate?: () => void }>) {
   return (
     <>
-      {sidebarLinks.map(({ href, label, icon: Icon }) => {
-        const isActive = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href)
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            className={cn(
-              'flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
-              isActive
-                ? 'bg-gray-800 text-white'
-                : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-            )}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-          </Link>
-        )
-      })}
+      {navGroups.map((group, groupIndex) => (
+        <div
+          key={group.label}
+          className={cn('space-y-1', groupIndex > 0 && 'mt-4 pt-4 border-t border-gray-800')}
+        >
+          <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">
+            {group.label}
+          </p>
+          {group.links.map(({ href, label, icon: Icon }) => {
+            const isActive = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href)
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={onNavigate}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
+                  isActive
+                    ? 'bg-gray-800 text-white'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </Link>
+            )
+          })}
+        </div>
+      ))}
     </>
   )
 }
@@ -89,7 +108,7 @@ export function AdminDesktopSidebar({
         <Logo variant="white" href="/admin" size="sm" />
       </div>
       <SchoolYearSwitcher years={years} selectedYear={selectedYear} currentYear={currentYear} />
-      <nav className="flex-1 py-4 px-2 space-y-1">
+      <nav className="flex-1 py-4 px-2">
         <NavLinks pathname={pathname} />
       </nav>
       <UserFooter userName={userName} />
@@ -138,7 +157,7 @@ export function AdminMobileNav({
             </button>
           </div>
           <SchoolYearSwitcher years={years} selectedYear={selectedYear} currentYear={currentYear} />
-          <div className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+          <div className="flex-1 py-4 px-2 overflow-y-auto">
             <NavLinks pathname={pathname} onNavigate={() => setIsOpen(false)} />
           </div>
           <UserFooter userName={userName} />
