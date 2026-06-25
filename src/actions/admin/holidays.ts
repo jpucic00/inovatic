@@ -390,14 +390,33 @@ type BulkImportHolidaysResult =
   | { success: false; error: string }
 
 /**
- * Delegate-loop wrapper around `upsertHoliday` / `upsertHolidayRange`. Counts
- * attendance across every candidate date up front so the admin gets one
- * unified confirm step instead of one per item.
+ * Thrown inside the bulk-import transaction when attendance exists on a
+ * candidate date and the admin hasn't confirmed deletion. Aborting via throw
+ * rolls the transaction back, so the confirmation is re-surfaced to the client
+ * without leaving a partial import behind.
+ */
+class AttendanceConfirmationRequired extends Error {
+  constructor(
+    readonly attendanceCount: number,
+    readonly conflictDates: string[],
+  ) {
+    super('ATTENDANCE_CONFIRMATION_REQUIRED')
+    this.name = 'AttendanceConfirmationRequired'
+  }
+}
+
+/**
+ * Imports every selected holiday in ONE transaction. The attendance conflict
+ * check and the holiday writes share that transaction, so the import is atomic
+ * (a mid-batch failure rolls the whole batch back) and a freshly-created
+ * attendance row can neither be silently skipped nor counted as imported
+ * without being written. Overlapping selections (e.g. a public holiday inside a
+ * school break) collapse to one row per date, the last-listed name winning.
  */
 export async function bulkImportHolidays(
   input: BulkImportHolidaysInput,
 ): Promise<BulkImportHolidaysResult> {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   const parsed = bulkImportHolidaysSchema.safeParse(input)
   if (!parsed.success) {
@@ -408,58 +427,73 @@ export async function bulkImportHolidays(
   const archived = archivedYearError(data.schoolYear)
   if (archived) return archived
 
-  if (!data.confirmDeleteAttendance) {
-    const allDates = new Set<string>()
-    for (const item of data.items) {
-      for (const d of datesForItem(item)) allDates.add(d)
-    }
-    const dateValues = Array.from(allDates).map(fromDateKey)
+  // Expand every selected item into the concrete holiday rows to write, keyed
+  // by date so overlapping selections collapse to one row (last name wins).
+  const dateToName = new Map<string, string | null>()
+  for (const item of data.items) {
+    const name = item.name.trim() ? item.name.trim() : null
+    for (const dateKey of datesForItem(item)) dateToName.set(dateKey, name)
+  }
+  const dateValues = Array.from(dateToName.keys()).map(fromDateKey)
 
-    const conflictRows = await db.attendance.findMany({
-      where: {
-        sessionDate: { in: dateValues },
-        enrollment: { scheduledGroup: { schoolYear: data.schoolYear } },
-      },
-      select: { sessionDate: true },
+  try {
+    await db.$transaction(async (tx) => {
+      if (data.confirmDeleteAttendance) {
+        await tx.attendance.deleteMany({
+          where: {
+            sessionDate: { in: dateValues },
+            enrollment: { scheduledGroup: { schoolYear: data.schoolYear } },
+          },
+        })
+      } else {
+        // Same transaction as the writes below: no TOCTOU gap a concurrent
+        // attendance insert could slip through to be silently skipped.
+        const conflictRows = await tx.attendance.findMany({
+          where: {
+            sessionDate: { in: dateValues },
+            enrollment: { scheduledGroup: { schoolYear: data.schoolYear } },
+          },
+          select: { sessionDate: true },
+        })
+        if (conflictRows.length > 0) {
+          const conflictDateSet = new Set<string>()
+          for (const r of conflictRows) conflictDateSet.add(toDateKey(r.sessionDate))
+          throw new AttendanceConfirmationRequired(
+            conflictRows.length,
+            Array.from(conflictDateSet).sort((a, b) => a.localeCompare(b)),
+          )
+        }
+      }
+
+      for (const [dateKey, name] of dateToName) {
+        const dateUtc = fromDateKey(dateKey)
+        await tx.schoolYearHoliday.upsert({
+          where: { schoolYear_date: { schoolYear: data.schoolYear, date: dateUtc } },
+          create: {
+            schoolYear: data.schoolYear,
+            date: dateUtc,
+            name,
+            createdById: session.user.id,
+          },
+          update: { name },
+        })
+      }
     })
-    if (conflictRows.length > 0) {
-      const conflictDateSet = new Set<string>()
-      for (const r of conflictRows) conflictDateSet.add(toDateKey(r.sessionDate))
+  } catch (err) {
+    if (err instanceof AttendanceConfirmationRequired) {
       return {
         success: true,
         requiresConfirmation: true,
-        attendanceCount: conflictRows.length,
-        conflictDates: Array.from(conflictDateSet).sort((a, b) => a.localeCompare(b)),
+        attendanceCount: err.attendanceCount,
+        conflictDates: err.conflictDates,
       }
     }
-  }
-
-  let importedCount = 0
-  for (const item of data.items) {
-    if (item.kind === 'single') {
-      const res = await upsertHoliday({
-        schoolYear: data.schoolYear,
-        date: item.date,
-        name: item.name,
-        confirmDeleteAttendance: data.confirmDeleteAttendance,
-      })
-      if (!res.success) return { success: false, error: res.error }
-      importedCount += 1
-    } else {
-      const res = await upsertHolidayRange({
-        schoolYear: data.schoolYear,
-        startDate: item.startDate,
-        endDate: item.endDate,
-        name: item.name,
-        confirmDeleteAttendance: data.confirmDeleteAttendance,
-      })
-      if (!res.success) return { success: false, error: res.error }
-      importedCount += enumerateDateKeys(item.startDate, item.endDate).length
-    }
+    console.error('bulkImportHolidays failed:', err)
+    return { success: false, error: 'Greška pri spremanju praznika.' }
   }
 
   revalidatePath('/admin/skolska-godina')
   revalidatePath('/nastavnik', 'layout')
-  return { success: true, requiresConfirmation: false, importedCount }
+  return { success: true, requiresConfirmation: false, importedCount: dateToName.size }
 }
 

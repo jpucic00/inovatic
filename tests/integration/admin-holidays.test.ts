@@ -704,6 +704,58 @@ describe('bulkImportHolidays', () => {
     expect(await db.schoolYearHoliday.count({ where: { schoolYear: SY } })).toBe(1)
   })
 
+  it('does not silently swallow attendance created in the TOCTOU window (atomic abort)', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const course = await createCourse({ isCustom: false })
+    const group = await createGroup({ courseId: course.id, schoolYear: SY })
+    const student = await createStudent()
+    const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
+
+    // Simulate an Attendance row that materialises AFTER the admin's preview, the
+    // instant the import transaction opens — the classic time-of-check/time-of-use
+    // window. The conflict check now lives INSIDE that transaction, so it must
+    // observe the row, abort, and re-surface the confirmation — never silently
+    // skip the day while counting it, nor write a partial import.
+    type TxArgs = Parameters<typeof db.$transaction>
+    const realTx = db.$transaction.bind(db) as (...a: TxArgs) => Promise<unknown>
+    const spy = vi.spyOn(db, '$transaction')
+    spy.mockImplementation(((...callArgs: TxArgs) => {
+      if (typeof callArgs[0] === 'function') {
+        return (async () => {
+          await createAttendance(enrollment.id, admin.id, {
+            sessionDate: new Date('2026-12-25T00:00:00.000Z'),
+          })
+          spy.mockRestore() // inject exactly once
+          return realTx(...callArgs)
+        })()
+      }
+      return realTx(...callArgs)
+    }) as typeof db.$transaction)
+
+    const res = await bulkImportHolidays({
+      schoolYear: SY,
+      items: [
+        { kind: 'single', date: '2026-12-24', name: 'Badnjak' },
+        { kind: 'single', date: '2026-12-25', name: 'Božić' },
+      ],
+    })
+
+    spy.mockRestore()
+
+    // The late row surfaces as a confirmation instead of being swallowed.
+    expect(res.success).toBe(true)
+    if (res.success) {
+      expect(res.requiresConfirmation).toBe(true)
+      if (res.requiresConfirmation) {
+        expect(res.conflictDates).toContain('2026-12-25')
+      }
+    }
+    // Atomic: nothing written — not even the conflict-free 2026-12-24.
+    expect(await db.schoolYearHoliday.count({ where: { schoolYear: SY } })).toBe(0)
+  })
+
   it('refuses on an archived school year', async () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
