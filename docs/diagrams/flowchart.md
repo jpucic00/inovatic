@@ -8,12 +8,13 @@ Spot math differs between standard courses (module-scoped) and radionice (group-
 
 ```mermaid
 flowchart TD
-    A[getActivePrograms called] --> B[For each ScheduledGroup with an active enrollment window]
-    B --> C["enrollingSchedule = first CourseModule (by sortOrder) whose ModuleSchedule for THIS group's schoolYear has startDate > now"]
-    C --> D{enrollingSchedule exists?}
-    D -->|No| HIDE[Group hidden from /upisi]
-    D -->|Yes| E["enrolledCount = count enrollments whose moduleEnrollments include enrollingSchedule"]
-    E --> F[preferredCount = inquiries where status NOT IN DECLINED, ACCOUNT_CREATED]
+    A[getActivePrograms called] --> A2["Resolve OPEN windows first: CourseEnrollmentWindow rows where enrollmentStart &lt;= now &lt;= enrollmentEnd → Set of (courseId, schoolYear) keys"]
+    A2 --> B["For each ScheduledGroup whose own (courseId, schoolYear) is in the open-window Set"]
+    B --> C["nextEnrollingModule = getGroupModuleArc(dayOfWeek, modules, holidays) race-ahead → first arc module whose firstSession &gt; now"]
+    C --> D{nextEnrollingModule exists?}
+    D -->|No| HIDE[Group hidden from /upisi - graduated past M4 or schedule incomplete]
+    D -->|Yes| E["enrolledCount = enrollments whose moduleEnrollments include nextEnrollingModule.moduleScheduleId"]
+    E --> F[preferredCount = inquiries where status = NEW]
     F --> G["available = maxStudents - enrolledCount - preferredCount"]
     G --> H{available > 0?}
     H -->|Yes| SHOW[Group shown with 'next module' label]
@@ -29,9 +30,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[getActivePrograms called] --> B[For each ScheduledGroup with an active enrollment window]
+    A[getActivePrograms called] --> A2["Resolve OPEN windows first: CourseEnrollmentWindow rows where enrollmentStart &lt;= now &lt;= enrollmentEnd → Set of (courseId, schoolYear) keys"]
+    A2 --> B["For each ScheduledGroup whose own (courseId, schoolYear) is in the open-window Set"]
     B --> C[enrolledCount = all enrollments in group, presence only]
-    C --> D[preferredCount = inquiries where status NOT IN DECLINED, ACCOUNT_CREATED]
+    C --> D[preferredCount = inquiries where status = NEW]
     D --> E["available = maxStudents - enrolledCount - preferredCount"]
     E --> F{available > 0?}
     F -->|Yes| SHOW[Group shown as available]
@@ -77,7 +79,7 @@ flowchart LR
     style F5 fill:#d1fae5
 ```
 
-> Note: When an inquiry transitions to ACCOUNT_CREATED, it stops counting as a preferred inquiry (filter excludes both DECLINED and ACCOUNT_CREATED). The new enrollment takes over the slot, so the net count stays the same.
+> Note: The preferred-inquiry count is `status === NEW` only (`_count.preferredInquiries` with `where: { status: 'NEW' }`). When an inquiry transitions to ACCOUNT_CREATED (or DECLINED) it stops counting as a preferred inquiry. The new enrollment takes over the slot, so the net count stays the same.
 >
 > Note: `closeModuleSchedule` doesn't delete any `ModuleEnrollment` rows — it just moves `ModuleSchedule.endDate` to now. The "enrolling module" logic advances to the next module (by sortOrder) whose `startDate` is still in the future, so the displayed free-spot count flips to that next module's capacity.
 
@@ -213,33 +215,37 @@ flowchart TD
 
 ## 4. Enrollment Window Logic
 
+The signup window lives on `CourseEnrollmentWindow(courseId, schoolYear)` — one row per program per school year, inherited by every group of that program/year. (It used to live per-group on `ScheduledGroup.enrollmentStart/enrollmentEnd`; those columns were dropped.)
+
 ```mermaid
 flowchart TD
-    A[getActivePrograms queries ScheduledGroups] --> B{enrollmentStart set AND enrollmentStart <= now?}
-    B -->|No| EXCLUDE[Excluded - window not yet open or never set]
-    B -->|Yes| C{enrollmentEnd IS NULL OR enrollmentEnd >= now?}
-
-    C -->|No| EXCLUDE
+    A[getActivePrograms] --> B["Load OPEN windows: CourseEnrollmentWindow where enrollmentStart &lt;= now AND enrollmentEnd &gt;= now"]
+    B --> B0{Any open window?}
+    B0 -->|No| EMPTY[Return empty - nothing enrollable]
+    B0 -->|Yes| B1["openKeys = Set of (courseId, schoolYear); fetch groups for those courseIds"]
+    B1 --> C{"Group's own (courseId, schoolYear) in openKeys?"}
+    C -->|No| EXCLUDE[Excluded - program has no open window for THIS group's year]
     C -->|Yes| D{course.isCustom?}
 
     D -->|Yes - radionica| INCLUDE[Group included in results]
-    D -->|No - standard| E{Next-starting ModuleSchedule for group.schoolYear exists?}
+    D -->|No - standard| E{"nextEnrollingModule from getGroupModuleArc exists?"}
 
     E -->|Yes| INCLUDE
-    E -->|No| EXCLUDE2[Excluded - no upcoming module to enroll into]
+    E -->|No| EXCLUDE2[Excluded - graduated past M4 or schedule incomplete]
 
     INCLUDE --> I[Group shown in public form dropdown]
 
+    style EMPTY fill:#fee2e2
     style EXCLUDE fill:#fee2e2
     style EXCLUDE2 fill:#fee2e2
     style INCLUDE fill:#d1fae5
 ```
 
-> Note: Groups with **both** `enrollmentStart` and `enrollmentEnd` null are hidden. Every publicly listable group must have an explicit start. There is no "always open" shortcut anymore.
+> Note: A window counts as open only when **both** `enrollmentStart` and `enrollmentEnd` are set and `now` falls inside the range. No `CourseEnrollmentWindow` row for a `(course, year)` — or one outside the range — hides every group of that program/year. There is no "always open" shortcut.
 >
-> Note: `ScheduledGroup.schoolYear` is **not** part of the visibility check. Admins control public visibility purely via the enrollment window; the school-year field is retained only for historization (which cohort a given `ModuleSchedule` / `ModuleEnrollment` / `StudentComment` belongs to).
+> Note: `ScheduledGroup.schoolYear` **is** part of the visibility check now. Prisma can't correlate the window's `schoolYear` to each group's `schoolYear` in one `where`, so `getActivePrograms` resolves the open `(courseId, schoolYear)` keys first and then keeps only groups whose own `(courseId, schoolYear)` is in that set. The field still doubles as historization for `ModuleSchedule` / `ModuleEnrollment` / `StudentComment`.
 >
-> Note: The second gate (next-starting module) is what keeps a standard group from appearing mid-year once all its modules have already started. To re-open the group, an admin closes the running module via `closeModuleSchedule` (sets `endDate = now`), which makes the next module's `startDate > now` check pass again.
+> Note: The standard-course second gate is the per-group race-ahead arc (`getGroupModuleArc` → `getActiveModuleForGroup().nextEnrollingModule`), not a raw `ModuleSchedule.startDate > now` check. It hides a standard group once its arc has raced past the last dated module. Closing the running module early (`closeModuleSchedule` sets `endDate = today`) reshapes the arc so a later module becomes the next-enrolling one again.
 
 ---
 

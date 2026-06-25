@@ -18,6 +18,15 @@ erDiagram
         string imageUrl "nullable"
         int sortOrder "default 0"
         boolean isCustom "default false - true for radionice"
+        string schoolYear "nullable - set on radionice (year-scoped); null on standard SLR (global)"
+    }
+
+    CourseEnrollmentWindow {
+        string id PK
+        string courseId FK
+        string schoolYear "part of unique(courseId, schoolYear)"
+        datetime enrollmentStart "nullable - window lower bound"
+        datetime enrollmentEnd "nullable - window upper bound"
     }
 
     CourseModule {
@@ -32,13 +41,21 @@ erDiagram
         string id PK
         string moduleId FK
         string schoolYear "e.g. 2025/2026"
-        datetime startDate "nullable"
-        datetime endDate "nullable - set to now to close early"
+        datetime startDate "nullable - @db.Date"
+        datetime endDate "nullable - @db.Date; set to today to close early"
     }
 
     SchoolYear {
         string label PK "format YYYY/YYYY - referenced by schoolYear string columns"
         datetime createdAt "default now"
+    }
+
+    SchoolYearHoliday {
+        string id PK
+        string schoolYear FK "references SchoolYear.label - unique with date"
+        datetime date "@db.Date - unique with schoolYear"
+        string name "nullable"
+        string createdById FK "nullable - User who added it"
     }
 
     Location {
@@ -56,14 +73,13 @@ erDiagram
         string courseId FK
         string locationId FK
         string name "nullable"
-        string date "nullable - specific date for radionice"
+        string dateStart "nullable - radionica range start YYYY-MM-DD"
+        string dateEnd "nullable - radionica range end YYYY-MM-DD"
         string dayOfWeek "nullable - recurring day for SLR"
         string startTime "nullable"
         string endTime "nullable"
-        string schoolYear "required - historization only"
+        string schoolYear "required - gates public visibility via CourseEnrollmentWindow"
         int maxStudents "default 12"
-        datetime enrollmentStart "nullable - window lower bound"
-        datetime enrollmentEnd "nullable - window upper bound"
     }
 
     TeacherAssignment {
@@ -92,6 +108,7 @@ erDiagram
         string referralSource "nullable"
         datetime consentGivenAt "nullable"
         InquiryStatus status "NEW - ACCOUNT_CREATED - DECLINED"
+        string schoolYear "nullable - cohort stamp; indexed"
         string declineReason "nullable - db.Text - reason captured on DECLINE"
     }
 
@@ -120,12 +137,14 @@ erDiagram
         string userId FK
         string scheduledGroupId FK
         string schoolYear
+        datetime fullYearPaidAt "nullable - admin whole-year paid mark"
     }
 
     ModuleEnrollment {
         string id PK
         string enrollmentId FK
         string moduleScheduleId FK
+        datetime paidAt "nullable - admin per-module paid mark"
     }
 
     Material {
@@ -216,6 +235,7 @@ erDiagram
 
     Course ||--o{ CourseModule : "has modules"
     Course ||--o{ ScheduledGroup : "has groups"
+    Course ||--o{ CourseEnrollmentWindow : "per-year signup window"
     Location ||--o{ ScheduledGroup : "hosts"
 
     CourseModule ||--o{ ModuleSchedule : "year instances"
@@ -240,6 +260,9 @@ erDiagram
     User ||--o{ Attendance : "recordedBy"
     User ||--o{ StudentComment : "authored"
     User ||--o{ StudentComment : "about student"
+    User ||--o{ SchoolYearHoliday : "createdBy - nullable"
+
+    SchoolYear ||--o{ SchoolYearHoliday : "year holidays"
 
     Course ||--o{ Inquiry : "courseId - preferred program"
     ScheduledGroup ||--o{ Inquiry : "scheduledGroupId - preferred"
@@ -264,7 +287,7 @@ erDiagram
 | CourseLevel | `SLR_1`, `SLR_2`, `SLR_3`, `SLR_4` |
 | InquiryStatus | `NEW`, `ACCOUNT_CREATED`, `DECLINED` |
 | CommentType | `COMMENT`, `MODULE_REVIEW` |
-| MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK` |
+| MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
 | MaterialScope | `MODULE`, `COURSE`, `GROUP` |
 
 > There are no `EnrollmentStatus` / `ModuleEnrollmentStatus` enums. Presence of a row means the student is in the group/module; deletion is the only way out.
@@ -289,7 +312,10 @@ erDiagram
 | ScheduledGroup → GalleryImage → CourseModule | Images scoped to group; `moduleId` required for standard programs, null for radionice |
 | Enrollment → Attendance | One attendance record per session date per enrollment. Session dates are derived, not stored. |
 | User → Article | Author relation for news articles |
-| SchoolYear | Standalone registry of valid year labels (`YYYY/YYYY`). `ScheduledGroup.schoolYear`, `ModuleSchedule.schoolYear`, and `Enrollment.schoolYear` reference `SchoolYear.label` by string — no Prisma FK relation. |
+| Course → CourseEnrollmentWindow | Per-`(course, schoolYear)` public signup window. Every group of that program/year inherits it; replaces the old per-group `enrollmentStart/End`. |
+| SchoolYear → SchoolYearHoliday | Per-year non-class days (holidays, breaks, ad-hoc closures). Excluded from `computeExpectedSessions` / `computeRadionicaSessions`. `SchoolYearHoliday.schoolYear` is a real Prisma FK to `SchoolYear.label` (`onDelete: Cascade`). |
+| User → SchoolYearHoliday | `createdBy` relation (nullable) — admin who added the holiday. |
+| SchoolYear | Standalone registry of valid year labels (`YYYY/YYYY`). The `schoolYear` string columns on `ScheduledGroup`, `ModuleSchedule`, `Enrollment`, `Inquiry`, `Course` (radionice) and `CourseEnrollmentWindow` reference `SchoolYear.label` by string with **no** Prisma FK relation; only `SchoolYearHoliday.schoolYear` is a true FK. |
 
 ## Unique Constraints
 
@@ -302,6 +328,8 @@ erDiagram
 | Tag.name | unique |
 | Tag.slug | unique |
 | ModuleSchedule | `(moduleId, schoolYear)` |
+| CourseEnrollmentWindow | `(courseId, schoolYear)` |
+| SchoolYearHoliday | `(schoolYear, date)` |
 | Enrollment | `(userId, scheduledGroupId, schoolYear)` |
 | ModuleEnrollment | `(enrollmentId, moduleScheduleId)` |
 | TeacherAssignment | `(userId, scheduledGroupId)` |
@@ -309,16 +337,27 @@ erDiagram
 | Attendance | `(enrollmentId, sessionDate)` |
 | ArticleTag | `(articleId, tagId)` composite PK |
 
+## Indexes (non-unique)
+
+| Model | Indexes |
+|-------|---------|
+| Inquiry | `scheduledGroupId`, `status`, `assignedGroupId`, `courseId`, `studentId`, `schoolYear` |
+| CourseEnrollmentWindow | `schoolYear` |
+| SchoolYearHoliday | `schoolYear` |
+| Material | `(scope, moduleId)`, `(scope, courseId)`, `(scope, scheduledGroupId)` |
+| GalleryImage | `(scheduledGroupId, moduleId, sortOrder)` |
+| Attendance | `sessionDate` |
+
 ## Schedule Pattern
 
 - **Standard SLR courses**: `dayOfWeek` + `startTime`/`endTime` for recurring weekly schedule
-- **Radionice - workshops**: `date` + `startTime`/`endTime` for specific one-off dates
+- **Radionice - workshops**: `dateStart`/`dateEnd` + `startTime`/`endTime` — a closed day range that runs every (non-Sunday, non-holiday) day at the same time
 
 ## Activity Rules
 
-- A `ScheduledGroup` appears on `/upisi` iff it has an **active enrollment window** (`enrollmentStart <= now` AND (`enrollmentEnd IS NULL` OR `enrollmentEnd >= now`)). Groups with both null are hidden.
-- For **standard courses**, the group must also have a **next-starting** `ModuleSchedule` for its own `schoolYear` — the first module (by `sortOrder`) whose `startDate > now`. If every module has already started, the group is hidden until an admin either closes the running module (sets `endDate = now`) or a future module's `startDate` crosses into the future again.
-- `ScheduledGroup.schoolYear` is **historical metadata only** — it is not used to filter what the public form shows. An admin can create a group for a future year and it will appear as soon as its enrollment window opens.
-- An `Enrollment` row means "this student is in this group for this school year". To cancel a radionica enrollment, delete the row.
-- A `ModuleEnrollment` row means "this student is taking this module instance". To remove a student from a module, delete the row. Cascading to later modules is **not** automatic — each module row must be deleted individually.
+- A `ScheduledGroup` appears on `/upisi` iff its program has an **open `CourseEnrollmentWindow` for the group's own `schoolYear`** — a row keyed `(courseId, schoolYear)` with both dates set and `enrollmentStart <= now <= enrollmentEnd`. No window row for that `(course, year)`, or one outside the range, hides every group of that program/year. The window moved off `ScheduledGroup` (the old `enrollmentStart/End` columns were dropped).
+- For **standard courses**, the group must also have a **next-enrolling module** — `getGroupModuleArc` race-aheads from the school-year kickoff (M1 `startDate`) using the group's `dayOfWeek` + holiday set, and `getActiveModuleForGroup` returns the first arc module whose first session is still in the future. If the arc has run out of future modules (graduated past M4, or schedule incomplete) the group is hidden from the public form.
+- `ScheduledGroup.schoolYear` **is** part of the public-visibility filter: `getActivePrograms` only keeps a group when an open window exists for that group's exact `(courseId, schoolYear)`. (It remains historization metadata for `ModuleSchedule` / `ModuleEnrollment` / `StudentComment` too.)
+- An `Enrollment` row means "this student is in this group for this school year". To cancel a radionica enrollment, delete the row. `fullYearPaidAt` is the admin "whole school year paid" mark.
+- A `ModuleEnrollment` row means "this student is taking this module instance". To remove a student from a module, delete the row. Cascading to later modules is **not** automatic — each module row must be deleted individually. `paidAt` is the admin per-module paid mark.
 - A module is "done" when `ModuleSchedule.endDate < now`, either because the date naturally passed or because a teacher manually set `endDate = now` via `closeModuleSchedule`.
