@@ -13,8 +13,10 @@ interface StudentFiltersProps {
   currentCourseId?: string
   currentGroupId?: string
   currentPayment?: string
+  currentYear?: string
   courses?: CourseOption[]
   groups?: GroupOption[]
+  years?: string[]
 }
 
 export function StudentFilters({
@@ -22,8 +24,10 @@ export function StudentFilters({
   currentCourseId,
   currentGroupId,
   currentPayment,
+  currentYear,
   courses,
   groups,
+  years,
 }: Readonly<StudentFiltersProps>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -46,9 +50,11 @@ export function StudentFilters({
       const courseId = overrides.courseId ?? currentCourseId ?? ''
       const groupId = overrides.groupId ?? currentGroupId ?? ''
       const payment = overrides.payment ?? currentPayment ?? ''
+      const year = overrides.year ?? currentYear ?? ''
       if (courseId) sp.set('courseId', courseId)
       if (groupId) sp.set('groupId', groupId)
       if (payment) sp.set('payment', payment)
+      if (year) sp.set('year', year)
     }
 
     return sp.toString()
@@ -79,6 +85,12 @@ export function StudentFilters({
     })
   }
 
+  const handleYearChange = (year: string) => {
+    startTransition(() => {
+      router.push(`${pathname}?${buildParams({ year })}`)
+    })
+  }
+
   return (
     <div className="flex flex-col gap-3 mb-6">
       <form onSubmit={handleSearchSubmit} className="relative flex gap-2">
@@ -100,7 +112,20 @@ export function StudentFilters({
       </form>
 
       {showFilters && (
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <select
+            value={currentYear ?? ''}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Sve godine</option>
+            {(years ?? []).map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+
           <select
             value={currentCourseId ?? ''}
             onChange={(e) => handleCourseChange(e.target.value)}

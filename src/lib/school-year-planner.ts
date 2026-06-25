@@ -222,6 +222,37 @@ export type WorkshopLabel = {
   title: string // Course.title
 }
 
+type WorkshopDayEntry = { titles: Set<string> }
+
+/**
+ * Walk every day in [dateStart, dateEnd] (inclusive) for one radionica group
+ * and record its title under each non-Sunday day. Mutates `byDate` in place so
+ * the caller can fold many groups into one dedupe map.
+ */
+function addWorkshopGroupDays(
+  byDate: Map<string, WorkshopDayEntry>,
+  dateStart: string,
+  dateEnd: string,
+  courseTitle: string,
+): void {
+  let cur = fromDateKey(dateStart).getTime()
+  const end = fromDateKey(dateEnd).getTime()
+  if (end < cur) return
+  while (cur <= end) {
+    const day = new Date(cur)
+    if (day.getUTCDay() !== 0) {
+      const key = toDateKey(day)
+      let entry = byDate.get(key)
+      if (!entry) {
+        entry = { titles: new Set() }
+        byDate.set(key, entry)
+      }
+      entry.titles.add(courseTitle)
+    }
+    cur += DAY_MS
+  }
+}
+
 /**
  * Enumerate every day in [dateStart, dateEnd] (inclusive, YYYY-MM-DD keys) for
  * each radionica group + emit one label per (date, course.title). Skips Sundays
@@ -238,27 +269,11 @@ export function computeWorkshopLabels(input: {
     courseTitle: string
   }>
 }): WorkshopLabel[] {
-  type DayEntry = { titles: Set<string> }
-  const byDate = new Map<string, DayEntry>()
+  const byDate = new Map<string, WorkshopDayEntry>()
 
   for (const g of input.radionicaGroups) {
     if (!g.dateStart || !g.dateEnd) continue
-    let cur = fromDateKey(g.dateStart).getTime()
-    const end = fromDateKey(g.dateEnd).getTime()
-    if (end < cur) continue
-    while (cur <= end) {
-      const day = new Date(cur)
-      if (day.getUTCDay() !== 0) {
-        const key = toDateKey(day)
-        let entry = byDate.get(key)
-        if (!entry) {
-          entry = { titles: new Set() }
-          byDate.set(key, entry)
-        }
-        entry.titles.add(g.courseTitle)
-      }
-      cur += DAY_MS
-    }
+    addWorkshopGroupDays(byDate, g.dateStart, g.dateEnd, g.courseTitle)
   }
 
   const out: WorkshopLabel[] = []
@@ -272,6 +287,53 @@ export function computeWorkshopLabels(input: {
     return a.date < b.date ? -1 : 1
   })
   return out
+}
+
+type MarkerGroup = {
+  date: string
+  kind: 'start' | 'end'
+  moduleIndex: number
+  moduleTitle: string
+  weekdayName: string
+  courses: Set<string>
+}
+
+/**
+ * Fold one weekday's race-ahead arc into the dedupe map: every module emits a
+ * `start` marker at its first session and an `end` marker at its last, keyed by
+ * (date, kind, moduleIndex, title) so identical markers from sibling courses
+ * collapse to a single chip that accumulates each contributing course label.
+ */
+function accumulateArcMarkers(
+  grouped: Map<string, MarkerGroup>,
+  arc: ReturnType<typeof getGroupModuleArc>,
+  weekdayName: string,
+  courseLabel: string,
+): void {
+  for (const entry of arc) {
+    const firstKey = toDateKey(entry.firstSession)
+    const lastKey = toDateKey(entry.lastSession)
+
+    for (const [date, kind] of [
+      [firstKey, 'start' as const],
+      [lastKey, 'end' as const],
+    ] as const) {
+      const key = `${date}|${kind}|${entry.moduleIndex}|${entry.moduleTitle}`
+      let g = grouped.get(key)
+      if (!g) {
+        g = {
+          date,
+          kind,
+          moduleIndex: entry.moduleIndex,
+          moduleTitle: entry.moduleTitle,
+          weekdayName,
+          courses: new Set(),
+        }
+        grouped.set(key, g)
+      }
+      g.courses.add(courseLabel)
+    }
+  }
 }
 
 /**
@@ -296,15 +358,7 @@ export function computeModuleMarkers(input: {
   courses: ReadonlyArray<ModuleMarkerInputCourse>
   holidayDates: ReadonlySet<string>
 }): ModuleMarker[] {
-  type Group = {
-    date: string
-    kind: 'start' | 'end'
-    moduleIndex: number
-    moduleTitle: string
-    weekdayName: string
-    courses: Set<string>
-  }
-  const grouped = new Map<string, Group>()
+  const grouped = new Map<string, MarkerGroup>()
 
   for (const course of input.courses) {
     // The arc primitive expects ArcModuleInput shape. We don't need module/
@@ -324,30 +378,7 @@ export function computeModuleMarkers(input: {
         modules: arcModules,
         holidayDates: input.holidayDates,
       })
-      for (const entry of arc) {
-        const firstKey = toDateKey(entry.firstSession)
-        const lastKey = toDateKey(entry.lastSession)
-
-        for (const [date, kind] of [
-          [firstKey, 'start' as const],
-          [lastKey, 'end' as const],
-        ] as const) {
-          const key = `${date}|${kind}|${entry.moduleIndex}|${entry.moduleTitle}`
-          let g = grouped.get(key)
-          if (!g) {
-            g = {
-              date,
-              kind,
-              moduleIndex: entry.moduleIndex,
-              moduleTitle: entry.moduleTitle,
-              weekdayName: w,
-              courses: new Set(),
-            }
-            grouped.set(key, g)
-          }
-          g.courses.add(course.courseLabel)
-        }
-      }
+      accumulateArcMarkers(grouped, arc, w, course.courseLabel)
     }
   }
 

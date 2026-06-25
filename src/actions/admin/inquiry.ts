@@ -160,8 +160,12 @@ export async function getReturningStudentInfo(input: {
 
 export async function getInquiryCourses() {
   await requireAdmin()
+  const year = await getSelectedSchoolYear()
 
   return db.course.findMany({
+    // Mirror getCourses: standard courses are global; radionice are year-scoped,
+    // so the Upiti program filter never lists other years' (always-empty) radionice.
+    where: { OR: [{ isCustom: false }, { schoolYear: year }] },
     select: { id: true, title: true },
     orderBy: { title: 'asc' },
   })

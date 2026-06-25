@@ -72,24 +72,6 @@ export async function listHolidays(schoolYear: string): Promise<HolidayRow[]> {
 }
 
 /**
- * Count Attendance rows for a given holiday date across every group in the
- * school year — used to warn the admin before flipping a day to "holiday" so
- * they can confirm the cascade delete.
- */
-export async function countAttendanceOnDate(
-  schoolYear: string,
-  date: string,
-): Promise<number> {
-  await requireAdmin()
-  return db.attendance.count({
-    where: {
-      sessionDate: fromDateKey(date),
-      enrollment: { scheduledGroup: { schoolYear } },
-    },
-  })
-}
-
-/**
  * Upserts the holiday by (schoolYear, date). When attendance rows exist on
  * that date in the school year and `confirmDeleteAttendance` is not set, the
  * action returns `{ requiresConfirmation: true, attendanceCount }` without

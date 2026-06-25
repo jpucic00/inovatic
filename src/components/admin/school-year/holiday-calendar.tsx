@@ -198,6 +198,111 @@ function buildMonthGrid(
   return cells
 }
 
+function groupMarkersByDate(
+  moduleMarkers: ModuleMarker[],
+): Map<string, ModuleMarker[]> {
+  const m = new Map<string, ModuleMarker[]>()
+  for (const marker of moduleMarkers) {
+    const arr = m.get(marker.date) ?? []
+    arr.push(marker)
+    m.set(marker.date, arr)
+  }
+  return m
+}
+
+function groupWorkshopTitlesByDate(
+  workshopLabels: WorkshopLabel[],
+): Map<string, string[]> {
+  const m = new Map<string, string[]>()
+  for (const w of workshopLabels) {
+    const arr = m.get(w.date) ?? []
+    arr.push(w.title)
+    m.set(w.date, arr)
+  }
+  return m
+}
+
+function collectSessionDateSet(
+  sessionDatesByWeekday: Record<string, ReadonlyArray<string>>,
+): Set<string> {
+  const s = new Set<string>()
+  for (const keys of Object.values(sessionDatesByWeekday)) {
+    for (const k of keys) s.add(k)
+  }
+  return s
+}
+
+function collectLastSessionDateSet(
+  lastSessionDateByWeekday: Record<string, string | null>,
+): Set<string> {
+  const s = new Set<string>()
+  for (const k of Object.values(lastSessionDateByWeekday)) {
+    if (k) s.add(k)
+  }
+  return s
+}
+
+function indexInMonthCellsByKey(
+  monthGrids: ReadonlyArray<{ cells: CellState[] }>,
+): Map<string, CellState> {
+  const map = new Map<string, CellState>()
+  for (const g of monthGrids) {
+    for (const c of g.cells) {
+      if (c.inMonth) map.set(c.key, c)
+    }
+  }
+  return map
+}
+
+function buildPreviewKeys(
+  previewRange: { start: string; end: string } | null,
+): ReadonlySet<string> {
+  if (!previewRange) return EMPTY_KEY_SET
+  const set = new Set<string>()
+  let cur = previewRange.start
+  // Cap the walk at a full school year so a stray hover can't spin forever.
+  for (let i = 0; i < 400 && cur <= previewRange.end; i++) {
+    set.add(cur)
+    cur = shiftDateKey(cur, 1)
+  }
+  return set
+}
+
+function computeDialogTitle(
+  editing: DialogState | null,
+  isRange: boolean,
+): string {
+  if (editing?.existingHoliday) {
+    return `Praznik — ${formatDate(editing.startDate, 'long')}`
+  }
+  if (editing && isRange) {
+    return `Označi raspon — ${formatDate(editing.startDate)} – ${formatDate(editing.endDate)} (${dayCount(editing.startKey, editing.endKey)} dana)`
+  }
+  if (editing) {
+    return `Označi kao praznik — ${formatDate(editing.startDate, 'long')}`
+  }
+  return ''
+}
+
+function computeDialogDescription(archived: boolean, isRange: boolean): string {
+  if (archived) {
+    return 'Pregled arhivirane školske godine — izmjene nisu dozvoljene.'
+  }
+  return isRange
+    ? 'Svi dani u rasponu bit će označeni kao praznik i izuzeti iz evidencije dolaska.'
+    : 'Dani označeni kao praznik nisu uključeni u evidenciju dolaska.'
+}
+
+function computeSaveLabel(
+  editing: DialogState | null,
+  isRange: boolean,
+  attendanceConflict: number | null,
+): string {
+  if (attendanceConflict !== null) return 'Da, obriši dolaske i spremi'
+  if (editing?.existingHoliday) return 'Ažuriraj'
+  return isRange ? 'Spremi raspon' : 'Spremi'
+}
+
 export function HolidayCalendar({
   schoolYear,
   archived,
@@ -246,38 +351,22 @@ export function HolidayCalendar({
     () => new Map(holidays.map((h) => [h.date, h])),
     [holidays],
   )
-  const markersByDate = useMemo(() => {
-    const m = new Map<string, ModuleMarker[]>()
-    for (const marker of moduleMarkers) {
-      const arr = m.get(marker.date) ?? []
-      arr.push(marker)
-      m.set(marker.date, arr)
-    }
-    return m
-  }, [moduleMarkers])
-  const workshopsByDate = useMemo(() => {
-    const m = new Map<string, string[]>()
-    for (const w of workshopLabels) {
-      const arr = m.get(w.date) ?? []
-      arr.push(w.title)
-      m.set(w.date, arr)
-    }
-    return m
-  }, [workshopLabels])
-  const sessionDateSet = useMemo(() => {
-    const s = new Set<string>()
-    for (const keys of Object.values(sessionDatesByWeekday)) {
-      for (const k of keys) s.add(k)
-    }
-    return s
-  }, [sessionDatesByWeekday])
-  const lastSessionDateSet = useMemo(() => {
-    const s = new Set<string>()
-    for (const k of Object.values(lastSessionDateByWeekday)) {
-      if (k) s.add(k)
-    }
-    return s
-  }, [lastSessionDateByWeekday])
+  const markersByDate = useMemo(
+    () => groupMarkersByDate(moduleMarkers),
+    [moduleMarkers],
+  )
+  const workshopsByDate = useMemo(
+    () => groupWorkshopTitlesByDate(workshopLabels),
+    [workshopLabels],
+  )
+  const sessionDateSet = useMemo(
+    () => collectSessionDateSet(sessionDatesByWeekday),
+    [sessionDatesByWeekday],
+  )
+  const lastSessionDateSet = useMemo(
+    () => collectLastSessionDateSet(lastSessionDateByWeekday),
+    [lastSessionDateByWeekday],
+  )
   const today = useMemo(todayUtcMidnight, [])
 
   // Build every month's cell grid once, keyed only on the painted data (not on
@@ -305,15 +394,10 @@ export function HolidayCalendar({
 
   // One global key→cell lookup so a staged range start resolves regardless of
   // which month grid it was clicked in — cross-month ranges included.
-  const cellsByKey = useMemo(() => {
-    const map = new Map<string, CellState>()
-    for (const g of monthGrids) {
-      for (const c of g.cells) {
-        if (c.inMonth) map.set(c.key, c)
-      }
-    }
-    return map
-  }, [monthGrids])
+  const cellsByKey = useMemo(
+    () => indexInMonthCellsByKey(monthGrids),
+    [monthGrids],
+  )
 
   // While a start is staged, the hovered cell defines the prospective
   // [start, end] band. Ordered low→high so it reads the same whether the user
@@ -325,17 +409,10 @@ export function HolidayCalendar({
       : { start: hoverKey, end: rangeStart }
   }, [rangeStart, hoverKey])
 
-  const previewKeys = useMemo<ReadonlySet<string>>(() => {
-    if (!previewRange) return EMPTY_KEY_SET
-    const set = new Set<string>()
-    let cur = previewRange.start
-    // Cap the walk at a full school year so a stray hover can't spin forever.
-    for (let i = 0; i < 400 && cur <= previewRange.end; i++) {
-      set.add(cur)
-      cur = shiftDateKey(cur, 1)
-    }
-    return set
-  }, [previewRange])
+  const previewKeys = useMemo<ReadonlySet<string>>(
+    () => buildPreviewKeys(previewRange),
+    [previewRange],
+  )
 
   const isRange = editing !== null && editing.startKey !== editing.endKey
 
@@ -379,7 +456,12 @@ export function HolidayCalendar({
   }
 
   function handleCellClick(cell: CellState) {
-    if (archived) return
+    if (archived) {
+      // Archived years are read-only: a holiday opens a view-only dialog (no
+      // save/remove controls), every other cell is inert and rendered disabled.
+      if (cell.holiday) openSingle(cell)
+      return
+    }
     // Clicking an existing holiday always opens the edit dialog and drops
     // any pending range start — keeps editing flow predictable.
     if (cell.holiday) {
@@ -428,7 +510,10 @@ export function HolidayCalendar({
   }
 
   function handleCellDoubleClick(cell: CellState) {
-    if (archived) return
+    if (archived) {
+      if (cell.holiday) openSingle(cell)
+      return
+    }
     // Safety net for browsers/OSs where dblclick fires but our click-handler
     // disambiguation missed it. openSingle is idempotent so calling it twice
     // (once via the second click, once via dblclick) is harmless.
@@ -516,25 +601,9 @@ export function HolidayCalendar({
   // the rangeStart cell may live in any of the 12 month grids.
   const rangeStartDate = rangeStart ? fromDateKey(rangeStart) : null
 
-  let dialogTitle = ''
-  if (editing?.existingHoliday) {
-    dialogTitle = `Praznik — ${formatDate(editing.startDate, 'long')}`
-  } else if (editing && isRange) {
-    dialogTitle = `Označi raspon — ${formatDate(editing.startDate)} – ${formatDate(editing.endDate)} (${dayCount(editing.startKey, editing.endKey)} dana)`
-  } else if (editing) {
-    dialogTitle = `Označi kao praznik — ${formatDate(editing.startDate, 'long')}`
-  }
-
-  const editableDescription = isRange
-    ? 'Svi dani u rasponu bit će označeni kao praznik i izuzeti iz evidencije dolaska.'
-    : 'Dani označeni kao praznik nisu uključeni u evidenciju dolaska.'
-  const dialogDescription = archived
-    ? 'Pregled arhivirane školske godine — izmjene nisu dozvoljene.'
-    : editableDescription
-
-  const newHolidaySaveLabel = isRange ? 'Spremi raspon' : 'Spremi'
-  let saveLabel = editing?.existingHoliday ? 'Ažuriraj' : newHolidaySaveLabel
-  if (attendanceConflict !== null) saveLabel = 'Da, obriši dolaske i spremi'
+  const dialogTitle = computeDialogTitle(editing, isRange)
+  const dialogDescription = computeDialogDescription(archived, isRange)
+  const saveLabel = computeSaveLabel(editing, isRange, attendanceConflict)
 
   return (
     <>
@@ -742,6 +811,64 @@ export function HolidayCalendar({
   )
 }
 
+function dayCellClassName(p: {
+  inMonth: boolean
+  inPreviewRange: boolean
+  holiday: boolean
+  isSessionDate: boolean
+  hasWorkshops: boolean
+  showLastRing: boolean
+  isToday: boolean
+  isRangeStart: boolean
+  isPreviewEnd: boolean
+  weekday: number
+  disabled: boolean
+}): string {
+  return cn(
+    'relative h-20 rounded-md border p-1 text-left text-xs transition-colors',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500',
+    !p.inMonth && 'border-transparent bg-transparent text-gray-300',
+    // The range-preview band overrides the base colors so the prospective
+    // selection reads clearly while picking the second day.
+    p.inMonth && p.inPreviewRange && 'border-cyan-300 bg-cyan-100 text-cyan-900',
+    p.inMonth && !p.inPreviewRange && !p.holiday && !p.isSessionDate && !p.hasWorkshops && 'border-gray-100 bg-white text-gray-600 hover:bg-gray-50',
+    p.inMonth && !p.inPreviewRange && !p.holiday && !p.isSessionDate && p.hasWorkshops && 'border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100',
+    p.inMonth && !p.inPreviewRange && !p.holiday && p.isSessionDate && 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
+    p.inMonth && !p.inPreviewRange && p.holiday && 'border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200',
+    p.showLastRing && 'ring-2 ring-inset ring-emerald-700',
+    p.isToday && p.inMonth && !p.isRangeStart && !p.isPreviewEnd && 'ring-2 ring-inset ring-cyan-500',
+    p.weekday === 0 && p.inMonth && !p.inPreviewRange && !p.holiday && !p.hasWorkshops && 'text-gray-400',
+    p.disabled && 'cursor-default',
+  )
+}
+
+function dayCellTitle(p: {
+  holidayTitle: string
+  showLastRing: boolean
+  workshops: string[]
+  markers: ModuleMarker[]
+}): string | undefined {
+  return (
+    [
+      p.holidayTitle,
+      p.showLastRing ? 'Zadnja radionica (28. po redu)' : '',
+      ...p.workshops.map((w) => `Radionica: ${w}`),
+      ...p.markers.map((m) => m.tooltip),
+    ]
+      .filter(Boolean)
+      .join('\n') || undefined
+  )
+}
+
+function dayCellAriaLabel(p: {
+  date: Date
+  holiday: boolean
+  showLastRing: boolean
+  isRangeStart: boolean
+}): string {
+  return `${p.date.getUTCDate()}. ${p.date.getUTCMonth() + 1}. ${p.date.getUTCFullYear()}${p.holiday ? ' — praznik' : ''}${p.showLastRing ? ' — zadnja radionica' : ''}${p.isRangeStart ? ' — početak raspona' : ''}`
+}
+
 function DayCell({
   cell,
   disabled,
@@ -778,38 +905,28 @@ function DayCell({
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onMouseEnter={onMouseEnter}
-      disabled={disabled && !holiday && markers.length === 0}
+      disabled={disabled && !holiday}
       data-date={cell.key}
       data-holiday={holiday ? 'true' : 'false'}
       data-in-month={inMonth ? 'true' : 'false'}
       data-range-start={isRangeStart ? 'true' : 'false'}
       data-session={isSessionDate ? 'true' : 'false'}
       data-last-session={isLastSessionDate ? 'true' : 'false'}
-      title={[
-        holidayTitle,
-        showLastRing ? 'Zadnja radionica (28. po redu)' : '',
-        ...workshops.map((w) => `Radionica: ${w}`),
-        ...markers.map((m) => m.tooltip),
-      ]
-        .filter(Boolean)
-        .join('\n') || undefined}
-      className={cn(
-        'relative h-20 rounded-md border p-1 text-left text-xs transition-colors',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500',
-        !inMonth && 'border-transparent bg-transparent text-gray-300',
-        // The range-preview band overrides the base colors so the prospective
-        // selection reads clearly while picking the second day.
-        inMonth && inPreviewRange && 'border-cyan-300 bg-cyan-100 text-cyan-900',
-        inMonth && !inPreviewRange && !holiday && !isSessionDate && !hasWorkshops && 'border-gray-100 bg-white text-gray-600 hover:bg-gray-50',
-        inMonth && !inPreviewRange && !holiday && !isSessionDate && hasWorkshops && 'border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100',
-        inMonth && !inPreviewRange && !holiday && isSessionDate && 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
-        inMonth && !inPreviewRange && holiday && 'border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200',
-        showLastRing && 'ring-2 ring-inset ring-emerald-700',
-        isToday && inMonth && !isRangeStart && !isPreviewEnd && 'ring-2 ring-inset ring-cyan-500',
-        weekday === 0 && inMonth && !inPreviewRange && !holiday && !hasWorkshops && 'text-gray-400',
-        disabled && 'cursor-default',
-      )}
-      aria-label={`${date.getUTCDate()}. ${date.getUTCMonth() + 1}. ${date.getUTCFullYear()}${holiday ? ' — praznik' : ''}${showLastRing ? ' — zadnja radionica' : ''}${isRangeStart ? ' — početak raspona' : ''}`}
+      title={dayCellTitle({ holidayTitle, showLastRing, workshops, markers })}
+      className={dayCellClassName({
+        inMonth,
+        inPreviewRange,
+        holiday: !!holiday,
+        isSessionDate,
+        hasWorkshops,
+        showLastRing,
+        isToday,
+        isRangeStart,
+        isPreviewEnd,
+        weekday,
+        disabled,
+      })}
+      aria-label={dayCellAriaLabel({ date, holiday: !!holiday, showLastRing, isRangeStart })}
     >
       <span className="text-[11px] font-semibold leading-none">
         {date.getUTCDate()}

@@ -43,7 +43,6 @@ const {
   removeHoliday,
   removeHolidayRange,
   listHolidays,
-  countAttendanceOnDate,
   previewHolidaysFromApi,
   bulkImportHolidays,
 } = await import('@/actions/admin/holidays')
@@ -120,7 +119,7 @@ describe('upsertHoliday', () => {
     expect(await db.schoolYearHoliday.count({ where: { schoolYear: SY } })).toBe(0)
   })
 
-  it('countAttendanceOnDate matches the upsert preview number', async () => {
+  it('upsert preview reports the attendance count for a holiday date', async () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
@@ -137,7 +136,14 @@ describe('upsertHoliday', () => {
       sessionDate: new Date('2027-01-06T00:00:00.000Z'),
     })
 
-    expect(await countAttendanceOnDate(SY, '2027-01-06')).toBe(2)
+    // Preview path: upsert without confirmDeleteAttendance returns the cascade
+    // count instead of writing (replaces the removed countAttendanceOnDate).
+    const res = await upsertHoliday({ schoolYear: SY, date: '2027-01-06' })
+    expect(res.success).toBe(true)
+    if (!res.success || !res.requiresConfirmation) {
+      throw new Error('expected a confirmation preview with an attendance count')
+    }
+    expect(res.attendanceCount).toBe(2)
   })
 
   it('deletes attendance + inserts the holiday in one transaction when confirmDeleteAttendance is true', async () => {

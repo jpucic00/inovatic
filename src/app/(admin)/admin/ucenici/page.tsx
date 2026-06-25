@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { getStudents } from '@/actions/admin/student'
 import { getCourses } from '@/actions/admin/course'
 import { getGroups } from '@/actions/admin/group'
+import { getAllSchoolYears } from '@/actions/admin/school-year'
 import { StudentFilters } from '@/components/admin/students/student-filters'
 import { StudentTable } from '@/components/admin/students/student-table'
 import { CreateStudentDialog } from '@/components/admin/students/create-student-dialog'
@@ -26,6 +27,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
   const courseId = params.courseId ?? ''
   const groupId = params.groupId ?? ''
   const scheduleId = params.scheduleId ?? ''
+  const year = params.year ?? ''
   const paymentStatus = PAYMENT_FILTER_VALUES.includes(params.payment as PaymentFilter)
     ? (params.payment as PaymentFilter)
     : undefined
@@ -34,12 +36,13 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
   const isModuleView = !!scheduleId
 
   const groupFilter = courseId ? { courseId } : {}
-  const [result, courses, groups, scheduleInfo] = await Promise.all([
+  const [result, courses, groups, scheduleInfo, years] = await Promise.all([
     getStudents({
       search,
       courseId,
       groupId,
       scheduleId: scheduleId || undefined,
+      schoolYear: year || undefined,
       paymentStatus,
       page,
       pageSize: PAGE_SIZE,
@@ -55,6 +58,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
           },
         })
       : Promise.resolve(null),
+    isModuleView ? Promise.resolve<string[]>([]) : getAllSchoolYears(),
   ])
 
   return (
@@ -86,12 +90,14 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
           currentCourseId: courseId,
           currentGroupId: groupId,
           currentPayment: paymentStatus ?? '',
+          currentYear: year,
           courses: courses.map((c) => ({ id: c.id, title: c.title })),
           groups: groups.map((g) => ({
             id: g.id,
             name: g.name,
             course: g.course,
           })),
+          years,
         })}
       />
 

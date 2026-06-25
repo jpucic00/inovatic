@@ -82,17 +82,8 @@ export type GroupAttendance =
       defaultSelectedDate: string
     })
 
-/**
- * Returns everything the Dolazak tab needs. For standard programs the dates
- * are sliced into 4 race-ahead module sections (per-group, holiday-aware via
- * `loadHolidayDateKeys`); for radionice the flat list is preserved.
- */
-export async function getGroupAttendance(
-  groupId: string,
-): Promise<GroupAttendance> {
-  await assertTeacherOwnsGroup(groupId)
-
-  const group = await db.scheduledGroup.findUniqueOrThrow({
+function loadAttendanceGroup(groupId: string) {
+  return db.scheduledGroup.findUniqueOrThrow({
     where: { id: groupId },
     select: {
       id: true,
@@ -126,12 +117,11 @@ export async function getGroupAttendance(
       },
     },
   })
+}
+type AttendanceGroup = Awaited<ReturnType<typeof loadAttendanceGroup>>
 
-  const schoolYear = group.schoolYear
-  const isCustom = group.course.isCustom
-  const holidayDates = await loadHolidayDateKeys(schoolYear)
-
-  const enrollments = await db.enrollment.findMany({
+function loadAttendanceEnrollments(groupId: string, schoolYear: string) {
+  return db.enrollment.findMany({
     where: { scheduledGroupId: groupId, schoolYear },
     orderBy: [{ user: { lastName: 'asc' } }, { user: { firstName: 'asc' } }],
     include: {
@@ -151,14 +141,17 @@ export async function getGroupAttendance(
       },
     },
   })
+}
+type AttendanceEnrollment = Awaited<
+  ReturnType<typeof loadAttendanceEnrollments>
+>[number]
 
-  const roster: AttendanceRosterRow[] = enrollments.map((e) => ({
-    enrollmentId: e.id,
-    studentId: e.user.id,
-    firstName: e.user.firstName,
-    lastName: e.user.lastName,
-  }))
+type HolidayDateKeys = Awaited<ReturnType<typeof loadHolidayDateKeys>>
 
+/** Flatten each enrollment's Attendance rows into the flat record list the UI consumes. */
+function flattenAttendanceRecords(
+  enrollments: AttendanceEnrollment[],
+): AttendanceRecord[] {
   const records: AttendanceRecord[] = []
   for (const e of enrollments) {
     for (const a of e.attendances) {
@@ -174,40 +167,65 @@ export async function getGroupAttendance(
       })
     }
   }
+  return records
+}
 
-  const base: GroupAttendanceBase = {
-    groupId: group.id,
-    schoolYear,
-    dayOfWeek: group.dayOfWeek,
-    dateStart: group.dateStart,
-    dateEnd: group.dateEnd,
-    startTime: group.startTime,
-    endTime: group.endTime,
-    roster,
-    records,
+/** Radionica branch: flat holiday-aware expected list plus any extra recorded dates. */
+function buildCustomAttendance(
+  base: GroupAttendanceBase,
+  dateStart: string | null,
+  dateEnd: string | null,
+  holidayDates: HolidayDateKeys,
+  records: AttendanceRecord[],
+): GroupAttendance {
+  const expectedDates = computeRadionicaSessions({ dateStart, dateEnd, holidayDates })
+  const expectedSessions = expectedDates.map(toDateKey)
+  const expectedSet = new Set(expectedSessions)
+  const extraSet = new Set<string>()
+  for (const r of records) {
+    if (!expectedSet.has(r.sessionDate)) extraSet.add(r.sessionDate)
   }
+  return {
+    ...base,
+    kind: 'custom',
+    expectedSessions,
+    extraSessions: Array.from(extraSet).sort((a, b) => a.localeCompare(b)),
+  }
+}
 
-  if (isCustom) {
-    const expectedDates = computeRadionicaSessions({
-      dateStart: group.dateStart,
-      dateEnd: group.dateEnd,
-      holidayDates,
-    })
-    const expectedSessions = expectedDates.map(toDateKey)
-    const expectedSet = new Set(expectedSessions)
-    const extraSet = new Set<string>()
-    for (const r of records) {
-      if (!expectedSet.has(r.sessionDate)) extraSet.add(r.sessionDate)
-    }
-    return {
-      ...base,
-      kind: 'custom',
-      expectedSessions,
-      extraSessions: Array.from(extraSet).sort((a, b) => a.localeCompare(b)),
+/**
+ * Distribute record-only dates (Attendance rows whose date isn't in any
+ * module's expected list) into the matching section's `adhocSessions` (mutated
+ * in place); return the leftovers for the "Ostali termini" bucket.
+ */
+function bucketAdhocDates(
+  sections: AttendanceModuleSection[],
+  records: AttendanceRecord[],
+): string[] {
+  const expectedSet = new Set<string>()
+  for (const s of sections) for (const d of s.expectedSessions) expectedSet.add(d)
+  const otherSet = new Set<string>()
+  for (const r of records) {
+    if (expectedSet.has(r.sessionDate)) continue
+    const idx = assignAdhocDateToSection(r.sessionDate, sections)
+    if (idx === null) otherSet.add(r.sessionDate)
+    else if (!sections[idx].adhocSessions.includes(r.sessionDate)) {
+      sections[idx].adhocSessions.push(r.sessionDate)
     }
   }
+  for (const s of sections) s.adhocSessions.sort((a, b) => a.localeCompare(b))
+  return Array.from(otherSet).sort((a, b) => a.localeCompare(b))
+}
 
-  // Standard branch: build race-ahead arc, then map to sections.
+/** Standard branch: build the race-ahead arc, slice it into module sections, bucket ad-hoc dates. */
+function buildStandardAttendance(
+  base: GroupAttendanceBase,
+  group: AttendanceGroup,
+  schoolYear: string,
+  holidayDates: HolidayDateKeys,
+  enrollments: AttendanceEnrollment[],
+  records: AttendanceRecord[],
+): GroupAttendance {
   const modulesForArc = group.course.modules.map((m) => {
     const schedule = m.schedules.find((s) => s.schoolYear === schoolYear)
     return {
@@ -250,28 +268,87 @@ export async function getGroupAttendance(
     }
   })
 
-  // Bucket record-only dates (Attendance rows whose date isn't in any module's
-  // expected list) into the matching section, or surface as "Ostali termini".
-  const expectedSet = new Set<string>()
-  for (const s of sections) for (const d of s.expectedSessions) expectedSet.add(d)
-  const otherSet = new Set<string>()
-  for (const r of records) {
-    if (expectedSet.has(r.sessionDate)) continue
-    const idx = assignAdhocDateToSection(r.sessionDate, sections)
-    if (idx === null) otherSet.add(r.sessionDate)
-    else if (!sections[idx].adhocSessions.includes(r.sessionDate)) {
-      sections[idx].adhocSessions.push(r.sessionDate)
-    }
-  }
-  for (const s of sections) s.adhocSessions.sort((a, b) => a.localeCompare(b))
+  const otherDates = bucketAdhocDates(sections, records)
 
   return {
     ...base,
     kind: 'standard',
     sections,
-    otherDates: Array.from(otherSet).sort((a, b) => a.localeCompare(b)),
+    otherDates,
     defaultSelectedDate: pickDefaultSelectedDate(arc, sections),
   }
+}
+
+/**
+ * Returns everything the Dolazak tab needs. For standard programs the dates
+ * are sliced into 4 race-ahead module sections (per-group, holiday-aware via
+ * `loadHolidayDateKeys`); for radionice the flat list is preserved.
+ */
+export async function getGroupAttendance(
+  groupId: string,
+): Promise<GroupAttendance> {
+  await assertTeacherOwnsGroup(groupId)
+
+  const group = await loadAttendanceGroup(groupId)
+  const schoolYear = group.schoolYear
+  const isCustom = group.course.isCustom
+  const holidayDates = await loadHolidayDateKeys(schoolYear)
+
+  const enrollments = await loadAttendanceEnrollments(groupId, schoolYear)
+
+  const roster: AttendanceRosterRow[] = enrollments.map((e) => ({
+    enrollmentId: e.id,
+    studentId: e.user.id,
+    firstName: e.user.firstName,
+    lastName: e.user.lastName,
+  }))
+
+  const records = flattenAttendanceRecords(enrollments)
+
+  const base: GroupAttendanceBase = {
+    groupId: group.id,
+    schoolYear,
+    dayOfWeek: group.dayOfWeek,
+    dateStart: group.dateStart,
+    dateEnd: group.dateEnd,
+    startTime: group.startTime,
+    endTime: group.endTime,
+    roster,
+    records,
+  }
+
+  return isCustom
+    ? buildCustomAttendance(base, group.dateStart, group.dateEnd, holidayDates, records)
+    : buildStandardAttendance(base, group, schoolYear, holidayDates, enrollments, records)
+}
+
+/**
+ * Resolve the default date from the arc's active-module state, or null when the
+ * arc is empty / no module phase applies (caller then falls back to sections).
+ */
+function pickDateFromArcState(
+  arc: GroupModuleArcEntry[],
+  today: string,
+): string | null {
+  if (arc.length === 0) return null
+  const state = getActiveModuleForGroup(arc, todayUtc())
+  const inProgress = state.inProgressModule
+  if (inProgress) {
+    const dates = inProgress.sessionDates.map(toDateKey)
+    if (dates.includes(today)) return today
+    const past = dates.filter((d) => d <= today)
+    if (past.length > 0) return past.at(-1)!
+    return dates[0]
+  }
+  if (state.lastCompletedModule) {
+    const dates = state.lastCompletedModule.sessionDates.map(toDateKey)
+    const past = dates.filter((d) => d <= today)
+    return past.at(-1) ?? dates.at(-1) ?? today
+  }
+  if (state.nextEnrollingModule) {
+    return toDateKey(state.nextEnrollingModule.firstSession)
+  }
+  return null
 }
 
 function pickDefaultSelectedDate(
@@ -279,25 +356,8 @@ function pickDefaultSelectedDate(
   sections: AttendanceModuleSection[],
 ): string {
   const today = toDateKey(todayUtc())
-  if (arc.length > 0) {
-    const state = getActiveModuleForGroup(arc, todayUtc())
-    const inProgress = state.inProgressModule
-    if (inProgress) {
-      const dates = inProgress.sessionDates.map(toDateKey)
-      if (dates.includes(today)) return today
-      const past = dates.filter((d) => d <= today)
-      if (past.length > 0) return past.at(-1)!
-      return dates[0]
-    }
-    if (state.lastCompletedModule) {
-      const dates = state.lastCompletedModule.sessionDates.map(toDateKey)
-      const past = dates.filter((d) => d <= today)
-      return past.at(-1) ?? dates.at(-1) ?? today
-    }
-    if (state.nextEnrollingModule) {
-      return toDateKey(state.nextEnrollingModule.firstSession)
-    }
-  }
+  const fromArc = pickDateFromArcState(arc, today)
+  if (fromArc !== null) return fromArc
   for (const s of sections) {
     if (s.expectedSessions.length > 0) return s.expectedSessions[0]
   }

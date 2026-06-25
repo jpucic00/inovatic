@@ -10,12 +10,12 @@ import {
 const utc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d, 12))
 
 describe('formatDate — short (default)', () => {
-  it('produces dd.MM.yyyy. (Croatian locale with trailing dot)', () => {
-    expect(formatDate(utc(2026, 5, 15))).toBe('15. 05. 2026.')
+  it('produces compact dd.MM.yyyy. with a trailing dot', () => {
+    expect(formatDate(utc(2026, 5, 15))).toBe('15.05.2026.')
   })
 
   it('zero-pads day and month', () => {
-    expect(formatDate(utc(2026, 1, 5))).toBe('05. 01. 2026.')
+    expect(formatDate(utc(2026, 1, 5))).toBe('05.01.2026.')
   })
 
   it('returns empty string for null date', () => {

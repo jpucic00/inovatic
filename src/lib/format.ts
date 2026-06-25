@@ -5,7 +5,11 @@ export function formatDate(date: Date | null, style: DateStyle = 'short'): strin
   if (style === 'long') {
     return new Intl.DateTimeFormat('hr-HR', { day: '2-digit', month: 'long', year: 'numeric' }).format(date)
   }
-  return new Intl.DateTimeFormat('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date)
+  // Compact dd.MM.yyyy. — matches formatDateKey so adjacent admin UI agrees.
+  // (Intl 'hr-HR' short would render "15. 05. 2026." with internal spaces.)
+  const dd = String(date.getDate()).padStart(2, '0')
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  return `${dd}.${mm}.${date.getFullYear()}.`
 }
 
 /** Build display name from child name fields. */

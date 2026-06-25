@@ -312,6 +312,30 @@ async function createStudentCore(tx: TxClient, input: CoreInput): Promise<CoreRe
   return { user, password, isExisting, enrollmentId, group }
 }
 
+/**
+ * Translate the named errors thrown while creating a student (capacity guard,
+ * inquiry-state guards, missing group) into their Croatian result. Returns null
+ * for anything unrecognized so the caller logs it and surfaces a generic message.
+ */
+function mapStudentCreationError(err: unknown): CreateStudentResult | null {
+  if (err instanceof GroupFullError) {
+    return { success: false, error: GROUP_FULL_ERROR, code: 'GROUP_FULL' }
+  }
+  if (err instanceof InquiryNotFoundError) {
+    return { success: false, error: 'Upit nije pronađen.' }
+  }
+  if (err instanceof InquiryAlreadyProcessedError) {
+    return { success: false, error: 'Račun je već stvoren za ovaj upit.' }
+  }
+  if (err instanceof InquiryDeclinedError) {
+    return { success: false, error: 'Upit je odbijen.' }
+  }
+  if (err instanceof GroupNotFoundError) {
+    return { success: false, error: 'Grupa nije pronađena.' }
+  }
+  return null
+}
+
 export async function createStudentFromInquiry(
   inquiryId: string,
   groupId: string,
@@ -384,21 +408,8 @@ export async function createStudentFromInquiry(
     core = result.core
     inquiry = result.inquiry
   } catch (err) {
-    if (err instanceof GroupFullError) {
-      return { success: false, error: GROUP_FULL_ERROR, code: 'GROUP_FULL' }
-    }
-    if (err instanceof InquiryNotFoundError) {
-      return { success: false, error: 'Upit nije pronađen.' }
-    }
-    if (err instanceof InquiryAlreadyProcessedError) {
-      return { success: false, error: 'Račun je već stvoren za ovaj upit.' }
-    }
-    if (err instanceof InquiryDeclinedError) {
-      return { success: false, error: 'Upit je odbijen.' }
-    }
-    if (err instanceof GroupNotFoundError) {
-      return { success: false, error: 'Grupa nije pronađena.' }
-    }
+    const mapped = mapStudentCreationError(err)
+    if (mapped) return mapped
     console.error('createStudentFromInquiry failed:', err)
     return { success: false, error: 'Greška pri kreiranju računa.' }
   }
@@ -520,16 +531,12 @@ export async function createStudentManually(
       }),
     )
   } catch (err) {
-    if (err instanceof GroupFullError) {
-      return { success: false, error: GROUP_FULL_ERROR, code: 'GROUP_FULL' }
-    }
-    // Symmetric application of the named-error pattern: ensureEnrollment throws
-    // GroupNotFoundError when data.groupId points at a missing group. Normally
-    // shadowed by the archivedGroupError pre-flight, but reachable if the group
-    // is deleted mid-tx — surface the specific message instead of the generic.
-    if (err instanceof GroupNotFoundError) {
-      return { success: false, error: 'Grupa nije pronađena.' }
-    }
+    // ensureEnrollment throws GroupNotFoundError when data.groupId points at a
+    // missing group (normally shadowed by the archivedGroupError pre-flight, but
+    // reachable if the group is deleted mid-tx); the shared mapper handles that
+    // plus GroupFullError, falling through to the generic message otherwise.
+    const mapped = mapStudentCreationError(err)
+    if (mapped) return mapped
     console.error('createStudentManually failed:', err)
     return { success: false, error: 'Greška pri kreiranju učenika.' }
   }
@@ -701,6 +708,7 @@ type StudentFilters = {
   courseId?: string
   groupId?: string
   scheduleId?: string
+  schoolYear?: string
   paymentStatus?: PaymentFilter
   page?: number
   pageSize?: number
@@ -711,7 +719,7 @@ export async function getStudents(
 ): Promise<PaginatedResult<StudentRow>> {
   await requireAdmin()
 
-  const { search, courseId, groupId, scheduleId, paymentStatus, page = 1, pageSize = 20 } = filters
+  const { search, courseId, groupId, scheduleId, schoolYear, paymentStatus, page = 1, pageSize = 20 } = filters
 
   const now = new Date()
   const currentYear = computeSchoolYear(now)
@@ -727,13 +735,14 @@ export async function getStudents(
           ],
         }
       : {}),
-    ...(courseId || groupId || scheduleId
+    ...(courseId || groupId || scheduleId || schoolYear
       ? {
           enrollments: {
             some: {
               ...(groupId ? { scheduledGroupId: groupId } : {}),
               ...(courseId ? { scheduledGroup: { courseId } } : {}),
               ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId } } } : {}),
+              ...(schoolYear ? { schoolYear } : {}),
             },
           },
         }
