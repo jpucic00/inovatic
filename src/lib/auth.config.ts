@@ -6,6 +6,10 @@ import type { UserRole } from '@prisma/client'
 // Edge runtime, which cannot load the Prisma engine. `import type` is erased
 // at build time, so the UserRole type import below is safe.
 export const authConfig = {
+  // Railway sits behind a reverse proxy; Auth.js only auto-trusts the
+  // forwarded host on Vercel. Without this, signOut() resolves its redirect
+  // against AUTH_URL (localhost) instead of the real request origin.
+  trustHost: true,
   session: { strategy: 'jwt' },
   providers: [],
   pages: {
