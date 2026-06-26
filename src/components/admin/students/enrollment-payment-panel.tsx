@@ -28,6 +28,102 @@ function formatDate(value: Date): string {
   return `${dd}.${mm}.${d.getFullYear()}.`
 }
 
+function RadionicaPaymentSection({
+  yearPaid,
+  fullYearPaidAt,
+  busy,
+  onToggle,
+}: Readonly<{
+  yearPaid: boolean
+  fullYearPaidAt: Date | null
+  busy: boolean
+  onToggle: () => void
+}>) {
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-200">
+      <p className="text-xs font-medium text-gray-500 mb-1.5">Plaćanje</p>
+      {yearPaid ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700">
+            <Check className="w-3 h-3" />
+            Plaćeno · {fullYearPaidAt ? formatDate(fullYearPaidAt) : ''}
+          </span>
+          <button
+            type="button"
+            onClick={onToggle}
+            disabled={busy}
+            className="text-xs text-gray-400 hover:text-red-600 disabled:opacity-50"
+          >
+            {busy ? '...' : 'Poništi'}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={busy}
+          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-dashed border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-700 disabled:opacity-50"
+        >
+          {busy ? <span className="text-[10px]">...</span> : <Plus className="w-3 h-3" />}
+          Označi plaćeno
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ModulePaymentChip({
+  module,
+  isPending,
+  pendingId,
+  yearPaid,
+  onToggle,
+}: Readonly<{
+  module: PaymentModule
+  isPending: boolean
+  pendingId: string | null
+  yearPaid: boolean
+  onToggle: () => void
+}>) {
+  const busy = isPending && pendingId === module.moduleEnrollmentId
+  const paid = module.paidAt !== null || yearPaid
+
+  if (yearPaid) {
+    return (
+      <span
+        title="Pokriveno oznakom plaćene cijele godine"
+        className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700 opacity-70"
+      >
+        <Check className="w-3 h-3" />
+        {module.title}
+      </span>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={busy}
+      title={paid ? 'Označi kao neplaćeno' : 'Označi kao plaćeno'}
+      className={
+        paid
+          ? 'inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 disabled:opacity-50'
+          : 'inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 disabled:opacity-50'
+      }
+    >
+      {busy ? (
+        <span className="text-[10px]">...</span>
+      ) : paid ? (
+        <Check className="w-3 h-3" />
+      ) : (
+        <X className="w-3 h-3" />
+      )}
+      {module.title}
+    </button>
+  )
+}
+
 export function EnrollmentPaymentPanel({
   enrollmentId,
   isCustom,
@@ -81,35 +177,12 @@ export function EnrollmentPaymentPanel({
   // Radionica: the enrollment itself is the single payable item.
   if (isCustom) {
     return (
-      <div className="mt-3 pt-3 border-t border-gray-200">
-        <p className="text-xs font-medium text-gray-500 mb-1.5">Plaćanje</p>
-        {yearPaid ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700">
-              <Check className="w-3 h-3" />
-              Plaćeno · {formatDate(fullYearPaidAt)}
-            </span>
-            <button
-              type="button"
-              onClick={toggleYear}
-              disabled={yearBusy}
-              className="text-xs text-gray-400 hover:text-red-600 disabled:opacity-50"
-            >
-              {yearBusy ? '...' : 'Poništi'}
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={toggleYear}
-            disabled={yearBusy}
-            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-dashed border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-700 disabled:opacity-50"
-          >
-            {yearBusy ? <span className="text-[10px]">...</span> : <Plus className="w-3 h-3" />}
-            Označi plaćeno
-          </button>
-        )}
-      </div>
+      <RadionicaPaymentSection
+        yearPaid={yearPaid}
+        fullYearPaidAt={fullYearPaidAt}
+        busy={yearBusy}
+        onToggle={toggleYear}
+      />
     )
   }
 
@@ -150,47 +223,16 @@ export function EnrollmentPaymentPanel({
       {/* Per-module marks */}
       {modules.length > 0 ? (
         <div className="flex flex-wrap gap-2 mt-2">
-          {modules.map((m) => {
-            const busy = isPending && pendingId === m.moduleEnrollmentId
-            const paid = m.paidAt !== null || yearPaid
-
-            if (yearPaid) {
-              return (
-                <span
-                  key={m.moduleEnrollmentId}
-                  title="Pokriveno oznakom plaćene cijele godine"
-                  className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700 opacity-70"
-                >
-                  <Check className="w-3 h-3" />
-                  {m.title}
-                </span>
-              )
-            }
-
-            return (
-              <button
-                key={m.moduleEnrollmentId}
-                type="button"
-                onClick={() => toggleModule(m)}
-                disabled={busy}
-                title={paid ? 'Označi kao neplaćeno' : 'Označi kao plaćeno'}
-                className={
-                  paid
-                    ? 'inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 disabled:opacity-50'
-                    : 'inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 disabled:opacity-50'
-                }
-              >
-                {busy ? (
-                  <span className="text-[10px]">...</span>
-                ) : paid ? (
-                  <Check className="w-3 h-3" />
-                ) : (
-                  <X className="w-3 h-3" />
-                )}
-                {m.title}
-              </button>
-            )
-          })}
+          {modules.map((m) => (
+            <ModulePaymentChip
+              key={m.moduleEnrollmentId}
+              module={m}
+              isPending={isPending}
+              pendingId={pendingId}
+              yearPaid={yearPaid}
+              onToggle={() => toggleModule(m)}
+            />
+          ))}
         </div>
       ) : (
         <p className="text-xs text-gray-400 mt-2">Nema upisanih modula.</p>

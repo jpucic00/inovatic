@@ -101,85 +101,96 @@ function nonEmpty(v: string | null | undefined): v is string {
   return typeof v === 'string' && v.length > 0
 }
 
-function validateTypeUrlPairing(
-  val: {
-    type: 'DOCUMENT' | 'PRESENTATION' | 'VIDEO' | 'LINK' | 'ROBOCAMP'
-    fileUrl?: string | null
-    externalUrl?: string | null
-  },
+type MaterialPairingInput = {
+  type: 'DOCUMENT' | 'PRESENTATION' | 'VIDEO' | 'LINK' | 'ROBOCAMP'
+  fileUrl?: string | null
+  externalUrl?: string | null
+}
+
+function validateRobocampPairing(
+  val: MaterialPairingInput,
   ctx: z.RefinementCtx,
+  hasFile: boolean,
+  hasExternal: boolean,
 ) {
-  const hasFile = nonEmpty(val.fileUrl)
-  const hasExternal = nonEmpty(val.externalUrl)
-
-  if (val.type === 'ROBOCAMP') {
-    // Interactive RoboCamp tutorial: an externalUrl on the RoboCamp host, no file.
-    if (!hasExternal) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Unesite RoboCamp poveznicu.',
-        path: ['externalUrl'],
-      })
-    } else if (!isRobocampUrl(val.externalUrl as string)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Poveznica mora biti sa elearning.robocamp.eu.',
-        path: ['externalUrl'],
-      })
-    }
-    if (hasFile) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'RoboCamp materijal nema priloženu datoteku.',
-        path: ['fileUrl'],
-      })
-    }
-    return
+  // Interactive RoboCamp tutorial: an externalUrl on the RoboCamp host, no file.
+  if (!hasExternal) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Unesite RoboCamp poveznicu.',
+      path: ['externalUrl'],
+    })
+  } else if (!isRobocampUrl(val.externalUrl as string)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Poveznica mora biti sa elearning.robocamp.eu.',
+      path: ['externalUrl'],
+    })
   }
-
-  if (val.type === 'VIDEO') {
-    // Exactly one of fileUrl OR externalUrl; externalUrl must be YT/Vimeo.
-    if (hasFile && hasExternal) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Za video materijal ne unosite i datoteku i poveznicu — samo jedno.',
-        path: ['externalUrl'],
-      })
-    } else if (!hasFile && !hasExternal) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Priložite video datoteku ili unesite poveznicu (YouTube/Vimeo).',
-        path: ['fileUrl'],
-      })
-    } else if (hasExternal && !isAllowedExternalVideoUrl(val.externalUrl as string)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Poveznica mora biti sa YouTube ili Vimeo.',
-        path: ['externalUrl'],
-      })
-    }
-    return
+  if (hasFile) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'RoboCamp materijal nema priloženu datoteku.',
+      path: ['fileUrl'],
+    })
   }
+}
 
-  if (val.type === 'LINK') {
-    // LINK stores the URL in externalUrl (not uploaded to Cloudinary).
-    if (!hasExternal) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Unesite URL poveznice.',
-        path: ['externalUrl'],
-      })
-    }
-    if (hasFile) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Poveznica ne smije imati priloženu datoteku.',
-        path: ['fileUrl'],
-      })
-    }
-    return
+function validateVideoPairing(
+  val: MaterialPairingInput,
+  ctx: z.RefinementCtx,
+  hasFile: boolean,
+  hasExternal: boolean,
+) {
+  // Exactly one of fileUrl OR externalUrl; externalUrl must be YT/Vimeo.
+  if (hasFile && hasExternal) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Za video materijal ne unosite i datoteku i poveznicu — samo jedno.',
+      path: ['externalUrl'],
+    })
+  } else if (!hasFile && !hasExternal) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Priložite video datoteku ili unesite poveznicu (YouTube/Vimeo).',
+      path: ['fileUrl'],
+    })
+  } else if (hasExternal && !isAllowedExternalVideoUrl(val.externalUrl as string)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Poveznica mora biti sa YouTube ili Vimeo.',
+      path: ['externalUrl'],
+    })
   }
+}
 
+function validateLinkPairing(
+  ctx: z.RefinementCtx,
+  hasFile: boolean,
+  hasExternal: boolean,
+) {
+  // LINK stores the URL in externalUrl (not uploaded to Cloudinary).
+  if (!hasExternal) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Unesite URL poveznice.',
+      path: ['externalUrl'],
+    })
+  }
+  if (hasFile) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Poveznica ne smije imati priloženu datoteku.',
+      path: ['fileUrl'],
+    })
+  }
+}
+
+function validateUploadPairing(
+  ctx: z.RefinementCtx,
+  hasFile: boolean,
+  hasExternal: boolean,
+) {
   // DOCUMENT and PRESENTATION require a fileUrl (Cloudinary raw upload).
   if (!hasFile) {
     ctx.addIssue({
@@ -195,4 +206,14 @@ function validateTypeUrlPairing(
       path: ['externalUrl'],
     })
   }
+}
+
+function validateTypeUrlPairing(val: MaterialPairingInput, ctx: z.RefinementCtx) {
+  const hasFile = nonEmpty(val.fileUrl)
+  const hasExternal = nonEmpty(val.externalUrl)
+
+  if (val.type === 'ROBOCAMP') return validateRobocampPairing(val, ctx, hasFile, hasExternal)
+  if (val.type === 'VIDEO') return validateVideoPairing(val, ctx, hasFile, hasExternal)
+  if (val.type === 'LINK') return validateLinkPairing(ctx, hasFile, hasExternal)
+  return validateUploadPairing(ctx, hasFile, hasExternal)
 }

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import type { MaterialType } from '@prisma/client'
+import type { Material, MaterialType } from '@prisma/client'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
@@ -111,6 +111,52 @@ function toItem(m: {
   }
 }
 
+type MaterialPartition = {
+  moduleBuckets: Map<string, KindBuckets>
+  programMaterials: KindBuckets
+  groupMaterials: KindBuckets
+  radionicaMaterials: KindBuckets
+}
+
+/**
+ * Sort every material into its display bucket: MODULE-scoped rows group by
+ * moduleId; on a radionica everything else folds into one flat bucket; on a
+ * standard program COURSE-scoped rows go to the program bucket and the rest to
+ * the group bucket.
+ */
+function partitionMaterials(
+  materials: Material[],
+  isCustom: boolean,
+): MaterialPartition {
+  const moduleBuckets = new Map<string, KindBuckets>()
+  const programMaterials = emptyBuckets()
+  const groupMaterials = emptyBuckets()
+  const radionicaMaterials = emptyBuckets()
+
+  for (const m of materials) {
+    const item = toItem(m)
+    const kind = kindOf(m)
+
+    if (m.scope === 'MODULE' && m.moduleId) {
+      let bucket = moduleBuckets.get(m.moduleId)
+      if (!bucket) {
+        bucket = emptyBuckets()
+        moduleBuckets.set(m.moduleId, bucket)
+      }
+      bucket[kind].push(item)
+    } else if (isCustom) {
+      // Radionica: COURSE + GROUP both fold into one flat bucket (no modules).
+      radionicaMaterials[kind].push(item)
+    } else if (m.scope === 'COURSE') {
+      programMaterials[kind].push(item)
+    } else {
+      groupMaterials[kind].push(item)
+    }
+  }
+
+  return { moduleBuckets, programMaterials, groupMaterials, radionicaMaterials }
+}
+
 /**
  * Loads a group and computes the effective, kind-partitioned material view a
  * student sees — respecting per-group hides. Does NOT authorize the caller;
@@ -163,31 +209,8 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   })
 
-  const moduleBuckets = new Map<string, KindBuckets>()
-  const programMaterials = emptyBuckets()
-  const groupMaterials = emptyBuckets()
-  const radionicaMaterials = emptyBuckets()
-
-  for (const m of materials) {
-    const item = toItem(m)
-    const kind = kindOf(m)
-
-    if (m.scope === 'MODULE' && m.moduleId) {
-      let bucket = moduleBuckets.get(m.moduleId)
-      if (!bucket) {
-        bucket = emptyBuckets()
-        moduleBuckets.set(m.moduleId, bucket)
-      }
-      bucket[kind].push(item)
-    } else if (isCustom) {
-      // Radionica: COURSE + GROUP both fold into one flat bucket (no modules).
-      radionicaMaterials[kind].push(item)
-    } else if (m.scope === 'COURSE') {
-      programMaterials[kind].push(item)
-    } else {
-      groupMaterials[kind].push(item)
-    }
-  }
+  const { moduleBuckets, programMaterials, groupMaterials, radionicaMaterials } =
+    partitionMaterials(materials, isCustom)
 
   // Only the active module is shown to kids (and in the staff preview).
   const moduleSections: ModuleMaterialGroup[] =
