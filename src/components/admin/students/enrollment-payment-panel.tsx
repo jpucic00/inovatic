@@ -100,6 +100,15 @@ function ModulePaymentChip({
     )
   }
 
+  let icon
+  if (busy) {
+    icon = <span className="text-[10px]">...</span>
+  } else if (paid) {
+    icon = <Check className="w-3 h-3" />
+  } else {
+    icon = <X className="w-3 h-3" />
+  }
+
   return (
     <button
       type="button"
@@ -112,13 +121,7 @@ function ModulePaymentChip({
           : 'inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 disabled:opacity-50'
       }
     >
-      {busy ? (
-        <span className="text-[10px]">...</span>
-      ) : paid ? (
-        <Check className="w-3 h-3" />
-      ) : (
-        <X className="w-3 h-3" />
-      )}
+      {icon}
       {module.title}
     </button>
   )

@@ -40,7 +40,7 @@ beforeAll(() => {
 })
 
 const { submitInquiry } = await import('@/actions/inquiry')
-const { getInquiries } = await import('@/actions/admin/inquiry')
+const { getInquiries, getInquiryCourses } = await import('@/actions/admin/inquiry')
 
 let emailCounter = 0
 const uniqueEmail = () => `sy-${Date.now().toString(36)}-${++emailCounter}@test.local`
@@ -143,5 +143,33 @@ describe('getInquiries — filters by the selected school year', () => {
     setSelectedYearCookie(getNextSchoolYear(computeSchoolYear()))
     res = await getInquiries({ search: marker })
     expect(res.data.map((i) => i.id)).not.toContain(orphan.id)
+  })
+})
+
+describe('getInquiryCourses — radionica year-scoping', () => {
+  it('lists standard courses globally but radionice only for the selected year', async () => {
+    const admin = await createAdmin()
+    const currentYear = computeSchoolYear()
+    const futureYear = getNextSchoolYear(currentYear)
+
+    // Standard courses are year-agnostic (schoolYear: null); radionice are
+    // stamped with a school year, mirroring getCourses' OR predicate.
+    const standard = await createCourse({ isCustom: false })
+    const radioCurrent = await createCourse({ isCustom: true, schoolYear: currentYear })
+    const radioFuture = await createCourse({ isCustom: true, schoolYear: futureYear })
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    setSelectedYearCookie(currentYear)
+    let ids = (await getInquiryCourses()).map((c) => c.id)
+    expect(ids).toContain(standard.id)
+    expect(ids).toContain(radioCurrent.id)
+    expect(ids).not.toContain(radioFuture.id)
+
+    setSelectedYearCookie(futureYear)
+    ids = (await getInquiryCourses()).map((c) => c.id)
+    expect(ids).toContain(standard.id)
+    expect(ids).toContain(radioFuture.id)
+    expect(ids).not.toContain(radioCurrent.id)
   })
 })

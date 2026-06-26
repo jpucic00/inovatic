@@ -226,11 +226,12 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
         ]
       : []
 
-  const featuredRobocamp = isCustom
-    ? radionicaMaterials.robocamp
-    : activeModule
-      ? moduleBuckets.get(activeModule.id)?.robocamp ?? []
-      : []
+  let featuredRobocamp: MaterialItem[] = []
+  if (isCustom) {
+    featuredRobocamp = radionicaMaterials.robocamp
+  } else if (activeModule) {
+    featuredRobocamp = moduleBuckets.get(activeModule.id)?.robocamp ?? []
+  }
 
   return {
     group: {
