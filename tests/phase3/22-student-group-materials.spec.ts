@@ -5,10 +5,10 @@ import {
   loginWithEmail,
   collectGroupIds,
   getGroupCourseTitle,
-  createStudentInGroup,
   expectNotFoundPage,
   type StudentData,
 } from '../helpers/phase3'
+import { seedStudentInGroup } from '../helpers/seed'
 
 const RUN_ID = Date.now().toString().slice(-6)
 
@@ -41,7 +41,10 @@ test.describe('Phase 3 Step 11 — Student Group Materials', () => {
     await loginAsAdmin(page)
     const [a, b] = collectGroupIds(page, 2)
     const aCourseTitle = await getGroupCourseTitle(page, a)
-    const creds = await createStudentInGroup(page, a, STUDENT)
+    await page.close()
+    // Direct-Prisma seed (per the seed.ts convention) — capacity-independent, so
+    // it doesn't break when the shared bootstrap group fills up across runs.
+    const creds = await seedStudentInGroup(a, STUDENT)
     seeded = {
       loginEmail: `${creds.username}@student.inovatic.local`,
       password: creds.password,
@@ -49,7 +52,6 @@ test.describe('Phase 3 Step 11 — Student Group Materials', () => {
       otherGroupId: b,
       courseTitle: aCourseTitle,
     }
-    await page.close()
   })
 
   test('enrolled group page renders course title, back link, and material list', async ({ page }) => {

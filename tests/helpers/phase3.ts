@@ -264,7 +264,10 @@ export async function addLinkMaterial(
   await dialog.locator('#material-external-url').fill(url)
   await dialog.getByRole('button', { name: 'Spremi' }).click()
   await expect(dialog).toBeHidden({ timeout: 10000 })
-  await expect(page.getByText(title)).toBeVisible({ timeout: 15000 })
+  // The merged Materijali tab can render the title in both the manage list (link)
+  // and the student preview (span), so the text may resolve to >1 node — assert
+  // the first match is visible rather than tripping strict-mode on the duplicate.
+  await expect(page.getByText(title).first()).toBeVisible({ timeout: 15000 })
 }
 
 /** Resolves the courseId for a group by following its card on /admin/programi. */
@@ -304,7 +307,10 @@ export async function addMaterialOnProgramPage(
   await dialog.locator('#material-external-url').fill(url)
   await dialog.getByRole('button', { name: 'Spremi' }).click()
   await expect(dialog).toBeHidden({ timeout: 10000 })
-  await expect(page.getByText(title)).toBeVisible({ timeout: 15000 })
+  // The merged Materijali tab can render the title in both the manage list (link)
+  // and the student preview (span), so the text may resolve to >1 node — assert
+  // the first match is visible rather than tripping strict-mode on the duplicate.
+  await expect(page.getByText(title).first()).toBeVisible({ timeout: 15000 })
 }
 
 let cloudinaryConfigured = false

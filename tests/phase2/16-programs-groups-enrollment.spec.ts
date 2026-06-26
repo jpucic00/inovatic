@@ -185,11 +185,18 @@ async function openProgramWindow(page: Page, groupName: string, isRadionica: boo
     await page.locator('button', { hasText: 'Radionice' }).last().click()
   }
   const row = page.locator('tr', { hasText: groupName }).first()
-  await row.locator('a', { hasText: groupName }).first().click()
-  await page.waitForURL(/\/admin\/grupe\/[a-z0-9]+$/)
-
-  await page.getByRole('link', { name: 'Uredi u programu' }).first().click()
-  await page.waitForURL(/\/admin\/programi\//)
+  // Next <Link> clicks can land before hydration on the dev server; retry until
+  // the navigation actually happens.
+  await submitUntilUrl(
+    page,
+    row.locator('a', { hasText: groupName }).first(),
+    /\/admin\/grupe\/[a-z0-9]+$/,
+  )
+  await submitUntilUrl(
+    page,
+    page.getByRole('link', { name: 'Uredi u programu' }).first(),
+    /\/admin\/programi\//,
+  )
 
   await page.getByRole('button', { name: 'Uredi', exact: true }).first().click()
   const start = page.locator('#window-start')
@@ -266,13 +273,13 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     test('standard SLR courses cannot be deleted (no delete button)', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
-      // SLR courses are rendered as ModuleDatesTable cards (div.rounded-lg)
-      // with the course title in an <h3>.
-      const slr1Card = page.locator('div.rounded-lg').filter({
-        has: page.locator('h3', { hasText: 'Robotike 1' }),
+      // Standard SLR programs render as clickable <Link> rows (<a class="…rounded-lg">),
+      // not deletable cards — opening a program just navigates to its detail page.
+      const slr1Card = page.locator('a.rounded-lg').filter({
+        has: page.getByRole('heading', { level: 3, name: /Robotike 1/ }),
       })
       await expect(slr1Card).toBeVisible()
-      // No "Obriši" button should appear within a standard course card
+      // No "Obriši" button should appear within a standard program row
       await expect(slr1Card.getByRole('button', { name: /Obriši/ })).toHaveCount(0)
     })
   })
