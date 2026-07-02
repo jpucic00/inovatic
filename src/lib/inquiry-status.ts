@@ -2,12 +2,26 @@ export const INQUIRY_STATUS_LABELS: Record<string, string> = {
   NEW: 'Nova',
   ACCOUNT_CREATED: 'Račun stvoren',
   DECLINED: 'Odbijena',
+  PARTY_SCHEDULED: 'Termin dogovoren',
 }
 
 export const INQUIRY_STATUS_COLORS: Record<string, string> = {
   NEW: 'bg-amber-100 text-amber-800 border-amber-200',
   ACCOUNT_CREATED: 'bg-cyan-100 text-cyan-800 border-cyan-200',
   DECLINED: 'bg-gray-100 text-gray-600 border-gray-200',
+  PARTY_SCHEDULED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+}
+
+// Inquiry.type discriminator. Only PARTY renders a badge (COURSE is the
+// implicit default and stays unlabeled in the UI).
+export const INQUIRY_TYPE_LABELS: Record<string, string> = {
+  COURSE: 'Upis',
+  PARTY: 'Proslava',
+}
+
+export const INQUIRY_TYPE_COLORS: Record<string, string> = {
+  COURSE: 'bg-gray-100 text-gray-600 border-gray-200',
+  PARTY: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
 }
 
 // Label for the derived "returning student" marker (a child whose name + DOB

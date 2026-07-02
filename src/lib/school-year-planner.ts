@@ -222,6 +222,20 @@ export type WorkshopLabel = {
   title: string // Course.title
 }
 
+/**
+ * A scheduled party (proslava) painted on the calendar at its confirmed date.
+ * All strings so it crosses the RSC boundary cleanly. `time` is "HH:mm" or null.
+ */
+export type PartyEvent = {
+  date: string // YYYY-MM-DD (confirmed date)
+  time: string | null // "HH:mm" start time
+  name: string // parent name
+  phone: string
+  email: string
+  message: string | null
+  inquiryId: string
+}
+
 type WorkshopDayEntry = { titles: Set<string> }
 
 /**

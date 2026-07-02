@@ -16,6 +16,7 @@ import {
   deriveSessionDatesFromWindows,
   type ModuleMarker,
   type WorkshopLabel,
+  type PartyEvent,
 } from '@/lib/school-year-planner'
 import {
   ACTIVE_WEEKDAYS,
@@ -68,6 +69,8 @@ type Props = {
   customCourses: SchoolYearCourseInput[]
   /** Radionica ScheduledGroups with date ranges (for the workshop labels on the calendar). */
   radionicaGroups: SchoolYearRadionicaGroupInput[]
+  /** Scheduled parties (proslave) painted on the calendar at their confirmed date. */
+  partyEvents: PartyEvent[]
   /** True when any standard module already has a startDate or endDate for this year. */
   hasAnyModuleDate: boolean
 }
@@ -89,6 +92,7 @@ export function SchoolYearPlannerView({
   standardCourses,
   customCourses,
   radionicaGroups,
+  partyEvents,
   hasAnyModuleDate,
 }: Readonly<Props>) {
   const router = useRouter()
@@ -232,6 +236,7 @@ export function SchoolYearPlannerView({
         lastSessionDateByWeekday={lastSessionDateByWeekday}
         moduleMarkers={moduleMarkers}
         workshopLabels={workshopLabels}
+        partyEvents={partyEvents}
       />
 
       {summary && <WeekdayEndSummary summary={summary} />}

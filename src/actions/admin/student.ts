@@ -372,6 +372,12 @@ export async function createStudentFromInquiry(
       if (fresh.status === 'DECLINED') {
         throw new InquiryDeclinedError()
       }
+      // Party inquiries carry no enrolling child and never reach this action
+      // (the UI offers "Dogovori termin" instead). Guard defensively so the
+      // child name fields narrow to non-null for createStudentCore below.
+      if (fresh.type !== 'COURSE' || !fresh.childFirstName || !fresh.childLastName) {
+        throw new Error('Cannot create a student account from a non-course inquiry.')
+      }
 
       // Free this inquiry's reservation BEFORE the capacity assertion so the
       // count doesn't include the spot we're about to claim. Inquiry-mark
@@ -461,8 +467,8 @@ function describeEmailError(err: unknown): string {
 }
 
 type InquiryEmailContext = {
-  childFirstName: string
-  childLastName: string
+  childFirstName: string | null
+  childLastName: string | null
   parentName: string
   parentEmail: string
 }
@@ -473,7 +479,7 @@ async function sendInquiryCredentialsEmail(
 ): Promise<void> {
   if (!process.env.RESEND_API_KEY || !core.group) return
 
-  const childName = `${inquiry.childFirstName} ${inquiry.childLastName}`.trim()
+  const childName = `${inquiry.childFirstName ?? ''} ${inquiry.childLastName ?? ''}`.trim()
   const schedule = formatGroupSchedule({
     isCustom: core.group.course.isCustom,
     dayOfWeek: core.group.dayOfWeek,

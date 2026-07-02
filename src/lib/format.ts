@@ -12,12 +12,13 @@ export function formatDate(date: Date | null, style: DateStyle = 'short'): strin
   return `${dd}.${mm}.${date.getFullYear()}.`
 }
 
-/** Build display name from child name fields. */
+/** Build display name from child name fields. Empty/null (e.g. PARTY inquiries
+ * with no child) yields the fallback. */
 export function formatChildName(
-  fields: { childFirstName: string; childLastName: string },
+  fields: { childFirstName: string | null; childLastName: string | null },
   fallback = '–',
 ): string {
-  const full = `${fields.childFirstName} ${fields.childLastName}`.trim()
+  const full = `${fields.childFirstName ?? ''} ${fields.childLastName ?? ''}`.trim()
   return full || fallback
 }
 

@@ -2,9 +2,13 @@
 
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
-import { InquiryStatus } from '@prisma/client'
+import { InquiryStatus, InquiryType } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
-import { declineInquirySchema } from '@/lib/validators/admin/inquiry'
+import {
+  declineInquirySchema,
+  schedulePartySchema,
+  type SchedulePartyInput,
+} from '@/lib/validators/admin/inquiry'
 import type { AdminActionResult } from '@/lib/action-types'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
@@ -21,6 +25,7 @@ type InquiryFilters = {
   search?: string
   courseId?: string
   grade?: Grade
+  type?: InquiryType | 'ALL'
   page?: number
   pageSize?: number
 }
@@ -48,12 +53,13 @@ export async function getInquiries(
 ): Promise<PaginatedResult<InquiryListRow>> {
   await requireAdmin()
 
-  const { status, search, courseId, grade, page = 1, pageSize = 20 } = filters
+  const { status, search, courseId, grade, type, page = 1, pageSize = 20 } = filters
   const schoolYear = await getSelectedSchoolYear()
 
   const where = {
     schoolYear,
     ...(status && status !== 'ALL' ? { status } : {}),
+    ...(type && type !== 'ALL' ? { type } : {}),
     ...(courseIdFilter(courseId)),
     ...(grade ? { childGrade: grade } : {}),
     ...(search
@@ -407,4 +413,83 @@ export async function sendScheduleOptions(
   revalidatePath('/admin/upiti')
   revalidatePath(`/admin/upiti/${inquiryId}`)
   return { success: true }
+}
+
+/**
+ * Accept a PARTY inquiry by recording the agreed date + "HH:mm" start time.
+ * Moves it to PARTY_SCHEDULED. The inquiry's `schoolYear` is intentionally left
+ * unchanged so it stays in the admin's Upiti list (contact details remain
+ * reachable after acceptance); the Kalendar finds it by its confirmed date
+ * instead (see getScheduledParties). No email is sent.
+ */
+export async function schedulePartyInquiry(
+  input: SchedulePartyInput,
+): Promise<AdminActionResult> {
+  await requireAdmin()
+
+  const parsed = schedulePartySchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
+  }
+  const { id, confirmedDate, startTime } = parsed.data
+
+  try {
+    const inquiry = await db.inquiry.findUnique({ where: { id }, select: { type: true } })
+    if (!inquiry) return { success: false, error: 'Upit nije pronađen.' }
+    if (inquiry.type !== 'PARTY') {
+      return { success: false, error: 'Ovaj upit nije upit za proslavu.' }
+    }
+
+    const confirmed = new Date(`${confirmedDate}T00:00:00.000Z`)
+    await db.inquiry.update({
+      where: { id },
+      data: {
+        status: 'PARTY_SCHEDULED',
+        partyConfirmedDate: confirmed,
+        partyStartTime: startTime,
+      },
+    })
+  } catch (err) {
+    console.error('schedulePartyInquiry failed:', err)
+    return { success: false, error: 'Greška pri dogovaranju termina.' }
+  }
+
+  revalidatePath('/admin/upiti')
+  revalidatePath(`/admin/upiti/${id}`)
+  revalidatePath('/admin/skolska-godina')
+  return { success: true }
+}
+
+/**
+ * Scheduled parties (type PARTY, status PARTY_SCHEDULED) whose CONFIRMED date
+ * falls within the given school year (Sept 1 → next Sept 1) — the calendar feed
+ * for `/admin/skolska-godina`. Keyed on the confirmed date, not the inquiry's
+ * `schoolYear` field, so a party shows on the calendar of the year it's held in
+ * regardless of which year's Upiti list the inquiry lives in.
+ */
+export async function getScheduledParties(schoolYear: string) {
+  await requireAdmin()
+
+  const startYear = Number.parseInt(schoolYear.split('/')[0], 10)
+  if (Number.isNaN(startYear)) return []
+  const start = new Date(Date.UTC(startYear, 8, 1)) // Sept 1
+  const end = new Date(Date.UTC(startYear + 1, 8, 1)) // next Sept 1 (exclusive)
+
+  return db.inquiry.findMany({
+    where: {
+      type: 'PARTY',
+      status: 'PARTY_SCHEDULED',
+      partyConfirmedDate: { gte: start, lt: end },
+    },
+    select: {
+      id: true,
+      parentName: true,
+      parentPhone: true,
+      parentEmail: true,
+      message: true,
+      partyConfirmedDate: true,
+      partyStartTime: true,
+    },
+    orderBy: { partyConfirmedDate: 'asc' },
+  })
 }

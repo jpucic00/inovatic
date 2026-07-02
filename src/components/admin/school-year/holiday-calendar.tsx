@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowDownToLine, ArrowUpFromLine, Trash2, X } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpFromLine, PartyPopper, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   Dialog,
@@ -17,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatDate } from '@/lib/format'
 import { fromDateKey, toDateKey } from '@/lib/session-dates'
-import type { ModuleMarker, WorkshopLabel } from '@/lib/school-year-planner'
+import type { ModuleMarker, WorkshopLabel, PartyEvent } from '@/lib/school-year-planner'
 import {
   upsertHoliday,
   upsertHolidayRange,
@@ -42,6 +43,8 @@ type Props = {
   moduleMarkers: ModuleMarker[]
   /** Per-day radionica (workshop) Course.title labels — empty when no workshops are scheduled. */
   workshopLabels?: WorkshopLabel[]
+  /** Scheduled parties (proslave) to paint on their confirmed date. */
+  partyEvents?: PartyEvent[]
 }
 
 type CellState = {
@@ -58,6 +61,7 @@ type CellState = {
   holiday: HolidayRow | null
   markers: ModuleMarker[]
   workshops: string[] // course titles for any radionica covering this day
+  parties: PartyEvent[] // scheduled parties on this day
 }
 
 /**
@@ -74,6 +78,7 @@ type DialogState = {
   endDate: Date
   existingHoliday: HolidayRow | null
   markers: ModuleMarker[]
+  parties: PartyEvent[]
   blockStart: string | null
   blockEnd: string | null
 }
@@ -168,6 +173,7 @@ function buildMonthGrid(
     holidaysByDate: Map<string, HolidayRow>
     markersByDate: Map<string, ModuleMarker[]>
     workshopsByDate: Map<string, string[]>
+    partiesByDate: Map<string, PartyEvent[]>
   },
 ): CellState[] {
   const firstOfMonth = utcMidnight(year, month, 1)
@@ -193,6 +199,7 @@ function buildMonthGrid(
       holiday: ctx.holidaysByDate.get(key) ?? null,
       markers: ctx.markersByDate.get(key) ?? [],
       workshops: ctx.workshopsByDate.get(key) ?? [],
+      parties: ctx.partiesByDate.get(key) ?? [],
     })
   }
   return cells
@@ -218,6 +225,16 @@ function groupWorkshopTitlesByDate(
     const arr = m.get(w.date) ?? []
     arr.push(w.title)
     m.set(w.date, arr)
+  }
+  return m
+}
+
+function groupPartiesByDate(partyEvents: PartyEvent[]): Map<string, PartyEvent[]> {
+  const m = new Map<string, PartyEvent[]>()
+  for (const p of partyEvents) {
+    const arr = m.get(p.date) ?? []
+    arr.push(p)
+    m.set(p.date, arr)
   }
   return m
 }
@@ -311,6 +328,7 @@ export function HolidayCalendar({
   lastSessionDateByWeekday,
   moduleMarkers,
   workshopLabels = [],
+  partyEvents = [],
 }: Readonly<Props>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -359,6 +377,10 @@ export function HolidayCalendar({
     () => groupWorkshopTitlesByDate(workshopLabels),
     [workshopLabels],
   )
+  const partiesByDate = useMemo(
+    () => groupPartiesByDate(partyEvents),
+    [partyEvents],
+  )
   const sessionDateSet = useMemo(
     () => collectSessionDateSet(sessionDatesByWeekday),
     [sessionDatesByWeekday],
@@ -380,6 +402,7 @@ export function HolidayCalendar({
       holidaysByDate,
       markersByDate,
       workshopsByDate,
+      partiesByDate,
     }
     return months.map((m) => ({ ...m, cells: buildMonthGrid(m.year, m.month, ctx) }))
   }, [
@@ -390,6 +413,7 @@ export function HolidayCalendar({
     holidaysByDate,
     markersByDate,
     workshopsByDate,
+    partiesByDate,
   ])
 
   // One global key→cell lookup so a staged range start resolves regardless of
@@ -429,6 +453,7 @@ export function HolidayCalendar({
       endDate: cell.date,
       existingHoliday: cell.holiday,
       markers: cell.markers,
+      parties: cell.parties,
       blockStart: block?.start ?? null,
       blockEnd: block?.end ?? null,
     })
@@ -448,6 +473,7 @@ export function HolidayCalendar({
       endDate: end.date,
       existingHoliday: null,
       markers: [],
+      parties: [],
       blockStart: null,
       blockEnd: null,
     })
@@ -457,14 +483,15 @@ export function HolidayCalendar({
 
   function handleCellClick(cell: CellState) {
     if (archived) {
-      // Archived years are read-only: a holiday opens a view-only dialog (no
-      // save/remove controls), every other cell is inert and rendered disabled.
-      if (cell.holiday) openSingle(cell)
+      // Archived years are read-only: a holiday or party opens a view-only
+      // dialog; every other cell is inert and rendered disabled.
+      if (cell.holiday || cell.parties.length > 0) openSingle(cell)
       return
     }
-    // Clicking an existing holiday always opens the edit dialog and drops
-    // any pending range start — keeps editing flow predictable.
-    if (cell.holiday) {
+    // Clicking an existing holiday OR a scheduled party always opens the dialog
+    // (party details + holiday controls) and drops any pending range start —
+    // keeps the editing flow predictable.
+    if (cell.holiday || cell.parties.length > 0) {
       openSingle(cell)
       return
     }
@@ -511,7 +538,7 @@ export function HolidayCalendar({
 
   function handleCellDoubleClick(cell: CellState) {
     if (archived) {
-      if (cell.holiday) openSingle(cell)
+      if (cell.holiday || cell.parties.length > 0) openSingle(cell)
       return
     }
     // Safety net for browsers/OSs where dblclick fires but our click-handler
@@ -703,6 +730,41 @@ export function HolidayCalendar({
             <DialogDescription>{dialogDescription}</DialogDescription>
           </DialogHeader>
 
+          {editing && editing.parties.length > 0 && (
+            <div className="space-y-2 rounded-md border border-fuchsia-200 bg-fuchsia-50 px-3 py-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fuchsia-800">
+                <PartyPopper className="h-3.5 w-3.5" aria-hidden />
+                {editing.parties.length === 1 ? 'Proslava' : 'Proslave'}
+              </div>
+              {editing.parties.map((p) => (
+                <div key={p.inquiryId} className="text-sm text-gray-800">
+                  <div className="font-medium">
+                    {p.time ? `${p.time} · ` : ''}
+                    {p.name}
+                  </div>
+                  <div className="mt-0.5 text-xs text-gray-600">
+                    <a href={`tel:${p.phone}`} className="text-cyan-700 hover:underline">
+                      {p.phone}
+                    </a>
+                    {' · '}
+                    <a href={`mailto:${p.email}`} className="text-cyan-700 hover:underline">
+                      {p.email}
+                    </a>
+                  </div>
+                  {p.message && (
+                    <p className="mt-1 whitespace-pre-wrap text-xs text-gray-600">{p.message}</p>
+                  )}
+                  <Link
+                    href={`/admin/upiti/${p.inquiryId}`}
+                    className="mt-1 inline-block text-xs font-medium text-cyan-700 hover:underline"
+                  >
+                    Otvori upit →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+
           {editing?.existingHoliday &&
             editing.blockStart &&
             editing.blockEnd &&
@@ -815,6 +877,7 @@ function dayCellClassName(p: {
   inMonth: boolean
   inPreviewRange: boolean
   holiday: boolean
+  hasParties: boolean
   isSessionDate: boolean
   hasWorkshops: boolean
   showLastRing: boolean
@@ -831,13 +894,16 @@ function dayCellClassName(p: {
     // The range-preview band overrides the base colors so the prospective
     // selection reads clearly while picking the second day.
     p.inMonth && p.inPreviewRange && 'border-cyan-300 bg-cyan-100 text-cyan-900',
-    p.inMonth && !p.inPreviewRange && !p.holiday && !p.isSessionDate && !p.hasWorkshops && 'border-gray-100 bg-white text-gray-600 hover:bg-gray-50',
-    p.inMonth && !p.inPreviewRange && !p.holiday && !p.isSessionDate && p.hasWorkshops && 'border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100',
-    p.inMonth && !p.inPreviewRange && !p.holiday && p.isSessionDate && 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
+    // A scheduled party colors the whole cell (fuchsia) and outranks
+    // session/workshop; a holiday still wins the background if they overlap.
+    p.inMonth && !p.inPreviewRange && !p.holiday && p.hasParties && 'border-fuchsia-300 bg-fuchsia-100 text-fuchsia-900 hover:bg-fuchsia-200',
+    p.inMonth && !p.inPreviewRange && !p.holiday && !p.hasParties && !p.isSessionDate && !p.hasWorkshops && 'border-gray-100 bg-white text-gray-600 hover:bg-gray-50',
+    p.inMonth && !p.inPreviewRange && !p.holiday && !p.hasParties && !p.isSessionDate && p.hasWorkshops && 'border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100',
+    p.inMonth && !p.inPreviewRange && !p.holiday && !p.hasParties && p.isSessionDate && 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100',
     p.inMonth && !p.inPreviewRange && p.holiday && 'border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200',
     p.showLastRing && 'ring-2 ring-inset ring-emerald-700',
     p.isToday && p.inMonth && !p.isRangeStart && !p.isPreviewEnd && 'ring-2 ring-inset ring-cyan-500',
-    p.weekday === 0 && p.inMonth && !p.inPreviewRange && !p.holiday && !p.hasWorkshops && 'text-gray-400',
+    p.weekday === 0 && p.inMonth && !p.inPreviewRange && !p.holiday && !p.hasParties && !p.hasWorkshops && 'text-gray-400',
     p.disabled && 'cursor-default',
   )
 }
@@ -847,6 +913,7 @@ function dayCellTitle(p: {
   showLastRing: boolean
   workshops: string[]
   markers: ModuleMarker[]
+  parties: PartyEvent[]
 }): string | undefined {
   return (
     [
@@ -854,6 +921,9 @@ function dayCellTitle(p: {
       p.showLastRing ? 'Zadnja radionica (28. po redu)' : '',
       ...p.workshops.map((w) => `Radionica: ${w}`),
       ...p.markers.map((m) => m.tooltip),
+      ...p.parties.map(
+        (pt) => `Proslava: ${pt.name}${pt.time ? ` u ${pt.time}` : ''} (${pt.phone})`,
+      ),
     ]
       .filter(Boolean)
       .join('\n') || undefined
@@ -888,7 +958,7 @@ function DayCell({
   onDoubleClick: () => void
   onMouseEnter: () => void
 }>) {
-  const { inMonth, isToday, isSessionDate, isLastSessionDate, holiday, markers, workshops, date, weekday } = cell
+  const { inMonth, isToday, isSessionDate, isLastSessionDate, holiday, markers, workshops, parties, date, weekday } = cell
 
   // Dedupe start/end markers by moduleIndex — multiple courses already merge
   // upstream, but a cell can still receive several markers from custom radionice.
@@ -896,6 +966,7 @@ function DayCell({
   const endBadges = uniqByIndex(markers.filter((m) => m.kind === 'end'))
   const showLastRing = isLastSessionDate && inMonth && !holiday
   const hasWorkshops = inMonth && workshops.length > 0
+  const hasParties = inMonth && parties.length > 0
   const holidayNameSuffix = holiday?.name ? `: ${holiday.name}` : ''
   const holidayTitle = holiday ? `Praznik${holidayNameSuffix}` : ''
 
@@ -912,11 +983,12 @@ function DayCell({
       data-range-start={isRangeStart ? 'true' : 'false'}
       data-session={isSessionDate ? 'true' : 'false'}
       data-last-session={isLastSessionDate ? 'true' : 'false'}
-      title={dayCellTitle({ holidayTitle, showLastRing, workshops, markers })}
+      title={dayCellTitle({ holidayTitle, showLastRing, workshops, markers, parties })}
       className={dayCellClassName({
         inMonth,
         inPreviewRange,
         holiday: !!holiday,
+        hasParties,
         isSessionDate,
         hasWorkshops,
         showLastRing,
@@ -951,7 +1023,27 @@ function DayCell({
         </div>
       )}
 
-      {hasWorkshops && (
+      {/* Party label sits at the bottom over the fuchsia cell; takes precedence
+          over workshop/holiday labels on the rare day they overlap. */}
+      {hasParties && (
+        <div
+          className="absolute inset-x-1 bottom-0.5 space-y-px text-[9px] font-semibold leading-tight text-fuchsia-900"
+          data-testid="party-labels"
+        >
+          {parties.map((p) => (
+            <span
+              key={p.inquiryId}
+              className="block truncate"
+              title={`Proslava: ${p.name}${p.time ? ` u ${p.time}` : ''}`}
+            >
+              🎉 {p.time ? `${p.time} ` : ''}
+              {p.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {hasWorkshops && !hasParties && (
         <div
           className={cn(
             'absolute inset-x-1 bottom-0.5 space-y-px text-[9px] font-medium leading-tight',
@@ -967,7 +1059,7 @@ function DayCell({
         </div>
       )}
 
-      {holiday?.name && inMonth && !hasWorkshops && (
+      {holiday?.name && inMonth && !hasWorkshops && !hasParties && (
         <span className="absolute inset-x-1 bottom-0.5 truncate text-[9px] font-medium leading-tight text-sky-800">
           {holiday.name}
         </span>
@@ -1045,6 +1137,10 @@ function CalendarLegend() {
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-3 w-3 rounded border border-sky-300 bg-sky-100" />{' '}
         Praznik
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block h-3 w-3 rounded border border-fuchsia-300 bg-fuchsia-100" />{' '}
+        Proslava
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-flex items-center gap-0.5 rounded-sm border border-emerald-400 bg-emerald-100 px-1 py-px text-[9px] font-semibold leading-none text-emerald-900">

@@ -27,6 +27,12 @@ enum InquiryStatus {
   NEW
   ACCOUNT_CREATED
   DECLINED
+  PARTY_SCHEDULED
+}
+
+enum InquiryType {
+  COURSE
+  PARTY
 }
 
 enum CommentType {
@@ -242,11 +248,14 @@ model TeacherAssignment {
 
 model Inquiry {
   id              String        @id @default(cuid())
+  type            InquiryType   @default(COURSE)
   parentName      String
   parentEmail     String
   parentPhone     String
-  childFirstName      String
-  childLastName       String
+  // Null for PARTY inquiries (no enrolling child); required for COURSE via the
+  // public inquiry Zod schema.
+  childFirstName      String?
+  childLastName       String?
   childDateOfBirth    String?
   childSchool         String?
   childGrade          String?
@@ -256,6 +265,11 @@ model Inquiry {
   scheduledGroupId String?
   message         String?       @db.Text
   referralSource  String?
+  // PARTY only: parent's optional preferred date from the public form.
+  partyProposedDate  DateTime?  @db.Date
+  // PARTY only: admin-agreed date + "HH:mm" start time, set when scheduling.
+  partyConfirmedDate DateTime?  @db.Date
+  partyStartTime     String?
   consentGivenAt  DateTime?
   status          InquiryStatus @default(NEW)
   schoolYear      String?
@@ -276,6 +290,7 @@ model Inquiry {
   @@index([courseId])
   @@index([studentId])
   @@index([schoolYear])
+  @@index([type, status])
 }
 
 

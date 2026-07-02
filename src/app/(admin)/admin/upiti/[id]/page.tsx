@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Check, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Check, RotateCcw, CalendarCheck, PartyPopper } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
 import {
   getInquiry,
@@ -10,18 +10,21 @@ import {
   getReturningStudentInfo,
 } from '@/actions/admin/inquiry'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
+import { InquiryTypeBadge } from '@/components/admin/inquiries/inquiry-type-badge'
 import { ReturningInquiryBadge } from '@/components/admin/inquiries/returning-inquiry-badge'
 import { DeclineDialog } from '@/components/admin/inquiries/decline-dialog'
 import { DeleteDialog } from '@/components/admin/inquiries/delete-dialog'
 import { SendScheduleDialog } from '@/components/admin/inquiries/send-schedule-dialog'
 import { CreateAccountDialog } from '@/components/admin/inquiries/create-account-dialog'
+import { SchedulePartyDialog } from '@/components/admin/inquiries/schedule-party-dialog'
 import {
   INQUIRY_STATUS_LABELS,
   COURSE_LEVEL_LABELS,
   STATUS_FLOW,
   GRADE_LABELS,
 } from '@/lib/inquiry-status'
-import { formatChildName } from '@/lib/format'
+import { formatChildName, formatDate } from '@/lib/format'
+import { toDateKey } from '@/lib/session-dates'
 
 export const metadata: Metadata = { title: 'Admin – Upit' }
 
@@ -92,6 +95,171 @@ function StatusTimeline({ currentStatus }: Readonly<{ currentStatus: string }>) 
   )
 }
 
+function formatDateTime(date: Date): string {
+  return `${date.toLocaleDateString('hr-HR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })} u ${date.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' })}`
+}
+
+/**
+ * Detail view for a PARTY (proslava) inquiry — a distinct layout from the
+ * course flow: no child/course/returning-student, and the primary action is
+ * "Dogovori termin" (schedule a date+time) rather than creating a student.
+ */
+function PartyInquiryDetail({
+  inquiry,
+}: Readonly<{ inquiry: NonNullable<Awaited<ReturnType<typeof getInquiry>>> }>) {
+  const isDeclined = inquiry.status === 'DECLINED'
+  const isScheduled = inquiry.status === 'PARTY_SCHEDULED'
+  const canDecline = !isDeclined && !isScheduled
+
+  const proposedIso = inquiry.partyProposedDate ? toDateKey(inquiry.partyProposedDate) : ''
+  const confirmedIso = inquiry.partyConfirmedDate ? toDateKey(inquiry.partyConfirmedDate) : ''
+  const proposedLabel = inquiry.partyProposedDate ? formatDate(inquiry.partyProposedDate) : null
+  const confirmedLabel = inquiry.partyConfirmedDate ? formatDate(inquiry.partyConfirmedDate) : null
+
+  return (
+    <div className="max-w-3xl">
+      <div className="flex items-center gap-3 mb-6">
+        <Link
+          href="/admin/upiti"
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Natrag na upite
+        </Link>
+      </div>
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <PartyPopper className="w-6 h-6 text-fuchsia-500" />
+            Upit za proslavu
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">Upit primljen {formatDateTime(inquiry.createdAt)}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <InquiryTypeBadge type={inquiry.type} className="text-sm px-3 py-1" />
+          <InquiryStatusBadge status={inquiry.status} className="text-sm px-3 py-1" />
+        </div>
+      </div>
+
+      {/* Scheduled / declined banner */}
+      {isScheduled && confirmedLabel && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-6">
+          <div className="flex items-start gap-3">
+            <CalendarCheck className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+            <div>
+              <h2 className="text-sm font-semibold text-emerald-900">Termin dogovoren</h2>
+              <p className="text-sm text-emerald-800 mt-1">
+                Proslava je zakazana za <strong>{confirmedLabel}</strong>
+                {inquiry.partyStartTime ? (
+                  <>
+                    {' '}
+                    u <strong>{inquiry.partyStartTime}</strong>
+                  </>
+                ) : null}
+                . Prikazuje se u kalendaru školske godine.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {isDeclined && (
+        <div className="bg-white rounded-xl border p-6 mb-6">
+          <p className="text-sm text-red-600 font-medium">Upit je odbijen.</p>
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-red-700">
+              Razlog odbijanja
+            </div>
+            {inquiry.declineReason ? (
+              <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{inquiry.declineReason}</p>
+            ) : (
+              <p className="mt-1 text-sm italic text-gray-500">Razlog nije zabilježen.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Parent info */}
+      <div className="bg-white rounded-xl border p-6 mb-6">
+        <h2 className="text-sm font-semibold text-gray-700 mb-2">Podaci o roditelju</h2>
+        <dl>
+          <DetailRow label="Ime i prezime" value={inquiry.parentName} />
+          <DetailRow
+            label="E-mail"
+            value={
+              <a href={`mailto:${inquiry.parentEmail}`} className="text-cyan-700 hover:underline">
+                {inquiry.parentEmail}
+              </a>
+            }
+          />
+          <DetailRow
+            label="Telefon"
+            value={
+              <a href={`tel:${inquiry.parentPhone}`} className="text-cyan-700 hover:underline">
+                {inquiry.parentPhone}
+              </a>
+            }
+          />
+        </dl>
+      </div>
+
+      {/* Party details */}
+      <div className="bg-white rounded-xl border p-6 mb-6">
+        <h2 className="text-sm font-semibold text-gray-700 mb-2">Detalji proslave</h2>
+        <dl>
+          <DetailRow
+            label="Predloženi datum"
+            value={proposedLabel ?? <span className="text-gray-400 italic">Nije naveden</span>}
+          />
+          {isScheduled && (
+            <DetailRow
+              label="Dogovoreni termin"
+              value={
+                confirmedLabel
+                  ? `${confirmedLabel}${inquiry.partyStartTime ? ` u ${inquiry.partyStartTime}` : ''}`
+                  : '–'
+              }
+            />
+          )}
+          <DetailRow
+            label="Poruka"
+            value={inquiry.message || <span className="text-gray-400 italic">Nije navedena</span>}
+          />
+          <DetailRow
+            label="Pristanak (GDPR)"
+            value={
+              inquiry.consentGivenAt ? (
+                `Dan ${formatDateTime(inquiry.consentGivenAt)}`
+              ) : (
+                <span className="text-gray-400 italic">Nije zabilježen</span>
+              )
+            }
+          />
+        </dl>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {!isDeclined && (
+          <SchedulePartyDialog
+            inquiryId={inquiry.id}
+            initialDate={confirmedIso || proposedIso}
+            initialTime={inquiry.partyStartTime ?? ''}
+            isRescheduling={isScheduled}
+          />
+        )}
+        {canDecline && <DeclineDialog inquiryId={inquiry.id} childName={inquiry.parentName} />}
+        <DeleteDialog inquiryId={inquiry.id} childName={inquiry.parentName} />
+      </div>
+    </div>
+  )
+}
+
 export default async function InquiryDetailPage({ params }: Readonly<PageProps>) {
   await requireAdmin()
 
@@ -99,6 +267,10 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   const inquiry = await getInquiry(id)
 
   if (!inquiry) notFound()
+
+  if (inquiry.type === 'PARTY') {
+    return <PartyInquiryDetail inquiry={inquiry} />
+  }
 
   const isDeclined = inquiry.status === 'DECLINED'
   const isAccountCreated = inquiry.status === 'ACCOUNT_CREATED'
@@ -154,8 +326,8 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   // Returning-student detection: a child (name + DOB) already in the system,
   // other than the account this inquiry itself created.
   const returningStudent = await getReturningStudentInfo({
-    firstName: inquiry.childFirstName,
-    lastName: inquiry.childLastName,
+    firstName: inquiry.childFirstName ?? '',
+    lastName: inquiry.childLastName ?? '',
     dateOfBirth: inquiry.childDateOfBirth,
     excludeStudentId: inquiry.studentId,
   })

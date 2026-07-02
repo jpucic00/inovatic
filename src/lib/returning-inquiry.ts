@@ -2,8 +2,10 @@ import { db } from '@/lib/db'
 import { studentIdentityWhere, identityKey } from '@/lib/student-match'
 
 type ReturningFlaggable = {
-  childFirstName: string
-  childLastName: string
+  // Nullable since PARTY inquiries carry no child. Such rows have no DOB either,
+  // so identity matching below short-circuits to `isReturning: false`.
+  childFirstName: string | null
+  childLastName: string | null
   childDateOfBirth: string | null
   studentId: string | null
 }
@@ -24,8 +26,8 @@ export async function flagReturningInquiries<T extends ReturningFlaggable>(
   const orClauses = rows
     .map((r) =>
       studentIdentityWhere({
-        firstName: r.childFirstName,
-        lastName: r.childLastName,
+        firstName: r.childFirstName ?? '',
+        lastName: r.childLastName ?? '',
         dateOfBirth: r.childDateOfBirth,
       }),
     )
@@ -44,7 +46,7 @@ export async function flagReturningInquiries<T extends ReturningFlaggable>(
   }
 
   return rows.map((r) => {
-    const key = identityKey(r.childFirstName, r.childLastName, r.childDateOfBirth)
+    const key = identityKey(r.childFirstName ?? '', r.childLastName ?? '', r.childDateOfBirth)
     const matchedId = key ? matchByKey.get(key) : undefined
     return { ...r, isReturning: !!matchedId && matchedId !== r.studentId }
   })

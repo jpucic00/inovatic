@@ -19,25 +19,28 @@ interface InquiryFiltersProps {
   currentSearch: string
   currentCourse: string
   currentGrade: string
+  currentType: string
   courses: { id: string; title: string }[]
 }
 
-export function InquiryFilters({ currentStatus, currentSearch, currentCourse, currentGrade, courses }: Readonly<InquiryFiltersProps>) {
+export function InquiryFilters({ currentStatus, currentSearch, currentCourse, currentGrade, currentType, courses }: Readonly<InquiryFiltersProps>) {
   const router = useRouter()
   const pathname = usePathname()
   const [, startTransition] = useTransition()
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const pushUrl = (params: { status?: string; search?: string; course?: string; grade?: string }) => {
+  const pushUrl = (params: { status?: string; search?: string; course?: string; grade?: string; type?: string }) => {
     const sp = new URLSearchParams()
     const s = params.status ?? currentStatus
     const q = params.search ?? currentSearch
     const c = params.course ?? currentCourse
     const g = params.grade ?? currentGrade
+    const t = params.type ?? currentType
     if (s && s !== 'ALL') sp.set('status', s)
     if (q) sp.set('search', q)
     if (c) sp.set('course', c)
     if (g) sp.set('grade', g)
+    if (t && t !== 'ALL') sp.set('type', t)
     // Always reset to page 1 when filters change
     startTransition(() => {
       router.push(`${pathname}?${sp.toString()}`)
@@ -51,6 +54,16 @@ export function InquiryFilters({ currentStatus, currentSearch, currentCourse, cu
 
   return (
     <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <select
+        value={currentType || 'ALL'}
+        onChange={(e) => pushUrl({ type: e.target.value })}
+        className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+      >
+        <option value="ALL">Sve vrste</option>
+        <option value="COURSE">Upisi</option>
+        <option value="PARTY">Proslave</option>
+      </select>
+
       <select
         value={currentCourse}
         onChange={(e) => pushUrl({ course: e.target.value })}

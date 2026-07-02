@@ -33,3 +33,30 @@ const step3Schema = z.object({
 export const inquirySchema = step1Schema.merge(step2Schema).merge(step3Schema)
 
 export type InquiryFormData = z.infer<typeof inquirySchema>
+
+// ── Party (proslava) sign-up ────────────────────────────────────────────────
+// Standalone schema for the /proslave booking form. It has no child/course and
+// captures the parent's first/last name separately (combined into
+// Inquiry.parentName on submit) plus an optional preferred date. `message` is
+// the parent's inquiry text and is required here (unlike the course flow, it is
+// the primary content of a party booking).
+export const partyInquirySchema = z.object({
+  parentFirstName: z.string().trim().min(2, 'Unesite ime (najmanje 2 znaka)'),
+  parentLastName: z.string().trim().min(2, 'Unesite prezime (najmanje 2 znaka)'),
+  parentPhone: z.string().trim().min(9, 'Unesite valjani broj telefona'),
+  parentEmail: z.string().trim().email('Unesite valjanu email adresu'),
+  message: z
+    .string()
+    .trim()
+    .min(5, 'Unesite poruku (najmanje 5 znakova)')
+    .max(1000, 'Poruka može imati najviše 1000 znakova'),
+  // Optional preferred date. DateInput emits 'YYYY-MM-DD' or '' when cleared.
+  partyProposedDate: z
+    .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Neispravan datum'), z.literal('')])
+    .optional(),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: 'Morate pristati na obradu osobnih podataka.' }),
+  }),
+})
+
+export type PartyInquiryFormData = z.infer<typeof partyInquirySchema>

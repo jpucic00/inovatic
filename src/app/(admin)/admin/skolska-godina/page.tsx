@@ -1,11 +1,16 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { PartyPopper } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 import { listHolidays } from '@/actions/admin/holidays'
+import { getScheduledParties } from '@/actions/admin/inquiry'
 import { toDateKey } from '@/lib/session-dates'
+import { formatDateKey } from '@/lib/format'
+import type { PartyEvent } from '@/lib/school-year-planner'
 import { HolidayImportDialog } from '@/components/admin/school-year/holiday-import-dialog'
 import {
   SchoolYearPlannerView,
@@ -29,7 +34,7 @@ export default async function SchoolYearPage() {
   // labels (radionice groups whose [dateStart, dateEnd] range covers the day).
   // Standard ScheduledGroups are NOT a calendar input — they only matter for
   // attendance and the per-group teacher panel.
-  const [holidays, standardCoursesRaw, customCoursesRaw, radionicaGroupsRaw] = await Promise.all([
+  const [holidays, standardCoursesRaw, customCoursesRaw, radionicaGroupsRaw, scheduledPartiesRaw] = await Promise.all([
     listHolidays(schoolYear),
     db.course.findMany({
       where: { isCustom: false },
@@ -91,6 +96,7 @@ export default async function SchoolYearPage() {
       },
       orderBy: { dateStart: 'asc' },
     }),
+    getScheduledParties(schoolYear),
   ])
 
   function toCourseInput(
@@ -123,6 +129,18 @@ export default async function SchoolYearPage() {
     courseTitle: g.course.title,
   }))
 
+  const partyEvents: PartyEvent[] = scheduledPartiesRaw
+    .filter((p) => p.partyConfirmedDate !== null)
+    .map((p) => ({
+      date: toDateKey(p.partyConfirmedDate as Date),
+      time: p.partyStartTime,
+      name: p.parentName,
+      phone: p.parentPhone,
+      email: p.parentEmail,
+      message: p.message,
+      inquiryId: p.id,
+    }))
+
   const hasAnyModuleDate = standardCourses.some((c) =>
     c.modules.some((m) => m.startDateKey || m.endDateKey),
   )
@@ -146,6 +164,11 @@ export default async function SchoolYearPage() {
           <span className="rounded-md bg-gray-100 px-2.5 py-1">
             Praznika: <strong className="text-gray-900">{holidayCount}</strong>
           </span>
+          {partyEvents.length > 0 && (
+            <span className="rounded-md bg-fuchsia-50 px-2.5 py-1 text-fuchsia-800">
+              Proslava: <strong>{partyEvents.length}</strong>
+            </span>
+          )}
         </div>
       </header>
 
@@ -159,8 +182,38 @@ export default async function SchoolYearPage() {
         standardCourses={standardCourses}
         customCourses={customCourses}
         radionicaGroups={radionicaGroups}
+        partyEvents={partyEvents}
         hasAnyModuleDate={hasAnyModuleDate}
       />
+
+      {partyEvents.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+            <PartyPopper className="w-4 h-4 text-fuchsia-500" />
+            Proslave — {schoolYear}
+          </h2>
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white divide-y">
+            {partyEvents.map((p) => (
+              <Link
+                key={p.inquiryId}
+                href={`/admin/upiti/${p.inquiryId}`}
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-gray-50 transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">
+                    {formatDateKey(p.date)}
+                    {p.time ? ` u ${p.time}` : ''}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {p.name} · {p.phone}
+                  </p>
+                </div>
+                <span className="text-sm text-cyan-600 shrink-0">Otvori upit →</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

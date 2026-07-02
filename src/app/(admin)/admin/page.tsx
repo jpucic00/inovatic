@@ -37,6 +37,7 @@ export default async function AdminDashboard() {
       take: 5,
       select: {
         id: true,
+        type: true,
         parentName: true,
         childFirstName: true,
         childLastName: true,
@@ -131,7 +132,9 @@ export default async function AdminDashboard() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {inquiry.childFirstName} {inquiry.childLastName}
+                        {inquiry.type === 'PARTY'
+                          ? 'Proslava rođendana'
+                          : `${inquiry.childFirstName ?? ''} ${inquiry.childLastName ?? ''}`.trim()}
                       </p>
                       {inquiry.isReturning && <ReturningInquiryBadge />}
                     </div>

@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight, Users, Clock, Star, Phone, Mail, Euro } from 'lucide-react'
+import { ArrowRight, Users, Clock, Star, Phone, Euro } from 'lucide-react'
 import { PartyRobotSvg } from '@/components/shared/party-robot-svg'
 import { GearDecor } from '@/components/shared/decorations'
 import { HeroCarousel } from '@/components/shared/hero-carousel'
+import { PartyInquiryForm } from '@/components/public/party-inquiry-form'
+import { SmoothScrollLink } from '@/components/shared/smooth-scroll-link'
 
 export const metadata: Metadata = {
   title: 'Proslave',
@@ -68,12 +70,12 @@ export default function CelebrationsPage() {
             Djeca grade i programiraju LEGO robote uz iskusnog robo trenera.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-            <a
-              href="mailto:info@udruga-inovatic.hr?subject=Proslava%20ro%C4%91endana"
+            <SmoothScrollLink
+              targetId="upit"
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-yellow-400 text-gray-900 font-bold rounded-xl hover:bg-yellow-300 transition-colors shadow-md text-base"
             >
               Zatraži ponudu <ArrowRight className="w-4 h-4" />
-            </a>
+            </SmoothScrollLink>
             <a
               href="tel:+385993936993"
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white/15 text-white font-semibold rounded-xl border-2 border-white/30 hover:bg-white/25 hover:border-white/50 transition-colors text-base backdrop-blur-sm"
@@ -165,31 +167,32 @@ export default function CelebrationsPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-14 px-4 bg-yellow-50 border-t border-yellow-100 relative overflow-hidden">
+      {/* Sign-up form */}
+      <section id="upit" className="scroll-mt-20 py-14 px-4 bg-yellow-50 border-t border-yellow-100 relative overflow-hidden">
         <div className="absolute right-0 bottom-0 opacity-5 pointer-events-none">
           <PartyRobotSvg className="w-48 translate-x-6 translate-y-6" />
         </div>
-        <div className="container mx-auto max-w-xl text-center relative">
-          <div className="text-4xl mb-4">🎉</div>
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-4">Zanima vas proslava?</h2>
-          <p className="text-gray-500 mb-6">
-            Pišite nam za slobodne termine i cijeniku. Odgovaramo brzo!
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a
-              href="mailto:info@udruga-inovatic.hr?subject=Proslava%20ro%C4%91endana"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-yellow-400 text-gray-900 font-bold rounded-xl hover:bg-yellow-300 transition-colors shadow-sm"
-            >
-              <Mail className="w-4 h-4" /> Pišite nam email
-            </a>
-            <Link
-              href="/kontakt"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 font-semibold rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
-            >
-              Kontakt informacije <ArrowRight className="w-4 h-4" />
-            </Link>
+        <div className="container mx-auto max-w-xl relative">
+          <div className="text-center mb-8">
+            <div className="text-4xl mb-4">🎉</div>
+            <h2 className="text-2xl font-extrabold text-gray-900 mb-3">Zanima vas proslava?</h2>
+            <p className="text-gray-500">
+              Ostavite upit i javit ćemo vam se s dostupnim terminima. Odgovaramo brzo!
+            </p>
           </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
+            <PartyInquiryForm />
+          </div>
+          <p className="text-center text-sm text-gray-500 mt-6">
+            Radije biste nazvali?{' '}
+            <a href="tel:+385993936993" className="text-cyan-600 font-medium hover:underline">
+              099 393 6993
+            </a>{' '}
+            ·{' '}
+            <Link href="/kontakt" className="text-cyan-600 font-medium hover:underline">
+              Kontakt informacije
+            </Link>
+          </p>
         </div>
       </section>
     </>
