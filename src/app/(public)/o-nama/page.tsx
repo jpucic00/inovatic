@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight, Trophy, Users, MapPin, BookOpen, Award } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Trophy, Users, MapPin, BookOpen, Award } from 'lucide-react'
 import { GearDecor } from '@/components/shared/decorations'
 
 export const metadata: Metadata = {
@@ -38,27 +38,32 @@ const competitions = [
     name: 'FIRST LEGO League (FLL)',
     description: 'Globalno natjecanje u robotici i inovacijama za djecu i mlade.',
     icon: Trophy,
+    url: 'https://www.firstlegoleague.org/',
   },
   {
     name: 'World Robot Olympiad (WRO)',
     description: 'Jedno od najprestižnijih robotičkih natjecanja na svijetu. Naš tim CroSpec osvoji srebro 2025. u Singapuru.',
     icon: Award,
     highlight: true,
+    url: 'https://wro-association.org/',
   },
   {
     name: 'Croatian Makers League',
     description: 'Hrvatsko natjecanje za mlade robotičare i makere.',
     icon: Trophy,
+    url: 'https://croatianmakers.hr/',
   },
   {
     name: 'Natjecanje mladih tehničara (NMT)',
     description: 'Nacionalno natjecanje u tehničkoj kulturi i robotici.',
     icon: Trophy,
+    url: 'https://www.hztk.hr/',
   },
   {
     name: 'RoboCup',
     description: 'Međunarodno natjecanje u autonomnoj robotici.',
     icon: Trophy,
+    url: 'https://www.robocup.org/',
   },
 ]
 
@@ -74,9 +79,9 @@ const trainers = [
 ]
 
 const memberships = [
-  { name: 'ZTK Split', full: 'Zajednica tehničke kulture Splita' },
-  { name: 'HZTK', full: 'Hrvatska zajednica tehničke kulture' },
-  { name: 'HROBOS', full: 'Hrvatska robotička zajednica' },
+  { name: 'ZTK Split', full: 'Zajednica tehničke kulture Splita', url: 'http://www.ztk-split.hr/' },
+  { name: 'HZTK', full: 'Hrvatska zajednica tehničke kulture', url: 'https://www.hztk.hr/' },
+  { name: 'HROBOS', full: 'Hrvatska robotička zajednica', url: 'https://hrobos.hr/' },
 ]
 
 const statCards = [
@@ -201,12 +206,15 @@ export default function AboutPage() {
           </div>
           <div className="space-y-4">
             {competitions.map((comp) => (
-              <div
+              <a
                 key={comp.name}
-                className={`flex gap-4 p-5 rounded-xl border transition-colors ${
+                href={comp.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`group flex gap-4 p-5 rounded-xl border transition-all hover:shadow-md ${
                   comp.highlight
-                    ? 'bg-yellow-50 border-yellow-200'
-                    : 'bg-cyan-50 border-cyan-100'
+                    ? 'bg-yellow-50 border-yellow-200 hover:border-yellow-400 hover:shadow-yellow-100'
+                    : 'bg-cyan-50 border-cyan-100 hover:border-cyan-300 hover:shadow-cyan-100'
                 }`}
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -214,8 +222,11 @@ export default function AboutPage() {
                 }`}>
                   <comp.icon className={`w-5 h-5 ${comp.highlight ? 'text-gray-900' : 'text-cyan-600'}`} />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-0.5">{comp.name}</h3>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900 mb-0.5 inline-flex items-center gap-1.5 group-hover:text-cyan-600 transition-colors">
+                    {comp.name}
+                    <ArrowUpRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                  </h3>
                   <p className="text-sm text-gray-600">{comp.description}</p>
                   {comp.highlight && (
                     <span className="inline-block mt-2 text-xs font-bold text-yellow-800 bg-yellow-200 px-2.5 py-0.5 rounded-full">
@@ -223,7 +234,7 @@ export default function AboutPage() {
                     </span>
                   )}
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         </div>
@@ -235,10 +246,19 @@ export default function AboutPage() {
           <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Članstvo u organizacijama</h2>
           <div className="flex flex-wrap justify-center gap-4">
             {memberships.map((m) => (
-              <div key={m.name} className="bg-yellow-50 rounded-xl px-5 py-3 border border-yellow-200 shadow-sm text-center">
-                <div className="font-bold text-cyan-600 text-sm">{m.name}</div>
+              <a
+                key={m.name}
+                href={m.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-yellow-50 rounded-xl px-5 py-3 border border-yellow-200 shadow-sm text-center transition-all hover:border-yellow-400 hover:shadow-md"
+              >
+                <div className="font-bold text-cyan-600 text-sm inline-flex items-center gap-1 group-hover:text-cyan-700 transition-colors">
+                  {m.name}
+                  <ArrowUpRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-cyan-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                </div>
                 <div className="text-xs text-gray-500 mt-0.5">{m.full}</div>
-              </div>
+              </a>
             ))}
           </div>
           <p className="text-center text-xs text-gray-400 mt-5">
