@@ -23,7 +23,7 @@ export async function createLocation(data: CreateLocationInput): Promise<AdminAc
   const parsed = createLocationSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
-  const { name, address, phone, email, lat, lng } = parsed.data
+  const { name, address, phone, email } = parsed.data
 
   try {
     await db.location.create({
@@ -32,8 +32,6 @@ export async function createLocation(data: CreateLocationInput): Promise<AdminAc
         address,
         phone: phone || null,
         email: email || null,
-        lat: lat ?? null,
-        lng: lng ?? null,
       },
     })
   } catch (err) {

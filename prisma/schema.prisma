@@ -67,7 +67,6 @@ model User {
   role          UserRole
   username      String?   @unique
   plainPassword String?
-  emailVerified DateTime?
   parentName    String?
   parentEmail   String?
   parentPhone   String?
@@ -100,8 +99,6 @@ model Course {
   ageMax      Int
   equipment   String?
   price       Float?
-  priceYear   Decimal?     @db.Decimal(10, 2)
-  priceModule Decimal?     @db.Decimal(10, 2)
   imageUrl    String?
   sortOrder   Int          @default(0)
   isCustom    Boolean      @default(false)
@@ -197,8 +194,6 @@ model Location {
   id       String  @id @default(cuid())
   name     String
   address  String
-  lat      Float?
-  lng      Float?
   phone    String?
   email    String?
 
@@ -259,8 +254,6 @@ model Inquiry {
   childDateOfBirth    String?
   childSchool         String?
   childGrade          String?
-  courseLevelPref CourseLevel?
-  locationPref    String?
   courseId        String?
   scheduledGroupId String?
   message         String?       @db.Text

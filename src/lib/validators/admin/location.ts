@@ -5,8 +5,6 @@ export const createLocationSchema = z.object({
   address: z.string().min(5, 'Adresa mora imati najmanje 5 znakova'),
   phone: z.string().optional().or(z.literal('')),
   email: z.string().email('Neispravna email adresa').optional().or(z.literal('')),
-  lat: z.coerce.number().optional(),
-  lng: z.coerce.number().optional(),
 })
 
 export type CreateLocationInput = z.infer<typeof createLocationSchema>

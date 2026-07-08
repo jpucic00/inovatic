@@ -107,7 +107,6 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
           parentName,
           childName: `${childFirstName} ${childLastName}`,
           childDateOfBirth,
-          courseLevelPref: undefined,
         }),
       })
     }

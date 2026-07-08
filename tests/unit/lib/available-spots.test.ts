@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAvailableSpots } from '@/lib/available-spots'
+import { computeAvailableSpots } from '@/lib/group-capacity'
 
 describe('computeAvailableSpots', () => {
   it('returns capacity when nothing is enrolled', () => {

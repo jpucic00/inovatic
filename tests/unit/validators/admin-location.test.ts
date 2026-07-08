@@ -16,11 +16,8 @@ describe('createLocationSchema', () => {
       address: 'Splitska 1',
       phone: '021123456',
       email: 'info@example.com',
-      lat: '43.5',
-      lng: '16.4',
     })
-    expect(result.lat).toBe(43.5)
-    expect(result.lng).toBe(16.4)
+    expect(result.name).toBe('Centar')
   })
 
   it('accepts empty-string phone and email', () => {

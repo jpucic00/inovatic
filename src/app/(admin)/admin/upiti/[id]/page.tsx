@@ -19,7 +19,6 @@ import { CreateAccountDialog } from '@/components/admin/inquiries/create-account
 import { SchedulePartyDialog } from '@/components/admin/inquiries/schedule-party-dialog'
 import {
   INQUIRY_STATUS_LABELS,
-  COURSE_LEVEL_LABELS,
   STATUS_FLOW,
   GRADE_LABELS,
 } from '@/lib/inquiry-status'
@@ -348,14 +347,9 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
       })
     : <span className="text-gray-400 italic">Nije navedeno</span>
 
-  let preferredProgram: React.ReactNode
-  if (inquiry.course) {
-    preferredProgram = inquiry.course.title
-  } else if (inquiry.courseLevelPref) {
-    preferredProgram = COURSE_LEVEL_LABELS[inquiry.courseLevelPref] ?? inquiry.courseLevelPref
-  } else {
-    preferredProgram = <span className="text-gray-400 italic">Nije navedeno</span>
-  }
+  const preferredProgram: React.ReactNode = inquiry.course
+    ? inquiry.course.title
+    : <span className="text-gray-400 italic">Nije navedeno</span>
 
   return (
     <div className="max-w-3xl">
@@ -566,12 +560,6 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
               />
             )
           })()}
-          {!inquiry.scheduledGroup && (
-            <DetailRow
-              label="Željena lokacija"
-              value={inquiry.locationPref || <span className="text-gray-400 italic">Nije navedeno</span>}
-            />
-          )}
           <DetailRow
             label="Poruka"
             value={

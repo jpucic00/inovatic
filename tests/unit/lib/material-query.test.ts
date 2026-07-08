@@ -12,7 +12,7 @@ describe('buildEffectiveMaterialsWhere', () => {
     const where = buildEffectiveMaterialsWhere({
       scheduledGroupId: 'g1',
       courseId: 'c1',
-      courseIsCustom: false,
+
       moduleIds: ['m1', 'm2'],
     })
     const branches = scopeBranches(where)
@@ -25,7 +25,7 @@ describe('buildEffectiveMaterialsWhere', () => {
     const where = buildEffectiveMaterialsWhere({
       scheduledGroupId: 'g1',
       courseId: 'c1',
-      courseIsCustom: true,
+
       moduleIds: [],
     })
     const branches = scopeBranches(where)
@@ -37,7 +37,7 @@ describe('buildEffectiveMaterialsWhere', () => {
     const where = buildEffectiveMaterialsWhere({
       scheduledGroupId: 'g1',
       courseId: 'c1',
-      courseIsCustom: false,
+
       moduleIds: [],
     })
     const and = where.AND as Prisma.MaterialWhereInput[]

@@ -7,7 +7,6 @@ import type { Prisma } from '@prisma/client'
 type MaterialScopeContext = {
   scheduledGroupId: string
   courseId: string
-  courseIsCustom: boolean
   moduleIds: string[]
 }
 

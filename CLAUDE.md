@@ -3,7 +3,7 @@
 Website for Udruga za robotiku "Inovatic" (Robotics Association), Split, Croatia. Teaches kids ages 6-14 STEM/robotics through LEGO Spike courses (SLR 1-4).
 
 ## Tech Stack
-Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + PostgreSQL (Neon) + Auth.js v5 + Cloudinary (EU) + Resend + React Email + Zod + next-intl + BlockNote (admin editor only) + Playwright + Vitest (unit + integration tiers)
+Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + PostgreSQL (Neon) + Auth.js v5 + Cloudinary (EU) + Resend + React Email + Zod + BlockNote (admin editor only) + Playwright + Vitest (unit + integration tiers)
 
 ## Project Structure
 - Route groups: `(public)`, `(admin)`, `(teacher)`, `(portal)`, `(auth)`

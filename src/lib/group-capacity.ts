@@ -1,12 +1,15 @@
 import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
-import { computeAvailableSpots } from '@/lib/available-spots'
 import {
   getActiveModuleForGroup,
   getGroupModuleArc,
 } from '@/lib/group-module-arc'
 import { computeSchoolYear } from '@/lib/school-year'
 import { toDateKey } from '@/lib/session-dates'
+
+export function computeAvailableSpots(capacity: number, activeEnrollments: number): number {
+  return Math.max(0, capacity - activeEnrollments)
+}
 
 export class GroupFullError extends Error {
   constructor() {
@@ -128,10 +131,8 @@ export function computeGroupCapacity(
   }
 
   const reservedInquiriesCount = group._count.preferredInquiries
-  const availableSpots = computeAvailableSpots(
-    group.maxStudents,
-    enrolledCount + reservedInquiriesCount,
-  )
+  // Only NEW inquiries reserve a spot — DECLINED and ACCOUNT_CREATED do not.
+  const availableSpots = Math.max(0, group.maxStudents - enrolledCount - reservedInquiriesCount)
   return {
     enrolledCount,
     reservedInquiriesCount,

@@ -412,6 +412,10 @@ describe('group pickers — scope by selected school year', () => {
     const radionica = await createCourse({ isCustom: true })
     const currentYear = computeSchoolYear()
     const futureYear = getNextSchoolYear(currentYear)
+    // Register all years used as cookies so getSelectedSchoolYear passes validation.
+    await db.schoolYear.upsert({ where: { label: currentYear }, create: { label: currentYear }, update: {} })
+    await db.schoolYear.upsert({ where: { label: futureYear }, create: { label: futureYear }, update: {} })
+    await db.schoolYear.upsert({ where: { label: '2024/2025' }, create: { label: '2024/2025' }, update: {} })
     const archivedGroup = await createGroup({
       courseId: radionica.id,
       schoolYear: '2024/2025',
@@ -444,6 +448,8 @@ describe('group pickers — scope by selected school year', () => {
     const radionica = await createCourse({ isCustom: true })
     const currentYear = computeSchoolYear()
     const futureYear = getNextSchoolYear(currentYear)
+    await db.schoolYear.upsert({ where: { label: currentYear }, create: { label: currentYear }, update: {} })
+    await db.schoolYear.upsert({ where: { label: futureYear }, create: { label: futureYear }, update: {} })
     const currentGroup = await createGroup({
       courseId: radionica.id,
       schoolYear: currentYear,

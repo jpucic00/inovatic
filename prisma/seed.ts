@@ -1331,8 +1331,6 @@ async function main() {
     data: {
       name: 'Velebitska 32',
       address: 'Velebitska 32, 21000 Split',
-      lat: 43.5111,
-      lng: 16.4497,
     },
   })
 
@@ -1340,8 +1338,6 @@ async function main() {
     data: {
       name: 'Ruđera Boškovića 33',
       address: 'Ruđera Boškovića 33, 21000 Split',
-      lat: 43.5089,
-      lng: 16.4511,
     },
   })
   console.log('✅ Locations created')
@@ -1361,8 +1357,7 @@ Godišnji program obuhvaća 4 modula, ukupno 56 školskih sati.`,
       ageMin: 6,
       ageMax: 8,
       equipment: 'LEGO WeDo 2.0',
-      priceYear: 400.0,
-      priceModule: 110.0,
+
       sortOrder: 1,
       modules: {
         create: [
@@ -1388,8 +1383,7 @@ Program uključuje složenije konstrukcije i uvod u algoritamsko razmišljanje.`
       ageMin: 9,
       ageMax: 10,
       equipment: 'LEGO Spike Essential',
-      priceYear: 400.0,
-      priceModule: 110.0,
+
       sortOrder: 2,
       modules: {
         create: [
@@ -1415,8 +1409,7 @@ LEGO Spike Prime omogućuje preciznije motore, više vrsta senzora i programiran
       ageMin: 11,
       ageMax: 12,
       equipment: 'LEGO Spike Prime',
-      priceYear: 400.0,
-      priceModule: 110.0,
+
       sortOrder: 3,
       modules: {
         create: [
@@ -1442,8 +1435,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
       ageMin: 13,
       ageMax: 14,
       equipment: 'LEGO Spike Prime (Scratch)',
-      priceYear: 400.0,
-      priceModule: 110.0,
+
       sortOrder: 4,
       modules: {
         create: [

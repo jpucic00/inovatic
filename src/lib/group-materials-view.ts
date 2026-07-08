@@ -203,7 +203,6 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
     where: buildEffectiveMaterialsWhere({
       scheduledGroupId: group.id,
       courseId: group.course.id,
-      courseIsCustom: isCustom,
       moduleIds: visibleModuleIds,
     }),
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],

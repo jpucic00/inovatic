@@ -473,13 +473,14 @@ type InquiryEmailContext = {
   parentEmail: string
 }
 
-async function sendInquiryCredentialsEmail(
-  inquiry: InquiryEmailContext,
+async function sendStudentCredentialsEmail(
+  to: string,
+  parentName: string,
+  childName: string,
   core: CoreResult,
 ): Promise<void> {
   if (!process.env.RESEND_API_KEY || !core.group) return
 
-  const childName = `${inquiry.childFirstName ?? ''} ${inquiry.childLastName ?? ''}`.trim()
   const schedule = formatGroupSchedule({
     isCustom: core.group.course.isCustom,
     dayOfWeek: core.group.dayOfWeek,
@@ -492,10 +493,10 @@ async function sendInquiryCredentialsEmail(
   await resend.emails.send({
     from: FROM_EMAIL,
     replyTo: REPLY_TO,
-    to: inquiry.parentEmail,
+    to,
     subject: `Pristupni podaci za ${childName} – Inovatic`,
     react: AccountCredentialsEmail({
-      parentName: inquiry.parentName,
+      parentName,
       childName,
       username: core.user.username ?? '',
       password: core.password,
@@ -504,6 +505,14 @@ async function sendInquiryCredentialsEmail(
       locationName: core.group.location.name,
     }),
   })
+}
+
+async function sendInquiryCredentialsEmail(
+  inquiry: InquiryEmailContext,
+  core: CoreResult,
+): Promise<void> {
+  const childName = `${inquiry.childFirstName ?? ''} ${inquiry.childLastName ?? ''}`.trim()
+  await sendStudentCredentialsEmail(inquiry.parentEmail, inquiry.parentName, childName, core)
 }
 
 export async function createStudentManually(
@@ -553,38 +562,10 @@ export async function createStudentManually(
   // swallowed-and-flagged rather than surfaced as a creation failure.
   let emailFailed = false
   const parentEmail = data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null
-  if (
-    !core.isExisting &&
-    parentEmail &&
-    core.group &&
-    process.env.RESEND_API_KEY
-  ) {
+  if (!core.isExisting && parentEmail && core.group) {
     try {
       const childName = `${data.firstName} ${data.lastName}`.trim()
-      const schedule = formatGroupSchedule({
-        isCustom: core.group.course.isCustom,
-        dayOfWeek: core.group.dayOfWeek,
-        dateStart: core.group.dateStart,
-        dateEnd: core.group.dateEnd,
-        startTime: core.group.startTime,
-        endTime: core.group.endTime,
-      })
-
-      await resend.emails.send({
-        from: FROM_EMAIL,
-        replyTo: REPLY_TO,
-        to: parentEmail,
-        subject: `Pristupni podaci za ${childName} – Inovatic`,
-        react: AccountCredentialsEmail({
-          parentName: data.parentName ?? '',
-          childName,
-          username: core.user.username ?? '',
-          password: core.password,
-          groupName: core.group.name ?? core.group.course.title,
-          schedule,
-          locationName: core.group.location.name,
-        }),
-      })
+      await sendStudentCredentialsEmail(parentEmail, data.parentName ?? '', childName, core)
     } catch (err) {
       emailFailed = true
       console.error(
@@ -638,41 +619,8 @@ export async function addEnrollment(
   let enrollmentId: string
   try {
     enrollmentId = await runWithGroupCapacityGuard(async (tx) => {
-      const existing = await tx.enrollment.findUnique({
-        where: {
-          userId_scheduledGroupId_schoolYear: {
-            userId: studentId,
-            scheduledGroupId: groupId,
-            schoolYear: groupPreview.schoolYear,
-          },
-        },
-      })
-
-      if (!existing) {
-        await assertGroupHasAvailableSpot(tx, groupId)
-      }
-
-      const enrollment =
-        existing ??
-        (await tx.enrollment.create({
-          data: {
-            userId: studentId,
-            scheduledGroupId: groupId,
-            schoolYear: groupPreview.schoolYear,
-          },
-        }))
-
-      if (moduleScheduleIds && moduleScheduleIds.length > 0) {
-        await tx.moduleEnrollment.createMany({
-          data: moduleScheduleIds.map((moduleScheduleId) => ({
-            enrollmentId: enrollment.id,
-            moduleScheduleId,
-          })),
-          skipDuplicates: true,
-        })
-      }
-
-      return enrollment.id
+      const { enrollmentId: id } = await ensureEnrollment(tx, studentId, groupId, moduleScheduleIds)
+      return id
     })
   } catch (err) {
     if (err instanceof GroupFullError) {

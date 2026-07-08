@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { computeSchoolYear } from '@/lib/school-year'
+import { db } from '@/lib/db'
 
 const SCHOOL_YEAR_COOKIE = 'inovatic_school_year'
 
@@ -21,7 +22,9 @@ const cookieOptions = {
  */
 export async function getSelectedSchoolYear(): Promise<string> {
   const raw = (await cookies()).get(SCHOOL_YEAR_COOKIE)?.value
-  return raw && SCHOOL_YEAR_RE.test(raw) ? raw : computeSchoolYear()
+  if (!raw || !SCHOOL_YEAR_RE.test(raw)) return computeSchoolYear()
+  const exists = await db.schoolYear.findUnique({ where: { label: raw }, select: { label: true } })
+  return exists ? raw : computeSchoolYear()
 }
 
 /** Persists the selection. Only legal inside a Server Action / Route Handler. */

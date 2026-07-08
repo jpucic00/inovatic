@@ -29,12 +29,6 @@ export const INQUIRY_TYPE_COLORS: Record<string, string> = {
 // lifecycle status, since it is orthogonal to NEW / ACCOUNT_CREATED / DECLINED.
 export const RETURNING_INQUIRY_LABEL = 'Ponovni upis'
 
-export const COURSE_LEVEL_LABELS: Record<string, string> = {
-  SLR_1: 'SLR 1',
-  SLR_2: 'SLR 2',
-  SLR_3: 'SLR 3',
-  SLR_4: 'SLR 4',
-}
 
 export const STATUS_FLOW = [
   'NEW',

@@ -19,7 +19,6 @@ type InquiryRow = {
   childLastName: string | null
   childDateOfBirth: string | null
   childGrade: string | null
-  locationPref: string | null
   status: string
   isReturning?: boolean
   createdAt: Date

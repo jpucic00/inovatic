@@ -67,7 +67,6 @@ export async function GET(
         buildEffectiveMaterialsWhere({
           scheduledGroupId: e.scheduledGroup.id,
           courseId: e.scheduledGroup.course.id,
-          courseIsCustom: e.scheduledGroup.course.isCustom,
           moduleIds: e.scheduledGroup.course.modules.map((m) => m.id),
         }),
       )

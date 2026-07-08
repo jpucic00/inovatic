@@ -9,7 +9,7 @@ import {
   autosaveArticleSchema,
   type AutosaveArticleInput,
 } from '@/lib/validators/admin/article'
-import { upsertTagByName } from './tag'
+import { upsertTagByName } from '@/lib/tags'
 import { extractImageUrls } from '@/lib/blocknote-images'
 import { destroyCloudinaryAssets } from '@/lib/cloudinary-cleanup'
 import type { PaginatedResult } from './inquiry'
