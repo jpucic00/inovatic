@@ -21,6 +21,9 @@ export default async function GroupsPage() {
   const [groups, courses, locations, teachers] = await Promise.all([
     getGroups(),
     db.course.findMany({
+      // Standard SLR programs are global (schoolYear = null) and always appear.
+      // Radionice are year-scoped — only those stamped with the selected year.
+      where: { OR: [{ isCustom: false }, { schoolYear: selectedYear }] },
       orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }],
       select: { id: true, title: true, isCustom: true },
     }),

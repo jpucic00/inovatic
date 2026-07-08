@@ -153,6 +153,18 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
     teacherIds,
   } = parsed.data
 
+  // Trust-boundary guard mirroring the dropdown filter on /admin/grupe: the
+  // course must be valid for this year — a global standard program, or a
+  // radionica stamped with the selected year. Blocks a crafted request from
+  // attaching a stale radionica from another school year.
+  const course = await db.course.findUnique({
+    where: { id: courseId },
+    select: { isCustom: true, schoolYear: true },
+  })
+  if (!course || (course.isCustom && course.schoolYear !== schoolYear)) {
+    return { success: false, error: 'Odabrani program ne pripada ovoj školskoj godini.' }
+  }
+
   try {
     await db.$transaction(async (tx) => {
       const group = await tx.scheduledGroup.create({
