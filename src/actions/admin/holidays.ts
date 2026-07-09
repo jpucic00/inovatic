@@ -81,7 +81,7 @@ export async function listHolidays(schoolYear: string): Promise<HolidayRow[]> {
 export async function upsertHoliday(input: UpsertHolidayInput): Promise<UpsertHolidayResult> {
   const parsed = upsertHolidaySchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevažeći podaci.' }
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
   }
   const { date, ...rest } = parsed.data
   return upsertHolidayRange({ startDate: date, endDate: date, ...rest })
@@ -100,7 +100,7 @@ export async function upsertHolidayRange(
 
   const parsed = upsertHolidayRangeSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevažeći podaci.' }
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
   }
   const data = parsed.data
 
@@ -169,7 +169,7 @@ export async function removeHolidayRange(
 
   const parsed = removeHolidayRangeSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevažeći podaci.' }
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
   }
   const data = parsed.data
 
@@ -198,7 +198,7 @@ export async function removeHoliday(input: RemoveHolidayInput): Promise<AdminAct
 
   const parsed = removeHolidaySchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevažeći podaci.' }
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
   }
 
   const row = await db.schoolYearHoliday.findUnique({
@@ -352,7 +352,7 @@ export async function bulkImportHolidays(
 
   const parsed = bulkImportHolidaysSchema.safeParse(input)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevažeći podaci.' }
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
   }
   const data = parsed.data
 

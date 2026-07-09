@@ -341,9 +341,9 @@ model Material {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  scheduledGroup ScheduledGroup? @relation(fields: [scheduledGroupId], references: [id])
-  course         Course?         @relation(fields: [courseId], references: [id])
-  module         CourseModule?   @relation(fields: [moduleId], references: [id])
+  scheduledGroup ScheduledGroup? @relation(fields: [scheduledGroupId], references: [id], onDelete: Restrict)
+  course         Course?         @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  module         CourseModule?   @relation(fields: [moduleId], references: [id], onDelete: Restrict)
   uploadedBy     User            @relation(fields: [uploadedById], references: [id])
   hiddenInGroups MaterialGroupHide[]
 

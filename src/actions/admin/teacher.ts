@@ -3,7 +3,7 @@
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
-import type { AdminActionResult } from '@/lib/action-types'
+import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
 import { archivedYearError } from '@/lib/school-year-guard'
 import {
   createTeacherSchema,
@@ -16,7 +16,6 @@ import {
 import { hashPassword, generateSimplePassword } from '@/lib/password'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { TeacherCredentialsEmail } from '../../../emails/teacher-credentials'
-import type { PaginatedResult } from './inquiry'
 
 type TeacherRow = {
   id: string

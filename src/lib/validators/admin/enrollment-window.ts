@@ -7,7 +7,7 @@ import { z } from 'zod'
  */
 export const upsertEnrollmentWindowSchema = z
   .object({
-    courseId: z.string().min(1),
+    courseId: z.string().min(1, 'Nevaljani podaci.'),
     schoolYear: z.string().regex(/^\d{4}\/\d{4}$/, 'Neispravna školska godina.'),
     enrollmentStart: z.string().optional().or(z.literal('')),
     enrollmentEnd: z.string().optional().or(z.literal('')),

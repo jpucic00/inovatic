@@ -1,4 +1,6 @@
 import { PrismaClient, CourseLevel, UserRole } from '@prisma/client'
+// courses-data.ts is the source of truth for standard SLR program content.
+import { courses as coursesData } from '../src/lib/courses-data'
 import bcrypt from 'bcryptjs'
 
 // ── BlockNote JSON helpers ────────────────────────────────────────────────────
@@ -1346,127 +1348,31 @@ async function main() {
   console.log('✅ Locations created')
 
   // ── Courses ──────────────────────────────────────────────────────────────────
-  const slr1 = await prisma.course.create({
-    data: {
-      slug: 'slr-1',
-      level: CourseLevel.SLR_1,
-      title: 'Svijet LEGO Robotike 1',
-      subtitle: 'Uvod u robotiku za najmlađe',
-      description: `Tečaj SLR 1 je namijenjen djeci od 6 do 8 godina koja prvi put ulaze u svijet robotike i programiranja.
-Kroz igru i istraživanje djeca uče osnovne pojmove mehanike i programiranja koristeći LEGO WeDo 2.0 platformu.
-
-Svaki modul traje 14 školskih sati, a nastava se odvija jednom tjedno u trajanju od 90 minuta.
-Godišnji program obuhvaća 4 modula, ukupno 56 školskih sati.`,
-      ageMin: 6,
-      ageMax: 8,
-      equipment: 'LEGO WeDo 2.0',
-
-      sortOrder: 1,
-      modules: {
-        create: [
-          { title: 'Modul 1 – Uvod u mehaniku', sortOrder: 1, description: 'Osnove mehanike, zupčanici, poluge i koloture.' },
-          { title: 'Modul 2 – Senzori i motori', sortOrder: 2, description: 'Rad s motorima i senzorima pokreta i nagiba.' },
-          { title: 'Modul 3 – Programiranje', sortOrder: 3, description: 'Uvod u blokovno programiranje u LEGO Education aplikaciji.' },
-          { title: 'Modul 4 – Projekt', sortOrder: 4, description: 'Timski projektni rad: izrada i prezentacija robota.' },
-        ],
-      },
-    },
-  })
-
-  const slr2 = await prisma.course.create({
-    data: {
-      slug: 'slr-2',
-      level: CourseLevel.SLR_2,
-      title: 'Svijet LEGO Robotike 2',
-      subtitle: 'Napredna mehanika i programiranje',
-      description: `Tečaj SLR 2 je namijenjen djeci od 9 do 10 godina koja su završila SLR 1 ili imaju osnovno znanje o robotici.
-Djeca nadograđuju znanje o mehanici i programiranju koristeći napredniju primjenu LEGO WeDo 2.0 platforme.
-
-Program uključuje složenije konstrukcije i uvod u algoritamsko razmišljanje.`,
-      ageMin: 9,
-      ageMax: 10,
-      equipment: 'LEGO Spike Essential',
-
-      sortOrder: 2,
-      modules: {
-        create: [
-          { title: 'Modul 1 – Složene konstrukcije', sortOrder: 1, description: 'Napredne mehaničke konstrukcije i transmisije.' },
-          { title: 'Modul 2 – Napredni senzori', sortOrder: 2, description: 'Rad s više senzora istovremeno, uvjetni iskazi.' },
-          { title: 'Modul 3 – Algoritmi', sortOrder: 3, description: 'Algoritmičko razmišljanje, petlje i uvjetne grane.' },
-          { title: 'Modul 4 – Timski projekt', sortOrder: 4, description: 'Izrada složenijeg robota s punom programskom logikom.' },
-        ],
-      },
-    },
-  })
-
-  const slr3 = await prisma.course.create({
-    data: {
-      slug: 'slr-3',
-      level: CourseLevel.SLR_3,
-      title: 'Svijet LEGO Robotike 3',
-      subtitle: 'LEGO Spike Prime – pravi inženjering',
-      description: `Tečaj SLR 3 uvodi djecu od 11 do 12 godina u naprednu robotiku pomoću LEGO Spike Prime platforme.
-Polaznici uče tekstualno programiranje i rade na kompleksnijim inženjerskim izazovima.
-
-LEGO Spike Prime omogućuje preciznije motore, više vrsta senzora i programiranje u Python/Scratch okruženju.`,
-      ageMin: 11,
-      ageMax: 12,
-      equipment: 'LEGO Spike Prime',
-
-      sortOrder: 3,
-      modules: {
-        create: [
-          { title: 'Modul 1 – Spike Prime osnove', sortOrder: 1, description: 'Upoznavanje s Spike Prime setom i novim mogućnostima.' },
-          { title: 'Modul 2 – Programiranje u Scratch', sortOrder: 2, description: 'Napredni Scratch za upravljanje robotima.' },
-          { title: 'Modul 3 – Uvod u Python', sortOrder: 3, description: 'Osnove Python programiranja za robotiku.' },
-          { title: 'Modul 4 – Natjecateljski robot', sortOrder: 4, description: 'Izrada robota za natjecanje (FLL/WRO format).' },
-        ],
-      },
-    },
-  })
-
-  const slr4 = await prisma.course.create({
-    data: {
-      slug: 'slr-4',
-      level: CourseLevel.SLR_4,
-      title: 'Svijet LEGO Robotike 4',
-      subtitle: 'Industrijsko doba – napredni sustavi',
-      description: `Tečaj SLR 4 je namijenjen polaznicima od 13 do 14 godina koji su završili SLR 3 ili imaju odgovarajuće predznanje.
-Koristimo LEGO Spike Prime s Scratch programiranjem za simulaciju stvarnih industrijskih i prometnih sustava.
-
-Program je organiziran u 4 tematska modula koji predstavljaju različite grane industrije.`,
-      ageMin: 13,
-      ageMax: 14,
-      equipment: 'LEGO Spike Prime (Scratch)',
-
-      sortOrder: 4,
-      modules: {
-        create: [
-          {
-            title: 'Modul 1 – Zabavni sustavi 4.0',
-            sortOrder: 1,
-            description: 'Sigurnosni sef, zabavni stroj, robotski čuvar – interaktivni uređaji koji simuliraju zabavne i sigurnosne sustave.',
+  // courses-data.ts is the source of truth; seed derives DB rows from it.
+  const seededCourses = await Promise.all(
+    coursesData.map((c, i) =>
+      prisma.course.create({
+        data: {
+          slug: c.slug,
+          level: c.level as CourseLevel,
+          title: c.title,
+          subtitle: c.subtitle,
+          description: c.description,
+          ageMin: c.ageMin,
+          ageMax: c.ageMax,
+          equipment: c.equipment,
+          sortOrder: i + 1,
+          modules: {
+            create: c.modules.map((m, j) => ({
+              title: m.title,
+              description: m.description,
+              sortOrder: j + 1,
+            })),
           },
-          {
-            title: 'Modul 2 – Prometni sustavi 4.0',
-            sortOrder: 2,
-            description: 'Helikopter, nagibni avion, simulator leta – modeli koji istražuju prometne tehnologije.',
-          },
-          {
-            title: 'Modul 3 – Industrijski sustavi 4.0',
-            sortOrder: 3,
-            description: 'Lift, transportna traka, sorter – simulacija modernih industrijskih procesa.',
-          },
-          {
-            title: 'Modul 4 – Robotsko vozilo 1.0',
-            sortOrder: 4,
-            description: 'Jedan sveobuhvatni projektni zadatak: izrada i programiranje autonomnog vozila.',
-          },
-        ],
-      },
-    },
-  })
-
+        },
+      }),
+    ),
+  )
   console.log('✅ Courses and modules created')
 
   // ── Signup windows ───────────────────────────────────────────────────────────
@@ -1479,7 +1385,7 @@ Program je organiziran u 4 tematska modula koji predstavljaju različite grane i
   const currentSchoolYear =
     seedMonth >= 9 ? `${seedYear}/${seedYear + 1}` : `${seedYear - 1}/${seedYear}`
   await prisma.courseEnrollmentWindow.createMany({
-    data: [slr1, slr2, slr3, slr4].map((c) => ({
+    data: seededCourses.map((c) => ({
       courseId: c.id,
       schoolYear: currentSchoolYear,
       enrollmentStart: new Date(`${seedYear}-01-01`),
@@ -7902,11 +7808,6 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
   })
 
 
-  // Suppress unused variable warnings
-  void slr1
-  void slr2
-  void slr3
-  void slr4
   void velebitska
   void boskovica
 

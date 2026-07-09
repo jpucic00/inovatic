@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { createLocationSchema } from '@/lib/validators/admin/location'
 import type { CreateLocationInput } from '@/lib/validators/admin/location'
 import type { AdminActionResult } from '@/lib/action-types'
+import { adminAction } from '@/lib/admin-action'
 
 export async function getLocations() {
   await requireAdmin()
@@ -18,29 +19,18 @@ export async function getLocations() {
 }
 
 export async function createLocation(data: CreateLocationInput): Promise<AdminActionResult> {
-  await requireAdmin()
-
-  const parsed = createLocationSchema.safeParse(data)
-  if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
-
-  const { name, address, phone, email } = parsed.data
-
-  try {
-    await db.location.create({
-      data: {
-        name,
-        address,
-        phone: phone || null,
-        email: email || null,
-      },
-    })
-  } catch (err) {
-    console.error('createLocation failed:', err)
-    return { success: false, error: 'Greška pri kreiranju lokacije.' }
-  }
-
-  revalidatePath('/admin/lokacije')
-  return { success: true }
+  return adminAction(createLocationSchema, data, async ({ name, address, phone, email }) => {
+    try {
+      await db.location.create({
+        data: { name, address, phone: phone || null, email: email || null },
+      })
+    } catch (err) {
+      console.error('createLocation failed:', err)
+      return { success: false, error: 'Greška pri kreiranju lokacije.' }
+    }
+    revalidatePath('/admin/lokacije')
+    return { success: true }
+  })
 }
 
 export async function deleteLocation(id: string): Promise<AdminActionResult> {

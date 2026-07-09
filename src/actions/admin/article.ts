@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto'
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
-import type { AdminActionResult } from '@/lib/action-types'
+import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
 import {
   autosaveArticleSchema,
   type AutosaveArticleInput,
@@ -12,7 +12,6 @@ import {
 import { upsertTagByName } from '@/lib/tags'
 import { extractImageUrls } from '@/lib/blocknote-images'
 import { destroyCloudinaryAssets } from '@/lib/cloudinary-cleanup'
-import type { PaginatedResult } from './inquiry'
 
 type ArticleRow = {
   id: string

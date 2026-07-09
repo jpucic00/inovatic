@@ -9,7 +9,7 @@ import {
   schedulePartySchema,
   type SchedulePartyInput,
 } from '@/lib/validators/admin/inquiry'
-import type { AdminActionResult } from '@/lib/action-types'
+import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
 import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
 import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
@@ -28,14 +28,6 @@ type InquiryFilters = {
   type?: InquiryType | 'ALL'
   page?: number
   pageSize?: number
-}
-
-export type PaginatedResult<T> = {
-  data: T[]
-  total: number
-  page: number
-  pageSize: number
-  pageCount: number
 }
 
 function courseIdFilter(courseId: string | undefined) {

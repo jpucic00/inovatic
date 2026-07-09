@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
 import { buildStudentDetailForAdmin } from '@/lib/student-detail'
 import { revalidatePath } from 'next/cache'
-import type { AdminActionResult } from '@/lib/action-types'
+import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
 import {
   createStudentSchema,
   createStudentManuallySchema,
@@ -31,7 +31,6 @@ import {
   type PaymentStatus,
   type PaymentFilter,
 } from '@/lib/payment-status'
-import type { PaginatedResult } from '@/lib/action-types'
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
 

@@ -114,9 +114,21 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
   if (!id) return { success: false, error: 'ID nije pronađen.' }
 
   try {
-    const course = await db.course.findUnique({ where: { id } })
+    const course = await db.course.findUnique({
+      where: { id },
+      select: {
+        isCustom: true,
+        _count: { select: { materials: true } },
+        modules: { select: { _count: { select: { materials: true } } } },
+      },
+    })
     if (!course) return { success: false, error: 'Program nije pronađen.' }
     if (!course.isCustom) return { success: false, error: 'Standardni SLR programi se ne mogu brisati.' }
+
+    const moduleMaterialCount = course.modules.reduce((sum, m) => sum + m._count.materials, 0)
+    if (course._count.materials + moduleMaterialCount > 0) {
+      return { success: false, error: 'Program ima materijale koji se moraju obrisati prije brisanja programa.' }
+    }
 
     await db.course.delete({ where: { id } })
   } catch (err) {
