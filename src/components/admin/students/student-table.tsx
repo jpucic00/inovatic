@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import type { StudentRow } from '@/actions/admin/student'
+import { formatDate } from '@/lib/format'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { PaymentStatusBadge } from '@/components/admin/students/payment-status-badge'
 import { PAYMENT_STATUS_SORT_KEY } from '@/lib/payment-status'
@@ -67,13 +68,7 @@ const columns: ColumnDef<StudentRow>[] = [
     header: 'Datum kreiranja',
     sortable: true,
     sortValue: (row) => row.createdAt.getTime(),
-    cell: (row) => {
-      const d = new Date(row.createdAt)
-      const dd = String(d.getDate()).padStart(2, '0')
-      const mm = String(d.getMonth() + 1).padStart(2, '0')
-      const yyyy = d.getFullYear()
-      return `${dd}.${mm}.${yyyy}.`
-    },
+    cell: (row) => formatDate(new Date(row.createdAt)),
   },
   {
     key: 'actions',

@@ -13,6 +13,7 @@ import { DeleteEnrollmentButton } from '@/components/admin/students/delete-enrol
 import { AddEnrollmentDialog } from '@/components/admin/students/add-enrollment-dialog'
 import { ManageEnrollmentModules } from '@/components/admin/students/manage-enrollment-modules'
 import { EnrollmentPaymentPanel } from '@/components/admin/students/enrollment-payment-panel'
+import { formatDate } from '@/lib/format'
 
 type StudentEnrollments = NonNullable<
   Awaited<ReturnType<typeof getStudent>>
@@ -162,7 +163,7 @@ export function StudentYearSections({
                         {[schedule, sg.location.name].filter(Boolean).join(' · ')}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        Upisan {enrollment.createdAt.toLocaleDateString('hr-HR')}
+                        Upisan {formatDate(enrollment.createdAt)}
                       </p>
                     </div>
                     {isAdmin && (

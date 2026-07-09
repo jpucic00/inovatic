@@ -16,6 +16,9 @@ const li    = (...c: BNInline[]): BNBlock => ({ type: 'bulletListItem', content:
 const img   = (url: string, width = 512): BNBlock => ({ type: 'image', props: { url, caption: '', textAlignment: 'left', previewWidth: width } })
 const video = (url: string): BNBlock    => ({ type: 'video', props: { url } })
 
+// Any future seeded rows that have string-date fields (dateOfBirth, dateStart,
+// dateEnd) must use ISO literals — e.g. '1999-03-15', not locale strings.
+// The Zod validators at the action boundary enforce this format.
 const prisma = new PrismaClient()
 
 // ── Article gallery images (Cloudinary URLs) ─────────────────────────────────

@@ -11,6 +11,7 @@ import type { CommentListItem } from '@/components/shared/comment-list'
 import { DeleteStudentDialog } from '@/components/admin/students/delete-student-dialog'
 import { StudentYearSections } from '@/components/shared/student-year-sections'
 import { CopyButton } from './copy-button'
+import { formatDate, formatDateKey } from '@/lib/format'
 
 type StudentWithRelations = NonNullable<Awaited<ReturnType<typeof getStudent>>>
 
@@ -50,15 +51,6 @@ function DetailRow({ label, value }: Readonly<{ label: string; value: React.Reac
   )
 }
 
-function formatDate(value: Date | string | null | undefined): string | null {
-  if (!value) return null
-  return new Date(value).toLocaleDateString('hr-HR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
-
 export function StudentDetailView({
   viewerRole,
   student,
@@ -94,12 +86,7 @@ export function StudentDetailView({
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Račun kreiran{' '}
-          {student.createdAt.toLocaleDateString('hr-HR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-          })}
+          Račun kreiran {formatDate(student.createdAt)}
         </p>
       </div>
 
@@ -144,7 +131,7 @@ export function StudentDetailView({
             {student.dateOfBirth && (
               <DetailRow
                 label="Datum rođenja"
-                value={formatDate(student.dateOfBirth)}
+                value={formatDateKey(student.dateOfBirth ?? '')}
               />
             )}
             {student.childSchool && (

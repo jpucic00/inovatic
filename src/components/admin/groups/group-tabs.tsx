@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { GroupTable } from './group-table'
+import { tabClass } from '@/lib/ui-classes'
 
 type Group = {
   id: string
@@ -42,7 +43,7 @@ interface GroupTabsProps {
   editable: boolean
 }
 
-export function GroupTabs({ standardTabs, radioniceTabs, editable }: Readonly<GroupTabsProps>) {
+export function AdminGroupTabs({ standardTabs, radioniceTabs, editable }: Readonly<GroupTabsProps>) {
   const tabs = [
     ...standardTabs.map((t) => ({ id: t.courseId, label: t.title })),
     { id: '__radionice__', label: 'Radionice' },
@@ -66,12 +67,7 @@ export function GroupTabs({ standardTabs, radioniceTabs, editable }: Readonly<Gr
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={[
-              'px-4 py-2 text-sm font-medium rounded-t-md border-b-2 -mb-px transition-colors',
-              activeTab === tab.id
-                ? 'border-cyan-600 text-cyan-700 bg-white'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-            ].join(' ')}
+            className={tabClass(activeTab === tab.id, 'lg')}
           >
             {tab.label}
           </button>

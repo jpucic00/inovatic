@@ -79,62 +79,12 @@ export async function listHolidays(schoolYear: string): Promise<HolidayRow[]> {
  * inserted in a single transaction.
  */
 export async function upsertHoliday(input: UpsertHolidayInput): Promise<UpsertHolidayResult> {
-  const session = await requireAdmin()
-
   const parsed = upsertHolidaySchema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevažeći podaci.' }
   }
-  const data = parsed.data
-
-  const archived = archivedYearError(data.schoolYear)
-  if (archived) return archived
-
-  const dateUtc = fromDateKey(data.date)
-
-  if (!data.confirmDeleteAttendance) {
-    const attendanceCount = await db.attendance.count({
-      where: {
-        sessionDate: dateUtc,
-        enrollment: { scheduledGroup: { schoolYear: data.schoolYear } },
-      },
-    })
-    if (attendanceCount > 0) {
-      return { success: true, requiresConfirmation: true, attendanceCount }
-    }
-  }
-
-  const name = data.name?.trim() ? data.name.trim() : null
-
-  try {
-    await db.$transaction(async (tx) => {
-      if (data.confirmDeleteAttendance) {
-        await tx.attendance.deleteMany({
-          where: {
-            sessionDate: dateUtc,
-            enrollment: { scheduledGroup: { schoolYear: data.schoolYear } },
-          },
-        })
-      }
-      await tx.schoolYearHoliday.upsert({
-        where: { schoolYear_date: { schoolYear: data.schoolYear, date: dateUtc } },
-        create: {
-          schoolYear: data.schoolYear,
-          date: dateUtc,
-          name,
-          createdById: session.user.id,
-        },
-        update: { name },
-      })
-    })
-  } catch (err) {
-    console.error('upsertHoliday failed:', err)
-    return { success: false, error: 'Greška pri spremanju praznika.' }
-  }
-
-  revalidatePath('/admin/skolska-godina')
-  revalidatePath('/nastavnik', 'layout')
-  return { success: true, requiresConfirmation: false }
+  const { date, ...rest } = parsed.data
+  return upsertHolidayRange({ startDate: date, endDate: date, ...rest })
 }
 
 /**

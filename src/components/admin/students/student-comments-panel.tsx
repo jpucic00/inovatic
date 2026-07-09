@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { AdminActionResult } from '@/lib/action-types'
 import { AddCommentForm } from '@/components/shared/add-comment-form'
 import { CommentList, type CommentListItem } from '@/components/shared/comment-list'
+import { tabClass } from '@/lib/ui-classes'
 
 export type AdminCommentsPanelSection = {
   groupId: string
@@ -69,12 +70,7 @@ export function StudentCommentsPanel({
                 key={t.schoolYear}
                 type="button"
                 onClick={() => setActiveYear(t.schoolYear)}
-                className={[
-                  'px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 -mb-px whitespace-nowrap transition-colors',
-                  isActive
-                    ? 'border-cyan-600 text-cyan-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                ].join(' ')}
+                className={tabClass(isActive)}
               >
                 {t.schoolYear} ({count})
               </button>

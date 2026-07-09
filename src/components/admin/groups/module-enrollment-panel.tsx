@@ -13,15 +13,9 @@ import {
   getGroupModuleArc,
   type GroupModuleArcEntry,
 } from '@/lib/group-module-arc'
+import { formatDate } from '@/lib/format'
+import { tabClass } from '@/lib/ui-classes'
 import Link from 'next/link'
-
-function fmtDate(d: Date): string {
-  const date = new Date(d)
-  const dd = String(date.getDate()).padStart(2, '0')
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const yyyy = date.getFullYear()
-  return `${dd}.${mm}.${yyyy}.`
-}
 
 type ModuleInfo = {
   id: string
@@ -174,14 +168,14 @@ function ModuleTab({
 
       {arcEntry ? (
         <p className="text-xs text-gray-400 mb-3">
-          {fmtDate(arcEntry.firstSession)} – {fmtDate(arcEntry.lastSession)}{' '}
+          {formatDate(arcEntry.firstSession)} – {formatDate(arcEntry.lastSession)}{' '}
           <span className="text-gray-300">(7 sjednica)</span>
         </p>
       ) : (
         mod.startDate &&
         mod.endDate && (
           <p className="text-xs text-gray-400 mb-3">
-            {fmtDate(mod.startDate)} – {fmtDate(mod.endDate)}
+            {formatDate(mod.startDate)} – {formatDate(mod.endDate)}
           </p>
         )
       )}
@@ -333,12 +327,7 @@ export function ModuleEnrollmentPanel({
               key={mod.id}
               type="button"
               onClick={() => setExpandedIdx(idx)}
-              className={[
-                'px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 -mb-px transition-colors whitespace-nowrap sm:whitespace-normal sm:text-center sm:min-w-0',
-                isActive
-                  ? 'border-cyan-600 text-cyan-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-              ].join(' ')}
+              className={`${tabClass(isActive)} sm:whitespace-normal sm:text-center sm:min-w-0`}
             >
               {mod.title} ({enrolledCount})
             </button>

@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { Pencil, MapPin, Clock, Calendar, ExternalLink } from 'lucide-react'
 import { createGroupSchema, type CreateGroupInput } from '@/lib/validators/admin/group'
 import { updateGroup } from '@/actions/admin/group'
-import { DAYS_HR } from '@/lib/format'
+import { DAYS_HR, formatDate, formatDateKey } from '@/lib/format'
 import { adminInputClass, adminSelectClass } from '@/lib/admin-styles'
 import { DateInput } from '@/components/ui/date-input'
 import {
@@ -157,11 +157,9 @@ function GroupInfoView({
               </span>
               {windowState !== 'unset' && (
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {group.enrollmentStart &&
-                    `Od: ${group.enrollmentStart.toLocaleDateString('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`}
+                  {group.enrollmentStart && `Od: ${formatDate(group.enrollmentStart)}`}
                   {group.enrollmentStart && group.enrollmentEnd && ' – '}
-                  {group.enrollmentEnd &&
-                    `Do: ${group.enrollmentEnd.toLocaleDateString('hr-HR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`}
+                  {group.enrollmentEnd && `Do: ${formatDate(group.enrollmentEnd)}`}
                 </p>
               )}
               <Link
@@ -179,11 +177,6 @@ function GroupInfoView({
   )
 }
 
-function formatDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-')
-  return `${d}.${m}.${y}.`
-}
-
 function TimeSlot({ startTime, endTime }: Readonly<{ startTime: string | null; endTime: string | null }>) {
   if (!startTime) return null
   return (
@@ -199,8 +192,8 @@ function TerminValue({ group }: Readonly<{ group: GroupForEdit }>) {
   if (group.course.isCustom && group.dateStart && group.dateEnd) {
     const rangeLabel =
       group.dateStart === group.dateEnd
-        ? formatDate(group.dateStart)
-        : `${formatDate(group.dateStart)} – ${formatDate(group.dateEnd)}`
+        ? formatDateKey(group.dateStart)
+        : `${formatDateKey(group.dateStart)} – ${formatDateKey(group.dateEnd)}`
     return (
       <span className="flex items-center gap-1">
         <Calendar className="w-3.5 h-3.5 text-gray-400" />
@@ -250,7 +243,7 @@ function GroupInfoEdit({
       name: group.name ?? '',
       dateStart: group.dateStart ?? '',
       dateEnd: group.dateEnd ?? '',
-      dayOfWeek: group.dayOfWeek ?? '',
+      dayOfWeek: (group.dayOfWeek ?? '') as CreateGroupInput['dayOfWeek'],
       startTime: group.startTime ?? '',
       endTime: group.endTime ?? '',
       maxStudents: group.maxStudents,

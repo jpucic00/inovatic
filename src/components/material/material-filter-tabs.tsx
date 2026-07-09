@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { StaffMaterialList, type StaffMaterialRow } from './staff-material-list'
+import { tabClass } from '@/lib/ui-classes'
 
 interface Props {
   rows: StaffMaterialRow[]
@@ -62,12 +63,7 @@ export function MaterialFilterTabs({ rows, modules, inGroupId, isCustom }: Reado
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={[
-                'px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 -mb-px whitespace-nowrap transition-colors',
-                isActive
-                  ? 'border-cyan-600 text-cyan-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-              ].join(' ')}
+              className={tabClass(isActive)}
             >
               {tab.label} ({count})
             </button>

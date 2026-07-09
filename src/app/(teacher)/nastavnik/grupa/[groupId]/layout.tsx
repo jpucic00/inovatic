@@ -1,7 +1,9 @@
 import Link from 'next/link'
-import { ArrowLeft, Clock, MapPin, Users } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { getTeacherGroupDetail } from '@/actions/teacher/group'
 import { GroupTabs } from '@/components/teacher/group-tabs'
+import { GroupHeader } from '@/components/shared/group-header'
+import { formatGroupSchedule } from '@/lib/format'
 
 interface LayoutProps {
   params: Promise<{ groupId: string }>
@@ -11,6 +13,7 @@ interface LayoutProps {
 export default async function TeacherGroupLayout({ params, children }: Readonly<LayoutProps>) {
   const { groupId } = await params
   const group = await getTeacherGroupDetail(groupId)
+  const schedule = formatGroupSchedule({ isCustom: group.course.isCustom, dayOfWeek: group.dayOfWeek, startTime: group.startTime, endTime: group.endTime })
 
   return (
     <div>
@@ -23,29 +26,14 @@ export default async function TeacherGroupLayout({ params, children }: Readonly<
       </Link>
 
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{group.course.title}</h1>
-        {group.name ? <p className="text-sm text-gray-500 mt-1">{group.name}</p> : null}
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-600">
-          {group.dayOfWeek || group.startTime ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-gray-400" />
-              {[group.dayOfWeek, group.startTime && group.endTime ? `${group.startTime}–${group.endTime}` : group.startTime]
-                .filter(Boolean)
-                .join(' · ')}
-            </span>
-          ) : null}
-          <span className="inline-flex items-center gap-1.5">
-            <MapPin className="w-4 h-4 text-gray-400" />
-            {group.location.name}
-          </span>
-          {group.teacherNames.length > 0 ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-gray-400" />
-              {group.teacherNames.join(', ')}
-            </span>
-          ) : null}
-          <span className="text-gray-400">• Školska godina {group.schoolYear}.</span>
-        </div>
+        <GroupHeader
+          courseTitle={group.course.title}
+          name={group.name}
+          schedule={schedule}
+          locationName={group.location.name}
+          teacherNames={group.teacherNames}
+          schoolYear={group.schoolYear}
+        />
       </header>
 
       <GroupTabs groupId={group.id} />

@@ -16,6 +16,7 @@ import { addEnrollment } from '@/actions/admin/student'
 import { getGroupsForCourseInSelectedYear } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { toast } from 'sonner'
+import { formatModuleDateRange } from '@/lib/format'
 
 type ModuleOption = {
   id: string
@@ -56,14 +57,6 @@ function getScheduleDates(mod: ModuleOption): { startDate: Date | null; endDate:
   return { startDate: s?.startDate ?? null, endDate: s?.endDate ?? null }
 }
 
-function formatDateRange(startDate: Date | null, endDate: Date | null): string {
-  if (!startDate || !endDate) return ''
-  const s = new Date(startDate)
-  const e = new Date(endDate)
-  const sd = `${String(s.getDate()).padStart(2, '0')}.${String(s.getMonth() + 1).padStart(2, '0')}.`
-  const ed = `${String(e.getDate()).padStart(2, '0')}.${String(e.getMonth() + 1).padStart(2, '0')}.${e.getFullYear()}.`
-  return ` (${sd} – ${ed})`
-}
 
 export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
   const router = useRouter()
@@ -304,7 +297,7 @@ export function AddEnrollmentDialog({ studentId, courses }: Readonly<Props>) {
                     <span className="text-sm text-gray-800">
                       {mod.title}
                       <span className="text-gray-400 text-xs ml-1">
-                        {formatDateRange(startDate, endDate)}
+                        {startDate && endDate ? formatModuleDateRange(startDate, endDate) : ''}
                       </span>
                     </span>
                   </label>

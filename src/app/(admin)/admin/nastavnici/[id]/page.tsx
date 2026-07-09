@@ -12,6 +12,7 @@ import { ResetPasswordButton } from '@/components/admin/teachers/reset-password-
 import { DeleteTeacherDialog } from '@/components/admin/teachers/delete-teacher-dialog'
 import { TeacherAssignmentPanel } from '@/components/admin/teachers/teacher-assignment-panel'
 import { CopyButton } from '@/components/shared/copy-button'
+import { formatDate } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Admin – Nastavnik' }
 
@@ -62,11 +63,7 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
           <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
           <p className="text-gray-500 text-sm mt-1">
             Račun kreiran{' '}
-            {teacher.createdAt.toLocaleDateString('hr-HR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            })}
+            {formatDate(teacher.createdAt)}
           </p>
         </div>
         <EditTeacherDialog

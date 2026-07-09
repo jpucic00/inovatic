@@ -7,6 +7,7 @@ import { Pagination } from '@/components/admin/pagination'
 import { Plus, ExternalLink, ImageIcon } from 'lucide-react'
 import { DeleteArticleButton } from '@/components/admin/articles/delete-article-button'
 import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
+import { formatDate } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Admin – Novosti' }
 
@@ -174,13 +175,7 @@ export default async function ArticlesAdminPage({ searchParams }: Readonly<PageP
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {a.publishedAt
-                      ? a.publishedAt.toLocaleDateString('hr-HR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })
-                      : '—'}
+                    {a.publishedAt ? formatDate(a.publishedAt) : '—'}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {a.author ? `${a.author.firstName} ${a.author.lastName}` : '—'}

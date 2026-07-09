@@ -10,7 +10,7 @@ const step1Schema = z.object({
 const step2Schema = z.object({
   childFirstName: z.string().min(2, 'Unesite ime djeteta (najmanje 2 znaka)'),
   childLastName: z.string().min(2, 'Unesite prezime djeteta (najmanje 2 znaka)'),
-  childDateOfBirth: z.string().min(1, 'Unesite datum rođenja'),
+  childDateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Unesite datum rođenja (GGGG-MM-DD)'),
   childSchool: z.string().optional(),
 })
 

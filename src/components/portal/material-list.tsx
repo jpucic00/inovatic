@@ -10,21 +10,10 @@ import type {
 import { bucketsAreEmpty } from '@/lib/group-materials-view'
 import { RobocampEmbed } from '@/components/material/robocamp-embed'
 import { CompactMediaCard } from './compact-media-card'
-
-function formatBytes(bytes: number | null): string | null {
-  if (bytes == null || bytes <= 0) return null
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+import { formatBytes } from '@/components/material/material-type-badge'
+import { resolveHref } from '@/components/material/staff-material-list'
 
 // ─── Compact rows for documents + links ──────────────────────────────────────
-
-function resolveHref(item: MaterialItem): string | null {
-  if (item.externalUrl) return item.externalUrl
-  if (item.fileUrl) return `/api/download/${item.id}`
-  return null
-}
 
 function MaterialRow({ item, icon: Icon }: Readonly<{ item: MaterialItem; icon: LucideIcon }>) {
   const href = resolveHref(item)

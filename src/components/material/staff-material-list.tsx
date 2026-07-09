@@ -46,7 +46,7 @@ const SCOPE_LABEL: Record<MaterialScope, string> = {
   GROUP: 'Grupa',
 }
 
-function resolveHref(row: StaffMaterialRow): string | null {
+export function resolveHref(row: { id: string; externalUrl: string | null; fileUrl: string | null }): string | null {
   if (row.externalUrl) return row.externalUrl
   if (row.fileUrl) return `/api/download/${row.id}`
   return null

@@ -15,7 +15,7 @@ import { UserPlus } from 'lucide-react'
 import { createStudentFromInquiry } from '@/actions/admin/student'
 import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
-import { formatGroupSchedule } from '@/lib/format'
+import { formatGroupSchedule, formatModuleDateRange as fmtModuleDateRange } from '@/lib/format'
 import { toast } from 'sonner'
 
 type ModuleOption = {
@@ -97,11 +97,7 @@ function mapGroupOption(sg: {
 function formatModuleDateRange(mod: ModuleOption): string {
   const { startDate, endDate } = getScheduleDates(mod)
   if (!startDate || !endDate) return ''
-  const s = new Date(startDate)
-  const e = new Date(endDate)
-  const sd = `${String(s.getDate()).padStart(2, '0')}.${String(s.getMonth() + 1).padStart(2, '0')}.`
-  const ed = `${String(e.getDate()).padStart(2, '0')}.${String(e.getMonth() + 1).padStart(2, '0')}.${e.getFullYear()}.`
-  return ` (${sd} – ${ed})`
+  return fmtModuleDateRange(new Date(startDate), new Date(endDate))
 }
 
 export function CreateAccountDialog({

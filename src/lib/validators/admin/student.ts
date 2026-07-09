@@ -10,7 +10,7 @@ export const createStudentManuallySchema = z.object({
   lastName: z.string().min(2),
   // Required: DOB is the disambiguator that makes returning-student detection
   // reliable, so every student record must carry one.
-  dateOfBirth: z.string().min(1, 'Unesite datum rođenja'),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Unesite datum rođenja (GGGG-MM-DD)'),
   parentName: z.string().optional().nullable(),
   parentEmail: z
     .union([z.literal(''), z.string().email()])

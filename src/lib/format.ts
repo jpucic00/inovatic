@@ -43,6 +43,16 @@ export function formatDateKey(key: string): string {
   return `${m[3]}.${m[2]}.${m[1]}.`
 }
 
+/**
+ * Format a pair of dates as a module schedule suffix, e.g. " (15.07. – 22.07.2026.)".
+ * The leading space + parens allow direct concatenation after a module title.
+ */
+export function formatModuleDateRange(start: Date, end: Date): string {
+  const dd = (d: Date) => String(d.getDate()).padStart(2, '0')
+  const mm = (d: Date) => String(d.getMonth() + 1).padStart(2, '0')
+  return ` (${dd(start)}.${mm(start)}. – ${dd(end)}.${mm(end)}.${end.getFullYear()}.)`
+}
+
 type GroupScheduleParts = {
   isCustom?: boolean
   dayOfWeek?: string | null

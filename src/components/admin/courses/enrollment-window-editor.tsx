@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Pencil, Check, X, CalendarClock } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
 import { adminInputClass } from '@/lib/admin-styles'
+import { formatDate } from '@/lib/format'
 import { upsertEnrollmentWindow } from '@/actions/admin/enrollment-window'
 import {
   getEnrollmentWindowState,
@@ -30,14 +31,6 @@ function toIsoString(d: Date | null): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function formatDate(d: Date | null): string {
-  if (!d) return '–'
-  return new Date(d).toLocaleDateString('hr-HR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
 
 export function EnrollmentWindowEditor({
   courseId,
@@ -143,7 +136,7 @@ export function EnrollmentWindowEditor({
           </span>
           {state !== 'unset' && (
             <span className="text-gray-500">
-              ({formatDate(enrollmentStart)} – {formatDate(enrollmentEnd)})
+              ({formatDate(enrollmentStart) || '–'} – {formatDate(enrollmentEnd) || '–'})
             </span>
           )}
         </div>

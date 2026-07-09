@@ -18,6 +18,7 @@ import type { GalleryImage } from '@/actions/admin/article-gallery'
 import { CoverImageUpload } from './cover-image-upload'
 import { GalleryManager } from './gallery-manager'
 import { TagsCombobox, type TagOption } from './tags-combobox'
+import { formatDate } from '@/lib/format'
 
 // BlockNote is client-only and has sizable CSS. Dynamic import keeps the form
 // shell render fast and avoids SSR mismatches.
@@ -408,11 +409,7 @@ export function ArticleForm({ initial, availableTags }: Readonly<Props>) {
             {initial.publishedAt && (
               <p className="text-xs text-gray-400 mb-3">
                 Prvi put objavljeno{' '}
-                {new Date(initial.publishedAt).toLocaleDateString('hr-HR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                })}
+                {formatDate(new Date(initial.publishedAt))}
               </p>
             )}
 

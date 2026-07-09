@@ -7,6 +7,7 @@ import { Check, X, Pencil, Users, CheckCircle, Calendar } from 'lucide-react'
 import { upsertModuleSchedule } from '@/actions/admin/module'
 import { closeModuleSchedule } from '@/actions/admin/module-enrollment'
 import { DateInput } from '@/components/ui/date-input'
+import { formatDate } from '@/lib/format'
 import Link from 'next/link'
 
 type Module = {
@@ -36,15 +37,6 @@ interface ModuleDatesTableProps {
   editable: boolean
   /** Hide the course title/level header block (when the page already shows it). */
   hideHeader?: boolean
-}
-
-function formatDate(d: Date | null): string {
-  if (!d) return '–'
-  const date = new Date(d)
-  const dd = String(date.getDate()).padStart(2, '0')
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const yyyy = date.getFullYear()
-  return `${dd}.${mm}.${yyyy}.`
 }
 
 function toIsoString(d: Date | null): string {
@@ -126,7 +118,7 @@ function ModuleRow({
             className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
           />
         ) : (
-          <span className="text-sm text-gray-600">{formatDate(mod.startDate)}</span>
+          <span className="text-sm text-gray-600">{formatDate(mod.startDate) || '–'}</span>
         )}
       </td>
       <td className="py-2.5 pr-4">
@@ -137,7 +129,7 @@ function ModuleRow({
             className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
           />
         ) : (
-          <span className="text-sm text-gray-600">{formatDate(mod.endDate)}</span>
+          <span className="text-sm text-gray-600">{formatDate(mod.endDate) || '–'}</span>
         )}
       </td>
       <td className="py-2.5 pr-4">

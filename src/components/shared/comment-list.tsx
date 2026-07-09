@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import type { AdminActionResult } from '@/lib/action-types'
 import type { UserRole } from '@prisma/client'
+import { formatDate } from '@/lib/format'
 
 export type CommentListItem = {
   id: string
@@ -28,14 +29,6 @@ interface Props {
   emptyText?: string
 }
 
-function formatDate(value: Date | string): string {
-  const d = value instanceof Date ? value : new Date(value)
-  return d.toLocaleDateString('hr-HR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
 
 function roleLabel(role: UserRole | undefined): string | null {
   if (!role) return null
@@ -125,7 +118,7 @@ export function CommentList({
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-gray-400">
-                    {formatDate(c.createdAt)}
+                    {formatDate(new Date(c.createdAt))}
                   </span>
                   {c.canDelete ? (
                     <button

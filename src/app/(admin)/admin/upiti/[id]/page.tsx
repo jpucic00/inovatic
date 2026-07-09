@@ -95,11 +95,7 @@ function StatusTimeline({ currentStatus }: Readonly<{ currentStatus: string }>) 
 }
 
 function formatDateTime(date: Date): string {
-  return `${date.toLocaleDateString('hr-HR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })} u ${date.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' })}`
+  return `${formatDate(date)} u ${date.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' })}`
 }
 
 /**
@@ -332,19 +328,11 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   })
 
   const returningDob = returningStudent?.dateOfBirth
-    ? new Date(returningStudent.dateOfBirth).toLocaleDateString('hr-HR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
+    ? formatDate(new Date(returningStudent.dateOfBirth))
     : null
 
   const birthInfo: React.ReactNode = inquiry.childDateOfBirth
-    ? new Date(inquiry.childDateOfBirth).toLocaleDateString('hr-HR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
+    ? formatDate(new Date(inquiry.childDateOfBirth))
     : <span className="text-gray-400 italic">Nije navedeno</span>
 
   const preferredProgram: React.ReactNode = inquiry.course
@@ -371,11 +359,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
           </h1>
           <p className="text-gray-500 text-sm mt-1">
             Upit primljen{' '}
-            {inquiry.createdAt.toLocaleDateString('hr-HR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            })}
+            {formatDate(inquiry.createdAt)}
             {' u '}
             {inquiry.createdAt.toLocaleTimeString('hr-HR', {
               hour: '2-digit',
@@ -409,11 +393,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
               )}
               <p className="mt-2 text-xs text-gray-500">
                 Odbijeno{' '}
-                {inquiry.updatedAt.toLocaleDateString('hr-HR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                })}
+                {formatDate(inquiry.updatedAt)}
                 {' u '}
                 {inquiry.updatedAt.toLocaleTimeString('hr-HR', {
                   hour: '2-digit',
@@ -578,11 +558,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
               inquiry.consentGivenAt ? (
                 <span>
                   Dan{' '}
-                  {inquiry.consentGivenAt.toLocaleDateString('hr-HR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                  })}{' '}
+                  {formatDate(inquiry.consentGivenAt)}{' '}
                   u{' '}
                   {inquiry.consentGivenAt.toLocaleTimeString('hr-HR', {
                     hour: '2-digit',

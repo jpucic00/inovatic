@@ -42,6 +42,37 @@ type TeacherFilters = {
   pageSize?: number
 }
 
+async function sendTeacherCredentialsEmail(
+  teacher: { email: string; firstName: string; lastName: string },
+  password: string,
+  subject: string,
+): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) return false
+  try {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ??
+      process.env.NEXTAUTH_URL ??
+      'https://udruga-inovatic.hr'
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      replyTo: REPLY_TO,
+      to: teacher.email,
+      subject,
+      react: TeacherCredentialsEmail({
+        firstName: teacher.firstName,
+        lastName: teacher.lastName,
+        email: teacher.email,
+        password,
+        loginUrl: `${baseUrl}/prijava`,
+      }),
+    })
+    return true
+  } catch (err) {
+    console.error('Failed to send teacher credentials email:', err)
+    return false
+  }
+}
+
 type CreateTeacherResult =
   | { success: true; teacherId: string; password: string; emailSent: boolean }
   | { success: false; error: string }
@@ -198,33 +229,11 @@ export async function createTeacher(
       select: { id: true },
     })
 
-    let emailSent = false
-    if (process.env.RESEND_API_KEY) {
-      try {
-        const baseUrl =
-          process.env.NEXT_PUBLIC_APP_URL ??
-          process.env.NEXTAUTH_URL ??
-          'https://udruga-inovatic.hr'
-        await resend.emails.send({
-          from: FROM_EMAIL,
-          replyTo: REPLY_TO,
-          to: email,
-          subject: 'Pristupni podaci – Inovatic',
-          react: TeacherCredentialsEmail({
-            firstName: data.firstName,
-            lastName: data.lastName,
-            email,
-            password,
-            loginUrl: `${baseUrl}/prijava`,
-          }),
-        })
-        emailSent = true
-      } catch (err) {
-        // Don't fail the account creation if email delivery fails —
-        // admin can still read the password from plainPassword in the UI.
-        console.error('Failed to send teacher credentials email:', err)
-      }
-    }
+    const emailSent = await sendTeacherCredentialsEmail(
+      { email, firstName: data.firstName, lastName: data.lastName },
+      password,
+      'Pristupni podaci – Inovatic',
+    )
 
     revalidatePath('/admin/nastavnici')
 
@@ -291,31 +300,7 @@ export async function resetTeacherPassword(
       data: { passwordHash, plainPassword: password },
     })
 
-    let emailSent = false
-    if (process.env.RESEND_API_KEY) {
-      try {
-        const baseUrl =
-          process.env.NEXT_PUBLIC_APP_URL ??
-          process.env.NEXTAUTH_URL ??
-          'https://udruga-inovatic.hr'
-        await resend.emails.send({
-          from: FROM_EMAIL,
-          replyTo: REPLY_TO,
-          to: teacher.email,
-          subject: 'Nova lozinka – Inovatic',
-          react: TeacherCredentialsEmail({
-            firstName: teacher.firstName,
-            lastName: teacher.lastName,
-            email: teacher.email,
-            password,
-            loginUrl: `${baseUrl}/prijava`,
-          }),
-        })
-        emailSent = true
-      } catch (err) {
-        console.error('Failed to send teacher reset email:', err)
-      }
-    }
+    const emailSent = await sendTeacherCredentialsEmail(teacher, password, 'Nova lozinka – Inovatic')
 
     revalidatePath(`/admin/nastavnici/${id}`)
     return { success: true, password, emailSent }

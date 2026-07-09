@@ -5,7 +5,7 @@ import { getAssignableTeachers } from '@/actions/admin/teacher'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
 import { db } from '@/lib/db'
-import { GroupTabs } from '@/components/admin/groups/group-tabs'
+import { AdminGroupTabs } from '@/components/admin/groups/group-tabs'
 import { WeeklySchedule } from '@/components/admin/groups/weekly-schedule'
 import { CreateGroupDialog } from '@/components/admin/groups/create-group-dialog'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
@@ -71,7 +71,7 @@ export default async function GroupsPage() {
         <WeeklySchedule groups={groups} />
       </div>
 
-      <GroupTabs
+      <AdminGroupTabs
         standardTabs={standardTabs}
         radioniceTabs={radioniceTabs}
         editable={editable}

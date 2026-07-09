@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DAYS_HR } from '@/lib/format'
 
 export const createGroupSchema = z
   .object({
@@ -7,11 +8,11 @@ export const createGroupSchema = z
     name: z.string().min(1, 'Unesite naziv grupe'),
     // Radionice use dateStart + dateEnd as a closed YYYY-MM-DD range
     // (group runs every day in between); standard programs use dayOfWeek.
-    dateStart: z.string().optional().or(z.literal('')),
-    dateEnd: z.string().optional().or(z.literal('')),
-    dayOfWeek: z.string().optional().or(z.literal('')),
-    startTime: z.string().min(1, 'Unesite vrijeme početka'),
-    endTime: z.string().min(1, 'Unesite vrijeme kraja'),
+    dateStart: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Neispravan datum'), z.literal('')]).optional(),
+    dateEnd: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Neispravan datum'), z.literal('')]).optional(),
+    dayOfWeek: z.union([z.enum(DAYS_HR), z.literal('')]).optional(),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Unesite valjano vrijeme početka (HH:MM)'),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Unesite valjano vrijeme kraja (HH:MM)'),
     maxStudents: z.coerce.number().int().min(1).max(50),
     teacherIds: z.array(z.string().min(1)).optional(),
   })
@@ -41,11 +42,11 @@ export const updateGroupSchema = z
     courseId: z.string().min(1, 'Odaberite program').optional(),
     locationId: z.string().min(1, 'Odaberite lokaciju').optional(),
     name: z.string().min(1, 'Unesite naziv grupe').optional(),
-    dateStart: z.string().optional().or(z.literal('')),
-    dateEnd: z.string().optional().or(z.literal('')),
-    dayOfWeek: z.string().optional().or(z.literal('')),
-    startTime: z.string().min(1, 'Unesite vrijeme početka').optional(),
-    endTime: z.string().min(1, 'Unesite vrijeme kraja').optional(),
+    dateStart: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Neispravan datum'), z.literal('')]).optional(),
+    dateEnd: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Neispravan datum'), z.literal('')]).optional(),
+    dayOfWeek: z.union([z.enum(DAYS_HR), z.literal('')]).optional(),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Unesite valjano vrijeme početka (HH:MM)').optional(),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Unesite valjano vrijeme kraja (HH:MM)').optional(),
     maxStudents: z.coerce.number().int().min(1).max(50).optional(),
     teacherIds: z.array(z.string().min(1)).optional(),
   })
