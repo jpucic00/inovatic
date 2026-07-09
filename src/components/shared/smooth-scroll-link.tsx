@@ -21,7 +21,7 @@ export function SmoothScrollLink({ targetId, className, children }: Readonly<Smo
     const el = document.getElementById(targetId)
     if (!el) return // no target → let the browser's default #hash jump happen
     e.preventDefault()
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const prefersReduced = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches
     el.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth', block: 'start' })
     // Keep the URL hash in sync (shareable / back-button) without re-triggering a jump.
     history.pushState(null, '', `#${targetId}`)

@@ -921,9 +921,10 @@ function dayCellTitle(p: {
       p.showLastRing ? 'Zadnja radionica (28. po redu)' : '',
       ...p.workshops.map((w) => `Radionica: ${w}`),
       ...p.markers.map((m) => m.tooltip),
-      ...p.parties.map(
-        (pt) => `Proslava: ${pt.name}${pt.time ? ` u ${pt.time}` : ''} (${pt.phone})`,
-      ),
+      ...p.parties.map((pt) => {
+        const timeSuffix = pt.time ? ` u ${pt.time}` : ''
+        return `Proslava: ${pt.name}${timeSuffix} (${pt.phone})`
+      }),
     ]
       .filter(Boolean)
       .join('\n') || undefined
@@ -1030,16 +1031,19 @@ function DayCell({
           className="absolute inset-x-1 bottom-0.5 space-y-px text-[9px] font-semibold leading-tight text-fuchsia-900"
           data-testid="party-labels"
         >
-          {parties.map((p) => (
-            <span
-              key={p.inquiryId}
-              className="block truncate"
-              title={`Proslava: ${p.name}${p.time ? ` u ${p.time}` : ''}`}
-            >
-              🎉 {p.time ? `${p.time} ` : ''}
-              {p.name}
-            </span>
-          ))}
+          {parties.map((p) => {
+            const timeSuffix = p.time ? ` u ${p.time}` : ''
+            return (
+              <span
+                key={p.inquiryId}
+                className="block truncate"
+                title={`Proslava: ${p.name}${timeSuffix}`}
+              >
+                🎉 {p.time ? `${p.time} ` : ''}
+                {p.name}
+              </span>
+            )
+          })}
         </div>
       )}
 

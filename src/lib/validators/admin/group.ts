@@ -11,8 +11,10 @@ export const createGroupSchema = z
     dateStart: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Neispravan datum'), z.literal('')]).optional(),
     dateEnd: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Neispravan datum'), z.literal('')]).optional(),
     dayOfWeek: z.union([z.enum(DAYS_HR), z.literal('')]).optional(),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Unesite valjano vrijeme početka (HH:MM)'),
-    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Unesite valjano vrijeme kraja (HH:MM)'),
+    // Hour may be 1 or 2 digits: the group forms bind these to free-text inputs
+    // (placeholder "19:00"), so a morning class typed as "9:00" must be accepted.
+    startTime: z.string().regex(/^\d{1,2}:\d{2}$/, 'Unesite valjano vrijeme početka (HH:MM)'),
+    endTime: z.string().regex(/^\d{1,2}:\d{2}$/, 'Unesite valjano vrijeme kraja (HH:MM)'),
     maxStudents: z.coerce.number().int().min(1).max(50),
     teacherIds: z.array(z.string().min(1)).optional(),
   })
@@ -45,8 +47,8 @@ export const updateGroupSchema = z
     dateStart: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Neispravan datum'), z.literal('')]).optional(),
     dateEnd: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Neispravan datum'), z.literal('')]).optional(),
     dayOfWeek: z.union([z.enum(DAYS_HR), z.literal('')]).optional(),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Unesite valjano vrijeme početka (HH:MM)').optional(),
-    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Unesite valjano vrijeme kraja (HH:MM)').optional(),
+    startTime: z.string().regex(/^\d{1,2}:\d{2}$/, 'Unesite valjano vrijeme početka (HH:MM)').optional(),
+    endTime: z.string().regex(/^\d{1,2}:\d{2}$/, 'Unesite valjano vrijeme kraja (HH:MM)').optional(),
     maxStudents: z.coerce.number().int().min(1).max(50).optional(),
     teacherIds: z.array(z.string().min(1)).optional(),
   })

@@ -53,7 +53,7 @@ export function TimeInput({
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    commit(e.target.value.replace(/\D/g, ''))
+    commit(e.target.value.replaceAll(/\D/g, ''))
   }
 
   const handleBlur = () => {
@@ -63,7 +63,7 @@ export function TimeInput({
   }
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const digits = e.clipboardData.getData('text').replace(/\D/g, '')
+    const digits = e.clipboardData.getData('text').replaceAll(/\D/g, '')
     if (digits.length >= 3) {
       e.preventDefault()
       commit(digits)

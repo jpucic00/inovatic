@@ -10,10 +10,13 @@ export function tabClass(isActive: boolean, size: 'sm' | 'lg' = 'sm'): string {
     size === 'lg'
       ? 'px-4 py-2 text-sm font-medium rounded-t-md border-b-2 -mb-px transition-colors'
       : 'px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 -mb-px whitespace-nowrap transition-colors'
-  const state = isActive
-    ? size === 'lg'
-      ? 'border-cyan-600 text-cyan-700 bg-white'
-      : 'border-cyan-600 text-cyan-700'
-    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+  let state: string
+  if (!isActive) {
+    state = 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+  } else if (size === 'lg') {
+    state = 'border-cyan-600 text-cyan-700 bg-white'
+  } else {
+    state = 'border-cyan-600 text-cyan-700'
+  }
   return `${base} ${state}`
 }

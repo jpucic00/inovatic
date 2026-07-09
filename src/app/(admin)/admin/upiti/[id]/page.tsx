@@ -114,6 +114,8 @@ function PartyInquiryDetail({
   const confirmedIso = inquiry.partyConfirmedDate ? toDateKey(inquiry.partyConfirmedDate) : ''
   const proposedLabel = inquiry.partyProposedDate ? formatDate(inquiry.partyProposedDate) : null
   const confirmedLabel = inquiry.partyConfirmedDate ? formatDate(inquiry.partyConfirmedDate) : null
+  const partyTimeSuffix = inquiry.partyStartTime ? ` u ${inquiry.partyStartTime}` : ''
+  const confirmedTermin = confirmedLabel ? `${confirmedLabel}${partyTimeSuffix}` : '–'
 
   return (
     <div className="max-w-3xl">
@@ -212,14 +214,7 @@ function PartyInquiryDetail({
             value={proposedLabel ?? <span className="text-gray-400 italic">Nije naveden</span>}
           />
           {isScheduled && (
-            <DetailRow
-              label="Dogovoreni termin"
-              value={
-                confirmedLabel
-                  ? `${confirmedLabel}${inquiry.partyStartTime ? ` u ${inquiry.partyStartTime}` : ''}`
-                  : '–'
-              }
-            />
+            <DetailRow label="Dogovoreni termin" value={confirmedTermin} />
           )}
           <DetailRow
             label="Poruka"
