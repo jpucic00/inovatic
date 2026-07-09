@@ -7,7 +7,7 @@
 ```mermaid
 erDiagram
     CourseModule   ||--o{ Material : "scope=MODULE"
-    Course         ||--o{ Material : "scope=COURSE (radionice only)"
+    Course         ||--o{ Material : "scope=COURSE"
     ScheduledGroup ||--o{ Material : "scope=GROUP"
     Material       ||--o{ MaterialGroupHide : "per-group hide rows"
     ScheduledGroup ||--o{ MaterialGroupHide : "hidden here"
@@ -19,7 +19,7 @@ erDiagram
         string courseId FK "non-null iff scope=COURSE"
         string scheduledGroupId FK "non-null iff scope=GROUP"
         string title
-        MaterialType type "DOCUMENT | PRESENTATION | VIDEO | LINK"
+        MaterialType type "DOCUMENT | PRESENTATION | VIDEO | LINK | ROBOCAMP"
         string fileUrl "Cloudinary (DOCUMENT/PRESENTATION/VIDEO file)"
         string externalUrl "YouTube/Vimeo (VIDEO) or LINK target"
     }
@@ -67,18 +67,17 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    CTX["MaterialScopeContext<br/>{scheduledGroupId, courseId, courseIsCustom, moduleIds[]}"]
+    CTX["MaterialScopeContext<br/>{scheduledGroupId, courseId, moduleIds[]}"]
     CTX --> B1["scope=GROUP AND scheduledGroupId = ctx.scheduledGroupId"]
+    CTX --> B3["scope=COURSE AND courseId = ctx.courseId"]
     CTX --> Q1{"moduleIds.length > 0?"}
     Q1 -->|Yes| B2["scope=MODULE AND moduleId IN ctx.moduleIds"]
     Q1 -->|No| SK1["(skip MODULE branch)"]
-    CTX --> Q2{"courseIsCustom?"}
-    Q2 -->|"Yes (radionica)"| B3["scope=COURSE AND courseId = ctx.courseId"]
-    Q2 -->|"No (standard)"| SK2["(skip COURSE branch)"]
 
     B1 --> UNION["OR — union of scope branches"]
     B2 --> UNION
     B3 --> UNION
+    SK1 --> UNION
 
     UNION --> HIDE{"hiddenInGroups.some({scheduledGroupId})?"}
     HIDE -->|Yes| HIDDEN["Excluded by MaterialGroupHide"]
@@ -87,17 +86,16 @@ flowchart LR
     style VISIBLE fill:#d1fae5
     style HIDDEN fill:#fee2e2
     style SK1 fill:#f3f4f6
-    style SK2 fill:#f3f4f6
 ```
 
-> Source: `buildEffectiveMaterialsWhere(ctx)` in `src/lib/material-query.ts:24-43`. Returns a single `Prisma.MaterialWhereInput` whose `AND` clause combines `OR` of scope branches with a `NOT hiddenInGroups.some(...)` filter so the hide always wins.
+> Source: `buildEffectiveMaterialsWhere(ctx)` in `src/lib/material-query.ts:24-43`. COURSE branch is always included — both standard programs (program-wide materials) and radionice (course-wide materials). MODULE branch only added when `moduleIds.length > 0`. Returns a `Prisma.MaterialWhereInput` with `NOT hiddenInGroups.some(...)` applied uniformly across all branches.
 
 ## Summary
 
 | Scope | Required FK | What students see | Hide-per-group? |
 |---|---|---|---|
 | `MODULE` | `moduleId → CourseModule` | Every `ScheduledGroup` whose course owns that module | Yes — `MaterialGroupHide` on a specific group hides this row for that group only |
-| `COURSE` | `courseId → Course` | Every `ScheduledGroup` of a radionica (`Course.isCustom = true`) | Yes — same mechanism |
+| `COURSE` | `courseId → Course` | Every `ScheduledGroup` of that course (standard and radionice). On standard programs = "whole program" materials visible across all modules. | Yes — same mechanism |
 | `GROUP` | `scheduledGroupId → ScheduledGroup` | Only the one `ScheduledGroup` it points at | N/A — already group-scoped |
 
 ## Why three layers

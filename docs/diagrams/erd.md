@@ -13,8 +13,6 @@ erDiagram
         int ageMax
         string equipment "nullable"
         float price "nullable"
-        decimal priceYear "nullable"
-        decimal priceModule "nullable"
         string imageUrl "nullable"
         int sortOrder "default 0"
         boolean isCustom "default false - true for radionice"
@@ -62,8 +60,6 @@ erDiagram
         string id PK
         string name
         string address
-        float lat "nullable"
-        float lng "nullable"
         string phone "nullable"
         string email "nullable"
     }
@@ -90,25 +86,27 @@ erDiagram
 
     Inquiry {
         string id PK
+        InquiryType type "COURSE - PARTY - default COURSE"
         string parentName
         string parentEmail
         string parentPhone
-        string childFirstName
-        string childLastName
+        string childFirstName "nullable - null for PARTY"
+        string childLastName "nullable - null for PARTY"
         string childDateOfBirth "nullable"
         string childSchool "nullable"
         string childGrade "nullable"
-        CourseLevel courseLevelPref "nullable"
-        string locationPref "nullable"
         string courseId FK "nullable"
         string scheduledGroupId FK "nullable - preferred group"
         string assignedGroupId FK "nullable - final group"
         string studentId FK "nullable"
         string message "nullable"
         string referralSource "nullable"
+        datetime partyProposedDate "nullable - PARTY: parent's preferred date"
+        datetime partyConfirmedDate "nullable - PARTY: admin-confirmed date"
+        string partyStartTime "nullable - PARTY: HH:mm start time"
         datetime consentGivenAt "nullable"
-        InquiryStatus status "NEW - ACCOUNT_CREATED - DECLINED"
-        string schoolYear "nullable - cohort stamp; indexed"
+        InquiryStatus status "NEW - PARTY_SCHEDULED - ACCOUNT_CREATED - DECLINED"
+        string schoolYear "nullable - submission-year bucket; NOT derived from party dates"
         string declineReason "nullable - db.Text - reason captured on DECLINE"
     }
 
@@ -123,7 +121,6 @@ erDiagram
         string phone "nullable"
         string dateOfBirth "nullable - YYYY-MM-DD for students"
         UserRole role "ADMIN - TEACHER - STUDENT"
-        datetime emailVerified "nullable"
         string parentName "nullable - migrated from Inquiry"
         string parentEmail "nullable - migrated from Inquiry"
         string parentPhone "nullable - migrated from Inquiry"
@@ -155,7 +152,7 @@ erDiagram
         string moduleId FK "nullable - set for MODULE scope"
         string title
         string description "nullable"
-        MaterialType type "DOCUMENT - PRESENTATION - VIDEO - LINK"
+        MaterialType type "DOCUMENT - PRESENTATION - VIDEO - LINK - ROBOCAMP"
         string fileUrl "nullable"
         string externalUrl "nullable - YouTube or Vimeo URL"
         int fileSize "nullable"
@@ -285,7 +282,8 @@ erDiagram
 |------|--------|
 | UserRole | `ADMIN`, `TEACHER`, `STUDENT` |
 | CourseLevel | `SLR_1`, `SLR_2`, `SLR_3`, `SLR_4` |
-| InquiryStatus | `NEW`, `ACCOUNT_CREATED`, `DECLINED` |
+| InquiryType | `COURSE`, `PARTY` |
+| InquiryStatus | `NEW`, `PARTY_SCHEDULED`, `ACCOUNT_CREATED`, `DECLINED` |
 | CommentType | `COMMENT`, `MODULE_REVIEW` |
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
 | MaterialScope | `MODULE`, `COURSE`, `GROUP` |
@@ -341,7 +339,7 @@ erDiagram
 
 | Model | Indexes |
 |-------|---------|
-| Inquiry | `scheduledGroupId`, `status`, `assignedGroupId`, `courseId`, `studentId`, `schoolYear` |
+| Inquiry | `scheduledGroupId`, `status`, `assignedGroupId`, `courseId`, `studentId`, `schoolYear`, `(type, status)` |
 | CourseEnrollmentWindow | `schoolYear` |
 | SchoolYearHoliday | `schoolYear` |
 | Material | `(scope, moduleId)`, `(scope, courseId)`, `(scope, scheduledGroupId)` |
@@ -361,3 +359,73 @@ erDiagram
 - An `Enrollment` row means "this student is in this group for this school year". To cancel a radionica enrollment, delete the row. `fullYearPaidAt` is the admin "whole school year paid" mark.
 - A `ModuleEnrollment` row means "this student is taking this module instance". To remove a student from a module, delete the row. Cascading to later modules is **not** automatic — each module row must be deleted individually. `paidAt` is the admin per-module paid mark.
 - A module is "done" when `ModuleSchedule.endDate < now`, either because the date naturally passed or because a teacher manually set `endDate = now` via `closeModuleSchedule`.
+
+## Module Template vs Year Instance
+
+Every standard SLR course is split into four modules (M1–M4). The same four titles run every school year, but each year's instance has its own dates and its own cohort of students. The schema separates the **template** (`CourseModule` — what the module is about, shared across years) from the **year instance** (`ModuleSchedule` — when it runs and who takes it).
+
+### `ModuleSchedule.startDate / endDate` are course-wide reference, NOT per-group
+
+`ModuleSchedule.startDate` is the school-year kickoff for the whole course. `ModuleSchedule.endDate` is the **slowest-weekday's 7th session** — written by the planner so all weekdays are guaranteed at least 7 sessions inside the window.
+
+But each `ScheduledGroup` runs on its own `dayOfWeek`, and `SchoolYearHoliday` rows don't fall evenly across weekdays. So the *real* first/last session for a Wed group is different from the same module's first/last for a Mon group. The "which module is this group on" question therefore can't be answered from `ModuleSchedule.startDate/endDate` alone.
+
+`getGroupModuleArc({ dayOfWeek, modules, holidayDates })` ([src/lib/group-module-arc.ts](../../src/lib/group-module-arc.ts)) walks 4×7 weekday occurrences forward from the school-year kickoff, race-ahead. Used by:
+
+- `computeGroupCapacity` (`src/lib/group-capacity.ts`) — counts enrollments against each group's own next-enrolling module.
+- `toActiveGroup` in `src/actions/public/programs.ts` — hides a group when its arc has no future module.
+- `getCurrentActiveModuleForGroup` in `src/lib/active-module.ts` — drives "current materials" in the student portal and teacher gallery.
+- `computeModuleMarkers` in `src/lib/school-year-planner.ts` — calendar M1↑/M1↓ markers land on each weekday's own 7th session.
+
+### What changes year to year
+
+| Concept | Lives on | Changes year to year? |
+|---------|----------|----------------------|
+| Module title, description, `sortOrder` | `CourseModule` | No — one template, many year instances |
+| Start / end dates (course-wide reference) | `ModuleSchedule` | Yes — new row per `schoolYear` |
+| Per-group first/last session | *Derived* — `getGroupModuleArc` | N/A — computed on every read |
+| Roster (which students took this module) | `ModuleEnrollment → ModuleSchedule` | Yes — scoped to a single year |
+| MODULE-scoped material | `Material.moduleId → CourseModule` | No — inherited forward, shared by all cohorts |
+| COURSE-scoped material | `Material.courseId → Course` | No — applies program-wide (standard and radionice) |
+| GROUP-scoped material | `Material.scheduledGroupId → ScheduledGroup` | Yes — specific to one cohort/group |
+| Student feedback / module reviews | `StudentComment.moduleId → CourseModule` | Stays on the template |
+
+### Unique constraint
+
+```
+ModuleSchedule @@unique([moduleId, schoolYear])
+```
+
+A given template module has **at most one schedule per school year**. Creating a new year is "for each `CourseModule`, create one `ModuleSchedule` with the new year string and the planned `startDate`/`endDate`."
+
+### Example — SLR 1, Module 1 across two years
+
+```mermaid
+flowchart LR
+    subgraph Template[CourseModule SLR 1 Module 1]
+        T[id mod_A<br/>title SLR 1 - Module 1<br/>sortOrder 1]
+    end
+
+    subgraph Instances[ModuleSchedule rows]
+        S1[id sched_2025<br/>schoolYear 2025/2026<br/>startDate 2025-09-15]
+        S2[id sched_2026<br/>schoolYear 2026/2027<br/>startDate 2026-09-14]
+    end
+
+    subgraph Enrollments[ModuleEnrollment rows]
+        ME1[Ana - sched_2025]
+        ME2[Marko - sched_2025]
+        ME3[Iva - sched_2026]
+    end
+
+    Template --> S1
+    Template --> S2
+    S1 --> ME1
+    S1 --> ME2
+    S2 --> ME3
+```
+
+### Relationship to `Enrollment`
+
+`Enrollment` is "this student is in this group for this school year". `ModuleEnrollment` is "this student is taking this module instance within that group enrollment". For a radionica (`course.isCustom`) only the `Enrollment` row exists — no modules.
+
+Deleting an `Enrollment` cascades (`onDelete: Cascade`) to its `ModuleEnrollment` rows. Deleting a `ModuleEnrollment` does **not** cascade — removing a student from M2 leaves M3 and M4 untouched.
