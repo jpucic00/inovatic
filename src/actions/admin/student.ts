@@ -3,6 +3,7 @@
 import type { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth-guard'
+import { buildStudentDetailForAdmin } from '@/lib/student-detail'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import {
@@ -30,7 +31,7 @@ import {
   type PaymentStatus,
   type PaymentFilter,
 } from '@/lib/payment-status'
-import type { PaginatedResult } from './inquiry'
+import type { PaginatedResult } from '@/lib/action-types'
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
 
@@ -757,73 +758,7 @@ export async function getStudents(
 
 export async function getStudent(id: string) {
   await requireAdmin()
-
-  return db.user.findUnique({
-    where: { id, role: 'STUDENT' },
-    include: {
-      enrollments: {
-        include: {
-          scheduledGroup: {
-            include: {
-              course: {
-                select: {
-                  id: true,
-                  title: true,
-                  level: true,
-                  isCustom: true,
-                  modules: {
-                    orderBy: { sortOrder: 'asc' },
-                    select: {
-                      id: true,
-                      title: true,
-                      sortOrder: true,
-                      schedules: {
-                        select: {
-                          id: true,
-                          schoolYear: true,
-                          startDate: true,
-                          endDate: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-              location: { select: { name: true, address: true } },
-            },
-          },
-          moduleEnrollments: {
-            include: {
-              moduleSchedule: {
-                select: {
-                  id: true,
-                  schoolYear: true,
-                  module: { select: { id: true, title: true, sortOrder: true } },
-                },
-              },
-            },
-            orderBy: { moduleSchedule: { module: { sortOrder: 'asc' } } },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      },
-      studentComments: {
-        include: {
-          author: { select: { id: true, firstName: true, lastName: true, role: true, deletedAt: true } },
-          module: { select: { id: true, title: true } },
-          group: {
-            select: {
-              id: true,
-              name: true,
-              schoolYear: true,
-              course: { select: { title: true } },
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      },
-    },
-  })
+  return buildStudentDetailForAdmin(id)
 }
 
 export async function deleteEnrollment(enrollmentId: string): Promise<AdminActionResult> {
@@ -855,14 +790,13 @@ export async function deleteStudent(studentId: string): Promise<AdminActionResul
   if (!studentId) return { success: false, error: 'ID nije pronađen.' }
 
   try {
-    // Clear studentId references on inquiries first
-    await db.inquiry.updateMany({
-      where: { studentId },
-      data: { studentId: null },
+    await db.$transaction(async (tx) => {
+      await tx.inquiry.updateMany({
+        where: { studentId },
+        data: { studentId: null },
+      })
+      await tx.user.delete({ where: { id: studentId } })
     })
-
-    // Delete user (cascades enrollments + student comments)
-    await db.user.delete({ where: { id: studentId } })
 
     revalidatePath('/admin/ucenici')
     // Removing the student drops the "Ponovni upis" match from any inquiry that

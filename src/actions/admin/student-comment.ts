@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import { createCommentSchema } from '@/lib/validators/admin/student-comment'
+import { insertStudentComment } from '@/lib/student-comment-core'
 
 export async function createComment(data: {
   studentId: string
@@ -18,22 +19,20 @@ export async function createComment(data: {
   const parsed = createCommentSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
-  try {
-    const authorId = session.user.id
-    if (!authorId) return { success: false, error: 'Neautorizirano.' }
+  const authorId = session.user.id
+  if (!authorId) return { success: false, error: 'Neautorizirano.' }
 
-    await db.studentComment.create({
-      data: {
+  try {
+    await insertStudentComment(
+      {
         studentId: parsed.data.studentId,
         groupId: parsed.data.groupId,
-        authorId,
         content: parsed.data.content,
         type: parsed.data.type ?? 'COMMENT',
-        moduleId: parsed.data.moduleId || null,
+        moduleId: parsed.data.moduleId ?? null,
       },
-    })
-
-    revalidatePath(`/admin/ucenici/${parsed.data.studentId}`)
+      authorId,
+    )
     return { success: true }
   } catch (err) {
     console.error('createComment failed:', err)
@@ -49,12 +48,15 @@ export async function deleteComment(commentId: string): Promise<AdminActionResul
   try {
     const comment = await db.studentComment.findUnique({
       where: { id: commentId },
+      select: { studentId: true, groupId: true },
     })
     if (!comment) return { success: false, error: 'Komentar nije pronađen.' }
 
     await db.studentComment.delete({ where: { id: commentId } })
 
     revalidatePath(`/admin/ucenici/${comment.studentId}`)
+    revalidatePath(`/nastavnik/ucenik/${comment.studentId}`)
+    revalidatePath(`/nastavnik/grupa/${comment.groupId}`)
     return { success: true }
   } catch (err) {
     console.error('deleteComment failed:', err)

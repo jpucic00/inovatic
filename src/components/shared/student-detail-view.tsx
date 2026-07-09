@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft, Mail, Phone } from 'lucide-react'
-import type { getStudent } from '@/actions/admin/student'
-import type { StudentAttendanceEnrollment } from '@/actions/admin/attendance'
+import type { StudentDetail } from '@/lib/student-detail'
+import type { StudentAttendanceEnrollment } from '@/lib/student-attendance'
 import type { AdminActionResult } from '@/lib/action-types'
 import type {
   AdminCommentsPanelSection,
@@ -13,7 +13,7 @@ import { StudentYearSections } from '@/components/shared/student-year-sections'
 import { CopyButton } from './copy-button'
 import { formatDate, formatDateKey } from '@/lib/format'
 
-type StudentWithRelations = NonNullable<Awaited<ReturnType<typeof getStudent>>>
+type StudentWithRelations = StudentDetail
 
 type CreateCommentAction = (input: {
   studentId: string

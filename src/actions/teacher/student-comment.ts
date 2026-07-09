@@ -10,6 +10,7 @@ import {
 } from '@/lib/teacher-guard'
 import { createCommentSchema } from '@/lib/validators/admin/student-comment'
 import type { AdminActionResult } from '@/lib/action-types'
+import { insertStudentComment } from '@/lib/student-comment-core'
 
 export async function createTeacherComment(input: {
   groupId: string
@@ -25,20 +26,16 @@ export async function createTeacherComment(input: {
   await assertStudentInGroup(parsed.data.studentId, parsed.data.groupId)
 
   try {
-    await db.studentComment.create({
-      data: {
+    await insertStudentComment(
+      {
         studentId: parsed.data.studentId,
         groupId: parsed.data.groupId,
-        authorId: session.user.id,
         content: parsed.data.content,
         type: parsed.data.type ?? 'COMMENT',
-        moduleId: parsed.data.moduleId || null,
+        moduleId: parsed.data.moduleId ?? null,
       },
-    })
-
-    revalidatePath(`/nastavnik/grupa/${parsed.data.groupId}`)
-    revalidatePath(`/nastavnik/ucenik/${parsed.data.studentId}`)
-    revalidatePath(`/admin/ucenici/${parsed.data.studentId}`)
+      session.user.id,
+    )
     return { success: true }
   } catch (err) {
     console.error('createTeacherComment failed:', err)
@@ -74,4 +71,3 @@ export async function deleteTeacherComment(
     return { success: false, error: 'Greška pri brisanju komentara.' }
   }
 }
-

@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import type { getStudent } from '@/actions/admin/student'
-import type { StudentAttendanceEnrollment } from '@/actions/admin/attendance'
+import type { StudentDetail } from '@/lib/student-detail'
+import type { StudentAttendanceEnrollment } from '@/lib/student-attendance'
 import type { AdminActionResult } from '@/lib/action-types'
 import {
   StudentCommentsPanel,
@@ -15,9 +15,7 @@ import { ManageEnrollmentModules } from '@/components/admin/students/manage-enro
 import { EnrollmentPaymentPanel } from '@/components/admin/students/enrollment-payment-panel'
 import { formatDate } from '@/lib/format'
 
-type StudentEnrollments = NonNullable<
-  Awaited<ReturnType<typeof getStudent>>
->['enrollments']
+type StudentEnrollments = StudentDetail['enrollments']
 
 type CreateCommentAction = (input: {
   studentId: string
