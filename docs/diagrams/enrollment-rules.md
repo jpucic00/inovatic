@@ -2,6 +2,8 @@
 
 Business rules for the inquiry → account-creation pipeline, spot reservation, and inquiry state transitions.
 
+**City tenancy:** the public `/upisi` form opens with a **mandatory city dropdown** (Split/Šibenik, no default) as Step 1's first field; the whole pipeline below runs inside that one city. `submitInquiry` server-verifies `chosenGroup.city === submitted city` and persists `Inquiry.city`; the party form has no dropdown — `submitPartyInquiry` stamps `SPLIT` (proslave are Split-only at launch). Admin review, group pickers and account creation are scoped to the admin's session city; `createStudentFromInquiry` additionally asserts `group.city === inquiry.city` inside the transaction, and a returning-student identity match in the *other* city blocks the accept flow with an escalation message (never auto-reuses the account).
+
 ---
 
 ## 1. Inquiry State Machine
@@ -27,6 +29,7 @@ stateDiagram-v2
 
     note right of NEW_COURSE
         type = COURSE
+        city = parent's Step-1 choice (group.city verified against it)
         consentGivenAt set to now
         Email: InquiryConfirmationEmail to parent
         Spot reserved if scheduledGroupId provided
@@ -35,6 +38,7 @@ stateDiagram-v2
 
     note right of NEW_PARTY
         type = PARTY
+        city = SPLIT stamped server-side (proslave are Split-only)
         partyProposedDate from form (optional)
         Email: PartyInquiryConfirmationEmail to parent
         No spot reservation (not a group enrollment)
@@ -71,7 +75,7 @@ stateDiagram-v2
 
 | From | To | Action | Guard | Side effects |
 |------|-----|--------|-------|-------------|
-| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation | Inquiry created; confirmation email; spot reserved if group selected (COURSE) |
+| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation; COURSE: `group.city === submitted city` | Inquiry created with `city`; confirmation email; spot reserved if group selected (COURSE) |
 | `NEW` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED && status !== DECLINED`; `type === COURSE` | User + Enrollment + ModuleEnrollments; credentials email; `studentId` + `assignedGroupId` set |
 | `NEW` | `PARTY_SCHEDULED` | `schedulePartyInquiry` | `type === PARTY` | `partyConfirmedDate` + `partyStartTime` set; appears on Kalendar |
 | `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000) | `declineReason` persisted; spot freed |
@@ -98,9 +102,9 @@ Spot math differs between standard courses (module-scoped) and radionice (group-
 
 ```mermaid
 flowchart TD
-    A[getActivePrograms called] --> A2["Resolve OPEN windows first: CourseEnrollmentWindow rows where enrollmentStart &lt;= now &lt;= enrollmentEnd → Set of (courseId, schoolYear) keys"]
-    A2 --> B["For each ScheduledGroup whose own (courseId, schoolYear) is in the open-window Set"]
-    B --> C["nextEnrollingModule = getGroupModuleArc(dayOfWeek, modules, holidays) race-ahead → first arc module whose firstSession &gt; now"]
+    A["getActivePrograms(city) called"] --> A2["Resolve OPEN windows first: CourseEnrollmentWindow rows for THIS city where enrollmentStart &lt;= now &lt;= enrollmentEnd → Set of (courseId, schoolYear, city) keys"]
+    A2 --> B["For each ScheduledGroup of this city whose own (courseId, schoolYear, city) is in the open-window Set"]
+    B --> C["nextEnrollingModule = getGroupModuleArc(dayOfWeek, modules + this city's ModuleSchedule rows, this city's holidays) race-ahead → first arc module whose firstSession &gt; now"]
     C --> D{nextEnrollingModule exists?}
     D -->|No| HIDE[Group hidden from /upisi - graduated past M4 or schedule incomplete]
     D -->|Yes| E["enrolledCount = enrollments whose moduleEnrollments include nextEnrollingModule.moduleScheduleId"]
@@ -120,8 +124,8 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[getActivePrograms called] --> A2["Resolve OPEN windows first: CourseEnrollmentWindow rows where enrollmentStart &lt;= now &lt;= enrollmentEnd → Set of (courseId, schoolYear) keys"]
-    A2 --> B["For each ScheduledGroup whose own (courseId, schoolYear) is in the open-window Set"]
+    A["getActivePrograms(city) called"] --> A2["Resolve OPEN windows first: CourseEnrollmentWindow rows for THIS city where enrollmentStart &lt;= now &lt;= enrollmentEnd → Set of (courseId, schoolYear, city) keys"]
+    A2 --> B["For each ScheduledGroup of this city whose own (courseId, schoolYear, city) is in the open-window Set"]
     B --> C[enrolledCount = all enrollments in group, presence only]
     C --> D[preferredCount = inquiries where status = NEW]
     D --> E["available = maxStudents - enrolledCount - preferredCount"]
@@ -213,8 +217,9 @@ flowchart TD
     A[createStudentFromInquiry called] --> B[Extract childFirstName, childLastName, childDateOfBirth from inquiry]
     B --> C{childDateOfBirth available?}
     C -->|No DOB| NEW[Create new student]
-    C -->|Has DOB| D{Find User where role = STUDENT and firstName + lastName case-insensitive and dateOfBirth matches?}
-    D -->|Found| REUSE[Reuse existing student]
+    C -->|Has DOB| D{Find User where role = STUDENT and firstName + lastName case-insensitive and dateOfBirth matches? GLOBAL - both cities}
+    D -->|Found in the SAME city| REUSE[Reuse existing student]
+    D -->|Found in the OTHER city| BLOCK["CrossCityStudentError - accept flow blocked with escalation message; the other city's account and credentials are never surfaced"]
     D -->|Not found| NEW
 
     NEW --> G[generateUsername: strip diacritics lowercase]
@@ -234,12 +239,15 @@ flowchart TD
 
     style NEW fill:#e0f2fe
     style REUSE fill:#fef3c7
+    style BLOCK fill:#fee2e2
     style M fill:#d1fae5
 ```
 
 ---
 
 ## 4. Grade-to-Level Mapping and Group Filtering
+
+> Step 3 renders only the **Step-1 city's** programs/groups (`programsByCity` payload; changing the city clears any stale course/group selection). Grade filtering below then applies within that city.
 
 ```mermaid
 flowchart TD
@@ -299,15 +307,15 @@ flowchart TD
 
 ## 5. Enrollment Window Logic
 
-The signup window lives on `CourseEnrollmentWindow(courseId, schoolYear)` — one row per program per school year, inherited by every group of that program/year.
+The signup window lives on `CourseEnrollmentWindow(courseId, schoolYear, city)` — one row per program per school year **per city** (each city opens the shared program independently), inherited by every group of that program/year/city.
 
 ```mermaid
 flowchart TD
-    A[getActivePrograms] --> B["Load OPEN windows: CourseEnrollmentWindow where enrollmentStart &lt;= now AND enrollmentEnd &gt;= now"]
+    A["getActivePrograms(city)"] --> B["Load OPEN windows for THIS city: CourseEnrollmentWindow where city = caller city AND enrollmentStart &lt;= now AND enrollmentEnd &gt;= now"]
     B --> B0{Any open window?}
     B0 -->|No| EMPTY[Return empty - nothing enrollable]
-    B0 -->|Yes| B1["openKeys = Set of (courseId, schoolYear); fetch groups for those courseIds"]
-    B1 --> C{"Group's own (courseId, schoolYear) in openKeys?"}
+    B0 -->|Yes| B1["openKeys = Set of (courseId, schoolYear, city); fetch this city's groups for those courseIds"]
+    B1 --> C{"Group's own (courseId, schoolYear, city) in openKeys?"}
     C -->|No| EXCLUDE[Excluded - program has no open window for THIS group's year]
     C -->|Yes| D{course.isCustom?}
 
@@ -325,7 +333,7 @@ flowchart TD
     style INCLUDE fill:#d1fae5
 ```
 
-> A window counts as open only when **both** `enrollmentStart` and `enrollmentEnd` are set and `now` falls inside the range. No `CourseEnrollmentWindow` row for a `(course, year)` — or one outside the range — hides every group of that program/year. There is no "always open" shortcut.
+> A window counts as open only when **both** `enrollmentStart` and `enrollmentEnd` are set and `now` falls inside the range. No `CourseEnrollmentWindow` row for a `(course, year, city)` — or one outside the range — hides every group of that program/year in that city; a Split window never exposes Šibenik groups or vice versa. There is no "always open" shortcut.
 >
 > The standard-course second gate is the per-group race-ahead arc (`getGroupModuleArc` → next-enrolling module), not a raw `ModuleSchedule.startDate > now` check. Closing the running module early (`closeModuleSchedule` sets `endDate = today`) reshapes the arc so a later module becomes the next-enrolling one.
 

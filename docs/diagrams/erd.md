@@ -17,12 +17,14 @@ erDiagram
         int sortOrder "default 0"
         boolean isCustom "default false - true for radionice"
         string schoolYear "nullable - set on radionice (year-scoped); null on standard SLR (global)"
+        City city "nullable - null on shared standard SLR; set on per-city radionice"
     }
 
     CourseEnrollmentWindow {
         string id PK
         string courseId FK
-        string schoolYear "part of unique(courseId, schoolYear)"
+        string schoolYear "part of unique(courseId, schoolYear, city)"
+        City city "each city opens the shared program independently"
         datetime enrollmentStart "nullable - window lower bound"
         datetime enrollmentEnd "nullable - window upper bound"
     }
@@ -39,6 +41,7 @@ erDiagram
         string id PK
         string moduleId FK
         string schoolYear "e.g. 2025/2026"
+        City city "per-city planner rows for the shared curriculum"
         datetime startDate "nullable - @db.Date"
         datetime endDate "nullable - @db.Date; set to today to close early"
     }
@@ -50,8 +53,9 @@ erDiagram
 
     SchoolYearHoliday {
         string id PK
-        string schoolYear FK "references SchoolYear.label - unique with date"
-        datetime date "@db.Date - unique with schoolYear"
+        string schoolYear FK "references SchoolYear.label - unique with (city, date)"
+        City city "per-city holiday calendars"
+        datetime date "@db.Date - unique with (schoolYear, city)"
         string name "nullable"
         string createdById FK "nullable - User who added it"
     }
@@ -62,12 +66,14 @@ erDiagram
         string address
         string phone "nullable"
         string email "nullable"
+        City city "canonical venue-to-city map; unique(id, city) backs the composite FK"
     }
 
     ScheduledGroup {
         string id PK
         string courseId FK
-        string locationId FK
+        string locationId FK "composite FK (locationId, city) to Location(id, city)"
+        City city "denormalized from the venue - drift impossible at DB level"
         string name "nullable"
         string dateStart "nullable - radionica range start YYYY-MM-DD"
         string dateEnd "nullable - radionica range end YYYY-MM-DD"
@@ -108,6 +114,7 @@ erDiagram
         InquiryStatus status "NEW - PARTY_SCHEDULED - ACCOUNT_CREATED - DECLINED"
         string schoolYear "nullable - submission-year bucket; NOT derived from party dates"
         string declineReason "nullable - db.Text - reason captured on DECLINE"
+        City city "required - parent's Step-1 choice; PARTY stamps SPLIT server-side"
     }
 
     User {
@@ -127,6 +134,7 @@ erDiagram
         string childSchool "nullable - migrated from Inquiry"
         datetime gdprConsentAt "nullable"
         datetime deletedAt "nullable - soft-delete for teachers (migration 20260513101212)"
+        City city "tenant - drives session scoping for all three roles"
     }
 
     Enrollment {
@@ -199,6 +207,7 @@ erDiagram
         string authorId FK
         boolean isPublished "default false"
         datetime publishedAt "nullable"
+        City city "auto-stamped from the author's admin session; public list stays cross-city with badges"
     }
 
     ArticleImage {
@@ -280,6 +289,7 @@ erDiagram
 
 | Enum | Values |
 |------|--------|
+| City | `SPLIT`, `SIBENIK` — the tenant boundary; **no `@default`**, every create stamps it explicitly |
 | UserRole | `ADMIN`, `TEACHER`, `STUDENT` |
 | CourseLevel | `SLR_1`, `SLR_2`, `SLR_3`, `SLR_4` |
 | InquiryType | `COURSE`, `PARTY` |
@@ -297,7 +307,7 @@ erDiagram
 | Course → CourseModule | One course has many modules (the template) |
 | CourseModule → ModuleSchedule | One template module has one schedule per `schoolYear` (historized instance) |
 | Course → ScheduledGroup | One course has many groups - time slots |
-| ScheduledGroup → Location | Each group meets at one location |
+| ScheduledGroup → Location | Each group meets at one location — composite FK `(locationId, city) → Location(id, city)`, so a group can never drift to another city than its venue |
 | ScheduledGroup → TeacherAssignment → User | Teachers assigned to groups - many-to-many |
 | Inquiry → Course | Parent preferred program - optional |
 | Inquiry.scheduledGroupId → ScheduledGroup | Parent preferred group from form - reserves spot |
@@ -310,7 +320,7 @@ erDiagram
 | ScheduledGroup → GalleryImage → CourseModule | Images scoped to group; `moduleId` required for standard programs, null for radionice |
 | Enrollment → Attendance | One attendance record per session date per enrollment. Session dates are derived, not stored. |
 | User → Article | Author relation for news articles |
-| Course → CourseEnrollmentWindow | Per-`(course, schoolYear)` public signup window. Every group of that program/year inherits it; replaces the old per-group `enrollmentStart/End`. |
+| Course → CourseEnrollmentWindow | Per-`(course, schoolYear, city)` public signup window. Every group of that program/year/city inherits it; replaces the old per-group `enrollmentStart/End`. |
 | SchoolYear → SchoolYearHoliday | Per-year non-class days (holidays, breaks, ad-hoc closures). Excluded from `computeExpectedSessions` / `computeRadionicaSessions`. `SchoolYearHoliday.schoolYear` is a real Prisma FK to `SchoolYear.label` (`onDelete: Cascade`). |
 | User → SchoolYearHoliday | `createdBy` relation (nullable) — admin who added the holiday. |
 | SchoolYear | Standalone registry of valid year labels (`YYYY/YYYY`). The `schoolYear` string columns on `ScheduledGroup`, `ModuleSchedule`, `Enrollment`, `Inquiry`, `Course` (radionice) and `CourseEnrollmentWindow` reference `SchoolYear.label` by string with **no** Prisma FK relation; only `SchoolYearHoliday.schoolYear` is a true FK. |
@@ -325,9 +335,10 @@ erDiagram
 | Article.slug | unique |
 | Tag.name | unique |
 | Tag.slug | unique |
-| ModuleSchedule | `(moduleId, schoolYear)` |
-| CourseEnrollmentWindow | `(courseId, schoolYear)` |
-| SchoolYearHoliday | `(schoolYear, date)` |
+| ModuleSchedule | `(moduleId, schoolYear, city)` |
+| CourseEnrollmentWindow | `(courseId, schoolYear, city)` |
+| SchoolYearHoliday | `(schoolYear, city, date)` |
+| Location | `(id, city)` — backstop target for the `ScheduledGroup(locationId, city)` composite FK |
 | Enrollment | `(userId, scheduledGroupId, schoolYear)` |
 | ModuleEnrollment | `(enrollmentId, moduleScheduleId)` |
 | TeacherAssignment | `(userId, scheduledGroupId)` |
@@ -339,12 +350,28 @@ erDiagram
 
 | Model | Indexes |
 |-------|---------|
-| Inquiry | `scheduledGroupId`, `status`, `assignedGroupId`, `courseId`, `studentId`, `schoolYear`, `(type, status)` |
+| User | `(role, city)` |
+| Location | `city` |
+| ScheduledGroup | `(city, schoolYear)` |
+| Inquiry | `scheduledGroupId`, `status`, `assignedGroupId`, `courseId`, `studentId`, `schoolYear`, `(type, status)`, `(city, schoolYear, status)` |
+| Article | `(city, isPublished)` |
 | CourseEnrollmentWindow | `schoolYear` |
 | SchoolYearHoliday | `schoolYear` |
 | Material | `(scope, moduleId)`, `(scope, courseId)`, `(scope, scheduledGroupId)` |
 | GalleryImage | `(scheduledGroupId, moduleId, sortOrder)` |
 | Attendance | `sessionDate` |
+
+## City Tenancy (two-city separation)
+
+Split and Šibenik run as fully separated tenants inside one app. "City" is the tenant; `Location` stays the venue *within* a city (Trokut inkubator is a `Location` with `city = SIBENIK`).
+
+**Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `SchoolYearHoliday`, and `Course` (nullable — `null` = shared standard SLR program, set = per-city radionica).
+
+**Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`Attendance`/`GalleryImage`/`TeacherAssignment`/`StudentComment`/`MaterialGroupHide` through their group, `ArticleImage`/`ArticleTag` through their article.
+
+**Deliberately shared (no city):** the `SchoolYear` label registry, the `Tag` taxonomy, `CourseModule` templates, and MODULE/COURSE-scoped `Material` rows (one curriculum for both cities). GROUP-scoped materials are per-group, hence per-city.
+
+**No `@default` on any city column** — a create that forgets to stamp `city` is a compile/DB error, never a silent SPLIT mis-stamp. Scoping is session-driven: `session.user.city` is a JWT claim (re-checked against the DB every 60s), and admin/teacher/student queries filter by it server-side. There is no city switcher and no super-admin.
 
 ## Schedule Pattern
 
@@ -353,7 +380,7 @@ erDiagram
 
 ## Activity Rules
 
-- A `ScheduledGroup` appears on `/upisi` iff its program has an **open `CourseEnrollmentWindow` for the group's own `schoolYear`** — a row keyed `(courseId, schoolYear)` with both dates set and `enrollmentStart <= now <= enrollmentEnd`. No window row for that `(course, year)`, or one outside the range, hides every group of that program/year. The window moved off `ScheduledGroup` (the old `enrollmentStart/End` columns were dropped).
+- A `ScheduledGroup` appears on `/upisi` iff its program has an **open `CourseEnrollmentWindow` for the group's own `(schoolYear, city)`** — a row keyed `(courseId, schoolYear, city)` with both dates set and `enrollmentStart <= now <= enrollmentEnd`. No window row for that `(course, year, city)`, or one outside the range, hides every group of that program/year in that city — a Split window never exposes Šibenik groups or vice versa (`getActivePrograms(city)`). The window moved off `ScheduledGroup` (the old `enrollmentStart/End` columns were dropped).
 - For **standard courses**, the group must also have a **next-enrolling module** — `getGroupModuleArc` race-aheads from the school-year kickoff (M1 `startDate`) using the group's `dayOfWeek` + holiday set, and `getActiveModuleForGroup` returns the first arc module whose first session is still in the future. If the arc has run out of future modules (graduated past M4, or schedule incomplete) the group is hidden from the public form.
 - `ScheduledGroup.schoolYear` **is** part of the public-visibility filter: `getActivePrograms` only keeps a group when an open window exists for that group's exact `(courseId, schoolYear)`. (It remains historization metadata for `ModuleSchedule` / `ModuleEnrollment` / `StudentComment` too.)
 - An `Enrollment` row means "this student is in this group for this school year". To cancel a radionica enrollment, delete the row. `fullYearPaidAt` is the admin "whole school year paid" mark.
@@ -393,10 +420,10 @@ But each `ScheduledGroup` runs on its own `dayOfWeek`, and `SchoolYearHoliday` r
 ### Unique constraint
 
 ```
-ModuleSchedule @@unique([moduleId, schoolYear])
+ModuleSchedule @@unique([moduleId, schoolYear, city])
 ```
 
-A given template module has **at most one schedule per school year**. Creating a new year is "for each `CourseModule`, create one `ModuleSchedule` with the new year string and the planned `startDate`/`endDate`."
+A given template module has **at most one schedule per school year per city** — each city runs its own planner over the shared curriculum (Šibenik can launch mid-cycle with its own dates). Creating a new year is "for each `CourseModule`, create one `ModuleSchedule` with the new year string, the admin's city and the planned `startDate`/`endDate`."
 
 ### Example — SLR 1, Module 1 across two years
 

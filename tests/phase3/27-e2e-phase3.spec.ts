@@ -96,8 +96,10 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
       GROUP_MATERIAL,
       'https://example.com/e2e/group',
     )
-    await expect(page.getByText(COURSE_MATERIAL)).toBeVisible()
-    await expect(page.getByText(GROUP_MATERIAL)).toBeVisible()
+    // Titles can render in both the manage list and the student preview —
+    // assert the first match to avoid strict-mode tripping on the duplicate.
+    await expect(page.getByText(COURSE_MATERIAL).first()).toBeVisible()
+    await expect(page.getByText(GROUP_MATERIAL).first()).toBeVisible()
 
     await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/dolazak`)
     const dateInput = page.locator('input[type="date"]')
@@ -154,8 +156,10 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await loginWithEmail(page, seeded.studentLogin.email, seeded.studentLogin.password)
     await page.waitForURL(/\/portal/, { timeout: 30000 })
 
-    await expect(page.getByText(COURSE_MATERIAL)).toBeVisible()
-    await expect(page.getByText(GROUP_MATERIAL)).toBeVisible()
+    // Titles can render in both the manage list and the student preview —
+    // assert the first match to avoid strict-mode tripping on the duplicate.
+    await expect(page.getByText(COURSE_MATERIAL).first()).toBeVisible()
+    await expect(page.getByText(GROUP_MATERIAL).first()).toBeVisible()
 
     for (const path of ['/portal', `/portal/grupa/${seeded.groupId}`, '/portal/profil']) {
       await page.goto(`${BASE}${path}`)

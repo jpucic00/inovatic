@@ -1,6 +1,6 @@
 # Attendance — Session Dates and Marking Flow
 
-There is no `ClassSession` model. Expected session dates are derived on the fly and Attendance rows are keyed by `(enrollmentId, sessionDate)` (`@db.Date`, UTC midnight). There are two derivations, both holiday-aware via `loadHolidayDateKeys(schoolYear)`:
+There is no `ClassSession` model. Expected session dates are derived on the fly and Attendance rows are keyed by `(enrollmentId, sessionDate)` (`@db.Date`, UTC midnight). There are two derivations, both holiday-aware via `loadHolidayDateKeys(schoolYear, city)` — holiday calendars are **per-city**, and each group resolves against its own city's set (a Šibenik closure never moves a Split group's sessions, and a holiday's attendance-cascade delete is city-filtered for the same reason):
 
 - **Standard programs** — dates come from the per-group **race-ahead module arc** (`getGroupModuleArc`): up to 4 modules × 7 weekday sessions, anchored at the school-year kickoff (M1 `startDate`), skipping holidays. `getGroupAttendance` slices these into per-module sections.
 - **Radionice** (`course.isCustom`) — `computeRadionicaSessions` enumerates every day in the `[dateStart, dateEnd]` range, skipping Sundays and holidays. The flat list is preserved (no module sections).
@@ -13,8 +13,8 @@ There is no `ClassSession` model. Expected session dates are derived on the fly 
 
 ```mermaid
 flowchart TD
-    A["getGroupAttendance(groupId) — standard branch"] --> B["loadHolidayDateKeys(group.schoolYear) → holidayDates set"]
-    B --> C["getGroupModuleArc(dayOfWeek, modules + ModuleSchedule for this year, holidayDates)"]
+    A["getGroupAttendance(groupId) — standard branch"] --> B["loadHolidayDateKeys(group.schoolYear, group.city) → holidayDates set"]
+    B --> C["getGroupModuleArc(dayOfWeek, modules + ModuleSchedule for this year AND this group's city, holidayDates)"]
     C --> D["Race-ahead: M1 anchors at its startDate; each later module's 1st session = next weekday after the previous module's 7th session"]
     D --> E["collectWeekdaySessions skips any date in holidayDates → exactly 7 sessions per module"]
     E --> F{"Module has a schedule and 7 sessions fit?"}
@@ -113,7 +113,7 @@ sequenceDiagram
     UI->>Server: bulkMarkSession(groupId, sessionDate, entries[])
 
     Server->>Server: Zod validation (bulkMarkSessionSchema)
-    Server->>Server: assertTeacherOwnsGroup(groupId) — ADMIN bypasses
+    Server->>Server: assertTeacherOwnsGroup(groupId) — ADMIN pass-through is city-bound (cross-city group 404s)
 
     rect rgb(224, 242, 254)
         Note over Server,DB: $transaction (isolationLevel Serializable)

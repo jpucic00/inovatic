@@ -270,15 +270,19 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       const dialog = page.locator('[role="dialog"]')
       await expect(dialog).toBeVisible()
 
-      // Select the first program from the dropdown (standard courses are pre-seeded)
+      // Select SLR 1 by title — the feed is title-ordered, so index 1 lands on
+      // whatever leaked radionica happens to sort before "Svijet..." (groupless
+      // → no radios). The inquiry was submitted for grade 1 = SLR 1.
       const courseSelect = dialog.locator('select').first()
-      await courseSelect.selectOption({ index: 1 })
+      const slrOpt = courseSelect.locator('option', { hasText: 'Robotike 1' }).first()
+      await courseSelect.selectOption((await slrOpt.getAttribute('value'))!)
 
-      // Wait for groups to load, then pick the first available group
-      await expect(dialog.locator('input[type="radio"]').first()).toBeVisible({
-        timeout: 10000,
-      })
-      await dialog.locator('input[type="radio"]').first().check()
+      // Wait for groups to load, then pick the first AVAILABLE group — full
+      // groups (e.g. phase2/16's 2-seat capacity leftovers, oldest-first in the
+      // createdAt-ordered feed) render with a disabled radio by design.
+      const availableRadio = dialog.locator('input[type="radio"]:not([disabled])').first()
+      await expect(availableRadio).toBeVisible({ timeout: 10000 })
+      await availableRadio.check()
 
       // Select all modules (the "Svi moduli" master checkbox)
       const allModulesCheckbox = dialog.locator('label', { hasText: 'Svi moduli' }).locator('input[type="checkbox"]')
@@ -361,12 +365,14 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       const dialog = page.locator('[role="dialog"]')
       await expect(dialog).toBeVisible()
 
-      // Pick the first program + first group
-      await dialog.locator('select').first().selectOption({ index: 1 })
-      await expect(dialog.locator('input[type="radio"]').first()).toBeVisible({
-        timeout: 10000,
-      })
-      await dialog.locator('input[type="radio"]').first().check()
+      // Pick SLR 1 + the first AVAILABLE group (full leftovers render a
+      // disabled radio by design; the feed is oldest-first).
+      const enrollCourseSelect = dialog.locator('select').first()
+      const enrollSlrOpt = enrollCourseSelect.locator('option', { hasText: 'Robotike 1' }).first()
+      await enrollCourseSelect.selectOption((await enrollSlrOpt.getAttribute('value'))!)
+      const enrollableRadio = dialog.locator('input[type="radio"]:not([disabled])').first()
+      await expect(enrollableRadio).toBeVisible({ timeout: 10000 })
+      await enrollableRadio.check()
 
       await dialog.getByRole('button', { name: /^Upiši$/ }).click()
 

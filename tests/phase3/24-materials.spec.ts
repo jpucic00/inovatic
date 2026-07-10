@@ -244,10 +244,12 @@ test.describe('Phase 3 Step 13 — Materials', () => {
     // MODULE (per-module) materials are created and shown on the program detail
     // page — the only place program curriculum is managed now.
     const courseId = await getCourseIdForGroup(page, seeded.groupId)
+    // Module sections are headed by the real curriculum titles (seed: SLR 1's
+    // first module is "Zabavni sustavi 1.0"), not by "Modul N" labels.
     await addMaterialOnProgramPage(
       page,
       courseId,
-      /^Modul 1/,
+      /Zabavni sustavi/i,
       MODULE_LINK_TITLE,
       'https://example.com/module-resource',
     )

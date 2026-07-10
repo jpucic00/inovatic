@@ -89,12 +89,21 @@ function slrTable(page: Page) {
  * buttons, so we scope by the panel that contains the "Polaznici po
  * modulima" heading.
  */
+// Module tabs are labelled with the real curriculum titles (seed SLR 1
+// modules, sortOrder 1..4), not "Modul N".
+const MODULE_TAB_TITLES = [
+  /Zabavni sustavi/i,
+  /Prometni sustavi/i,
+  /Industrijski sustavi/i,
+  /Svemirski sustavi/i,
+]
+
 function moduleTabButton(page: Page, n: number) {
   return page
     .locator('div.bg-white.rounded-xl', {
       has: page.getByText(/Polaznici po modulima/),
     })
-    .getByRole('button', { name: new RegExp(`^Modul ${n}\\b`) })
+    .getByRole('button', { name: MODULE_TAB_TITLES[n - 1] })
 }
 
 /**
@@ -167,6 +176,10 @@ async function createStudentAndEnroll(
 
   await page.locator('#create-student-first').fill(firstName)
   await page.locator('#create-student-last').fill(lastName)
+  // Date of birth is required for submit; the DateInput commits on blur.
+  const dob = page.locator('#create-student-dob')
+  await dob.fill('10.04.2016')
+  await dob.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
 
   // Program → pick SLR 1 by matching option text
   const courseSelect = page.locator('#create-student-course')

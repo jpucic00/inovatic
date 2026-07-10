@@ -1,6 +1,6 @@
 # Inovatic Project
 
-Website for Udruga za robotiku "Inovatic" (Robotics Association), Split, Croatia. Teaches kids ages 6-14 STEM/robotics through LEGO Spike courses (SLR 1-4).
+Website for Udruga za robotiku "Inovatic" (Robotics Association), Split, Croatia — operating as two separated city tenants since 2026: Split and Šibenik (Trokut inkubator). Teaches kids ages 6-14 STEM/robotics through LEGO Spike courses (SLR 1-4).
 
 ## Tech Stack
 Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + PostgreSQL (Neon) + Auth.js v5 + Cloudinary (EU) + Resend + React Email + Zod + BlockNote (admin editor only) + Playwright + Vitest (unit + integration tiers)
@@ -16,7 +16,7 @@ Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + Postgr
 - Server Actions for all mutations (no REST API)
 - Server Components for SEO-critical public pages
 - Croatian locale: date format `dd.MM.yyyy.`, currency EUR, primary language Croatian
-- Auth guards: `requireAdmin()`, `requireTeacher()`, `requireStudent()` from `src/lib/auth-guard.ts` (`requireAuth` is module-private)
+- Auth guards: `requireAdmin()`, `requireAdminCtx()` (returns `{ session, city }`), `requireTeacher()`, `requireStudent()` from `src/lib/auth-guard.ts` (`requireAuth` is module-private and fails closed on a session without a `city` claim)
 - Roles: ADMIN, TEACHER, STUDENT (future: PARENT)
 - Inquiry status flow: NEW -> ACCOUNT_CREATED (or DECLINED at any point)
 - Enrollment workflow: Public inquiry -> Admin reviews -> Creates student account + enrollment
@@ -26,9 +26,19 @@ Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + Postgr
 - **Teacher panel** at `/nastavnik` is gated by `requireTeacher()` (admins pass through for support). Group-scoped routes use `assertTeacherOwnsGroup(groupId)` from `src/lib/teacher-guard.ts` — teachers 404 on colleagues' groups.
 - **Material scope model** (`MaterialScope` enum): MODULE → visible on every group of that course+module; COURSE → visible on every group of that course (standard and radionice); GROUP → visible only in that one ScheduledGroup. Per-group exceptions via `MaterialGroupHide`. No publish/draft — attached = visible. Videos support Cloudinary upload OR an embedded YouTube/Vimeo URL.
 - **Attendance** is `(Enrollment, sessionDate)` — no separate `ClassSession`. Teacher marks weekly from the Dolazak tab; admin reads `getStudentAttendance(studentId)` on the student page.
-- **Comments/reviews/grades** live in `StudentComment` with `type` = COMMENT or MODULE_REVIEW. **Staff-only — never rendered in `/portal/*`.** Teachers can delete only their own; admins delete anything (`canDeleteComment` in `src/lib/teacher-guard.ts`).
+- **Comments/reviews/grades** live in `StudentComment` with `type` = COMMENT or MODULE_REVIEW. **Staff-only — never rendered in `/portal/*`.** Teachers can delete only their own; admins delete anything *within their city* (`canDeleteComment` in `src/lib/teacher-guard.ts`; both delete actions resolve the comment's group city first).
 - **Gallery** (`GalleryImage` model, added 2026-05-07): per-group image bucket, scoped by `(scheduledGroupId, moduleId?)`. Standard programs require `moduleId`; radionice (`Course.isCustom = true`) require `moduleId IS NULL`. Validation lives in the server action (`src/actions/gallery/crud.ts`), not in a DB CHECK. Teacher `Galerija` tab on `/nastavnik/grupa/[id]`, student read-only view at `/portal/grupa/[id]/galerija`, admin `<GroupGalleryPanel>` on `/admin/grupe/[id]`. Upload route `/api/upload/gallery`: image-only (jpeg/png/webp/gif), **10 MB cap to match Cloudinary free-plan image limit**, ADMIN+TEACHER. `publicId` stored on the row; cleanup via `destroyCloudinaryAssetsByPublicId` in `src/lib/cloudinary-cleanup.ts`. Lightbox = `yet-another-react-lightbox` v3.29 + `Download` plugin (already installed for article galleries — reuse, don't reinvent).
 - **Role-based login redirect**: `src/actions/login.ts` routes ADMIN → `/admin`, TEACHER → `/nastavnik`, STUDENT → `/portal`.
+
+## City tenancy (two-city separation, added 2026-07)
+- **`City` enum (`SPLIT | SIBENIK`) is the tenant boundary.** City-bearing models: `User`, `Location`, `ScheduledGroup` (denormalized from its venue — composite FK `(locationId, city) → Location(id, city)` makes drift impossible), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `SchoolYearHoliday`, `Course` (nullable: `null` = shared standard SLR, set = per-city radionica). Everything else derives city transitively via its group/article parent.
+- **Every tenant-owned create passes `city` explicitly — there is NO `@default` on any city column.** Forgetting is a tsc/DB error, never a silent SPLIT mis-stamp. City comes from the session (`requireAdminCtx()` for reads, `adminAction` handler ctx for mutations), from the verified parent row (student ← inquiry, group ← venue), or hardcoded `SPLIT` for the party form. Never from client input.
+- **Scoping is session-driven, data-level.** `session.user.city` is a JWT claim (60s DB re-check via `revalidateTokenClaims`; a legacy token without the claim refreshes immediately; a prod city flip propagates without re-login). Middleware stays role-only. Id-based mutations use `src/lib/city-guard.ts` asserts — a cross-city id is `notFound()`, indistinguishable from nonexistent. No city switcher, no super-admin; the admin sidebar shows a read-only city chip.
+- **Every dropdown/filter feed is city-scoped**: locations, assignable teachers, courses (shared standard + own-city radionice via `city IS NULL OR city = adminCity`), and every group picker (upiti dialogs, add-enrollment, send-schedule). A new tenant-scoped query or feed is not done without a cross-city negative test — per-site tests live in `tests/integration/city-scoping-*.test.ts`; the residual launch-gate matrix is `tests/integration/city-isolation-matrix.test.ts`; the E2E journey is `tests/phase3/40-sibenik-city-journey.spec.ts`.
+- **Slavica exception (dual role):** ONE `User` row — role `ADMIN`, city `SIBENIK` — is both the sole Šibenik admin and its only teacher. All teacher-guard/material/gallery ADMIN pass-throughs are city-bound (`group.city === session.user.city`); `getAssignableTeachers` returns same-city TEACHERs + the city's ADMIN; the "Nastavnički panel" sidebar shortcut appears only for an admin with ≥1 `TeacherAssignment`.
+- **Deliberately shared — do NOT city-scope:** standard SLR courses (one canonical `/programi/[slug]` page; never duplicate per city), MODULE/COURSE materials + their downloads (shared curriculum; only GROUP-scope downloads check city), `Tag` taxonomy, `SchoolYear` registry, the elearning proxy (role-only). The public novosti list stays cross-city with per-article city badges and a `?grad=` filter.
+- **Returning-student matching is GLOBAL with a masked cross-city hint:** same-city identity match → full history; cross-city → neutral "postojeći polaznik (druga lokacija)" badge only, and `createStudentFromInquiry` blocks with an escalation error (`CrossCityStudentError`) — never auto-reuse a cross-city account.
+- **Per-city planner/holidays/windows:** uniques `(moduleId, schoolYear, city)`, `(schoolYear, city, date)`, `(courseId, schoolYear, city)` — each city plans the shared curriculum on its own dates (Šibenik launched mid-cycle). Holiday attendance-cascade deletes are city-filtered. `getActivePrograms(city)` gates groups on the composite open-window key; `/api/group-availability` 400s without a valid `?city=`.
 
 ## Common Commands
 ```bash
@@ -40,7 +50,7 @@ npm run test:unit:watch        # Vitest unit watch
 npm run test:integration       # Vitest integration tier — resets inovatic_test, then runs route+DB tests
 npm run test:integration:reset # Drop + recreate + migrate inovatic_test (called automatically by test:integration)
 npm run test:integration:watch # Vitest integration watch (no reset — for interactive dev)
-npx playwright test tests/     # Playwright E2E tier (requires dev server on port 3000)
+npx playwright test tests/phase1 tests/phase2 tests/phase3  # Playwright E2E tier (requires dev server on port 3000; bare tests/ would also collect the vitest tiers and abort)
 ```
 
 ## Testing — three tiers

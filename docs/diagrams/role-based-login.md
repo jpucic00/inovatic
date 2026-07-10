@@ -32,15 +32,15 @@ sequenceDiagram
     Action->>Auth: signIn('credentials', { redirect: false })
     Auth->>Auth: Zod parse — z.string().email().safeParse(identifier)
     Note right of Auth: success → lookup by email<br/>fail → lookup by username
-    Auth->>DB: findUnique by chosen field (select includes deletedAt)
-    DB-->>Auth: { passwordHash, role, deletedAt } or null
+    Auth->>DB: findUnique by chosen field (select includes deletedAt + city)
+    DB-->>Auth: { passwordHash, role, deletedAt, city } or null
     alt user missing or user.deletedAt is set
         Auth-->>Action: return null → AuthError
     end
     Auth->>Auth: bcrypt compare password vs passwordHash
     Auth-->>Action: ok or AuthError
     Note right of Action: AuthError → 'Pogrešno korisničko ime ili lozinka.'
-    Note over Auth,DB: JWT callback re-checks deletedAt on every refresh (max 60s TTL) per src/lib/auth.ts:65-67
+    Note over Auth,DB: JWT callback stamps token.city on login and re-checks<br/>deletedAt + role + city every refresh (60s TTL) via revalidateTokenClaims.<br/>A legacy token WITHOUT a city claim is refreshed immediately regardless<br/>of TTL — a prod city flip propagates without re-login (src/lib/auth-token.ts)
 
     Action->>DB: findUnique by email or username (re-fetch role for routing)
     DB-->>Action: { role }
@@ -84,7 +84,7 @@ flowchart TD
 flowchart TD
     CALL["Server Component or Server Action<br/>calls a guard helper"] --> WHICH{Which helper?}
 
-    WHICH -->|requireAuth| A1{session.user set?}
+    WHICH -->|requireAuth| A1{session.user set<br/>AND city claim present?}
     WHICH -->|requireAdmin| A2{role === 'ADMIN'?}
     WHICH -->|requireTeacher| A3{role === 'TEACHER'<br/>or role === 'ADMIN'?}
     WHICH -->|requireStudent| A4{role === 'STUDENT'?}
@@ -102,7 +102,7 @@ flowchart TD
     style RED fill:#fee2e2
 ```
 
-> Source: `src/lib/auth-guard.ts`. Each helper composes on top of `requireAuth()`, so an unauthenticated request always lands on `/prijava` regardless of which role check follows.
+> Source: `src/lib/auth-guard.ts`. Each helper composes on top of `requireAuth()`, so an unauthenticated request always lands on `/prijava` regardless of which role check follows. `requireAuth` also **fails closed on a session without a `city` claim** — Prisma treats `city: undefined` in a where-clause as "no filter", so a legacy token must never reach a query. `requireAdminCtx()` returns `{ session, city }` for read actions; `adminAction` hands the same city to wrapped mutations via handler ctx.
 
 ## Defence in depth
 
@@ -112,3 +112,5 @@ Two layers cover slightly different concerns:
 - **Guards** run inside Server Components and Server Actions, where role checks can be more granular (e.g. `assertTeacherOwnsGroup` builds on top of `requireTeacher` to also check `TeacherAssignment`). They also handle the case of someone calling a Server Action directly without crossing the middleware boundary.
 
 If you change a route's role expectation, update **both** layers — and the post-login switch in `LoginForm` if the new route should be the default landing page for that role.
+
+**City is enforced at the data layer, not in middleware.** Middleware stays role-only (it is non-authoritative); tenant separation comes from `session.user.city` flowing into every query/guard (`requireAdminCtx`, `adminAction` ctx, `city-guard.ts` asserts, city-bound ADMIN bypasses in `teacher-guard.ts`). There is no city switcher — an account's city is a static fact, changed only in the DB (the 60s JWT re-check propagates it without re-login).

@@ -155,6 +155,20 @@ async function readCredentialsFromDetail(
   return { username, password }
 }
 
+/**
+ * #create-student-dob is a DateInput: its text field expects dd.MM.yyyy and
+ * commits on blur — an ISO string silently fails to parse, the RHF value stays
+ * empty, and the dialog's submit never enables. Accept both shapes, fill the
+ * display format, then dispatch blur to commit.
+ */
+async function fillDob(page: Page, dob: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob)
+  const display = m ? `${m[3]}.${m[2]}.${m[1]}` : dob
+  const input = page.locator('#create-student-dob')
+  await input.fill(display)
+  await input.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+}
+
 export async function createStudentInGroup(
   page: Page,
   groupId: string,
@@ -164,7 +178,7 @@ export async function createStudentInGroup(
   await page.getByRole('button', { name: 'Kreiraj učenika' }).click()
   await page.locator('#create-student-first').fill(student.firstName)
   await page.locator('#create-student-last').fill(student.lastName)
-  await page.locator('#create-student-dob').fill(student.dateOfBirth)
+  await fillDob(page, student.dateOfBirth)
   await page.locator('#create-student-school').fill(student.childSchool)
   await page.locator('#create-student-parent-name').fill(student.parentName)
   await page.locator('#create-student-parent-email').fill(student.parentEmail)
@@ -227,7 +241,7 @@ export async function createStudentNoEnrollment(
 
   await page.locator('#create-student-first').fill(student.firstName)
   await page.locator('#create-student-last').fill(student.lastName)
-  await page.locator('#create-student-dob').fill(student.dateOfBirth)
+  await fillDob(page, student.dateOfBirth)
   await page.locator('#create-student-school').fill(student.childSchool)
   await page.locator('#create-student-parent-name').fill(student.parentName)
   await page.locator('#create-student-parent-email').fill(student.parentEmail)

@@ -52,9 +52,24 @@ export async function deleteTeacherComment(
   try {
     const comment = await db.studentComment.findUnique({
       where: { id: commentId },
-      select: { id: true, authorId: true, studentId: true, groupId: true },
+      select: {
+        id: true,
+        authorId: true,
+        studentId: true,
+        groupId: true,
+        group: { select: { city: true } },
+      },
     })
     if (!comment) return { success: false, error: 'Komentar nije pronađen.' }
+
+    // Admin delete-anything authority is tenant-bound: a cross-city comment id
+    // reads as nonexistent, mirroring admin/student-comment.deleteComment.
+    if (
+      session.user.role === 'ADMIN' &&
+      comment.group.city !== session.user.city
+    ) {
+      return { success: false, error: 'Komentar nije pronađen.' }
+    }
 
     if (!canDeleteComment(session, comment)) {
       return { success: false, error: 'Nemate dopuštenje za brisanje.' }

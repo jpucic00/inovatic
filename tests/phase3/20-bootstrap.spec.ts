@@ -45,10 +45,17 @@ test.describe('Phase 3 Step 0 — Bootstrap (creates groups for downstream specs
       await expect(page.getByText('Grupa kreirana.')).toBeVisible({ timeout: 15000 })
     }
 
+    // Collect ONLY the two groups created above. Sweeping every group link on
+    // the page can put a leftover full 2-seat group from phase2/16's capacity
+    // flow at index 0 — downstream specs then hang on its disabled radio.
     await page.goto(`${BASE}/admin/grupe`)
-    const links = await page.locator('a[href^="/admin/grupe/"]').all()
-    for (const link of links) {
-      const href = await link.getAttribute('href')
+    for (const name of ['Test Grupa A', 'Test Grupa B']) {
+      const href = await page
+        .locator('tr', { hasText: name })
+        .first()
+        .locator('a[href^="/admin/grupe/"]')
+        .first()
+        .getAttribute('href')
       const m = href?.match(/^\/admin\/grupe\/([^/?#]+)/)
       if (m && !groupIds.includes(m[1])) groupIds.push(m[1])
     }

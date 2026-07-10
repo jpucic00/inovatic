@@ -7,13 +7,15 @@
 
 Unlike `MaterialScope`, this invariant has **no DB-level `CHECK` constraint** — `Course.isCustom` lives on a sibling row, not on `GalleryImage` itself, so a single-row check can't express the rule. Instead the rule is enforced in `addGalleryImages()` in `src/actions/gallery/crud.ts`. This diagram is the most accessible reference for the rule.
 
+**City tenancy:** galleries are per-group, hence per-city — `GalleryImage` needs no `city` column of its own. `canManageGroupImages` bounds the ADMIN pass-through to `group.city === session.user.city` (a cross-city admin gets "Nemate dopuštenje za ovu grupu."); teachers are bound through their same-city assignments; students through their enrollment.
+
 ## Validation flow on write
 
 ```mermaid
 flowchart TD
     A["addGalleryImages(input)"] --> Z[Zod parse: addGalleryImagesSchema]
     Z -->|fail| ZE["error: parsed.error.issues[0]?.message<br/>or 'Nevažeći podaci.'"]
-    Z -->|pass| P{canManageGroupImages?<br/>ADMIN bypass OR<br/>TeacherAssignment row}
+    Z -->|pass| P{canManageGroupImages?<br/>ADMIN pass-through city-bound:<br/>group.city === admin.city<br/>OR TeacherAssignment row}
     P -->|No| PE["error: 'Nemate dopuštenje za ovu grupu.'"]
     P -->|Yes| L[Load group + course.isCustom + course.modules]
     L -->|not found| NF["error: 'Grupa nije pronađena.'"]

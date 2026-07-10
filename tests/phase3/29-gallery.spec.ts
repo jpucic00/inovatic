@@ -286,20 +286,25 @@ test.describe('Gallery — scope validation', () => {
     // 2. Create radionica scheduled group
     await page.goto(`${BASE}/admin/grupe`)
     await page.getByRole('button', { name: 'Nova grupa' }).click()
+    const createDialog = page.locator('[role="dialog"]')
+    await createDialog.waitFor({ state: 'visible', timeout: 10000 })
 
     const courseSelect = page.locator('#create-courseId')
     await courseSelect.selectOption({ label: `Scope radionica ${RUN_ID}` })
     await page.locator('#create-locationId').selectOption({ index: 1 })
     await page.fill('#create-name', `ScopeGr ${RUN_ID}`)
 
-    const dateInput = page.locator('#create-date')
-    await dateInput.fill('01.09.2025.')
-    await dateInput.evaluate((el) => el.dispatchEvent(new Event('blur')))
+    // Radionica course: a [dateStart, dateEnd] range replaced the old single
+    // #create-date — fill the native date companions (same-day workshop).
+    const rangeInputs = createDialog.locator('input[type="date"]')
+    await rangeInputs.nth(0).fill('2025-09-01')
+    await rangeInputs.nth(1).fill('2025-09-01')
 
     await page.fill('#create-startTime', '09:00')
     await page.fill('#create-endTime', '11:00')
-    await page.fill('#create-schoolYear', '2025/2026')
-    await page.fill('#create-maxStudents', '10')
+    // School year is stamped from the admin's selected-year cookie now — the
+    // old #create-schoolYear input no longer exists.
+    await createDialog.locator('input[type="number"][min="1"]').fill('10')
 
     // Signup window moved to the program (per school year); not needed here.
     await page.getByRole('button', { name: 'Kreiraj grupu' }).click()

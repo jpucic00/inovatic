@@ -2,6 +2,8 @@
 
 `Material` rows carry a `scope` of `MODULE`, `COURSE`, or `GROUP`. Each value of the enum picks exactly one FK column that must be non-null — the other two must be null. The invariant is enforced at three layers: a Zod discriminated union at the action boundary, a Prisma model with three nullable FKs, and a SQL `CHECK` constraint at the DB. On top of that, `MaterialGroupHide` lets a teacher hide an inherited MODULE/COURSE-scoped material from a single `ScheduledGroup` without affecting any other group.
 
+**City tenancy:** `Material` deliberately has **no `city` column**. MODULE/COURSE-scoped rows are the shared curriculum — one standard SLR program taught identically in Split and Šibenik; any city's admin can manage them and both cities' staff/students see and download them. GROUP-scoped rows are per-group and therefore per-city: `canManageMaterial` bounds the ADMIN branch to `group.city === session.user.city`, and the download route applies the same check for GROUP-scope files (`src/lib/material-access.ts`, `src/app/api/download/[materialId]/route.ts`). Teachers are city-bound implicitly through their same-city `TeacherAssignment`s.
+
 ## Schema shape
 
 ```mermaid
@@ -92,11 +94,11 @@ flowchart LR
 
 ## Summary
 
-| Scope | Required FK | What students see | Hide-per-group? |
-|---|---|---|---|
-| `MODULE` | `moduleId → CourseModule` | Every `ScheduledGroup` whose course owns that module | Yes — `MaterialGroupHide` on a specific group hides this row for that group only |
-| `COURSE` | `courseId → Course` | Every `ScheduledGroup` of that course (standard and radionice). On standard programs = "whole program" materials visible across all modules. | Yes — same mechanism |
-| `GROUP` | `scheduledGroupId → ScheduledGroup` | Only the one `ScheduledGroup` it points at | N/A — already group-scoped |
+| Scope | Required FK | What students see | City posture | Hide-per-group? |
+|---|---|---|---|---|
+| `MODULE` | `moduleId → CourseModule` | Every `ScheduledGroup` whose course owns that module | Shared curriculum — both cities | Yes — `MaterialGroupHide` on a specific group hides this row for that group only |
+| `COURSE` | `courseId → Course` | Every `ScheduledGroup` of that course (standard and radionice). On standard programs = "whole program" materials visible across all modules. | Shared curriculum — both cities | Yes — same mechanism |
+| `GROUP` | `scheduledGroupId → ScheduledGroup` | Only the one `ScheduledGroup` it points at | Per-city — ADMIN writes/downloads bound to `group.city === admin.city` | N/A — already group-scoped |
 
 ## Why three layers
 
