@@ -189,7 +189,7 @@ type CoreResult = {
     endTime: string | null
     schoolYear: string
     course: { title: string; isCustom: boolean }
-    location: { name: string }
+    location: { name: string; address: string }
   } | null
 }
 
@@ -268,7 +268,7 @@ async function ensureEnrollment(
   const sg = await tx.scheduledGroup.findUnique({
     where: { id: groupId },
     include: {
-      location: { select: { name: true } },
+      location: { select: { name: true, address: true } },
       course: { select: { title: true, isCustom: true } },
     },
   })
@@ -548,6 +548,7 @@ async function sendStudentCredentialsEmail(
       groupName: core.group.name ?? core.group.course.title,
       schedule,
       locationName: core.group.location.name,
+      locationAddress: core.group.location.address,
     }),
   })
 }

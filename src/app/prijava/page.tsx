@@ -5,6 +5,9 @@ import { LoginForm } from '@/components/auth/login-form'
 
 export const metadata: Metadata = {
   title: 'Prijava',
+  description: 'Prijava u Inovatic portal za učenike i nastavnike.',
+  // Private auth entry point — keep it out of search indexes.
+  robots: { index: false, follow: false },
 }
 
 export default function LoginPage() {

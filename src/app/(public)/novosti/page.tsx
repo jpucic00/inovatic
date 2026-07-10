@@ -11,12 +11,12 @@ import type { City } from '@prisma/client'
 
 export const metadata: Metadata = {
   title: 'Novosti',
-  description: 'Najnovije vijesti i obavijesti Udruge za robotiku Inovatic iz Splita – natjecanja, radionice, upisi i događaji.',
+  description: 'Najnovije vijesti i obavijesti Udruge za robotiku Inovatic iz Splita i Šibenika – natjecanja, radionice, upisi i događaji.',
   openGraph: {
     title: 'Novosti | Inovatic',
     description: 'Pratite naša natjecanja, radionice i sve što se događa u Inovatic zajednici.',
     url: 'https://udruga-inovatic.hr/novosti',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu i Šibeniku' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/novosti' },
 }

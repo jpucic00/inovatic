@@ -7,6 +7,9 @@ interface GroupOption {
    * programs or "15.07.2026. – 21.07.2026., 09:00–11:00" for radionice. */
   schedule: string
   locationName: string
+  /** Full venue address incl. city (e.g. "Ul. Velimira Škorpika 7/a, 22000 Šibenik")
+   * so a bare venue name like "Trokut" is never ambiguous to a parent. */
+  locationAddress: string
 }
 
 interface ScheduleOptionsProps {
@@ -39,6 +42,8 @@ export function ScheduleOptionsEmail({
             {opt.schedule}
             <br />
             📍 {opt.locationName}
+            <br />
+            <span style={locationAddress}>{opt.locationAddress}</span>
           </Text>
         </Section>
       ))}
@@ -71,4 +76,9 @@ const optionText = {
   fontSize: '14px',
   lineHeight: '1.5',
   margin: '0',
+}
+
+const locationAddress = {
+  color: '#6b7280',
+  fontSize: '13px',
 }

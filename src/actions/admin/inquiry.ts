@@ -432,6 +432,7 @@ export async function sendScheduleOptions(
         endTime: g.endTime,
       }),
       locationName: g.location.name,
+      locationAddress: g.location.address,
     }))
 
     const childName = `${inquiry.childFirstName} ${inquiry.childLastName}`.trim()

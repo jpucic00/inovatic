@@ -8,12 +8,12 @@ import { GearDecor, StarDecor } from '@/components/shared/decorations'
 export const metadata: Metadata = {
   title: 'Programi',
   description:
-    'Sva 4 razine tečajeva LEGO robotike – Svijet LEGO Robotike 1–4. Programi za djecu od 6 do 14 godina u Splitu.',
+    'Sva 4 razine tečajeva LEGO robotike – Svijet LEGO Robotike 1–4. Programi za djecu od 6 do 14 godina u Splitu i Šibeniku.',
   openGraph: {
     title: 'Programi – Svijet LEGO Robotike | Inovatic',
-    description: 'Sva 4 razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu.',
+    description: 'Sva 4 razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu i Šibeniku.',
     url: 'https://udruga-inovatic.hr/programi',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu i Šibeniku' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/programi' },
 }
@@ -22,7 +22,7 @@ const coursesJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'ItemList',
   name: 'Tečajevi LEGO robotike – Inovatic',
-  description: 'Četiri razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu.',
+  description: 'Četiri razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu i Šibeniku.',
   url: 'https://udruga-inovatic.hr/programi',
   numberOfItems: 4,
   itemListElement: courses.map((c, i) => ({

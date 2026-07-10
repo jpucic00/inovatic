@@ -6,12 +6,12 @@ import { GearDecor } from '@/components/shared/decorations'
 export const metadata: Metadata = {
   title: 'O nama',
   description:
-    'Udruga za robotiku "Inovatic" – Split, osnovana 2014. Učimo djecu robotiku i programiranje kroz LEGO Spike Prime i WeDo 2.0.',
+    'Udruga za robotiku "Inovatic" – osnovana 2014. u Splitu, od 2026. i u Šibeniku. Učimo djecu robotiku i programiranje kroz LEGO Spike Prime i WeDo 2.0.',
   openGraph: {
-    title: 'O nama – Udruga Inovatic | Split',
-    description: 'Udruga za robotiku osnovana 2014. Educiramo djecu od 6 do 14 godina kroz LEGO programe. Tim CroSpec – srebrna medalja WRO 2025.',
+    title: 'O nama – Udruga Inovatic | Split i Šibenik',
+    description: 'Udruga za robotiku osnovana 2014. Educiramo djecu od 6 do 14 godina kroz LEGO programe u Splitu i Šibeniku. Tim CroSpec – srebrna medalja WRO 2025.',
     url: 'https://udruga-inovatic.hr/o-nama',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu i Šibeniku' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/o-nama' },
 }
@@ -87,7 +87,7 @@ const memberships = [
 const statCards = [
   { value: '2014.', label: 'Osnivanje', icon: BookOpen, bg: 'bg-cyan-50', border: 'border-cyan-200', color: 'text-cyan-600' },
   { value: '4', label: 'Razine programa', icon: Trophy, bg: 'bg-yellow-50', border: 'border-yellow-200', color: 'text-yellow-600' },
-  { value: '2', label: 'Lokacije u Splitu', icon: MapPin, bg: 'bg-emerald-50', border: 'border-emerald-200', color: 'text-emerald-600' },
+  { value: '3', label: 'Lokacije u 2 grada', icon: MapPin, bg: 'bg-emerald-50', border: 'border-emerald-200', color: 'text-emerald-600' },
   { value: '≤ 8', label: 'Djece po grupi', icon: Users, bg: 'bg-purple-50', border: 'border-purple-200', color: 'text-purple-600' },
 ]
 

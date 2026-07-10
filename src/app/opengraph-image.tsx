@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 
 export const runtime = 'edge'
-export const alt = 'Inovatic – Udruga za robotiku Split'
+export const alt = 'Inovatic – Udruga za robotiku Split i Šibenik'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
@@ -59,13 +59,17 @@ export default function Image() {
           }}
         >
           <span style={{ fontSize: 18, color: '#2A9EAD', fontWeight: 700, letterSpacing: 3 }}>
-            SPLIT, HRVATSKA · OD 2014.
+            SPLIT · ŠIBENIK · OD 2014.
           </span>
         </div>
 
-        {/* Main title */}
+        {/* Main title — flex column so Satori (@vercel/og) accepts the two
+            stacked lines; a multi-child div must declare display:flex. */}
         <div
           style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             fontSize: 72,
             fontWeight: 900,
             color: '#111827',
@@ -76,8 +80,7 @@ export default function Image() {
           }}
         >
           <span style={{ color: '#4BBDCA' }}>LEGO Robotika</span>
-          <br />
-          za djecu u Splitu
+          <span>za djecu u Splitu</span>
         </div>
 
         {/* Subtitle */}

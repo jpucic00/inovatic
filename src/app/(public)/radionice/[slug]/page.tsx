@@ -4,6 +4,7 @@ import { CheckCircle } from 'lucide-react'
 import { db } from '@/lib/db'
 import { getActivePrograms } from '@/actions/public/programs'
 import { InquiryForm } from '@/components/public/inquiry-form'
+import { CITY_LABELS } from '@/lib/city'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -30,13 +31,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const workshop = await getWorkshop(slug)
   if (!workshop) return { title: 'Radionica nije pronađena' }
 
+  // Radionice are per-city (isCustom courses carry a city); brand the metadata
+  // with that city so a Šibenik workshop never reads "Inovatic Split".
+  const brand = workshop.city ? `Inovatic ${CITY_LABELS[workshop.city]}` : 'Inovatic'
+
   return {
     title: workshop.title,
     description: workshop.description,
     openGraph: {
-      title: `${workshop.title} | Inovatic Split`,
+      title: `${workshop.title} | ${brand}`,
       description: workshop.description,
-      images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: `${workshop.title} – Inovatic Split` }],
+      images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: `${workshop.title} – ${brand}` }],
     },
   }
 }

@@ -9,7 +9,7 @@ const quickLinks = [
   { href: '/proslave', label: 'Proslave' },
   { href: '/novosti', label: 'Novosti' },
   { href: '/o-nama', label: 'O nama' },
-  { href: '/kontakt', label: 'Kontakt' },
+  { href: '/lokacije', label: 'Lokacije' },
   { href: '/upisi', label: 'Upiši se' },
 ]
 
@@ -23,7 +23,7 @@ export function Footer() {
             <Logo variant="white" className="mb-4" />
             <p className="text-sm text-gray-400 leading-relaxed mb-5">
               Udruga za robotiku koja potiče djecu na istraživanje, kreativnost
-              i razvoj STEM vještina kroz LEGO robotiku. U Splitu od 2014.
+              i razvoj STEM vještina kroz LEGO robotiku. U Splitu od 2014., u Šibeniku od 2026.
             </p>
             <div className="flex gap-3">
               <a
@@ -85,8 +85,9 @@ export function Footer() {
               <div className="flex items-start gap-2.5 text-sm text-gray-400">
                 <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p>Velebitska 32, Split</p>
-                  <p>Ruđera Boškovića 33, Split</p>
+                  <Link href="/lokacije/split" className="block hover:text-cyan-400 transition-colors">Velebitska 32, Split</Link>
+                  <Link href="/lokacije/split" className="block hover:text-cyan-400 transition-colors">Ruđera Boškovića 33, Split</Link>
+                  <Link href="/lokacije/sibenik" className="block hover:text-cyan-400 transition-colors">Trokut inkubator, Šibenik</Link>
                 </div>
               </div>
             </div>

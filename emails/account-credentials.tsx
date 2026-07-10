@@ -9,6 +9,8 @@ interface AccountCredentialsProps {
   groupName: string
   schedule: string
   locationName: string
+  /** Full venue address incl. city so a bare venue name is never ambiguous. */
+  locationAddress: string
 }
 
 export function AccountCredentialsEmail({
@@ -19,6 +21,7 @@ export function AccountCredentialsEmail({
   groupName,
   schedule,
   locationName,
+  locationAddress,
 }: AccountCredentialsProps) {
   return (
     <EmailLayout preview={`Pristupni podaci za ${childName} – Inovatic`}>
@@ -52,6 +55,8 @@ export function AccountCredentialsEmail({
           {schedule}
           <br />
           📍 {locationName}
+          <br />
+          <span style={locationAddressText}>{locationAddress}</span>
         </Text>
       </Section>
 
@@ -104,4 +109,9 @@ const groupText = {
   fontSize: '14px',
   lineHeight: '1.5',
   margin: '0',
+}
+
+const locationAddressText = {
+  color: '#6b7280',
+  fontSize: '13px',
 }

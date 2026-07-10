@@ -9,12 +9,12 @@ export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Upisi',
-  description: 'Upiši dijete na tečaj LEGO robotike u Splitu. Ispuni upit i kontaktirat ćemo te s dostupnim terminima. Bez obveza.',
+  description: 'Upiši dijete na tečaj LEGO robotike u Splitu i Šibeniku. Ispuni upit i kontaktirat ćemo te s dostupnim terminima. Bez obveza.',
   openGraph: {
-    title: 'Upiši dijete – LEGO Robotika | Inovatic Split',
+    title: 'Upiši dijete – LEGO Robotika | Inovatic',
     description: 'Ispuni kratki upit i kontaktirat ćemo te s dostupnim grupama i terminima. Bez obveza.',
     url: 'https://udruga-inovatic.hr/upisi',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu i Šibeniku' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/upisi' },
 }
