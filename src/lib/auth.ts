@@ -3,8 +3,9 @@ import Credentials from 'next-auth/providers/credentials'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { db } from './db'
-import type { UserRole } from '@prisma/client'
+import type { City, UserRole } from '@prisma/client'
 import { authConfig } from './auth.config'
+import { revalidateTokenClaims, type TokenClaims } from './auth-token'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -41,6 +42,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
           role: user.role,
+          city: user.city,
         }
       },
     }),
@@ -49,34 +51,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ...authConfig.callbacks,
     jwt: async ({ token, user }) => {
       // `user` is only set on initial login; subsequent requests hit the TTL
-      // branch below. checkedAt persists across requests via the JWT cookie.
+      // revalidation. checkedAt persists across requests via the JWT cookie.
       if (user) {
         token.id = user.id as string
         token.role = (user as { role: UserRole }).role
+        token.city = (user as { city: City }).city
         token.checkedAt = Date.now()
         return token
       }
-      const TTL_MS = 60_000
-      const checkedAt = (token.checkedAt as number | undefined) ?? 0
-      if (Date.now() - checkedAt < TTL_MS) return token
-      const userId = token.id as string | undefined
-      if (!userId) return null
-      try {
-        const dbUser = await db.user.findUnique({
-          where: { id: userId },
-          select: { deletedAt: true, role: true },
-        })
-        if (!dbUser || dbUser.deletedAt) return null
-        token.role = dbUser.role
-        token.checkedAt = Date.now()
-        return token
-      } catch (err) {
-        // Transient DB error (e.g. Neon cold start): keep the existing
-        // session and re-check on the next 60s cycle. Only a definitive
-        // "user gone / soft-deleted" result above invalidates the session.
-        console.error('jwt callback DB check failed:', err)
-        return token
-      }
+      // The callback token is @auth/core's loose record shape — narrow it to
+      // the claims this app actually stamps on it.
+      return revalidateTokenClaims(token as typeof token & TokenClaims)
     },
   },
 })

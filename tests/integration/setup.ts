@@ -1,5 +1,5 @@
 import type { Session } from 'next-auth'
-import type { UserRole } from '@prisma/client'
+import type { City, UserRole } from '@prisma/client'
 import { afterAll, afterEach, vi } from 'vitest'
 
 // `auth()` from @/lib/auth is stubbed for the entire integration tier — every
@@ -24,6 +24,11 @@ type SessionUser = {
   email?: string | null
   name?: string | null
   role: UserRole
+  /**
+   * Tenant city; omit for SPLIT. Pass `null` to simulate a legacy session
+   * without a city claim (the auth guards must fail closed on those).
+   */
+  city?: City | null
 }
 
 /**
@@ -42,6 +47,7 @@ export function mockSession(user: SessionUser | null = null) {
       email: user.email ?? null,
       name: user.name ?? null,
       role: user.role,
+      city: user.city === null ? undefined : (user.city ?? 'SPLIT'),
     },
     expires: new Date(Date.now() + 86_400_000).toISOString(),
   } as Session)

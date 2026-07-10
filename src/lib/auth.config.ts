@@ -1,5 +1,5 @@
 import type { NextAuthConfig } from 'next-auth'
-import type { UserRole } from '@prisma/client'
+import type { City, UserRole } from '@prisma/client'
 
 // Edge-safe Auth.js config: shared by middleware (Edge runtime) and auth.ts.
 // MUST stay free of Prisma/bcrypt imports — the middleware bundle runs on the
@@ -19,6 +19,9 @@ export const authConfig = {
     session: ({ session, token }) => {
       session.user.id = token.id as string
       session.user.role = token.role as UserRole
+      // May be undefined on a legacy token kept alive through a transient DB
+      // error — the auth guards fail closed on a missing city.
+      session.user.city = token.city as City
       return session
     },
   },

@@ -17,8 +17,8 @@ enum UserRole {
 }
 
 // Tenant key: Split and Šibenik operate as fully separated organizations.
-// @default(SPLIT) is transitional (phase 1) — dropped once every create site
-// stamps city explicitly; see docs runbook for the two-phase migration.
+// Deliberately no @default — every create must stamp city explicitly, so a
+// forgotten tenant assignment is a compile error, never a silent SPLIT row.
 enum City {
   SPLIT
   SIBENIK
@@ -73,7 +73,7 @@ model User {
   phone         String?
   dateOfBirth   String?
   role          UserRole
-  city          City      @default(SPLIT)
+  city          City
   username      String?   @unique
   plainPassword String?
   parentName    String?
@@ -137,7 +137,7 @@ model CourseEnrollmentWindow {
   courseId        String
   schoolYear      String
   // Each city opens/closes upisi for the same shared course independently.
-  city            City      @default(SPLIT)
+  city            City
   enrollmentStart DateTime?
   enrollmentEnd   DateTime?
   createdAt       DateTime  @default(now())
@@ -169,7 +169,7 @@ model ModuleSchedule {
   schoolYear String
   // Each city runs its own planner for the shared curriculum (Šibenik can
   // start mid-cycle with its own module dates).
-  city       City      @default(SPLIT)
+  city       City
   startDate  DateTime? @db.Date
   endDate    DateTime? @db.Date
   createdAt  DateTime  @default(now())
@@ -200,7 +200,7 @@ model SchoolYearHoliday {
   name        String?
   // Per-city holiday calendars; national holidays are duplicated per city
   // (accepted duplication — keeps attendance pacing queries flat).
-  city        City     @default(SPLIT)
+  city        City
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -218,7 +218,7 @@ model Location {
   address  String
   phone    String?
   email    String?
-  city     City    @default(SPLIT)
+  city     City
 
   scheduledGroups ScheduledGroup[]
 
@@ -235,7 +235,7 @@ model ScheduledGroup {
   // Denormalized from the venue (stamped server-side at create; cross-city
   // location moves are rejected). The composite FK below makes drift from
   // Location.city impossible at the DB level.
-  city            City      @default(SPLIT)
+  city            City
   name            String?
   // For radionice (Course.isCustom = true): closed YYYY-MM-DD range — the group runs every day in
   // [dateStart, dateEnd] at the same startTime/endTime. For standard programs both are null and
@@ -280,7 +280,7 @@ model Inquiry {
   type            InquiryType   @default(COURSE)
   // Required (not derivable): PARTY inquiries have no group→location chain.
   // COURSE inquiries persist the parent's mandatory city choice from /upisi.
-  city            City          @default(SPLIT)
+  city            City
   parentName      String
   parentEmail     String
   parentPhone     String
@@ -450,7 +450,7 @@ model Article {
   authorId    String
   // Auto-stamped from the authoring admin's city; public novosti list shows
   // all cities with a per-article badge, admin CRUD is city-scoped.
-  city        City      @default(SPLIT)
+  city        City
   isPublished Boolean   @default(false)
   publishedAt DateTime?
   createdAt   DateTime  @default(now())
