@@ -1,4 +1,4 @@
-import { PrismaClient, CourseLevel, UserRole } from '@prisma/client'
+import { PrismaClient, CourseLevel, UserRole, type City } from '@prisma/client'
 // courses-data.ts is the source of truth for standard SLR program content.
 import { courses as coursesData } from '../src/lib/courses-data'
 import bcrypt from 'bcryptjs'
@@ -1314,15 +1314,16 @@ async function main() {
   console.log(`✅ Admin created: ${admin.email}`)
 
   // ── Association admins ───────────────────────────────────────────────────────
-  const orgAdmins = [
+  const orgAdmins: { email: string; firstName: string; lastName: string; city?: City }[] = [
     { email: 'jozo.pivac@udruga-inovatic.hr', firstName: 'Jozo', lastName: 'Pivac' },
     { email: 'bruno.beslic@udruga-inovatic.hr', firstName: 'Bruno', lastName: 'Bešlić' },
-    { email: 'slavica.jurcevic@udruga-inovatic.hr', firstName: 'Slavica', lastName: 'Jurčević' },
+    // Slavica is the sole Šibenik admin — and its only teacher (city epic).
+    { email: 'slavica.jurcevic@udruga-inovatic.hr', firstName: 'Slavica', lastName: 'Jurčević', city: 'SIBENIK' },
   ]
   for (const a of orgAdmins) {
     const created = await prisma.user.create({
       data: {
-        city: 'SPLIT',
+        city: a.city ?? 'SPLIT',
         email: a.email,
         passwordHash: adminPassword,
         firstName: a.firstName,
@@ -1347,6 +1348,18 @@ async function main() {
       city: 'SPLIT',
       name: 'Ruđera Boškovića 33',
       address: 'Ruđera Boškovića 33, 21000 Split',
+    },
+  })
+
+  // Šibenik venue — Trokut inkubator. Space-only venue (like PMF in Split): no
+  // Trokut org contacts are published; the public Šibenik contact is Slavica,
+  // whose number lives on this row.
+  const trokut = await prisma.location.create({
+    data: {
+      city: 'SIBENIK',
+      name: 'Trokut inkubator',
+      address: 'Ul. Velimira Škorpika 7/a, 22000 Šibenik',
+      phone: '+385 92 168 9987',
     },
   })
   console.log('✅ Locations created')
@@ -7881,9 +7894,9 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
     ],
   })
 
-
   void velebitska
   void boskovica
+  void trokut
 
   console.log('✅ Articles and tags seeded (69 articles)')
 
@@ -7898,7 +7911,7 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
   console.log('  Admin: jpucic00@gmail.com')
   console.log('  Admin: jozo.pivac@udruga-inovatic.hr')
   console.log('  Admin: bruno.beslic@udruga-inovatic.hr')
-  console.log('  Admin: slavica.jurcevic@udruga-inovatic.hr')
+  console.log('  Admin (Šibenik): slavica.jurcevic@udruga-inovatic.hr')
 }
 
 main()
