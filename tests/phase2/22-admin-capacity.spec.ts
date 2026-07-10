@@ -28,6 +28,7 @@ let seeded: {
 test.beforeAll(async () => {
   const location = await db.location.create({
     data: {
+      city: 'SPLIT',
       name: `Capacity Lokacija ${RUN_ID}`,
       address: `Test ulica ${RUN_ID}`,
     },
@@ -57,6 +58,7 @@ test.beforeAll(async () => {
   })
   const group = await db.scheduledGroup.create({
     data: {
+      city: 'SPLIT',
       courseId: course.id,
       locationId: location.id,
       name: `Capacity Grupa ${RUN_ID}`,
@@ -71,6 +73,7 @@ test.beforeAll(async () => {
   // Fill the single seat
   const sittingStudent = await db.user.create({
     data: {
+      city: 'SPLIT',
       email: `sitting-${RUN_ID}@student.inovatic.local`,
       username: `sitting${RUN_ID}`,
       firstName: 'Sjedi',
@@ -91,6 +94,7 @@ test.beforeAll(async () => {
   // has someone to try to add into the full group.
   const spareStudent = await db.user.create({
     data: {
+      city: 'SPLIT',
       email: `spare-${RUN_ID}@student.inovatic.local`,
       username: `spare${RUN_ID}`,
       firstName: 'Slobodni',
@@ -104,6 +108,7 @@ test.beforeAll(async () => {
   // so the CreateAccountDialog opens with this course preselected.
   const inquiry = await db.inquiry.create({
     data: {
+      city: 'SPLIT',
       parentName: `Capacity Roditelj ${RUN_ID}`,
       parentEmail: `capacity.parent.${RUN_ID}@test.com`,
       parentPhone: `099000${RUN_ID}`,

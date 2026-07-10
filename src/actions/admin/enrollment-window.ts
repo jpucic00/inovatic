@@ -19,9 +19,10 @@ export async function upsertEnrollmentWindow(
     const end = enrollmentEnd ? new Date(enrollmentEnd) : null
 
     try {
+      // TODO(city PR4): city from admin session instead of transitional SPLIT
       await db.courseEnrollmentWindow.upsert({
-        where: { courseId_schoolYear: { courseId, schoolYear } },
-        create: { courseId, schoolYear, enrollmentStart: start, enrollmentEnd: end },
+        where: { courseId_schoolYear_city: { courseId, schoolYear, city: 'SPLIT' } },
+        create: { courseId, schoolYear, city: 'SPLIT', enrollmentStart: start, enrollmentEnd: end },
         update: { enrollmentStart: start, enrollmentEnd: end },
       })
     } catch (err) {

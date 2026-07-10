@@ -134,10 +134,12 @@ export async function upsertHolidayRange(
         })
       }
       for (const dateUtc of dateValues) {
+        // TODO(city PR4): city from admin session instead of transitional SPLIT
         await tx.schoolYearHoliday.upsert({
-          where: { schoolYear_date: { schoolYear: data.schoolYear, date: dateUtc } },
+          where: { schoolYear_city_date: { schoolYear: data.schoolYear, city: 'SPLIT', date: dateUtc } },
           create: {
             schoolYear: data.schoolYear,
+            city: 'SPLIT',
             date: dateUtc,
             name,
             createdById: session.user.id,
@@ -399,10 +401,12 @@ export async function bulkImportHolidays(
 
       for (const [dateKey, name] of dateToName) {
         const dateUtc = fromDateKey(dateKey)
+        // TODO(city PR4): city from admin session instead of transitional SPLIT
         await tx.schoolYearHoliday.upsert({
-          where: { schoolYear_date: { schoolYear: data.schoolYear, date: dateUtc } },
+          where: { schoolYear_city_date: { schoolYear: data.schoolYear, city: 'SPLIT', date: dateUtc } },
           create: {
             schoolYear: data.schoolYear,
+            city: 'SPLIT',
             date: dateUtc,
             name,
             createdById: session.user.id,

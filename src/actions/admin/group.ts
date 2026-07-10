@@ -179,6 +179,8 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
           endTime,
           schoolYear,
           maxStudents: maxStudents ?? 12,
+          // TODO(city PR3): derive from the validated location's city
+          city: 'SPLIT',
         },
       })
 

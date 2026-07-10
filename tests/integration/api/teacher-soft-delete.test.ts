@@ -87,6 +87,7 @@ describe('Teacher soft-delete', () => {
     const passwordHash = await bcrypt.hash(password, 4)
     const teacher = await db.user.create({
       data: {
+        city: 'SPLIT',
         email: `softdel-${Date.now()}@test.local`,
         username: `softdel_${Date.now()}`,
         firstName: 'X',

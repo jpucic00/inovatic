@@ -143,6 +143,8 @@ export async function createDraftArticle(): Promise<
         authorId: session.user.id,
         isPublished: false,
         publishedAt: null,
+        // TODO(city PR7): city from admin session
+        city: 'SPLIT',
       },
       select: { id: true },
     })

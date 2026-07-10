@@ -56,6 +56,7 @@ export async function seedTeacher(
       passwordHash,
       plainPassword: password,
       role: 'TEACHER',
+      city: 'SPLIT',
     },
   })
   return { teacherId: user.id, password }
@@ -104,7 +105,7 @@ export async function seedStudentInGroup(
 
   const group = await db.scheduledGroup.findUnique({
     where: { id: groupId },
-    select: { schoolYear: true, courseId: true },
+    select: { schoolYear: true, courseId: true, city: true },
   })
   if (!group) throw new Error(`seedStudentInGroup: group ${groupId} not found`)
 
@@ -134,6 +135,7 @@ export async function seedStudentInGroup(
         passwordHash,
         plainPassword: password,
         role: 'STUDENT',
+        city: group.city,
       },
     })
     const enrollment = await tx.enrollment.create({

@@ -225,6 +225,8 @@ async function findOrCreateStudent(
       parentPhone: input.parentPhone ?? null,
       childSchool: input.childSchool ?? null,
       gdprConsentAt: input.gdprConsentAt ?? null,
+      // TODO(city PR3): city from inquiry/admin session
+      city: 'SPLIT',
     },
     select: { id: true, username: true },
   })

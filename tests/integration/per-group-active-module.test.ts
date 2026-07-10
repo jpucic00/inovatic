@@ -57,6 +57,7 @@ async function seedStandardCourseWithFourModules() {
     modules.map((mod, i) =>
       db.moduleSchedule.create({
         data: {
+          city: 'SPLIT',
           moduleId: mod.id,
           schoolYear: SY,
           startDate: MODULE_WINDOWS[i].startDate,
@@ -96,8 +97,8 @@ describe('per-group active module — capacity diverges by weekday + holidays', 
     // Two Mon holidays inside M1 — slow Mon arc down 2 weeks.
     await db.schoolYearHoliday.createMany({
       data: [
-        { schoolYear: SY, date: new Date(Date.UTC(2026, 8, 21)) }, // Mon 21.09
-        { schoolYear: SY, date: new Date(Date.UTC(2026, 9, 5)) }, // Mon 05.10
+        { city: 'SPLIT', schoolYear: SY, date: new Date(Date.UTC(2026, 8, 21)) }, // Mon 21.09
+        { city: 'SPLIT', schoolYear: SY, date: new Date(Date.UTC(2026, 9, 5)) }, // Mon 05.10
       ],
     })
 

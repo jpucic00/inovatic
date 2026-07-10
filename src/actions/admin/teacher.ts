@@ -224,6 +224,8 @@ export async function createTeacher(
         role: 'TEACHER',
         passwordHash,
         plainPassword: password,
+        // TODO(city PR3): city from admin session
+        city: 'SPLIT',
       },
       select: { id: true },
     })

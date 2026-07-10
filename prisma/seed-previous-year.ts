@@ -157,6 +157,7 @@ async function main() {
     TEACHERS.map((t, i) =>
       prisma.user.create({
         data: {
+          city: 'SPLIT',
           email: `${EMAIL_PREFIX}teacher.${i + 1}@inovatic-demo.local`,
           passwordHash,
           firstName: t.firstName,
@@ -185,6 +186,7 @@ async function main() {
   )
   await prisma.courseEnrollmentWindow.createMany({
     data: distinctCourseIds.map((courseId) => ({
+      city: 'SPLIT',
       courseId,
       schoolYear: SCHOOL_YEAR,
       enrollmentStart: ENROLLMENT_START,
@@ -201,6 +203,7 @@ async function main() {
 
     const group = await prisma.scheduledGroup.create({
       data: {
+        city: 'SPLIT',
         courseId: course.id,
         locationId: location.id,
         name: spec.groupName,
@@ -222,6 +225,7 @@ async function main() {
       const win = MODULE_WINDOWS[m]
       const ms = await prisma.moduleSchedule.create({
         data: {
+          city: 'SPLIT',
           moduleId: courseModule.id,
           schoolYear: SCHOOL_YEAR,
           startDate: win.startDate,
@@ -259,6 +263,7 @@ async function main() {
 
     const student = await prisma.user.create({
       data: {
+        city: 'SPLIT',
         email: `${EMAIL_PREFIX}student.${n + 1}@inovatic-demo.local`,
         passwordHash,
         firstName,

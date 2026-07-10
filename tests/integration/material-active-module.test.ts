@@ -52,10 +52,10 @@ describe('kids see only the active module for their group', () => {
     // Per-group calendar: a Monday group whose Modul 1 ran weeks -10..-4 (done)
     // and whose Modul 2 window (race-ahead) spans now → Modul 2 is active.
     await db.moduleSchedule.create({
-      data: { moduleId: m1.id, schoolYear, startDate: mondayWeeksAgo(10), endDate: mondayWeeksAgo(4) },
+      data: { city: 'SPLIT', moduleId: m1.id, schoolYear, startDate: mondayWeeksAgo(10), endDate: mondayWeeksAgo(4) },
     })
     await db.moduleSchedule.create({
-      data: { moduleId: m2.id, schoolYear, startDate: mondayWeeksAgo(3), endDate: mondayWeeksAgo(-3) },
+      data: { city: 'SPLIT', moduleId: m2.id, schoolYear, startDate: mondayWeeksAgo(3), endDate: mondayWeeksAgo(-3) },
     })
 
     const group = await createGroup({ courseId: course.id, dayOfWeek: 'Ponedjeljak' })
@@ -91,10 +91,10 @@ describe('kids see only the active module for their group', () => {
     const m1 = await createModule(course.id, { title: 'Modul 1', sortOrder: 0 })
     const m2 = await createModule(course.id, { title: 'Modul 2', sortOrder: 1 })
     await db.moduleSchedule.create({
-      data: { moduleId: m1.id, schoolYear, startDate: mondayWeeksAgo(2), endDate: mondayWeeksAgo(-4) },
+      data: { city: 'SPLIT', moduleId: m1.id, schoolYear, startDate: mondayWeeksAgo(2), endDate: mondayWeeksAgo(-4) },
     })
     await db.moduleSchedule.create({
-      data: { moduleId: m2.id, schoolYear, startDate: mondayWeeksAgo(-5), endDate: mondayWeeksAgo(-11) },
+      data: { city: 'SPLIT', moduleId: m2.id, schoolYear, startDate: mondayWeeksAgo(-5), endDate: mondayWeeksAgo(-11) },
     })
 
     const groupMon = await createGroup({ courseId: course.id, dayOfWeek: 'Ponedjeljak' })

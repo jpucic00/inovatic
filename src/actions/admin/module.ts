@@ -16,11 +16,13 @@ export async function upsertModuleSchedule(
     if (blocked) return blocked
 
     try {
+      // TODO(city PR4): city from admin session instead of transitional SPLIT
       await db.moduleSchedule.upsert({
-        where: { moduleId_schoolYear: { moduleId, schoolYear } },
+        where: { moduleId_schoolYear_city: { moduleId, schoolYear, city: 'SPLIT' } },
         create: {
           moduleId,
           schoolYear,
+          city: 'SPLIT',
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
         },

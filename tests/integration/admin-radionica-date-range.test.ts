@@ -179,6 +179,7 @@ describe('getGroupAttendance — radionica session enumeration', () => {
     })
     await db.schoolYearHoliday.create({
       data: {
+        city: 'SPLIT',
         schoolYear: '2026/2027',
         date: new Date(Date.UTC(2026, 6, 17)),
         name: 'Test holiday',

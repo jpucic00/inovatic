@@ -49,7 +49,7 @@ test.beforeAll(async () => {
   await db.schoolYear.upsert({ where: { label: SY }, create: { label: SY }, update: {} })
 
   const location = await db.location.create({
-    data: { name: `Holiday Lokacija ${RUN_ID}`, address: `Test ulica ${RUN_ID}` },
+    data: { city: 'SPLIT', name: `Holiday Lokacija ${RUN_ID}`, address: `Test ulica ${RUN_ID}` },
   })
   const course = await db.course.create({
     data: {
@@ -66,6 +66,7 @@ test.beforeAll(async () => {
   })
   await db.moduleSchedule.create({
     data: {
+      city: 'SPLIT',
       moduleId: moduleRow.id,
       schoolYear: SY,
       startDate: MOD_START,
@@ -74,6 +75,7 @@ test.beforeAll(async () => {
   })
   const group = await db.scheduledGroup.create({
     data: {
+      city: 'SPLIT',
       courseId: course.id,
       locationId: location.id,
       name: `Holiday Grupa ${RUN_ID}`,
@@ -87,6 +89,7 @@ test.beforeAll(async () => {
 
   const student = await db.user.create({
     data: {
+      city: 'SPLIT',
       email: `holiday-student-${RUN_ID}@student.inovatic.local`,
       username: `holidaystudent${RUN_ID}`,
       firstName: 'Holiday',

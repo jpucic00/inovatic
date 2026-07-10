@@ -1303,6 +1303,7 @@ async function main() {
   const adminPassword = await bcrypt.hash('admin123', 12)
   const admin = await prisma.user.create({
     data: {
+      city: 'SPLIT',
       email: 'jpucic00@gmail.com',
       passwordHash: adminPassword,
       firstName: 'Josip',
@@ -1321,6 +1322,7 @@ async function main() {
   for (const a of orgAdmins) {
     const created = await prisma.user.create({
       data: {
+        city: 'SPLIT',
         email: a.email,
         passwordHash: adminPassword,
         firstName: a.firstName,
@@ -1334,6 +1336,7 @@ async function main() {
   // ── Locations ────────────────────────────────────────────────────────────────
   const velebitska = await prisma.location.create({
     data: {
+      city: 'SPLIT',
       name: 'Velebitska 32',
       address: 'Velebitska 32, 21000 Split',
     },
@@ -1341,6 +1344,7 @@ async function main() {
 
   const boskovica = await prisma.location.create({
     data: {
+      city: 'SPLIT',
       name: 'Ruđera Boškovića 33',
       address: 'Ruđera Boškovića 33, 21000 Split',
     },
@@ -1386,6 +1390,7 @@ async function main() {
     seedMonth >= 9 ? `${seedYear}/${seedYear + 1}` : `${seedYear - 1}/${seedYear}`
   await prisma.courseEnrollmentWindow.createMany({
     data: seededCourses.map((c) => ({
+      city: 'SPLIT',
       courseId: c.id,
       schoolYear: currentSchoolYear,
       enrollmentStart: new Date(`${seedYear}-01-01`),
@@ -1413,6 +1418,7 @@ async function main() {
   // [1/69] regionalno-fll-2026
   const a1 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'regionalno-fll-2026',
       title: `Sjajni rezultati sa regionalnog FLL natjecanja – Pula 2026.`,
       excerpt: `Udruga za robotiku „Inovatic“ sudjelovala je na regionalnom polufinalnom turniru FIRST LEGO League Hrvatska, koji se održao 7. veljače u OŠ Šijana, Pula. Natjecanje je okupilo 18 polufinalnih ekipa, a samo 8 najboljih ostvarilo je plasman na finale državnog natjecanja u Zagrebu (7. ožujka).`,
@@ -1530,6 +1536,7 @@ async function main() {
   // [2/69] science-comes-to-town
   const a2 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'science-comes-to-town',
       title: `Udruga Inovatic partner u europskom projektu “Science Comes to Town”`,
       excerpt: `Udruga za robotiku Inovatic s ponosom sudjeluje kao pridruženi partner Gradu Splitu u međunarodnom, EU-financiranom projektu Science Comes to Town, koji je službeno otvoren 20. siječnja 2026. godine u Hrvatskom domu u Splitu.`,
@@ -1728,6 +1735,7 @@ async function main() {
   // [3/69] odrzane-zimske-radionice-robotike-2026
   const a3 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzane-zimske-radionice-robotike-2026',
       title: `Održane Zimske radionice robotike 2026.`,
       excerpt: `Uspješno smo proveli Zimske radionice LEGO robotike u razdoblju 7. – 9. siječnja 2026. Na radionicama je sudjelovalo ukupno dvadeset polaznika uzrasta 6 – 14 godina.`,
@@ -1786,6 +1794,7 @@ async function main() {
   // [4/69] splitska-udruga-inovatic-osvojila-srebro-na-svjetskom-finalu-robotike-u-singapuru
   const a4 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'splitska-udruga-inovatic-osvojila-srebro-na-svjetskom-finalu-robotike-u-singapuru',
       title: `Udruga Inovatic osvojila srebro na svjetskom finalu robotike u Singapuru!`,
       excerpt: `Sa ponosom objavljujemo da je naš CroSpec tim osvojio srebrnu medalju na World Robot Olympiad™ INTERNATIONAL FINAL 2025, najvećem svjetskom natjecanju u robotici, održanom od 26. do 28. studenoga 2025. u Marina Bay Sands, Singapur.`,
@@ -1899,6 +1908,7 @@ async function main() {
   // [5/69] zimske-radionice-2026
   const a5 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zimske-radionice-2026',
       title: `Zimske radionice LEGO robotike: Saonice Djeda Mraza`,
       excerpt: `Prijavite djecu na zimske robotičke radionice od 7. do 9. siječnja 2026. Cijena 60 € za trodnevni ciklus. Lokacija: Velebitska 32, Split.`,
@@ -1943,6 +1953,7 @@ async function main() {
   // [6/69] donacija-singapur
   const a6 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'donacija-singapur',
       title: `Podržite naš CroSpec tim na svjetskom natjecanju u Singapuru!`,
       excerpt: `Tim CroSpec izborili su plasman na WRO finale 2025. u Singapuru (26.–28. studenog). Pozivamo sve koji žele podržati naše mlade robotičare na putu prema svjetskom zlatu.`,
@@ -1976,6 +1987,7 @@ async function main() {
   // [7/69] zavrsetak-cjelogodisnje-aktivnosti-2024-2025
   const a7 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zavrsetak-cjelogodisnje-aktivnosti-2024-2025',
       title: `Završetak cjelogodišnje aktivnosti “Svijet LEGO robotike” u 2024./2025.`,
       excerpt: `Naši mladi polaznici su uspješno završili cjelogodišnju aktivnost “Svijet LEGO robotike”, koju već petu godinu provodimo na našoj lokaciji Velebitska 32, Split. Na oduševljenje svih naših polaznika, naš kurikulum “Svijet LEGO robotike” pružio je našim polaznicima bogatstvo sadržaja i kreativnim L...`,
@@ -2037,6 +2049,7 @@ async function main() {
   // [8/69] ljetne-radionice-2025
   const a8 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'ljetne-radionice-2025',
       title: `Ljetni kamp LEGO robotike 2025.`,
       excerpt: `Pozivamo vas na naše ljetne kampove LEGO robotike!I ovo ljeto smo za vas pripremili aktivnosti sa puno zabave i edukacije. Ako volite stjecati nova znanja učeći kroz igru i zabavu onda su naši ljetni kampovi pravo mjesto za vas.`,
@@ -2221,6 +2234,7 @@ async function main() {
   // [9/69] zavrsetak-slr-2023-2024
   const a9 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zavrsetak-slr-2023-2024',
       title: `Završetak programa Svijet lego robotike u 2023./2024.`,
       excerpt: `Sa datumom 1. lipnja 2024. završili smo uspješno cjelogodišnji program Svijet lego robotike, kojeg već drugu godinu provodimo na našoj lokaciji Velebitska 32, Split.`,
@@ -2283,6 +2297,7 @@ async function main() {
   // [10/69] zimska-skola-2024
   const a10 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zimska-skola-2024',
       title: `Zimska škola robotike 2024.`,
       excerpt: `Za vrijeme zimskih praznika provodimo zimske radionice robotike za sve zainteresirane uzrasta 6-14 godina.`,
@@ -2382,6 +2397,7 @@ async function main() {
   // [11/69] upisi-2023-24
   const a11 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'upisi-2023-24',
       title: `Otvoreni su upisi za cjelogodišnje programe za 2023./2024.`,
       excerpt: `Otvorili smo upise u cjelogodišnje programe za polaznike uzrasta 6-14 godina za školsku godinu 2023./2024.`,
@@ -2606,6 +2622,7 @@ async function main() {
   // [12/69] besplatne-ljetne-radionice-2023-bilo-kuda-stem-svuda
   const a12 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'besplatne-ljetne-radionice-2023-bilo-kuda-stem-svuda',
       title: `Besplatne Ljetne radionice 2023. “Bilo kuda STEM svuda”.`,
       excerpt: `U razdoblju 26.6. – 1.7. 2023. provodimo besplatne Ljetne radionice u sklopu EU projekta “Bilo kuda STEM svuda”.`,
@@ -2725,6 +2742,7 @@ async function main() {
   // [13/69] zavrsetak-cjelogodisnjih-radionica-2022-2023
   const a13 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zavrsetak-cjelogodisnjih-radionica-2022-2023',
       title: `Završetak cjelogodišnjih radionica u 2022./2023.`,
       excerpt: `Sa datumom 9. lipnja 2023. smo uspješno završili osmu po redu školsku godinu od kada provedimo cjelogodišnje radionice robotike za učenike 6-18 g.`,
@@ -2793,6 +2811,7 @@ async function main() {
   // [14/69] robosim
   const a14 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'robosim',
       title: `RoboSim liga – “Bilo kuda STEM svuda”`,
       excerpt: `U sklopu projekta „Bilo kuda STEM svuda“, financiranog iz europskog socijalnog fonda, organiziramo online robotičku ligu u simulatoru.`,
@@ -3021,6 +3040,7 @@ async function main() {
   // [15/69] besplatne-proljetne-radionice-2023
   const a15 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'besplatne-proljetne-radionice-2023',
       title: `Besplatne Proljetne radionice 2023. “Bilo kuda STEM svuda”.`,
       excerpt: `U razdoblju 11.4. – 14.4. 2023. provodimo besplatne Proljetne radionice u sklopu esf projekta “Bilo kuda STEM svuda”.`,
@@ -3113,6 +3133,7 @@ async function main() {
   // [16/69] prijave-elementarna-robotika
   const a16 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'prijave-elementarna-robotika',
       title: `Prijave na ciklus besplatnih višednevne radionice elementarne robotike “Bilo kuda STEM svuda”`,
       excerpt: `Otvorene su prijave za novi besplatan ciklus višednevnih radionica elementarne robotike.`,
@@ -3226,6 +3247,7 @@ async function main() {
   // [17/69] prijave-festival-znanosti-2023
   const a17 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'prijave-festival-znanosti-2023',
       title: `Prijave za sudjelovanje na radionici Festivala znanosti 2023.`,
       excerpt: `I ove godine naša udruga u suradnji sa partnerom Prirodoslovno-matematičkim fakultetom u Splitu organizira besplatnu dvodnevnu radionicu povodom nadolazećeg Festivala znanosti 2023. i projekta “Bilo kuda STEM svuda”, čiji je korisnik naša udruga, a projekt je sufinanciran sredstvima iz europskog ...`,
@@ -3325,6 +3347,7 @@ async function main() {
   // [18/69] besplatne-zimske-radionice-2023
   const a18 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'besplatne-zimske-radionice-2023',
       title: `Besplatne Zimske radionice 2023. “Bilo kuda STEM svuda”`,
       excerpt: `U razdoblju 22.2. – 25.2. 2023. provodimo besplatne Zimske radionice u sklopu esf projekta “Bilo kuda STEM svuda”.`,
@@ -3425,6 +3448,7 @@ async function main() {
   // [19/69] male-bistre-glavice
   const a19 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'male-bistre-glavice',
       title: `Besplatne radionice: STEAM u Splitu – Male biSTre glavice!`,
       excerpt: `U sklopu organizacije Split Tech City projektnih aktivnosti: Male biSTre glavice, Udruga Inovatic organizira besplatne radionice za djecu od 10-14 godina na adresi Velebitska 32, Split:`,
@@ -3513,6 +3537,7 @@ async function main() {
   // [20/69] odrzana-treca-ljetna-skola-robotike-za-djecu-10-14-godina
   const a20 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzana-treca-ljetna-skola-robotike-za-djecu-10-14-godina',
       title: `Održana treća Ljetna škola robotike za djecu 10 – 14 godina.`,
       excerpt: `U razdoblju 22. 8. – 26. 8. 2022. je održana treća Ljetna škola robotike za polaznike uzrasta 10 – 14 godina.Ukupno je sudjelovalo 8 polaznika raspoređenih u jednoj jutarnjoj grupi.`,
@@ -3593,6 +3618,7 @@ async function main() {
   // [21/69] odrzane-tri-ljetne-skole-robotike-na-bracu-u-sklopu-eu-projekta-bilo-kuda-stem-svuda
   const a21 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzane-tri-ljetne-skole-robotike-na-bracu-u-sklopu-eu-projekta-bilo-kuda-stem-svuda',
       title: `Održane tri Ljetne škole robotike na Braču u sklopu EU projekta “Bilo kuda STEM svuda”.`,
       excerpt: `U razdoblju od 14. 7. do 14. 8. 2022., Udruga „RoboBrač“ je održala ukupno tri besplatne Ljetne škole robotike namijenjene osnovnoškolcima sa područja otoka Brača.`,
@@ -3676,6 +3702,7 @@ async function main() {
   // [22/69] odrzana-druga-ljetna-skola-robotike-za-djecu-6-9-godina
   const a22 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzana-druga-ljetna-skola-robotike-za-djecu-6-9-godina',
       title: `Održana druga Ljetna škola robotike za djecu 6 – 9 godina`,
       excerpt: `U razdoblju 8. 8. – 12. 8. 2022. je održana druga Ljetna škola robotike za polaznike uzrasta 6 – 9 godina.Ukupno je sudjelovalo 14 polaznika raspoređenih kroz jutarnju i popodnevnu grupu.`,
@@ -3766,6 +3793,7 @@ async function main() {
   // [23/69] prijave-za-ljetnu-2022-stariji-uzrast
   const a23 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'prijave-za-ljetnu-2022-stariji-uzrast',
       title: `Prijave za Ljetnu školu robotike 2022. uzrasta 10 – 14 godina.`,
       excerpt: `Otvorili smo prijave za Ljetnu školu robotike na temu: Energija, robotika i život.Radionice su namijenjene polaznicima uzrasta 10 – 14 godina, a održavati će se u razdoblju 22. 8. – 26 .8. 2022. u terminu kroz jutro 9:00 – 12:00.`,
@@ -3897,6 +3925,7 @@ async function main() {
   // [24/69] odrzan-drugi-ljetni-kamp-robotike-zsm
   const a24 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzan-drugi-ljetni-kamp-robotike-zsm',
       title: `Održan drugi Ljetni kamp robotike na Zvjezdanom selu Mosor u sklopu EU projekta “Bilo kuda STEM svuda”.`,
       excerpt: `U razdoblju od 30. 7. do 3. 8. 2022., u zvjezdarnici Zvjezdanog sela Mosor u Gornjem Sitnom je održan drugi besplatni Ljetni kamp robotike namijenjen djeci s područja Sisačko-moslavačke županije zahvaćenog nedavnim potresom.`,
@@ -3973,6 +4002,7 @@ async function main() {
   // [25/69] odrzan-prvi-splitski-kamp-robotike
   const a25 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzan-prvi-splitski-kamp-robotike',
       title: `Održan prvi splitski kamp robotike u sklopu EU projekta “Bilo kuda STEM svuda”.`,
       excerpt: `U razdoblju 25. 7. – 1. 8. 2022. u Udruzi Inovatic, u Splitu je održan prvi besplatni Ljetni kamp robotike u sklopu EU projekta „Bilo kuda STEM svuda“.`,
@@ -4049,6 +4079,7 @@ async function main() {
   // [26/69] odrzana-prva-ljetna-skola-robotike-za-djecu-6-9-godina
   const a26 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzana-prva-ljetna-skola-robotike-za-djecu-6-9-godina',
       title: `Održana prva Ljetna škola robotike za djecu 6 – 9 godina`,
       excerpt: `U razdoblju 11. 7. – 15. 7. 2022. je održana prva Ljetna škola robotike za polaznike uzrasta 6 – 9 godina.Ukupno je sudjelovalo 16 polaznika raspoređenih kroz jutarnju i popodnevnu grupu.`,
@@ -4151,6 +4182,7 @@ async function main() {
   // [27/69] zavrsen-prvi-ljetni-kamp-zsm
   const a27 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zavrsen-prvi-ljetni-kamp-zsm',
       title: `Održan prvi Ljetni kamp robotike na Zvjezdanom selu Mosor u sklopu EU projekta “Bilo kuda STEM svuda”.`,
       excerpt: `U razdoblju 4. 7. – 9. 7. 2022. na Zvjezdanom selu Mosor je održan prvi besplatni Ljetni kamp robotike namijenjen djeci sa područja zahvaćenih potresom Sisačko-moslovačke županije.`,
@@ -4236,6 +4268,7 @@ async function main() {
   // [28/69] zavrsetak-cjelogodisnje-2022
   const a28 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zavrsetak-cjelogodisnje-2022',
       title: `Završetak cjelogodišnjih radionica u škol. god. 2021./2022.`,
       excerpt: `Sa datumom 22. lipnja 2022. smo uspješno završili sedmu po redu školsku godinu od kada provedimo cjelogodišnje radionice robotike. Veliko nam je zadovoljstvo da iz godine u godinu postajemo sve aktivniji te upisujemo sve više zainteresirane djece u naše cjelogodišnje programe.`,
@@ -4289,6 +4322,7 @@ async function main() {
   // [29/69] ljetna-skola-2022
   const a29 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'ljetna-skola-2022',
       title: `Prijave za ljetna školu robotike 2022. za polaznike 6 – 9 godina.`,
       excerpt: `Za najmlađe robotičare/ke ovo ljeto smo pripremili dva ciklusa Ljetnih škola robotike na temu: Energija, robotika i život.Radionice su namijenjene polaznicima uzrasta 6 – 9 godina, a svaki ciklus radionica će trajati dvadeset školskih sati raspoređenih u pet dana škole.`,
@@ -4434,6 +4468,7 @@ async function main() {
   // [30/69] poziv-ljetni-kamp
   const a30 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'poziv-ljetni-kamp',
       title: `Poziv udrugama za prijavu na Ljetne kampove robotike.`,
       excerpt: `Pozivamo sve zainteresirane udruge koje se bave osjetljivom skupinom djece na njihovu suradnju i sudjelovanje na besplatnim Ljetnim kampovima robotike koje organiziramo ovo ljeto na splitskom kampusu.`,
@@ -4679,6 +4714,7 @@ async function main() {
   // [31/69] ljetni-kamp-robotike-2022-na-zvjezdanom-selu-mosor
   const a31 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'ljetni-kamp-robotike-2022-na-zvjezdanom-selu-mosor',
       title: `Ljetni kampovi robotike – Zvjezdano selo Mosor`,
       excerpt: `Udruga za robotiku „Inovatic“ u suradnji s partnerskom udrugom Zvjezdano selo Mosor organizira dva LJETNA KAMPA ROBOTIKE za učenike viših razreda osnovne škole. Prvi Kamp će biti održan u vremenu od 4. do 9. srpnja, a drugi od 30. srpnja do 4. kolovoza 2022. Kampovi će biti održani u zvjezdarnici...`,
@@ -4762,6 +4798,7 @@ async function main() {
   // [32/69] zavrsen-1-ciklus-besplatnih-radionica-iz-elementarne-robotike
   const a32 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zavrsen-1-ciklus-besplatnih-radionica-iz-elementarne-robotike',
       title: `Završen 1. ciklus besplatnih radionica iz elementarne robotike`,
       excerpt: `U subotu, 4. lipnja je završio prvi ciklus besplatnih radionica elementarne robotike. Ciklus je trajao sedam tjedana te su sudjelovala ukupno 32 polaznika uzrasta 10 – 14 godina.`,
@@ -4814,6 +4851,7 @@ async function main() {
   // [33/69] drzavni-prvaci-15-robokupa
   const a33 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'drzavni-prvaci-15-robokupa',
       title: `DRŽAVNI PRVACI 15. ROBOKUPA!`,
       excerpt: `Naši robotičari osvojili zlato na državnom prvenstvu iz elementarne robotike – 15. ROBOKUP-u, koje je održano 14. – 15. svibnja u Stubičkim Toplicama, točnije hotelu Matija Gubec.`,
@@ -4923,6 +4961,7 @@ async function main() {
   // [34/69] festival-znanosti-2022
   const a34 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'festival-znanosti-2022',
       title: `Festival znanosti 2022.`,
       excerpt: `Na ovogodišnjem Festivalu znanosti smo u suradnji sa partnerom Zvjezdano selo Mosor na projektu “Bilo kuda STEM svuda”, održali dvije radionice robotike u OŠ Spinut, Split. Tema ovogodišnjeg Festivala znanosti je Život, a mi smo uspješno naš projekt “Bilo kuda STEM svuda” kroz besplatne radionice...`,
@@ -5001,6 +5040,7 @@ async function main() {
   // [35/69] osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022
   const a35 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022',
       title: `Osvojeno 2. mjesto na županijskom ROBOKUP-u 2022.`,
       excerpt: `Na splitskom Pmf-u, je održana županijska razina natjecanja ROBOKUP 2022. – natjecanje iz elementarne robotike. Organizatori su bili Zajednica tehničke kulture grada Splita i Udruga za robotiku „Inovatic“. Natjecanju je pristupilo šest ekipa (17 učenika) iz osnovnih škola i udruga s područja Trog...`,
@@ -5091,6 +5131,7 @@ async function main() {
   // [36/69] drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022
   const a36 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022',
       title: `Državno natjecanje iz LEGO robotike: FIRST LEGO LEAGUE 2022.`,
       excerpt: `23. travnja 2022. smo sudjelovali na First Lego League  – FLL, državnom natjecanje iz robotike koje se održalo na Fakultetu elektrotehnike i računarstva (FER) u Zagrebu. Naša udruga je ove godine sudjelovala sa čak tri ekipe: Inovatic Storm, InovaTICA Programa i Inovatic Force. Trud, kreativne id...`,
@@ -5226,6 +5267,7 @@ async function main() {
   // [37/69] proljetna-radionica-u-zvjezdanom-selu-mosor
   const a37 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'proljetna-radionica-u-zvjezdanom-selu-mosor',
       title: `Proljetna radionica u Zvjezdanom selu mosor`,
       excerpt: `U zvjezdarnici naših partnera na projektu “Bilo kuda STEM svuda”, udruge Zvjezdano selo Mosor (ZSM) u Gornjem Sitnom je 19. travnja održana jednodnevna radionica za učenike osnovnih škola. Pohađalo ju je ukupno dvanaest učenika iz Splitsko-dalmatinske županije i grada Zaboka.`,
@@ -5322,6 +5364,7 @@ async function main() {
   // [38/69] proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda
   const a38 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda',
       title: `Proljetne radionice robotike 2022. “Bilo kuda STEM svuda”`,
       excerpt: `U periodu 19.4. – 21.4. 2022. su održane trodnevne radionice robotike za učenike uzrasta 10-14 g. Polaznici su se upoznali sa Lego Mindstorms EV3 edukacijskim setom te su konstruirali i programirali robotsko vozilo. Posljednji dan radionica naučena znanja su primjenjivali na stazi te su programir...`,
@@ -5395,6 +5438,7 @@ async function main() {
   // [39/69] proljetne-radionice-robotike-2022
   const a39 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'proljetne-radionice-robotike-2022',
       title: `Proljetne radionice robotike 2022.`,
       excerpt: `Povodom nadolazećih proljetnih praznika organiziramo za djecu uzrasta 6-9 godina kreativne radionice iz robotike i programiranja u periodu 19.4. -21.4.2022.I ove godine smo pripremili zanimljive tematske projekte koje će polaznici radionica slagati i programirati uz dosta zabave i novog iskustva.`,
@@ -5455,6 +5499,7 @@ async function main() {
   // [40/69] 3866-2
   const a40 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: '3866-2',
       title: `Besplatne Proljetne radionice robotike 2022.`,
       excerpt: `Još jednu u nizu aktivnosti koju provodimo u sklopu projekta “Bilo kuda STEM svuda” uskoro ćemo provesti u djelo. Kako nam se bliže proljetni praznici, vrijeme je i za prve u nizu VIŠEDNEVNIH RADIONICA za vrijeme školskih praznika. Proljetni ciklus će se održati od 19.4. do 21.4. u dva popodnevna...`,
@@ -5485,6 +5530,7 @@ async function main() {
   // [41/69] 3859-2
   const a41 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: '3859-2',
       title: `1. Ciklus radionica Elementarne robotike`,
       excerpt: `Naziv našeg projekta sufinanciranog sredstvima Europske unije i Vlade RH napokon dobiva svoj puni smisao – “Bilo kuda STEM svuda”.Ovaj mjesec smo počeli sa provedbom prvoga ciklusa besplatnih radionica elementarne robotike za polaznike 10-14 godina. Ciklus će trajati 16 školskih sati raspoređenih...`,
@@ -5517,6 +5563,7 @@ async function main() {
   // [42/69] robokup-2022-zupanijska-razina
   const a42 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'robokup-2022-zupanijska-razina',
       title: `ROBOKUP 2022. – županijska razina`,
       excerpt: `Zajednica tehničke kulture grada Splita i Udruga Inovatic i ove su godine organizatori županijske razine 15. po redu Robokupa. Natjecanje će se održati 29. travnja 2022. godine u 9.00 sati, a domaćin natjecanja ponovno je Prirodoslovno-matematički fakultet Split. Svi zainteresirani učitelji i men...`,
@@ -5545,6 +5592,7 @@ async function main() {
   // [43/69] besplatni-tecajevi-elementarne-robotike
   const a43 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'besplatni-tecajevi-elementarne-robotike',
       title: `Besplatni tečajevi elementarne robotike`,
       excerpt: `Ciklusi ovih tečajeva su zamišljeni kao višednevne radionice iz elementarne robotike. Jedan ciklus tečaja bi trajao otprilike 16 školskih sati te bi se radionice održavale jednom tjedno po blok školski sat. Ciklusi tečajeva se tematski ne nastavljaju već se isti program ponavlja iznova, stoga pol...`,
@@ -5703,6 +5751,7 @@ async function main() {
   // [44/69] projekt-bilo-kuda-stem-svuda
   const a44 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'projekt-bilo-kuda-stem-svuda',
       title: `Projekt “Bilo kuda STEM svuda”`,
       excerpt: `Udruga za robotiku „Inovatic“ nositelj je projekta pod nazivom “Bilo kuda STEM svuda” kojeg sufinancira Europska unija iz Europskog socijalnog fonda te Ured za udruge Vlade RH. Namijenjen je jačanju kapaciteta organizacija civilnog društva (OCD-a) te popularizaciji STEM-a među mladima. Projekt se...`,
@@ -5734,6 +5783,7 @@ async function main() {
   // [45/69] zimske-radionice-robotike-2022
   const a45 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zimske-radionice-robotike-2022',
       title: `Zimske radionice robotike 2022.`,
       excerpt: `U periodu 3.1. – 5.1. 2022. smo održali zimske radionice robotike za osnovnoškolce. Na radionicama je sudjelovalo ukupno 30 polaznika, raspoređenih u dvije dobne skupine zavisno o uzrastu.Mlađi polaznici su izrađivali Lego Spike saonice projekt, a stariji Lego Spike Rudolf projekt.`,
@@ -5782,6 +5832,7 @@ async function main() {
   // [46/69] zavrsetak-izvanskolske-aktivnosti-2020-2021
   const a46 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zavrsetak-izvanskolske-aktivnosti-2020-2021',
       title: `Završetak izvanškolske aktivnosti 2020./2021.`,
       excerpt: `Sa datumom 30. lipnja 2021. smo uspješno završili izvanškolsku aktivnost robotike u ovoj školskoj godini. Veliko nam je zadovoljstvo da je usprkos pandemiji preko 250 djece uspješno završilo izvanškolsku aktivnost u ovoj školskoj godini te zasluženo dobili diplome. Čestitamo svim našim članovima ...`,
@@ -5827,6 +5878,7 @@ async function main() {
   // [47/69] otvorili-smo-upise-u-nove-grupe-iz-robotike
   const a47 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'otvorili-smo-upise-u-nove-grupe-iz-robotike',
       title: `Otvaramo upise u nove grupe na novoj lokaciji!`,
       excerpt: `Zbog velikog interesa za pohađanje naših radionica iz robotike od 16.11.2020. radionice provodimo na još jednoj lokaciji gdje planiramo upisati sve zainteresirane koji se nisu uspjeli upisati u prvom jesenskom krugu. Novi prostor se nalazi u tzv. Plavoj zgradi, poznatoj i kao Anićeva zgrada, na k...`,
@@ -5994,6 +6046,7 @@ async function main() {
   // [48/69] pocele-radionice-robotike-u-novoj-skolskoj-godini-2020-2021
   const a48 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'pocele-radionice-robotike-u-novoj-skolskoj-godini-2020-2021',
       title: `Počele su radionice robotike u novoj školskoj godini 2020./2021.`,
       excerpt: `Počeli smo sa radionicama iz robotike u ovoj školskoj godini 2020./21 u kojoj očekujemo puno radnih izazova te zabavnih projekata i natjecanja. Kao i do sada naše stare/nove članove smo rasporedili u raznovrsne programe, prilagođene njihovom uzrastu i znanju. Više o programima i robotima možete p...`,
@@ -6068,6 +6121,7 @@ async function main() {
   // [49/69] odrzan-cetvrti-ciklus-ljetnih-radionica-robotike-u-kolovozu-2020
   const a49 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzan-cetvrti-ciklus-ljetnih-radionica-robotike-u-kolovozu-2020',
       title: `Održan četvrti ciklus ljetnih radionica robotike u kolovozu 2020.`,
       excerpt: `U razdoblju od 17.08.2020. – 21.08.2020. održane su Ljetne radionice robotike u kolovozu na kojima je sudjelovalo dvanaest polaznika, uzrasta 6 do 12 godina.`,
@@ -6120,6 +6174,7 @@ async function main() {
   // [50/69] odrzan-treci-ciklus-ljetnih-radionica-robotike-u-kolovozu-2020
   const a50 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzan-treci-ciklus-ljetnih-radionica-robotike-u-kolovozu-2020',
       title: `Održan treći ciklus ljetnih radionica robotike u kolovozu 2020.`,
       excerpt: `U razdoblju od 10.08.2020. – 14.08.2020. održane su Ljetne radionice robotike u kolovozu na kojima je sudjelovalo dvanaest polaznika, uzrasta 7 do 12 godina.`,
@@ -6255,6 +6310,7 @@ async function main() {
   // [51/69] odrzan-drugi-ciklus-ljetnih-radionica-robotike-2020
   const a51 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzan-drugi-ciklus-ljetnih-radionica-robotike-2020',
       title: `Održan drugi ciklus ljetnih radionica robotike 2020.`,
       excerpt: `U razdoblju od 20.07.2020. – 24.07.2020. održane su Ljetne radionice robotike na kojima je sudjelovalo šesnaest polaznika, uzrasta 6 do 12 godina.`,
@@ -6362,6 +6418,7 @@ async function main() {
   // [52/69] ljetne-radionice-robotike-2020-2
   const a52 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'ljetne-radionice-robotike-2020-2',
       title: `Održan prvi ciklus ljetnih radionica robotike 2020.`,
       excerpt: `U razdoblju od 13.07.2020. – 17.07.2020. održane su Ljetne radionice robotike na kojima je sudjelovalo sedamnaest polaznika, uzrasta 6 do 12 godina`,
@@ -6487,6 +6544,7 @@ async function main() {
   // [53/69] ljetne-radionice-robotike-2020
   const a53 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'ljetne-radionice-robotike-2020',
       title: `Ljetne radionice robotike 2020.`,
       excerpt: `Pozivamo svu zainteresiranu djecu da se i ovo ljeto pridruže našim radionicama iz robotike te na zabavan i edukativan način upotpune svoje ljetne praznike. Radionice su namijenjene polaznicima uzrasta 6 – 12 g. kojima izazov predstavlja slagati i programirati razne projekte iz robotike.`,
@@ -6751,6 +6809,7 @@ Plan i program ljetnih radionica će biti osmišljen kroz izradu i sastavljanje 
   // [54/69] rosil
   const a54 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'rosil',
       title: `Robotička simulacijska liga (ROSIL)`,
       excerpt: `Udruga Inovatic zajedno sa Hrvatskim robotičkim savezom organizira Robotičku simulacijsku ligu (ROSIL). Online liga je besplatna za sve sudionike, natjecateljskog je karaktera i usmjerena je prema svim udrugama i školama u Hrvatskoj za djecu od 4. do 8. razreda, koje zbog novonastale situacije ni...`,
@@ -6886,6 +6945,7 @@ Plan i program ljetnih radionica će biti osmišljen kroz izradu i sastavljanje 
   // [55/69] online-edukcije-iz-robotike
   const a55 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'online-edukcije-iz-robotike',
       title: `Online edukcija iz robotike!`,
       excerpt: `Pokrećemo online edukaciju iz robotike za onu djecu koja žele od doma učiti, stvarati i programirati robote! Aplikacije u obliku raznih simulatora koje ćemo koristiti u online edukaciji su osmišljene prvenstveno za poučavanje djece robotici te im omogućuju da na zabavan i kreativan način izrađuju...`,
@@ -7022,6 +7082,7 @@ Plan i program ljetnih radionica će biti osmišljen kroz izradu i sastavljanje 
   // [56/69] zimske-radionice-lego-robotike-2020
   const a56 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zimske-radionice-lego-robotike-2020',
       title: `Zimske radionice Lego robotike 2020.`,
       excerpt: `U razdoblju 02.01.2020. – 04.01.2020. su održane Zimske radionica robotike na kojima je sudjelovalo dvadeset i troje polaznika, uzrasta 6 do 9 godina.`,
@@ -7078,6 +7139,7 @@ Nadahnuti zimskim praznicima pripremili smo projekte tematskog sadržaja poput; 
   // [57/69] ljetne-radionice-robotike
   const a57 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'ljetne-radionice-robotike',
       title: `Održan drugi ciklus ljetnih radionica 2019.`,
       excerpt: `U razdoblju 19.8. – 30.8.2019.  su održana dva tjedna ciklusa Ljetnih radionica robotike. Na radionicama je ukupno sudjelovalo četrdeset učenika osnovnih škola, podijeljenih u dvije dobne skupine; mlađi uzrast (6-8 g.) i stariji uzrast (9-14 g.)`,
@@ -7161,6 +7223,7 @@ Veselimo se nadolazećim zimskim radionicama, a do tada možete pogledati najist
   // [58/69] odrzan-prvi-ciklus-ljetnih-radionica-2019
   const a58 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'odrzan-prvi-ciklus-ljetnih-radionica-2019',
       title: `Održan prvi ciklus ljetnih radionica 2019.`,
       excerpt: `U razdoblju 1.7.2019. – 5.7.2019. je održan prvi ciklus Ljetnih radionica robotike na kojem je sudjelovalo četrdesetak učenik osnovnih škola, podijeljenih u dvije dobne skupine.`,
@@ -7197,6 +7260,7 @@ Učenici su uz vodstvo naših predavača slagali i programirali zanimljive Lego 
   // [59/69] proljetne-radionice-lego-robotike-2019
   const a59 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'proljetne-radionice-lego-robotike-2019',
       title: `Proljetne radionice Lego robotike 2019.`,
       excerpt: ``,
@@ -7288,6 +7352,7 @@ Galerija slika:`, styles: {'bold': true} },
   // [60/69] 1082
   const a60 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: '1082',
       title: `Zimske radionice Lego robotike 2018./2019.`,
       excerpt: ``,
@@ -7349,6 +7414,7 @@ Mlađa dobna skupina je koristila `, styles: {} },
   // [61/69] lego-mindstorms-radionice-robotike
   const a61 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'lego-mindstorms-radionice-robotike',
       title: `Ljetne radionice Lego robotike 2018.`,
       excerpt: ``,
@@ -7426,6 +7492,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   // [62/69] festival-znanosti-2018
   const a62 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'festival-znanosti-2018',
       title: `Festival znanosti 2018.`,
       excerpt: ``,
@@ -7489,6 +7556,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   // [63/69] proljetne-radionice-lego-robotike-2018-2
   const a63 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'proljetne-radionice-lego-robotike-2018-2',
       title: `Proljetne radionice Lego robotike 2018.`,
       excerpt: ``,
@@ -7562,6 +7630,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   // [64/69] zimske-radionice-lego-robotike
   const a64 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zimske-radionice-lego-robotike',
       title: `Zimske radionice Lego robotike 2018.`,
       excerpt: ``,
@@ -7625,6 +7694,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   // [65/69] radionice-robotike-za-djecu-zaposlenika-ht-a
   const a65 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'radionice-robotike-za-djecu-zaposlenika-ht-a',
       title: `Radionice robotike za djecu zaposlenika HT-a`,
       excerpt: `Održali smo radionice iz robotike za djecu zaposlenika HT-a. Radionice robotike, u suradnji s Croatian Makersom i partnerima su održane u ciklusu od četiri subote u Udruzi Inovatic na Pmf-u Split. Polaznici su se upoznali sa osnovama robotike koristeći micro-bit, maleno programabilno računalo, uz...`,
@@ -7670,6 +7740,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   // [66/69] proljetna-skola-lego-robotike
   const a66 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'proljetna-skola-lego-robotike',
       title: `Proljetna škola Lego robotike 2017.`,
       excerpt: `Kako nam se bliže uskrsni praznici za vrijeme kojih sudjelujemo u brojnim slavljima i inspirirani smo raznim aktivnostima i udruga Inovatic je za vas pripremila zanimljive i kreativne aktivnosti. Najistaknutija aktivnost je zasigurno bojanje uskrsnih jaja, koja se uređuju različitim, često vrlo d...`,
@@ -7715,6 +7786,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   // [67/69] druga-zimska-skola-lego-robotike
   const a67 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'druga-zimska-skola-lego-robotike',
       title: `Zimska škola lego robotike`,
       excerpt: `Održana je druga Zimska škola LEGO robotike za osnovnoškolce u periodu 09.01. – 11.01. Učenici su u tri dana škole pod vodstvom mentora prošli tri faze robotike. Prvi dan je bio gradivni gdje su učenici od lego kockica sastavljali konstrukcije Djeda Mraza, saonica i sobova. Drugi su dan povezival...`,
@@ -7742,6 +7814,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   // [68/69] kras-razveselio-nase-malisane-poklonima
   const a68 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'kras-razveselio-nase-malisane-poklonima',
       title: `Kraš razveselio naše mališane poklonima`,
       excerpt: `Učenici su u prekrasnoj blagdanskoj atmosferi slagali lego saonice od kockica te programirali sobove da uspješno djedicu dovedu do cilja sa darovima. Da bi veselje bilo još veće KRAŠ je našim robo mališanima donirao po poklon paket koji ih je dodatno razveselio i zato im veliko hvala! Također naj...`,
@@ -7769,6 +7842,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   // [69/69] zimska-skola-lego-robotike
   const a69 = await prisma.article.create({
     data: {
+      city: 'SPLIT',
       slug: 'zimska-skola-lego-robotike',
       title: `Zimska škola Lego robotike 2017.`,
       excerpt: `Pozivamo sve osnovnoškolce koji vole slagati LEGO kockice i ROBOTIKA im predstavlja izazov da se prijave na Zimsku školu LEGO robotike.  Učenici će imati priliku slagati lego konstrukcije božićnih saonica, Djeda Božićnjaka i druge slične božićne konstrukcije koje će zatim programirati pomoću raču...`,

@@ -172,6 +172,7 @@ describe('completeSchoolYearPlan', () => {
     // dragging Module 1 endDate one week later.
     await db.schoolYearHoliday.create({
       data: {
+        city: 'SPLIT',
         schoolYear: SY,
         date: new Date(Date.UTC(2026, 9, 19)), // Oct 19
         name: 'Test',
@@ -257,6 +258,7 @@ describe('completeSchoolYearPlan', () => {
     // leave it alone.
     await db.moduleSchedule.create({
       data: {
+        city: 'SPLIT',
         moduleId: radionicaModule.id,
         schoolYear: SY,
         startDate: new Date(Date.UTC(2026, 10, 15)),

@@ -16,6 +16,14 @@ enum UserRole {
   STUDENT
 }
 
+// Tenant key: Split and Šibenik operate as fully separated organizations.
+// @default(SPLIT) is transitional (phase 1) — dropped once every create site
+// stamps city explicitly; see docs runbook for the two-phase migration.
+enum City {
+  SPLIT
+  SIBENIK
+}
+
 enum CourseLevel {
   SLR_1
   SLR_2
@@ -65,6 +73,7 @@ model User {
   phone         String?
   dateOfBirth   String?
   role          UserRole
+  city          City      @default(SPLIT)
   username      String?   @unique
   plainPassword String?
   parentName    String?
@@ -86,6 +95,8 @@ model User {
   studentComments      StudentComment[]   @relation("CommentStudent")
   recordedAttendances  Attendance[]       @relation("AttendanceRecorder")
   createdHolidays      SchoolYearHoliday[] @relation("HolidayCreator")
+
+  @@index([role, city])
 }
 
 model Course {
@@ -104,6 +115,9 @@ model Course {
   isCustom    Boolean      @default(false)
   // Set on custom radionice (year-scoped); null on standard SLR (global).
   schoolYear  String?
+  // null = shared standard SLR program (same catalog in every city);
+  // set = per-city radionica (isCustom rows are venue-bound).
+  city        City?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -122,6 +136,8 @@ model CourseEnrollmentWindow {
   id              String    @id @default(cuid())
   courseId        String
   schoolYear      String
+  // Each city opens/closes upisi for the same shared course independently.
+  city            City      @default(SPLIT)
   enrollmentStart DateTime?
   enrollmentEnd   DateTime?
   createdAt       DateTime  @default(now())
@@ -129,7 +145,7 @@ model CourseEnrollmentWindow {
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@unique([courseId, schoolYear])
+  @@unique([courseId, schoolYear, city])
   @@index([schoolYear])
 }
 
@@ -151,6 +167,9 @@ model ModuleSchedule {
   id         String    @id @default(cuid())
   moduleId   String
   schoolYear String
+  // Each city runs its own planner for the shared curriculum (Šibenik can
+  // start mid-cycle with its own module dates).
+  city       City      @default(SPLIT)
   startDate  DateTime? @db.Date
   endDate    DateTime? @db.Date
   createdAt  DateTime  @default(now())
@@ -159,7 +178,7 @@ model ModuleSchedule {
   module            CourseModule       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   moduleEnrollments ModuleEnrollment[]
 
-  @@unique([moduleId, schoolYear])
+  @@unique([moduleId, schoolYear, city])
 }
 
 // Registry of school years so a year can exist as a blank slate
@@ -179,6 +198,9 @@ model SchoolYearHoliday {
   schoolYear  String
   date        DateTime @db.Date
   name        String?
+  // Per-city holiday calendars; national holidays are duplicated per city
+  // (accepted duplication — keeps attendance pacing queries flat).
+  city        City     @default(SPLIT)
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -186,7 +208,7 @@ model SchoolYearHoliday {
   schoolYearRef SchoolYear @relation(fields: [schoolYear], references: [label], onDelete: Cascade)
   createdBy     User?      @relation("HolidayCreator", fields: [createdById], references: [id])
 
-  @@unique([schoolYear, date])
+  @@unique([schoolYear, city, date])
   @@index([schoolYear])
 }
 
@@ -196,14 +218,24 @@ model Location {
   address  String
   phone    String?
   email    String?
+  city     City    @default(SPLIT)
 
   scheduledGroups ScheduledGroup[]
+
+  // Composite-FK target so ScheduledGroup(locationId, city) can reference
+  // (id, city) — DB-level guarantee that a group's city matches its venue's.
+  @@unique([id, city])
+  @@index([city])
 }
 
 model ScheduledGroup {
   id              String    @id @default(cuid())
   courseId        String
   locationId      String
+  // Denormalized from the venue (stamped server-side at create; cross-city
+  // location moves are rejected). The composite FK below makes drift from
+  // Location.city impossible at the DB level.
+  city            City      @default(SPLIT)
   name            String?
   // For radionice (Course.isCustom = true): closed YYYY-MM-DD range — the group runs every day in
   // [dateStart, dateEnd] at the same startTime/endTime. For standard programs both are null and
@@ -219,7 +251,7 @@ model ScheduledGroup {
   updatedAt       DateTime  @updatedAt
 
   course               Course               @relation(fields: [courseId], references: [id])
-  location             Location             @relation(fields: [locationId], references: [id])
+  location             Location             @relation(fields: [locationId, city], references: [id, city])
   teacherAssignments   TeacherAssignment[]
   enrollments          Enrollment[]
   materials            Material[]
@@ -228,6 +260,8 @@ model ScheduledGroup {
   assignedInquiries    Inquiry[]            @relation("AssignedGroup")
   preferredInquiries   Inquiry[]            @relation("PreferredGroup")
   studentComments      StudentComment[]
+
+  @@index([city, schoolYear])
 }
 
 model TeacherAssignment {
@@ -244,6 +278,9 @@ model TeacherAssignment {
 model Inquiry {
   id              String        @id @default(cuid())
   type            InquiryType   @default(COURSE)
+  // Required (not derivable): PARTY inquiries have no group→location chain.
+  // COURSE inquiries persist the parent's mandatory city choice from /upisi.
+  city            City          @default(SPLIT)
   parentName      String
   parentEmail     String
   parentPhone     String
@@ -284,6 +321,7 @@ model Inquiry {
   @@index([studentId])
   @@index([schoolYear])
   @@index([type, status])
+  @@index([city, schoolYear, status])
 }
 
 
@@ -410,6 +448,9 @@ model Article {
   content     Json      @default("[]")
   coverImage  String?
   authorId    String
+  // Auto-stamped from the authoring admin's city; public novosti list shows
+  // all cities with a per-article badge, admin CRUD is city-scoped.
+  city        City      @default(SPLIT)
   isPublished Boolean   @default(false)
   publishedAt DateTime?
   createdAt   DateTime  @default(now())
@@ -418,6 +459,8 @@ model Article {
   author User          @relation(fields: [authorId], references: [id])
   tags   ArticleTag[]
   images ArticleImage[]
+
+  @@index([city, isPublished])
 }
 
 model ArticleImage {

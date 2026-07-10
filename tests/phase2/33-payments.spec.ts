@@ -45,7 +45,7 @@ test.beforeAll(async () => {
   await db.schoolYear.upsert({ where: { label: CY }, create: { label: CY }, update: {} })
 
   const location = await db.location.create({
-    data: { name: `Loc ${RUN_ID}`, address: `Test address ${RUN_ID}` },
+    data: { city: 'SPLIT', name: `Loc ${RUN_ID}`, address: `Test address ${RUN_ID}` },
   })
   const course = await db.course.create({
     data: {
@@ -61,10 +61,11 @@ test.beforeAll(async () => {
     data: { courseId: course.id, title: MODULE_TITLE, sortOrder: 0 },
   })
   const ms = await db.moduleSchedule.create({
-    data: { moduleId: mod.id, schoolYear: CY, startDate: STARTED },
+    data: { city: 'SPLIT', moduleId: mod.id, schoolYear: CY, startDate: STARTED },
   })
   const group = await db.scheduledGroup.create({
     data: {
+      city: 'SPLIT',
       courseId: course.id,
       locationId: location.id,
       name: `Grupa ${RUN_ID}`,
@@ -79,6 +80,7 @@ test.beforeAll(async () => {
   async function seedStudent(suffix: string, paid: boolean) {
     const user = await db.user.create({
       data: {
+        city: 'SPLIT',
         email: `pay-${suffix}-${RUN_ID}@test.local`,
         username: `pay_${suffix}_${RUN_ID}`,
         firstName: 'Pay',

@@ -76,6 +76,8 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
           message: message || null,
           referralSource: referralSource || null,
           consentGivenAt: new Date(),
+          // TODO(city PR5): city from the public form
+          city: 'SPLIT',
         },
       })
     })
@@ -159,6 +161,8 @@ export async function submitPartyInquiry(
         // confirmed date's year later, in schedulePartyInquiry.
         schoolYear: computeSchoolYear(),
         consentGivenAt: new Date(),
+        // Proslave are Split-only (owner decision 2026-07-10)
+        city: 'SPLIT',
       },
     })
   } catch (err) {

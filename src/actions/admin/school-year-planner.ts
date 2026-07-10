@@ -120,12 +120,14 @@ export async function completeSchoolYearPlan(
     mods.forEach((m, position) => {
       const window = plan.modules[position]
       if (!window) return
+      // TODO(city PR4): city from admin session instead of transitional SPLIT
       upserts.push(
         db.moduleSchedule.upsert({
-          where: { moduleId_schoolYear: { moduleId: m.id, schoolYear } },
+          where: { moduleId_schoolYear_city: { moduleId: m.id, schoolYear, city: 'SPLIT' } },
           create: {
             moduleId: m.id,
             schoolYear,
+            city: 'SPLIT',
             startDate: window.startDate,
             endDate: window.endDate,
           },

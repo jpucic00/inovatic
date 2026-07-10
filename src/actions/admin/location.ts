@@ -22,7 +22,14 @@ export async function createLocation(data: CreateLocationInput): Promise<AdminAc
   return adminAction(createLocationSchema, data, async ({ name, address, phone, email }) => {
     try {
       await db.location.create({
-        data: { name, address, phone: phone || null, email: email || null },
+        data: {
+          name,
+          address,
+          phone: phone || null,
+          email: email || null,
+          // TODO(city PR3): city from admin session
+          city: 'SPLIT',
+        },
       })
     } catch (err) {
       console.error('createLocation failed:', err)

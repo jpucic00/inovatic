@@ -27,7 +27,7 @@ test.beforeAll(async () => {
   await db.schoolYear.upsert({ where: { label: SY }, create: { label: SY }, update: {} })
 
   const location = await db.location.create({
-    data: { name: `Loc ${RUN_ID}`, address: `Test address ${RUN_ID}` },
+    data: { city: 'SPLIT', name: `Loc ${RUN_ID}`, address: `Test address ${RUN_ID}` },
   })
   const course = await db.course.create({
     data: {
@@ -42,6 +42,7 @@ test.beforeAll(async () => {
   })
   const group = await db.scheduledGroup.create({
     data: {
+      city: 'SPLIT',
       courseId: course.id,
       locationId: location.id,
       name: `Grupa ${RUN_ID}`,

@@ -8,6 +8,7 @@
 import bcrypt from 'bcryptjs'
 import {
   type Attendance,
+  type City,
   type CourseModule,
   type Enrollment,
   type Inquiry,
@@ -41,6 +42,7 @@ async function createUser(
     role: UserRole
     phone: string
     deletedAt: Date | null
+    city: City
   }> = {},
 ): Promise<User & { plainPassword: string }> {
   const id = uniq()
@@ -57,6 +59,7 @@ async function createUser(
       role,
       phone: overrides.phone,
       deletedAt: overrides.deletedAt ?? null,
+      city: overrides.city ?? 'SPLIT',
     },
   })
   return { ...user, plainPassword: password }
@@ -72,13 +75,14 @@ export const createStudent = (overrides: Parameters<typeof createUser>[0] = {}) 
   createUser({ ...overrides, role: UserRole.STUDENT })
 
 export async function createLocation(
-  overrides: Partial<{ name: string; address: string }> = {},
+  overrides: Partial<{ name: string; address: string; city: City }> = {},
 ): Promise<Location> {
   const id = uniq()
   return db.location.create({
     data: {
       name: overrides.name ?? `Lokacija ${id}`,
       address: overrides.address ?? `Test ulica ${id}`,
+      city: overrides.city ?? 'SPLIT',
     },
   })
 }
@@ -133,11 +137,15 @@ type CreateGroupOverrides = {
   dateEnd?: string | null
   startTime?: string
   endTime?: string
+  city?: City
 }
 
 export async function createGroup(overrides: CreateGroupOverrides = {}): Promise<ScheduledGroup> {
+  const city = overrides.city ?? 'SPLIT'
   const courseId = overrides.courseId ?? (await createCourse()).id
-  const locationId = overrides.locationId ?? (await createLocation()).id
+  // Auto-created location inherits the group's city so the composite
+  // (locationId, city) → Location(id, city) FK holds.
+  const locationId = overrides.locationId ?? (await createLocation({ city })).id
   const id = uniq()
   // When the caller supplies a date range, treat the group as a radionica and
   // null out dayOfWeek; otherwise default to the standard-program weekday.
@@ -157,6 +165,7 @@ export async function createGroup(overrides: CreateGroupOverrides = {}): Promise
       dateEnd: overrides.dateEnd ?? null,
       startTime: overrides.startTime ?? '17:00',
       endTime: overrides.endTime ?? '18:30',
+      city,
     },
   })
 }
@@ -182,6 +191,7 @@ export async function createModuleSchedule(
     schoolYear: string
     startDate: Date | null
     endDate: Date | null
+    city: City
   }> = {},
 ): Promise<ModuleSchedule> {
   return db.moduleSchedule.create({
@@ -190,6 +200,27 @@ export async function createModuleSchedule(
       schoolYear: overrides.schoolYear ?? '2026/2027',
       startDate: overrides.startDate ?? null,
       endDate: overrides.endDate ?? null,
+      city: overrides.city ?? 'SPLIT',
+    },
+  })
+}
+
+export async function createEnrollmentWindow(
+  courseId: string,
+  overrides: Partial<{
+    schoolYear: string
+    city: City
+    enrollmentStart: Date | null
+    enrollmentEnd: Date | null
+  }> = {},
+) {
+  return db.courseEnrollmentWindow.create({
+    data: {
+      courseId,
+      schoolYear: overrides.schoolYear ?? '2026/2027',
+      city: overrides.city ?? 'SPLIT',
+      enrollmentStart: overrides.enrollmentStart ?? null,
+      enrollmentEnd: overrides.enrollmentEnd ?? null,
     },
   })
 }
@@ -222,6 +253,7 @@ type CreateInquiryOverrides = {
   status?: InquiryStatus
   /** Denormalized school year (server-derived in prod). Defaults to null. */
   schoolYear?: string | null
+  city?: City
 }
 
 export async function createInquiry(
@@ -242,6 +274,7 @@ export async function createInquiry(
       assignedGroupId: overrides.assignedGroupId ?? null,
       status: overrides.status ?? InquiryStatus.NEW,
       schoolYear: overrides.schoolYear ?? null,
+      city: overrides.city ?? 'SPLIT',
       consentGivenAt: new Date(),
     },
   })

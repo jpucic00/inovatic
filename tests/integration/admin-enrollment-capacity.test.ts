@@ -164,6 +164,7 @@ describe('createStudentFromInquiry — capacity guardrail', () => {
 
     const myInquiry = await db.inquiry.create({
       data: {
+        city: 'SPLIT',
         parentName: 'Test Parent',
         parentEmail: `inquiry-${Date.now()}@example.local`,
         parentPhone: '+38500000',
@@ -197,6 +198,7 @@ describe('createStudentFromInquiry — capacity guardrail', () => {
 
     const inquiry = await db.inquiry.create({
       data: {
+        city: 'SPLIT',
         parentName: 'Other Parent',
         parentEmail: `other-${Date.now()}@example.local`,
         parentPhone: '+38500001',
@@ -226,6 +228,7 @@ describe('createStudentFromInquiry — capacity guardrail', () => {
 
     const inquiry = await db.inquiry.create({
       data: {
+        city: 'SPLIT',
         parentName: 'Rollback Parent',
         parentEmail: `rollback-${Date.now()}@example.local`,
         parentPhone: '+38500002',
@@ -275,6 +278,7 @@ describe('createStudentFromInquiry — error contract (named-error mapping)', ()
 
     const inquiry = await db.inquiry.create({
       data: {
+        city: 'SPLIT',
         parentName: 'NoGroup Parent',
         parentEmail: `nogroup-${Date.now()}@example.local`,
         parentPhone: '+38500005',
@@ -371,6 +375,7 @@ describe('archived-school-year guard — enrollment-creating actions', () => {
 
     const inquiry = await db.inquiry.create({
       data: {
+        city: 'SPLIT',
         parentName: 'Archived Parent',
         parentEmail: `archived-${Date.now()}@example.local`,
         parentPhone: '+38500099',
@@ -508,6 +513,7 @@ describe('createStudent* — Resend failure is non-fatal', () => {
 
     const inquiry = await db.inquiry.create({
       data: {
+        city: 'SPLIT',
         parentName: 'Mail Fail Parent',
         parentEmail: `mailfail-${Date.now()}@example.local`,
         parentPhone: '+38500003',
@@ -551,6 +557,7 @@ describe('createStudent* — Resend failure is non-fatal', () => {
 
     const inquiry = await db.inquiry.create({
       data: {
+        city: 'SPLIT',
         parentName: 'Mail OK Parent',
         parentEmail: `mailok-${Date.now()}@example.local`,
         parentPhone: '+38500004',

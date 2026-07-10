@@ -347,6 +347,7 @@ describe('getGroupAttendance — honours holidays', () => {
     const admin = await createAdmin()
     const teacher = await db.user.create({
       data: {
+        city: 'SPLIT',
         email: `t-${Date.now()}@test.local`,
         username: `t_${Date.now()}`,
         firstName: 'T',
@@ -361,6 +362,7 @@ describe('getGroupAttendance — honours holidays', () => {
     // Window: 2027-01-04 (Mon) → 2027-01-25 (Mon) — 4 Mondays.
     await db.moduleSchedule.create({
       data: {
+        city: 'SPLIT',
         moduleId: moduleRow.id,
         schoolYear: SY,
         startDate: new Date(Date.UTC(2027, 0, 4)),
@@ -473,6 +475,7 @@ describe('removeHolidayRange', () => {
     })
     await db.schoolYearHoliday.create({
       data: {
+        city: 'SPLIT',
         schoolYear: OTHER_SY,
         date: new Date(Date.UTC(2028, 11, 25)),
         name: 'Božić drugog godišta',
@@ -515,6 +518,7 @@ describe('removeHoliday', () => {
 
     const row = await db.schoolYearHoliday.create({
       data: {
+        city: 'SPLIT',
         schoolYear: '2020/2021',
         date: new Date(Date.UTC(2020, 11, 25)),
         name: 'Arhivirani Božić',
@@ -556,6 +560,7 @@ describe('previewHolidaysFromApi', () => {
     })
     await db.schoolYearHoliday.create({
       data: {
+        city: 'SPLIT',
         schoolYear: SY,
         date: new Date('2026-12-25T00:00:00.000Z'),
         name: 'Božić',
