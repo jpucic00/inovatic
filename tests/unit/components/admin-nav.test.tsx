@@ -65,6 +65,19 @@ describe('AdminDesktopSidebar — "plan the year" badge', () => {
   })
 })
 
+describe('AdminDesktopSidebar — city chip placement', () => {
+  it('renders the city chip in the top header next to the logo, not in the footer', () => {
+    render(<AdminDesktopSidebar {...baseProps} calendarNeedsPlanning={false} />)
+
+    const chip = screen.getByText('Split')
+    // Top-left header: the chip shares its parent with the logo link.
+    expect(chip.parentElement?.querySelector('a[href="/admin"]')).toBeTruthy()
+    // Not down in the footer beside the logout control.
+    const footer = screen.getByRole('button', { name: /Odjava/ }).closest('div')
+    expect(footer?.contains(chip)).toBe(false)
+  })
+})
+
 describe('AdminDesktopSidebar — "Nastavnički panel" shortcut', () => {
   it('links to /nastavnik when the admin also teaches', () => {
     render(<AdminDesktopSidebar {...baseProps} calendarNeedsPlanning={false} showTeacherPanel />)

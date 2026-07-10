@@ -138,17 +138,23 @@ function PlanningWarning() {
   )
 }
 
-function UserFooter({ userName, cityLabel }: Readonly<{ userName: string; cityLabel: string }>) {
+// City (tenant) chip — pinned top-left next to the logo so an admin's city
+// reads at a glance the moment the panel loads (Slavica in Šibenik vs. the
+// Split admins). Static account fact, not a switcher.
+function CityChip({ cityLabel }: Readonly<{ cityLabel: string }>) {
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
+      {cityLabel}
+    </span>
+  )
+}
+
+function UserFooter({ userName }: Readonly<{ userName: string }>) {
   return (
     <div className="px-3 py-3 border-t border-gray-800">
       <div className="px-2 mb-3">
         <p className="text-xs text-gray-500 truncate">{userName}</p>
-        <div className="flex items-center gap-1.5">
-          <p className="text-xs text-gray-600">Administrator</p>
-          <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
-            {cityLabel}
-          </span>
-        </div>
+        <p className="text-xs text-gray-600">Administrator</p>
       </div>
       <form action={logoutAction}>
         <button
@@ -186,8 +192,9 @@ export function AdminDesktopSidebar({
 
   return (
     <aside className="hidden lg:flex w-60 bg-gray-900 text-gray-300 flex-col flex-shrink-0 sticky top-0 h-screen overflow-y-auto">
-      <div className="px-4 py-3 border-b border-gray-800">
+      <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
         <Logo variant="white" href="/admin" size="sm" />
+        <CityChip cityLabel={cityLabel} />
       </div>
       <SchoolYearSwitcher years={years} selectedYear={selectedYear} currentYear={currentYear} />
       <nav className="flex-1 py-4 px-2">
@@ -197,7 +204,7 @@ export function AdminDesktopSidebar({
           showTeacherPanel={showTeacherPanel}
         />
       </nav>
-      <UserFooter userName={userName} cityLabel={cityLabel} />
+      <UserFooter userName={userName} />
     </aside>
   )
 }
@@ -217,7 +224,10 @@ export function AdminMobileNav({
   return (
     <>
       <header className="fixed top-0 inset-x-0 z-40 h-14 bg-gray-900 flex items-center justify-between px-4 lg:hidden">
-        <Logo variant="white" href="/admin" size="sm" />
+        <div className="flex items-center gap-2">
+          <Logo variant="white" href="/admin" size="sm" />
+          <CityChip cityLabel={cityLabel} />
+        </div>
         <button
           type="button"
           onClick={() => setIsOpen(true)}
@@ -235,7 +245,10 @@ export function AdminMobileNav({
           aria-label="Navigacija"
         >
           <div className="h-14 px-4 border-b border-gray-800 flex items-center justify-between flex-shrink-0">
-            <Logo variant="white" href="/admin" size="sm" />
+            <div className="flex items-center gap-2">
+              <Logo variant="white" href="/admin" size="sm" />
+              <CityChip cityLabel={cityLabel} />
+            </div>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
@@ -254,7 +267,7 @@ export function AdminMobileNav({
               onNavigate={() => setIsOpen(false)}
             />
           </div>
-          <UserFooter userName={userName} cityLabel={cityLabel} />
+          <UserFooter userName={userName} />
         </dialog>
       )}
     </>
