@@ -1,5 +1,6 @@
 'use server'
 
+import type { City } from '@prisma/client'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { computeGroupCapacity } from '@/lib/group-capacity'
@@ -75,17 +76,19 @@ function toActiveGroup(
   }
 }
 
-export async function getActivePrograms(): Promise<ActiveProgram[]> {
+export async function getActivePrograms(city: City): Promise<ActiveProgram[]> {
   const now = new Date()
   const yearFloor = computeSchoolYear()
 
-  // The signup window now lives per (course, schoolYear) on
+  // The signup window now lives per (course, schoolYear, city) on
   // CourseEnrollmentWindow. A group is publicly enrollable only when its
-  // program has an OPEN window for the group's own school year. Prisma can't
-  // correlate the window's schoolYear to each group's schoolYear in a single
-  // `where`, so resolve open windows first and gate groups on the composite key.
+  // program has an OPEN window for the group's own school year AND the caller's
+  // city — a Split window must never expose Šibenik groups or vice versa.
+  // Prisma can't correlate the window's schoolYear to each group's schoolYear
+  // in a single `where`, so resolve this city's open windows first and gate
+  // groups on the composite key.
   const openWindows = await db.courseEnrollmentWindow.findMany({
-    where: { enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
+    where: { city, enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
     select: { courseId: true, schoolYear: true, city: true },
   })
   if (openWindows.length === 0) return []
@@ -97,7 +100,7 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
   const openCourseIds = Array.from(new Set(openWindows.map((w) => w.courseId)))
 
   const groups = await db.scheduledGroup.findMany({
-    where: { courseId: { in: openCourseIds } },
+    where: { city, courseId: { in: openCourseIds } },
     include: {
       course: {
         select: {

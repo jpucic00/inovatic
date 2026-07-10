@@ -1,7 +1,13 @@
 import { describe, expect, it, vi, afterAll } from 'vitest'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
-import { createAdmin, createCourse, createGroup, createLocation } from './helpers/factory'
+import {
+  createAdmin,
+  createCourse,
+  createEnrollmentWindow,
+  createGroup,
+  createLocation,
+} from './helpers/factory'
 
 // upsertEnrollmentWindow revalidates on success — stub next/cache so the action
 // body runs without a request scope.
@@ -36,7 +42,7 @@ async function setup() {
 }
 
 const hasProgram = async (id: string) =>
-  (await getActivePrograms()).some((p) => p.id === id)
+  (await getActivePrograms('SPLIT')).some((p) => p.id === id)
 
 describe('getActivePrograms — gated by the program (course, year) window', () => {
   it('hides a program that has no window for the year', async () => {
@@ -86,5 +92,41 @@ describe('getActivePrograms — gated by the program (course, year) window', () 
       enrollmentEnd: '2027-12-31',
     })
     expect(await hasProgram(course.id)).toBe(false)
+  })
+})
+
+describe('getActivePrograms — city isolation under open windows', () => {
+  it('a Split group under an open window never appears in the Šibenik result, and vice versa', async () => {
+    // One shared course with a group AND an open window in EACH city — so the
+    // only thing that can keep them apart is the city filter, not a closed
+    // window or a missing program.
+    const course = await createCourse({ isCustom: true, schoolYear: YEAR })
+    createdCourseIds.push(course.id)
+
+    const splitLoc = await createLocation({ city: 'SPLIT' })
+    const sibLoc = await createLocation({ city: 'SIBENIK' })
+    const splitGroup = await createGroup({
+      courseId: course.id, locationId: splitLoc.id, city: 'SPLIT',
+      schoolYear: YEAR, dateStart: '2026-07-15', dateEnd: '2026-07-21',
+    })
+    const sibGroup = await createGroup({
+      courseId: course.id, locationId: sibLoc.id, city: 'SIBENIK',
+      schoolYear: YEAR, dateStart: '2026-07-15', dateEnd: '2026-07-21',
+    })
+
+    const openRange = {
+      enrollmentStart: new Date('2026-01-01'),
+      enrollmentEnd: new Date('2027-12-31'),
+    }
+    await createEnrollmentWindow(course.id, { schoolYear: YEAR, city: 'SPLIT', ...openRange })
+    await createEnrollmentWindow(course.id, { schoolYear: YEAR, city: 'SIBENIK', ...openRange })
+
+    const splitGroupIds = (await getActivePrograms('SPLIT')).flatMap((p) => p.groups.map((g) => g.id))
+    const sibGroupIds = (await getActivePrograms('SIBENIK')).flatMap((p) => p.groups.map((g) => g.id))
+
+    expect(splitGroupIds).toContain(splitGroup.id)
+    expect(splitGroupIds).not.toContain(sibGroup.id)
+    expect(sibGroupIds).toContain(sibGroup.id)
+    expect(sibGroupIds).not.toContain(splitGroup.id)
   })
 })

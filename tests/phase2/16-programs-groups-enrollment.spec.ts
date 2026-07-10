@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
+import { fillInquiryStep1 } from '../helpers/upisi'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 7 — Programs, Groups & Enrollment
@@ -102,13 +103,7 @@ async function loginAsAdmin(page: Page) {
 type ParentData = typeof PARENT_1
 
 async function fillStep1(page: Page, data: ParentData) {
-  await page.locator('#parentName').fill(data.parentName)
-  await page.locator('#parentEmail').fill(data.parentEmail)
-  await page.locator('#parentPhone').fill(data.parentPhone)
-  await clickUntilVisible(
-    page.locator('button', { hasText: 'Dalje' }),
-    page.locator('#childFirstName'),
-  )
+  await fillInquiryStep1(page, data)
 }
 
 async function fillStep2(page: Page, data: ParentData) {

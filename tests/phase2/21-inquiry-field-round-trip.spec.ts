@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { BASE, loginAsAdmin } from '../helpers/phase3'
 import { clickUntilVisible } from '../helpers/hydration'
+import { fillInquiryStep1 } from '../helpers/upisi'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 — Inquiry field round-trip: childGrade + referralSource
@@ -58,14 +59,8 @@ const INQUIRY_EMPTY_REFERRAL: InquiryData = {
 async function submitInquiry(page: Page, data: InquiryData) {
   await page.goto(`${BASE}/upisi`)
 
-  // Step 1 — parent info
-  await page.locator('#parentName').fill(data.parentName)
-  await page.locator('#parentEmail').fill(data.parentEmail)
-  await page.locator('#parentPhone').fill(data.parentPhone)
-  await clickUntilVisible(
-    page.locator('button', { hasText: 'Dalje' }),
-    page.locator('#childFirstName'),
-  )
+  // Step 1 — city + parent info
+  await fillInquiryStep1(page, data)
 
   // Step 2 — child info
   await page.locator('#childFirstName').fill(data.childFirstName)

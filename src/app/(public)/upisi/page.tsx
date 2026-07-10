@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import type { City } from '@prisma/client'
 import { CheckCircle } from 'lucide-react'
 import { InquiryForm } from '@/components/public/inquiry-form'
-import { getActivePrograms } from '@/actions/public/programs'
+import { getActivePrograms, type ActiveProgram } from '@/actions/public/programs'
+import { CITY_VALUES } from '@/lib/city'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +41,12 @@ const stepStyles = [
 ]
 
 export default async function InquiryPage() {
-  const programs = await getActivePrograms()
+  // Render every city's programs up front so the Step-1 city dropdown filters
+  // client-side with no post-selection loading state.
+  const entries = await Promise.all(
+    CITY_VALUES.map(async (c) => [c, await getActivePrograms(c)] as const),
+  )
+  const programsByCity = Object.fromEntries(entries) as Partial<Record<City, ActiveProgram[]>>
   return (
     <>
       <section className="relative bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-12 px-4 overflow-hidden">
@@ -108,7 +115,7 @@ export default async function InquiryPage() {
             {/* Form */}
             <div className="lg:col-span-3 order-2 lg:order-none">
               <div className="bg-white rounded-2xl border border-cyan-100 ring-1 ring-cyan-50 shadow-sm p-7">
-                <InquiryForm programs={programs} />
+                <InquiryForm programsByCity={programsByCity} />
               </div>
             </div>
 

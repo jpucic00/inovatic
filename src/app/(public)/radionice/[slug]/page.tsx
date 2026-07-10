@@ -20,6 +20,7 @@ async function getWorkshop(slug: string) {
       ageMin: true,
       ageMax: true,
       price: true,
+      city: true,
     },
   })
 }
@@ -50,15 +51,15 @@ const perkIconColors = ['text-cyan-500', 'text-yellow-400', 'text-emerald-400']
 
 export default async function WorkshopPage({ params }: Readonly<Props>) {
   const { slug } = await params
-  const [workshop, allPrograms] = await Promise.all([
-    getWorkshop(slug),
-    getActivePrograms(),
-  ])
+  const workshop = await getWorkshop(slug)
 
-  if (!workshop) notFound()
+  // A radionica always belongs to one city (isCustom courses are city-stamped);
+  // a null city would be a data defect, so treat it as not-found.
+  if (!workshop?.city) notFound()
 
+  const cityPrograms = await getActivePrograms(workshop.city)
   // Only pass this workshop's program to the form (pre-selected, no dropdown needed)
-  const workshopPrograms = allPrograms.filter((p) => p.id === workshop.id)
+  const workshopPrograms = cityPrograms.filter((p) => p.id === workshop.id)
 
   return (
     <>
@@ -118,7 +119,11 @@ export default async function WorkshopPage({ params }: Readonly<Props>) {
             {/* Form */}
             <div className="lg:col-span-3">
               <div className="bg-white rounded-2xl border border-orange-100 ring-1 ring-orange-50 shadow-sm p-7">
-                <InquiryForm programs={workshopPrograms} preselectedCourseId={workshop.id} />
+                <InquiryForm
+                  programsByCity={{ [workshop.city]: workshopPrograms }}
+                  preselectedCourseId={workshop.id}
+                  preselectedCity={workshop.city}
+                />
               </div>
             </div>
           </div>

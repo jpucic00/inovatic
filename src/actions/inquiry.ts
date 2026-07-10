@@ -15,10 +15,15 @@ import {
   assertGroupHasAvailableSpot,
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
+import { CITY_LABELS } from '@/lib/city'
 import { InquiryConfirmationEmail } from '../../emails/inquiry-confirmation'
 import { PartyInquiryConfirmationEmail } from '../../emails/party-inquiry-confirmation'
 import { computeSchoolYear } from '@/lib/school-year'
 import { createElement } from 'react'
+
+// Thrown when a submitted group does not belong to the submitted city — a
+// stale/tampered payload the client-side city filter would normally prevent.
+class GroupCityMismatchError extends Error {}
 
 type InquiryActionResult =
   | { success: true }
@@ -32,6 +37,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
   }
 
   const {
+    city,
     parentName,
     parentEmail,
     parentPhone,
@@ -56,9 +62,13 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
         await assertGroupHasAvailableSpot(tx, scheduledGroupId)
         const group = await tx.scheduledGroup.findUnique({
           where: { id: scheduledGroupId },
-          select: { schoolYear: true },
+          select: { schoolYear: true, city: true },
         })
-        schoolYear = group?.schoolYear ?? schoolYear
+        // Fail closed: a group must belong to the submitted city. The client
+        // only offers same-city groups, so a mismatch is a stale/tampered
+        // payload — reject rather than mis-file the inquiry cross-city.
+        if (!group || group.city !== city) throw new GroupCityMismatchError()
+        schoolYear = group.schoolYear
       }
       return tx.inquiry.create({
         data: {
@@ -76,14 +86,19 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
           message: message || null,
           referralSource: referralSource || null,
           consentGivenAt: new Date(),
-          // TODO(city PR5): city from the public form
-          city: 'SPLIT',
+          city,
         },
       })
     })
   } catch (err) {
+    if (err instanceof GroupCityMismatchError) {
+      return {
+        success: false,
+        error: 'Odabrani termin nije dostupan za odabrani grad. Osvježite stranicu i pokušajte ponovno.',
+      }
+    }
     if (err instanceof GroupFullError) {
-      const freshPrograms = await getActivePrograms()
+      const freshPrograms = await getActivePrograms(city)
       return {
         success: false,
         error: 'Odabrani termin je u međuvremenu popunjen. Molimo odaberite drugi termin.',
@@ -109,6 +124,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
           parentName,
           childName: `${childFirstName} ${childLastName}`,
           childDateOfBirth,
+          cityLabel: CITY_LABELS[city],
         }),
       })
     }

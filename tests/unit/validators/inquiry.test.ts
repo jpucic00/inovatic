@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { inquirySchema } from '@/lib/validators/inquiry'
 
 const baseInquiry = {
+  city: 'SPLIT' as const,
   parentName: 'Marija Horvat',
   parentEmail: 'marija@example.com',
   parentPhone: '0911234567',
@@ -108,5 +109,40 @@ describe('inquirySchema', () => {
     const result = inquirySchema.safeParse({ ...baseInquiry, grade: 'predskolci' })
     expect(result.success).toBe(true)
     if (result.success) expect(result.data.grade).toBe('predskolci')
+  })
+
+  it('accepts SIBENIK as a city', () => {
+    const result = inquirySchema.safeParse({ ...baseInquiry, city: 'SIBENIK' })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.city).toBe('SIBENIK')
+  })
+
+  it('rejects a missing city with the Croatian error message', () => {
+    const { city: _city, ...withoutCity } = baseInquiry
+    void _city
+    const result = inquirySchema.safeParse(withoutCity)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === 'city')
+      expect(issue?.message).toBe('Odaberite grad')
+    }
+  })
+
+  it('rejects an empty-string city (the no-default placeholder value)', () => {
+    const result = inquirySchema.safeParse({ ...baseInquiry, city: '' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === 'city')
+      expect(issue?.message).toBe('Odaberite grad')
+    }
+  })
+
+  it('rejects an unknown city value', () => {
+    const result = inquirySchema.safeParse({ ...baseInquiry, city: 'ZAGREB' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === 'city')
+      expect(issue).toBeDefined()
+    }
   })
 })

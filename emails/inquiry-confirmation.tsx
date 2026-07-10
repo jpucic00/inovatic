@@ -12,6 +12,7 @@ interface InquiryConfirmationProps {
   parentName: string
   childName: string
   childDateOfBirth: string
+  cityLabel?: string
   courseLevelPref?: string
 }
 
@@ -19,6 +20,7 @@ export function InquiryConfirmationEmail({
   parentName,
   childName,
   childDateOfBirth,
+  cityLabel,
   courseLevelPref,
 }: InquiryConfirmationProps) {
   const courseLabel = courseLevelPref ? courseLevelLabels[courseLevelPref] : undefined
@@ -30,6 +32,11 @@ export function InquiryConfirmationEmail({
         Zaprimili smo vašu prijavu za upis djeteta <strong>{childName}</strong> (datum
         rođenja: {childDateOfBirth}) u program LEGO robotike.
       </Text>
+      {cityLabel && (
+        <Text style={emailStyles.text}>
+          Odabrani grad: <strong>{cityLabel}</strong>
+        </Text>
+      )}
       {courseLabel && (
         <Text style={emailStyles.text}>
           Navedena preferencija programa: <strong>{courseLabel}</strong>

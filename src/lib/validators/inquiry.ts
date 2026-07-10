@@ -1,7 +1,12 @@
 import { z } from 'zod'
 import { GRADE_VALUES } from '@/lib/inquiry-status'
+import { CITY_VALUES } from '@/lib/city'
 
 const step1Schema = z.object({
+  // Mandatory tenant choice — first field of the public form, no default.
+  city: z.enum(CITY_VALUES, {
+    errorMap: () => ({ message: 'Odaberite grad' }),
+  }),
   parentName: z.string().min(2, 'Unesite ime i prezime (najmanje 2 znaka)'),
   parentEmail: z.string().email('Unesite valjanu email adresu'),
   parentPhone: z.string().min(9, 'Unesite valjani broj telefona'),

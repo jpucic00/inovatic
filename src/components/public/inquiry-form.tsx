@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useRef, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import type { City } from '@prisma/client'
 import { CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
 import { submitInquiry } from '@/actions/inquiry'
@@ -23,43 +24,40 @@ const STEPS = [
   { id: 3, label: 'Dostupni termini' },
 ]
 
-const step1Fields = ['parentName', 'parentEmail', 'parentPhone'] as const
+const step1Fields = ['city', 'parentName', 'parentEmail', 'parentPhone'] as const
 const step2Fields = ['childFirstName', 'childLastName', 'childDateOfBirth', 'childSchool'] as const
 
 interface InquiryFormProps {
-  programs: ActiveProgram[]
+  /**
+   * Programs pre-rendered per city. /upisi passes both cities so switching the
+   * dropdown filters client-side with no loading state; /radionice passes just
+   * the workshop's city. Missing keys resolve to an empty list.
+   */
+  programsByCity: Partial<Record<City, ActiveProgram[]>>
   preselectedCourseId?: string
+  /** Fixed city for the radionica flow — hides the Step-1 city dropdown. */
+  preselectedCity?: City
 }
 
-export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryFormProps>) {
+export function InquiryForm({
+  programsByCity,
+  preselectedCourseId,
+  preselectedCity,
+}: Readonly<InquiryFormProps>) {
   const [step, setStep] = useState(1)
   const [done, setDone] = useState(false)
   const [submittedCount, setSubmittedCount] = useState(0)
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const [livePrograms, setLivePrograms] = useState<ActiveProgram[]>(programs)
-
-  useEffect(() => {
-    if (step !== 3) return
-
-    let cancelled = false
-    async function refresh() {
-      try {
-        const res = await fetch('/api/group-availability')
-        if (!res.ok) return
-        const fresh: ActiveProgram[] = await res.json()
-        if (!cancelled) setLivePrograms(fresh)
-      } catch { /* stale data is acceptable briefly */ }
-    }
-
-    void refresh()
-    const interval = setInterval(refresh, 30_000)
-    return () => { cancelled = true; clearInterval(interval) }
-  }, [step])
+  // Live availability keyed by city — the 30s poll / GROUP_FULL refresh only
+  // ever touches the currently-selected city's entry, so a stale count for one
+  // city can never leak into the other.
+  const [liveByCity, setLiveByCity] = useState<Partial<Record<City, ActiveProgram[]>>>({})
 
   const {
     register,
     trigger,
+    watch,
     handleSubmit,
     setValue,
     reset,
@@ -68,8 +66,47 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
   } = useForm<InquiryFormData>({
     resolver: zodResolver(inquirySchema),
     mode: 'onTouched',
-    defaultValues: preselectedCourseId ? { courseId: preselectedCourseId } : undefined,
+    defaultValues: {
+      ...(preselectedCourseId ? { courseId: preselectedCourseId } : {}),
+      ...(preselectedCity ? { city: preselectedCity } : {}),
+    },
   })
+
+  const watchedCity = watch('city')
+  const selectedCity: City | '' = preselectedCity ?? (watchedCity || '')
+  const activePrograms: ActiveProgram[] = selectedCity
+    ? (liveByCity[selectedCity] ?? programsByCity[selectedCity] ?? [])
+    : []
+
+  // Poll availability for the selected city while on Step 3.
+  useEffect(() => {
+    if (step !== 3 || !selectedCity) return
+
+    const cityParam = selectedCity
+    let cancelled = false
+    async function refresh() {
+      try {
+        const res = await fetch(`/api/group-availability?city=${cityParam}`)
+        if (!res.ok) return
+        const fresh: ActiveProgram[] = await res.json()
+        if (!cancelled) setLiveByCity((m) => ({ ...m, [cityParam]: fresh }))
+      } catch { /* stale data is acceptable briefly */ }
+    }
+
+    void refresh()
+    const interval = setInterval(refresh, 30_000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [step, selectedCity])
+
+  // Changing the city invalidates any Step-3 course/group already chosen for
+  // the previous city — clear it (keeping the radionica preselect, if any).
+  const cityResetRef = useRef<string | undefined>(watchedCity)
+  useEffect(() => {
+    if (cityResetRef.current === watchedCity) return
+    cityResetRef.current = watchedCity
+    setValue('scheduledGroupId', undefined)
+    setValue('courseId', preselectedCourseId || undefined)
+  }, [watchedCity, setValue, preselectedCourseId])
 
   async function handleNext() {
     let valid = false
@@ -99,7 +136,7 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
         setSubmittedCount((c) => c + 1)
         setDone(true)
       } else if ('code' in result && result.code === 'GROUP_FULL') {
-        setLivePrograms(result.programs)
+        setLiveByCity((m) => ({ ...m, [data.city]: result.programs }))
         setServerError(result.error)
       } else {
         setServerError(result.error)
@@ -109,6 +146,7 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
 
   function handleAnotherChild() {
     reset({
+      city: getValues('city'),
       parentName: getValues('parentName'),
       parentEmail: getValues('parentEmail'),
       parentPhone: getValues('parentPhone'),
@@ -168,10 +206,10 @@ export function InquiryForm({ programs, preselectedCourseId }: Readonly<InquiryF
       </div>
 
       <form onSubmit={onFormSubmit} noValidate>
-        {step === 1 && <InquiryStep1 register={register} errors={errors} />}
+        {step === 1 && <InquiryStep1 register={register} errors={errors} showCity={!preselectedCity} />}
         {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} getValues={getValues} />}
         {step === 3 && (
-          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} programs={livePrograms} preselectedCourseId={preselectedCourseId} />
+          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} programs={activePrograms} preselectedCourseId={preselectedCourseId} />
         )}
 
         {serverError && (

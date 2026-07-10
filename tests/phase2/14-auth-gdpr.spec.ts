@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { clickUntilVisible } from '../helpers/hydration'
+import { fillInquiryStep1 } from '../helpers/upisi'
 
 const BASE = 'http://localhost:3000'
 
@@ -113,14 +114,12 @@ test.describe('GDPR Consent on Inquiry Form', () => {
   test('consent checkbox appears on step 3 after filling steps 1 and 2', async ({ page }) => {
     await page.goto(`${BASE}/upisi`)
 
-    // Step 1 — fill parent info
-    await page.locator('#parentName').fill('Ivan Horvat')
-    await page.locator('#parentEmail').fill('ivan@example.com')
-    await page.locator('#parentPhone').fill('0991234567')
-    await clickUntilVisible(
-      page.locator('button', { hasText: 'Dalje' }),
-      page.locator('#childFirstName'),
-    )
+    // Step 1 — city + parent info
+    await fillInquiryStep1(page, {
+      parentName: 'Ivan Horvat',
+      parentEmail: 'ivan@example.com',
+      parentPhone: '0991234567',
+    })
 
     // Step 2 — fill child info
     await page.locator('#childFirstName').fill('Ana')
@@ -145,14 +144,12 @@ test.describe('GDPR Consent on Inquiry Form', () => {
   test('form shows validation error when consent is not checked', async ({ page }) => {
     await page.goto(`${BASE}/upisi`)
 
-    // Step 1
-    await page.locator('#parentName').fill('Ivan Horvat')
-    await page.locator('#parentEmail').fill('ivan@example.com')
-    await page.locator('#parentPhone').fill('0991234567')
-    await clickUntilVisible(
-      page.locator('button', { hasText: 'Dalje' }),
-      page.locator('#childFirstName'),
-    )
+    // Step 1 — city + parent info
+    await fillInquiryStep1(page, {
+      parentName: 'Ivan Horvat',
+      parentEmail: 'ivan@example.com',
+      parentPhone: '0991234567',
+    })
 
     // Step 2
     await page.locator('#childFirstName').fill('Ana')

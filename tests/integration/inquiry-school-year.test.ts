@@ -47,6 +47,7 @@ const uniqueEmail = () => `sy-${Date.now().toString(36)}-${++emailCounter}@test.
 
 function validForm(overrides: Partial<InquiryFormData> = {}): InquiryFormData {
   return {
+    city: 'SPLIT',
     parentName: 'Test Roditelj',
     parentEmail: uniqueEmail(),
     parentPhone: '+385912345678',
