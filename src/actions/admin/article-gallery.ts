@@ -1,7 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import { destroyCloudinaryAssets } from '@/lib/cloudinary-cleanup'
 import type { AdminActionResult } from '@/lib/action-types'
@@ -27,7 +27,7 @@ export async function addGalleryImages(
   articleId: string,
   urls: string[],
 ): Promise<AdminActionResult & { images?: GalleryImage[] }> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!articleId || urls.length === 0) {
     return { success: false, error: 'Nedostaju podaci.' }
   }
@@ -35,9 +35,11 @@ export async function addGalleryImages(
   try {
     const article = await db.article.findUnique({
       where: { id: articleId },
-      select: { slug: true, isPublished: true },
+      select: { slug: true, isPublished: true, city: true },
     })
-    if (!article) return { success: false, error: 'Članak nije pronađen.' }
+    if (!article || article.city !== city) {
+      return { success: false, error: 'Članak nije pronađen.' }
+    }
 
     const last = await db.articleImage.findFirst({
       where: { articleId },
@@ -71,7 +73,7 @@ export async function addGalleryImages(
 export async function removeGalleryImage(
   imageId: string,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!imageId) return { success: false, error: 'Nedostaje ID.' }
 
   try {
@@ -79,10 +81,12 @@ export async function removeGalleryImage(
       where: { id: imageId },
       select: {
         url: true,
-        article: { select: { id: true, slug: true, isPublished: true } },
+        article: { select: { id: true, slug: true, isPublished: true, city: true } },
       },
     })
-    if (!image) return { success: false, error: 'Slika nije pronađena.' }
+    if (!image || image.article.city !== city) {
+      return { success: false, error: 'Slika nije pronađena.' }
+    }
 
     await db.articleImage.delete({ where: { id: imageId } })
     await destroyCloudinaryAssets([image.url])
@@ -106,7 +110,7 @@ export async function reorderGalleryImage(
   imageId: string,
   direction: 'up' | 'down',
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!imageId) return { success: false, error: 'Nedostaje ID.' }
 
   try {
@@ -115,10 +119,12 @@ export async function reorderGalleryImage(
       select: {
         articleId: true,
         sortOrder: true,
-        article: { select: { slug: true, isPublished: true } },
+        article: { select: { slug: true, isPublished: true, city: true } },
       },
     })
-    if (!current) return { success: false, error: 'Slika nije pronađena.' }
+    if (!current || current.article.city !== city) {
+      return { success: false, error: 'Slika nije pronađena.' }
+    }
 
     const neighbor = await db.articleImage.findFirst({
       where: {

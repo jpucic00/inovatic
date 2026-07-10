@@ -51,6 +51,7 @@ export default async function EditArticlePage({ params }: Readonly<PageProps>) {
           content: article.content,
           isPublished: article.isPublished,
           publishedAt: article.publishedAt,
+          city: article.city,
           tags: article.tags,
           images: article.images.map((i) => ({
             id: i.id,

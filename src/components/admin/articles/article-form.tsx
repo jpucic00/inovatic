@@ -18,7 +18,9 @@ import type { GalleryImage } from '@/actions/admin/article-gallery'
 import { CoverImageUpload } from './cover-image-upload'
 import { GalleryManager } from './gallery-manager'
 import { TagsCombobox, type TagOption } from './tags-combobox'
+import { CityBadge } from '@/components/shared/city-badge'
 import { formatDate } from '@/lib/format'
+import type { City } from '@prisma/client'
 
 // BlockNote is client-only and has sizable CSS. Dynamic import keeps the form
 // shell render fast and avoids SSR mismatches.
@@ -43,6 +45,7 @@ interface InitialArticle {
   content: unknown
   isPublished: boolean
   publishedAt: Date | null
+  city: City
   tags: { tag: { id: string; name: string; slug: string } }[]
   images: GalleryImage[]
 }
@@ -454,6 +457,15 @@ export function ArticleForm({ initial, availableTags }: Readonly<Props>) {
                 Otvori javnu stranicu
               </Link>
             )}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Grad</h3>
+            <CityBadge city={initial.city} />
+            <p className="text-xs text-gray-400 mt-2">
+              Članak se objavljuje za ovaj grad. Određuje se prema vašem računu i
+              ne mijenja se ovdje.
+            </p>
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-4">

@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/format'
 import { ArticleContent } from '@/components/article/article-content'
 import { ArticleGallery } from '@/components/article/article-gallery'
 import { BackButton } from '@/components/public/back-button'
+import { CityBadge } from '@/components/shared/city-badge'
 import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
 import type { PartialBlock } from '@blocknote/core'
 
@@ -187,6 +188,7 @@ export default async function ArticlePage({ params }: PageProps) {
                 <User className="w-4 h-4" />
                 <span>{article.author.firstName} {article.author.lastName}</span>
               </div>
+              <CityBadge city={article.city} />
             </div>
 
             {article.excerpt && (

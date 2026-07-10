@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Calendar, User, Tag, Eye, Pencil, ExternalLink } from 'lucide-react'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
+import type { City } from '@prisma/client'
 import { formatDate } from '@/lib/format'
 import { ArticleContent } from '@/components/article/article-content'
 import { ArticleGallery } from '@/components/article/article-gallery'
@@ -18,10 +19,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-async function getArticleForPreview(id: string) {
+async function getArticleForPreview(id: string, city: City) {
   try {
-    return await db.article.findUnique({
-      where: { id },
+    // findFirst + city: a cross-city id previews as a 404, never leaks.
+    return await db.article.findFirst({
+      where: { id, city },
       include: {
         author: { select: { firstName: true, lastName: true } },
         tags: { include: { tag: true } },
@@ -37,9 +39,9 @@ async function getArticleForPreview(id: string) {
 type PageProps = Readonly<{ params: Promise<{ id: string }> }>
 
 export default async function ArticlePreviewPage({ params }: PageProps) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   const { id } = await params
-  const article = await getArticleForPreview(id)
+  const article = await getArticleForPreview(id, city)
   if (!article) notFound()
 
   const fallbackDate = article.publishedAt ?? article.updatedAt

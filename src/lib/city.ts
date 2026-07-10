@@ -15,3 +15,22 @@ export const CITY_LABELS: Record<City, string> = {
 export function isCity(value: unknown): value is City {
   return typeof value === 'string' && (CITY_VALUES as readonly string[]).includes(value)
 }
+
+// URL slug form for the public `?grad=` filter (novosti). Single source so the
+// server (parse) and the links/pills (build) never drift.
+const CITY_SLUGS: Record<City, string> = {
+  SPLIT: 'split',
+  SIBENIK: 'sibenik',
+}
+
+/** City → `?grad=` slug (e.g. SIBENIK → "sibenik"). */
+export function citySlug(city: City): string {
+  return CITY_SLUGS[city]
+}
+
+/** Parse an untrusted `?grad=` slug back to a City; null when unrecognized. */
+export function cityFromSlug(slug: unknown): City | null {
+  if (typeof slug !== 'string') return null
+  const lower = slug.toLowerCase()
+  return CITY_VALUES.find((c) => CITY_SLUGS[c] === lower) ?? null
+}

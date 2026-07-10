@@ -3,6 +3,8 @@ import Image from 'next/image'
 import { ArrowRight, Calendar } from 'lucide-react'
 import { formatDate } from '@/lib/format'
 import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
+import { CityBadge } from '@/components/shared/city-badge'
+import type { City } from '@prisma/client'
 
 interface NewsArticle {
   slug: string
@@ -10,6 +12,7 @@ interface NewsArticle {
   excerpt: string | null
   coverImage: string | null
   publishedAt: Date | null
+  city: City
   tags: { tag: { name: string } }[]
 }
 
@@ -66,12 +69,15 @@ export function NewsSection({ articles }: Readonly<{ articles: NewsArticle[] }>)
                   </p>
                 )}
                 <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50">
-                  {article.publishedAt && (
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {formatDate(article.publishedAt)}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    {article.publishedAt && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {formatDate(article.publishedAt)}
+                      </span>
+                    )}
+                    <CityBadge city={article.city} />
+                  </div>
                   <span className="text-xs text-cyan-500 font-semibold group-hover:underline flex items-center gap-1">
                     Čitaj <ArrowRight className="w-3 h-3" />
                   </span>

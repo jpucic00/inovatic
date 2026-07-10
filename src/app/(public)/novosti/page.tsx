@@ -5,6 +5,9 @@ import { ArrowRight, Calendar, Newspaper } from 'lucide-react'
 import { db } from '@/lib/db'
 import { formatDate } from '@/lib/format'
 import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
+import { CityBadge } from '@/components/shared/city-badge'
+import { CITY_LABELS, CITY_VALUES, citySlug, cityFromSlug } from '@/lib/city'
+import type { City } from '@prisma/client'
 
 export const metadata: Metadata = {
   title: 'Novosti',
@@ -20,11 +23,13 @@ export const metadata: Metadata = {
 
 export const revalidate = 3600
 
-async function getArticles(page: number, perPage = 9) {
+async function getArticles(page: number, city: City | null, perPage = 9) {
+  // Default (no ?grad) shows both cities; a valid ?grad narrows to one.
+  const where = { isPublished: true, ...(city ? { city } : {}) }
   try {
     const [articles, total] = await Promise.all([
       db.article.findMany({
-        where: { isPublished: true },
+        where,
         orderBy: { publishedAt: 'desc' },
         skip: (page - 1) * perPage,
         take: perPage,
@@ -35,10 +40,11 @@ async function getArticles(page: number, perPage = 9) {
           excerpt: true,
           publishedAt: true,
           coverImage: true,
+          city: true,
           tags: { include: { tag: true } },
         },
       }),
-      db.article.count({ where: { isPublished: true } }),
+      db.article.count({ where }),
     ])
     return { articles, total, totalPages: Math.ceil(total / perPage) }
   } catch (error) {
@@ -60,12 +66,39 @@ function getCountLabel(count: number): string {
   return 'objava'
 }
 
-type PageProps = Readonly<{ searchParams: Promise<{ stranica?: string }> }>
+type PageProps = Readonly<{ searchParams: Promise<{ stranica?: string; grad?: string }> }>
+
+// Filter pills (Sve / Split / Šibenik). "Sve" drops ?grad; a city pill resets
+// to page 1. Canonical stays /novosti (see metadata) so the variants don't
+// fragment SEO.
+function NewsCityFilter({ active }: Readonly<{ active: City | null }>) {
+  const pillClass = (isActive: boolean) =>
+    [
+      'px-4 py-1.5 text-sm font-medium rounded-full border transition-colors',
+      isActive
+        ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
+        : 'border-gray-200 text-gray-500 hover:border-cyan-300 hover:text-cyan-600',
+    ].join(' ')
+  return (
+    <div className="flex flex-wrap justify-center gap-2 mb-10">
+      <Link href="/novosti" className={pillClass(!active)}>
+        Sve
+      </Link>
+      {CITY_VALUES.map((c) => (
+        <Link key={c} href={`/novosti?grad=${citySlug(c)}`} className={pillClass(active === c)}>
+          {CITY_LABELS[c]}
+        </Link>
+      ))}
+    </div>
+  )
+}
 
 export default async function NewsPage({ searchParams }: PageProps) {
-  const { stranica } = await searchParams
+  const { stranica, grad } = await searchParams
   const page = Math.max(1, Number.parseInt(stranica ?? '1', 10) || 1)
-  const { articles, total, totalPages } = await getArticles(page)
+  const cityFilter = cityFromSlug(grad)
+  const gradSuffix = cityFilter ? `&grad=${citySlug(cityFilter)}` : ''
+  const { articles, total, totalPages } = await getArticles(page, cityFilter)
 
   return (
     <>
@@ -83,10 +116,13 @@ export default async function NewsPage({ searchParams }: PageProps) {
 
       <section className="py-14 px-4 bg-white">
         <div className="container mx-auto max-w-6xl">
+          <NewsCityFilter active={cityFilter} />
           {articles.length === 0 ? (
             <div className="text-center py-20">
               <Newspaper className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-400 text-lg mb-2">Novosti uskoro dolaze.</p>
+              <p className="text-gray-400 text-lg mb-2">
+                {cityFilter ? 'Nema novosti za odabrani grad.' : 'Novosti uskoro dolaze.'}
+              </p>
               <p className="text-gray-400 text-sm">Pratite nas na društvenim mrežama za najnovije vijesti.</p>
             </div>
           ) : (
@@ -144,9 +180,12 @@ export default async function NewsPage({ searchParams }: PageProps) {
                       )}
 
                       <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>{formatDate(article.publishedAt)}</span>
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {formatDate(article.publishedAt)}
+                          </span>
+                          <CityBadge city={article.city} />
                         </div>
                         <span className="inline-flex items-center gap-1 text-xs text-cyan-500 font-semibold group-hover:underline">
                           Čitaj više <ArrowRight className="w-3 h-3" />
@@ -162,7 +201,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
                 <div className="flex justify-center items-center gap-2 mt-12">
                   {page > 1 && (
                     <Link
-                      href={`/novosti?stranica=${page - 1}`}
+                      href={`/novosti?stranica=${page - 1}${gradSuffix}`}
                       className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:border-cyan-300 hover:text-cyan-600 transition-colors"
                     >
                       ← Prethodna
@@ -173,7 +212,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
                   </span>
                   {page < totalPages && (
                     <Link
-                      href={`/novosti?stranica=${page + 1}`}
+                      href={`/novosti?stranica=${page + 1}${gradSuffix}`}
                       className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:border-cyan-300 hover:text-cyan-600 transition-colors"
                     >
                       Sljedeća →

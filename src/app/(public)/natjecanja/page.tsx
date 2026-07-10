@@ -7,6 +7,7 @@ import { competitions } from '@/lib/competitions-data'
 import { db } from '@/lib/db'
 import { formatDate } from '@/lib/format'
 import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
+import { CityBadge } from '@/components/shared/city-badge'
 
 export const revalidate = 3600
 
@@ -40,6 +41,7 @@ async function getCompetitionArticles() {
         excerpt: true,
         coverImage: true,
         publishedAt: true,
+        city: true,
         tags: { select: { tag: { select: { name: true } } } },
       },
     })
@@ -172,9 +174,12 @@ export default async function NatjecanjaPage() {
                       <p className="text-sm text-gray-500 line-clamp-3 mb-3 flex-1 leading-relaxed">{article.excerpt}</p>
                     )}
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>{formatDate(article.publishedAt)}</span>
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {formatDate(article.publishedAt)}
+                        </span>
+                        <CityBadge city={article.city} />
                       </div>
                       <span className="inline-flex items-center gap-1 text-xs text-cyan-500 font-semibold group-hover:underline">
                         Čitaj više <ArrowRight className="w-3 h-3" />

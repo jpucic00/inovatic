@@ -2,8 +2,9 @@
 
 import { randomBytes } from 'node:crypto'
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import type { City } from '@prisma/client'
 import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
 import {
   autosaveArticleSchema,
@@ -23,6 +24,7 @@ type ArticleRow = {
   publishedAt: Date | null
   createdAt: Date
   updatedAt: Date
+  city: City
   author: { firstName: string; lastName: string } | null
   tags: { tag: { id: string; name: string; slug: string } }[]
 }
@@ -37,11 +39,12 @@ type ArticleFilters = {
 export async function getArticles(
   filters: ArticleFilters = {},
 ): Promise<PaginatedResult<ArticleRow>> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const { search, status = 'ALL', page = 1, pageSize = 20 } = filters
 
   const where = {
+    city,
     ...(search
       ? {
           OR: [
@@ -67,6 +70,7 @@ export async function getArticles(
         publishedAt: true,
         createdAt: true,
         updatedAt: true,
+        city: true,
         author: { select: { firstName: true, lastName: true } },
         tags: {
           select: {
@@ -91,9 +95,11 @@ export async function getArticles(
 }
 
 export async function getArticle(id: string) {
-  await requireAdmin()
-  return db.article.findUnique({
-    where: { id },
+  const { city } = await requireAdminCtx()
+  // findFirst (not findUnique) so a cross-city id resolves to null — the edit
+  // page turns that into a 404, indistinguishable from a nonexistent article.
+  return db.article.findFirst({
+    where: { id, city },
     include: {
       tags: { include: { tag: true } },
       images: { orderBy: { sortOrder: 'asc' } },
@@ -126,7 +132,7 @@ function draftSlugSuffix(): string {
 export async function createDraftArticle(): Promise<
   AdminActionResult & { articleId?: string }
 > {
-  const session = await requireAdmin()
+  const { session, city } = await requireAdminCtx()
 
   try {
     // Retry once on the extremely unlikely slug collision.
@@ -143,8 +149,8 @@ export async function createDraftArticle(): Promise<
         authorId: session.user.id,
         isPublished: false,
         publishedAt: null,
-        // TODO(city PR7): city from admin session
-        city: 'SPLIT',
+        // Auto-stamped from the authoring admin's city — no picker.
+        city,
       },
       select: { id: true },
     })
@@ -168,7 +174,7 @@ export async function createDraftArticle(): Promise<
 export async function autosaveArticle(
   input: AutosaveArticleInput,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = autosaveArticleSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
@@ -186,9 +192,13 @@ export async function autosaveArticle(
         isPublished: true,
         coverImage: true,
         content: true,
+        city: true,
       },
     })
-    if (!existing) return { success: false, error: 'Članak nije pronađen.' }
+    // Fail closed: a cross-city id is indistinguishable from a missing one.
+    if (!existing || existing.city !== city) {
+      return { success: false, error: 'Članak nije pronađen.' }
+    }
 
     const oldUrls = [
       ...(existing.coverImage ? [existing.coverImage] : []),
@@ -243,15 +253,17 @@ export async function autosaveArticle(
 }
 
 export async function publishArticle(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!id) return { success: false, error: 'ID nije pronađen.' }
 
   try {
     const article = await db.article.findUnique({
       where: { id },
-      select: { slug: true, publishedAt: true },
+      select: { slug: true, publishedAt: true, city: true },
     })
-    if (!article) return { success: false, error: 'Članak nije pronađen.' }
+    if (!article || article.city !== city) {
+      return { success: false, error: 'Članak nije pronađen.' }
+    }
 
     await db.article.update({
       where: { id },
@@ -272,15 +284,17 @@ export async function publishArticle(id: string): Promise<AdminActionResult> {
 }
 
 export async function unpublishArticle(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!id) return { success: false, error: 'ID nije pronađen.' }
 
   try {
     const article = await db.article.findUnique({
       where: { id },
-      select: { slug: true },
+      select: { slug: true, city: true },
     })
-    if (!article) return { success: false, error: 'Članak nije pronađen.' }
+    if (!article || article.city !== city) {
+      return { success: false, error: 'Članak nije pronađen.' }
+    }
 
     await db.article.update({
       where: { id },
@@ -298,7 +312,7 @@ export async function unpublishArticle(id: string): Promise<AdminActionResult> {
 }
 
 export async function deleteArticle(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!id) return { success: false, error: 'ID nije pronađen.' }
 
   try {
@@ -308,10 +322,13 @@ export async function deleteArticle(id: string): Promise<AdminActionResult> {
         slug: true,
         coverImage: true,
         content: true,
+        city: true,
         images: { select: { url: true } },
       },
     })
-    if (!article) return { success: false, error: 'Članak nije pronađen.' }
+    if (!article || article.city !== city) {
+      return { success: false, error: 'Članak nije pronađen.' }
+    }
 
     // Collect every Cloudinary URL referenced by this article.
     const urls = [

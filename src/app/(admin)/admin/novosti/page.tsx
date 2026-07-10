@@ -6,6 +6,7 @@ import { getArticles } from '@/actions/admin/article'
 import { Pagination } from '@/components/admin/pagination'
 import { Plus, ExternalLink, ImageIcon } from 'lucide-react'
 import { DeleteArticleButton } from '@/components/admin/articles/delete-article-button'
+import { CityBadge } from '@/components/shared/city-badge'
 import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
 import { formatDate } from '@/lib/format'
 
@@ -117,6 +118,9 @@ export default async function ArticlesAdminPage({ searchParams }: Readonly<PageP
                   Status
                 </th>
                 <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">
+                  Grad
+                </th>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">
                   Objavljeno
                 </th>
                 <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">
@@ -173,6 +177,9 @@ export default async function ArticlesAdminPage({ searchParams }: Readonly<PageP
                         Skica
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <CityBadge city={a.city} />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {a.publishedAt ? formatDate(a.publishedAt) : '—'}

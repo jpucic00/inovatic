@@ -10,6 +10,7 @@ import { CoursesPreview } from '@/components/public/homepage/CoursesPreview'
 import { LocationsSection } from '@/components/public/homepage/LocationsSection'
 import { TestimonialsSection } from '@/components/public/homepage/TestimonialsSection'
 import { NewsSection } from '@/components/public/homepage/NewsSection'
+import type { City } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,7 @@ type LatestNewsArticle = {
   excerpt: string | null
   coverImage: string | null
   publishedAt: Date | null
+  city: City
   tags: { tag: { name: string } }[]
 }
 
@@ -44,7 +46,7 @@ export default async function HomePage() {
       where: { isPublished: true },
       orderBy: { publishedAt: 'desc' },
       take: 3,
-      select: { slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, tags: { select: { tag: { select: { name: true } } } } },
+      select: { slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, city: true, tags: { select: { tag: { select: { name: true } } } } },
     })
   } catch (error) {
     console.error('Failed to fetch latest news:', error)

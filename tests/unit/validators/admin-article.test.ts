@@ -59,6 +59,11 @@ describe('autosaveArticleSchema', () => {
     const result = autosaveArticleSchema.safeParse({ ...minimal, coverImage: 'not-a-url' })
     expect(result.success).toBe(false)
   })
+
+  it('strips a city field — city is auto-stamped at create, never user-editable', () => {
+    const result = autosaveArticleSchema.parse({ ...minimal, city: 'SIBENIK' })
+    expect('city' in result).toBe(false)
+  })
 })
 
 describe('slugifyTitle', () => {
