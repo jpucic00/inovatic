@@ -39,7 +39,6 @@ export type StudentEnrollmentSummary = {
 export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummary[]> {
   const session = await requireStudent()
   const schoolYear = computeSchoolYear()
-  const holidayDates = await loadHolidayDateKeys(schoolYear)
 
   const enrollments = await db.enrollment.findMany({
     where: { userId: session.user.id, schoolYear },
@@ -72,12 +71,25 @@ export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummar
     },
   })
 
+  // Every group paces by its own city's holiday calendar. A student's
+  // enrollments are all same-city by invariant, but keying per group keeps
+  // this correct even if that ever changes.
+  const cities = [...new Set(enrollments.map((e) => e.scheduledGroup.city))]
+  const holidaysByCity = new Map(
+    await Promise.all(
+      cities.map(
+        async (c) => [c, await loadHolidayDateKeys(schoolYear, c)] as const,
+      ),
+    ),
+  )
+
   return enrollments.map((e) => {
     const activeModule = getCurrentActiveModuleForGroup({
       dayOfWeek: e.scheduledGroup.dayOfWeek,
       modules: e.scheduledGroup.course.modules,
       schoolYear,
-      holidayDates,
+      city: e.scheduledGroup.city,
+      holidayDates: holidaysByCity.get(e.scheduledGroup.city) ?? new Set(),
     })
 
     return {

@@ -46,6 +46,7 @@ export async function buildGroupGalleryView(groupId: string): Promise<GalleryVie
       id: true,
       name: true,
       dayOfWeek: true,
+      city: true,
       course: {
         select: {
           id: true,
@@ -59,7 +60,7 @@ export async function buildGroupGalleryView(groupId: string): Promise<GalleryVie
               sortOrder: true,
               schedules: {
                 where: { schoolYear },
-                select: { id: true, schoolYear: true, startDate: true, endDate: true },
+                select: { id: true, schoolYear: true, city: true, startDate: true, endDate: true },
               },
             },
           },
@@ -85,11 +86,12 @@ export async function buildGroupGalleryView(groupId: string): Promise<GalleryVie
     },
   })
 
-  const holidayDates = await loadHolidayDateKeys(schoolYear)
+  const holidayDates = await loadHolidayDateKeys(schoolYear, group.city)
   const activeModule = getCurrentActiveModuleForGroup({
     dayOfWeek: group.dayOfWeek,
     modules: group.course.modules,
     schoolYear,
+    city: group.city,
     holidayDates,
   })
 

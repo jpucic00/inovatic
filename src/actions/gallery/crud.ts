@@ -28,7 +28,14 @@ async function canManageGroupImages(
   session: Session,
   scheduledGroupId: string,
 ): Promise<boolean> {
-  if (session.user.role === 'ADMIN') return true
+  if (session.user.role === 'ADMIN') {
+    // Galleries are per-group hence per-city: tenant-bound admin pass-through.
+    const group = await db.scheduledGroup.findUnique({
+      where: { id: scheduledGroupId },
+      select: { city: true },
+    })
+    return group !== null && group.city === session.user.city
+  }
   if (session.user.role !== 'TEACHER') return false
   const assigned = await db.teacherAssignment.findUnique({
     where: {

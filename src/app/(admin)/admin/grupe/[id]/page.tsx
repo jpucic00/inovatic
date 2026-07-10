@@ -46,7 +46,7 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   const editable = !isArchivedYear(group.schoolYear)
   const holidayDateKeys = group.course.isCustom
     ? []
-    : Array.from(await loadHolidayDateKeys(group.schoolYear))
+    : Array.from(await loadHolidayDateKeys(group.schoolYear, group.city))
 
   const assignedUserIds = new Set(group.teacherAssignments.map((ta) => ta.user.id))
   const assignableTeachers = allTeachers.filter((t) => !assignedUserIds.has(t.id))

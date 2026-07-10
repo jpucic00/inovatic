@@ -19,6 +19,7 @@ function mkModule(
           {
             id: `${id}-sched`,
             schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
             startDate: schedule.startDate,
             endDate: schedule.endDate,
           },
@@ -48,6 +49,7 @@ describe('getCurrentActiveModuleForGroup', () => {
         dayOfWeek: 'Srijeda',
         modules: [],
         schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
         holidayDates: new Set(),
         now: utc(2026, 10, 15),
       }),
@@ -59,6 +61,7 @@ describe('getCurrentActiveModuleForGroup', () => {
       dayOfWeek: 'Srijeda',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
       holidayDates: new Set(),
       now: utc(2026, 11, 18), // Mid-Module-2 for Wed (M2 window Nov 4 - Dec 16)
     })
@@ -72,6 +75,7 @@ describe('getCurrentActiveModuleForGroup', () => {
       dayOfWeek: 'Srijeda',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
       holidayDates: new Set(),
       now: utc(2026, 10, 16),
     })
@@ -83,6 +87,7 @@ describe('getCurrentActiveModuleForGroup', () => {
       dayOfWeek: 'Srijeda',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
       holidayDates: new Set(),
       now: utc(2026, 8, 15),
     })
@@ -100,6 +105,7 @@ describe('getCurrentActiveModuleForGroup', () => {
         dayOfWeek: 'Srijeda',
         modules,
         schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
         holidayDates: new Set(),
         now: utc(2026, 10, 15),
       })?.id,
@@ -112,6 +118,7 @@ describe('getCurrentActiveModuleForGroup', () => {
         dayOfWeek: null,
         modules: STD_MODULES,
         schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
         holidayDates: new Set(),
         now: utc(2026, 10, 15),
       })?.id,
@@ -126,6 +133,7 @@ describe('getCurrentActiveModuleForGroup', () => {
       dayOfWeek: 'Srijeda',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
       holidayDates: holidays,
       now: utc(2026, 11, 4),
     })
@@ -133,6 +141,7 @@ describe('getCurrentActiveModuleForGroup', () => {
       dayOfWeek: 'Ponedjeljak',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
       holidayDates: holidays,
       now: utc(2026, 11, 4),
     })
@@ -147,6 +156,7 @@ describe('getCurrentActiveModuleForGroup', () => {
         dayOfWeek: 'Srijeda',
         modules: STD_MODULES,
         schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
         holidayDates: new Set(),
         now: utc(2027, 5, 1),
       })?.id,
@@ -165,6 +175,7 @@ describe('getCurrentActiveModuleForGroup', () => {
           {
             id: 'M1-sched',
             schoolYear: '2025/2026',
+            city: 'SPLIT',
             startDate: utc(2026, 10, 1),
             endDate: utc(2026, 10, 31),
           },
@@ -177,8 +188,50 @@ describe('getCurrentActiveModuleForGroup', () => {
         dayOfWeek: 'Srijeda',
         modules,
         schoolYear: '2026/2027',
+        city: 'SPLIT',
         holidayDates: new Set(),
         now: utc(2026, 10, 15),
+      })?.id,
+    ).toBe('M1')
+  })
+
+  it("ignores the other city's schedule for the same schoolYear", () => {
+    // Both modules carry ONLY Šibenik schedules; at `now` M2's Šibenik window
+    // is in progress. A SPLIT group must ignore them entirely (arc empty →
+    // fallback M1). Pairing with the wrong city's dates would pick M2.
+    const sibenikSchedule = (
+      id: string,
+      startDate: Date,
+      endDate: Date,
+    ): Mod['schedules'][number] => ({
+      id,
+      schoolYear: SCHOOL_YEAR,
+      city: 'SIBENIK',
+      startDate,
+      endDate,
+    })
+    const modules: Mod[] = [
+      {
+        id: 'M1',
+        title: 'M1',
+        sortOrder: 0,
+        schedules: [sibenikSchedule('M1-sib', utc(2026, 9, 1), utc(2026, 10, 19))],
+      },
+      {
+        id: 'M2',
+        title: 'M2',
+        sortOrder: 1,
+        schedules: [sibenikSchedule('M2-sib', utc(2026, 10, 20), utc(2026, 12, 7))],
+      },
+    ]
+    expect(
+      getCurrentActiveModuleForGroup({
+        dayOfWeek: 'Srijeda',
+        modules,
+        schoolYear: SCHOOL_YEAR,
+        city: 'SPLIT',
+        holidayDates: new Set(),
+        now: utc(2026, 11, 15),
       })?.id,
     ).toBe('M1')
   })
@@ -197,6 +250,7 @@ describe('getCurrentActiveModuleForGroup', () => {
         dayOfWeek: 'Srijeda',
         modules,
         schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
         holidayDates: new Set(),
       })?.id,
     ).toBe('M1')

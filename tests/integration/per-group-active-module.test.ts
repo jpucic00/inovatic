@@ -136,7 +136,7 @@ describe('per-group active module — capacity diverges by weekday + holidays', 
     // same shape the action would produce.
     const { computeGroupCapacity } = await import('@/lib/group-capacity')
     const { loadHolidayDateKeys } = await import('@/lib/holidays')
-    const holidayDates = await loadHolidayDateKeys(SY)
+    const holidayDates = await loadHolidayDateKeys(SY, 'SPLIT')
     const asOf = new Date(Date.UTC(2026, 10, 4)) // 04.11.2026
 
     const reload = async (groupId: string) =>
@@ -144,6 +144,7 @@ describe('per-group active module — capacity diverges by weekday + holidays', 
         where: { id: groupId },
         select: {
           schoolYear: true,
+          city: true,
           dayOfWeek: true,
           maxStudents: true,
           enrollments: {
@@ -173,6 +174,7 @@ describe('per-group active module — capacity diverges by weekday + holidays', 
                     select: {
                       id: true,
                       schoolYear: true,
+                      city: true,
                       startDate: true,
                       endDate: true,
                     },

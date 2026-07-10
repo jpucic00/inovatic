@@ -88,6 +88,7 @@ function loadAttendanceGroup(groupId: string) {
     select: {
       id: true,
       schoolYear: true,
+      city: true,
       dayOfWeek: true,
       dateStart: true,
       dateEnd: true,
@@ -106,6 +107,7 @@ function loadAttendanceGroup(groupId: string) {
                 select: {
                   id: true,
                   schoolYear: true,
+                  city: true,
                   startDate: true,
                   endDate: true,
                 },
@@ -227,7 +229,9 @@ function buildStandardAttendance(
   records: AttendanceRecord[],
 ): GroupAttendance {
   const modulesForArc = group.course.modules.map((m) => {
-    const schedule = m.schedules.find((s) => s.schoolYear === schoolYear)
+    const schedule = m.schedules.find(
+      (s) => s.schoolYear === schoolYear && s.city === group.city,
+    )
     return {
       id: m.id,
       title: m.title,
@@ -292,7 +296,7 @@ export async function getGroupAttendance(
   const group = await loadAttendanceGroup(groupId)
   const schoolYear = group.schoolYear
   const isCustom = group.course.isCustom
-  const holidayDates = await loadHolidayDateKeys(schoolYear)
+  const holidayDates = await loadHolidayDateKeys(schoolYear, group.city)
 
   const enrollments = await loadAttendanceEnrollments(groupId, schoolYear)
 

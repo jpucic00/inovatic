@@ -1,7 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAdmin, requireAdminCtx } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import { archivedYearError } from '@/lib/school-year-guard'
@@ -46,7 +46,7 @@ export async function deleteModuleEnrollment(id: string): Promise<AdminActionRes
 export async function closeModuleSchedule(
   moduleScheduleId: string,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!moduleScheduleId) return { success: false, error: 'Modul nije pronađen.' }
 
@@ -55,18 +55,23 @@ export async function closeModuleSchedule(
       where: { id: moduleScheduleId },
       select: {
         schoolYear: true,
+        city: true,
         module: {
           select: {
             course: {
               select: {
-                scheduledGroups: { select: { id: true } },
+                scheduledGroups: { select: { id: true }, where: { city } },
               },
             },
           },
         },
       },
     })
-    if (!schedule) return { success: false, error: 'Modul nije pronađen.' }
+    // Schedules are per-city rows: closing by id only ever ends the caller's
+    // city's module. Cross-city ids read as nonexistent.
+    if (!schedule || schedule.city !== city) {
+      return { success: false, error: 'Modul nije pronađen.' }
+    }
 
     const blocked = archivedYearError(schedule.schoolYear)
     if (blocked) return blocked
@@ -109,6 +114,17 @@ export async function addModuleEnrollment(
 
     const blocked = archivedYearError(enrollment.schoolYear)
     if (blocked) return blocked
+
+    // Schedules are per-city: a raw moduleScheduleId must belong to the same
+    // city as the enrollment's group, or payments/counts would silently pair
+    // a student with the other city's module dates.
+    const schedule = await db.moduleSchedule.findUnique({
+      where: { id: moduleScheduleId },
+      select: { city: true },
+    })
+    if (!schedule || schedule.city !== enrollment.scheduledGroup.city) {
+      return { success: false, error: 'Modul nije pronađen.' }
+    }
 
     await db.moduleEnrollment.create({
       data: { enrollmentId, moduleScheduleId },

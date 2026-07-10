@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma, type City } from '@prisma/client'
 import { db } from '@/lib/db'
 import {
   getActiveModuleForGroup,
@@ -21,6 +21,7 @@ type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
 
 type GroupCapacityRow = {
   schoolYear: string
+  city: City
   dayOfWeek: string | null
   maxStudents: number
   enrollments: {
@@ -37,6 +38,7 @@ type GroupCapacityRow = {
       schedules: {
         id: string
         schoolYear: string
+        city: City
         startDate: Date | null
         endDate: Date | null
       }[]
@@ -95,7 +97,7 @@ export function computeGroupCapacity(
       dayOfWeek: group.dayOfWeek,
       modules: group.course.modules.map((m) => {
         const schedule = m.schedules.find(
-          (s) => s.schoolYear === group.schoolYear,
+          (s) => s.schoolYear === group.schoolYear && s.city === group.city,
         )
         return {
           id: m.id,
@@ -150,6 +152,7 @@ export async function assertGroupHasAvailableSpot(
     where: { id: scheduledGroupId },
     select: {
       schoolYear: true,
+      city: true,
       dayOfWeek: true,
       maxStudents: true,
       enrollments: {
@@ -188,6 +191,7 @@ export async function assertGroupHasAvailableSpot(
                 select: {
                   id: true,
                   schoolYear: true,
+                  city: true,
                   startDate: true,
                   endDate: true,
                 },
@@ -207,7 +211,7 @@ export async function assertGroupHasAvailableSpot(
   const holidayRows = group.course.isCustom
     ? []
     : await tx.schoolYearHoliday.findMany({
-        where: { schoolYear: group.schoolYear },
+        where: { schoolYear: group.schoolYear, city: group.city },
         select: { date: true },
       })
   const holidayDates = new Set(holidayRows.map((r) => toDateKey(r.date)))

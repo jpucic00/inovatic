@@ -38,7 +38,7 @@ type GroupRow = Awaited<ReturnType<typeof db.scheduledGroup.findMany>>[number] &
     modules: {
       id: string; title: string; sortOrder: number;
       schedules: {
-        id: string; schoolYear: string;
+        id: string; schoolYear: string; city: import('@prisma/client').City;
         startDate: Date | null; endDate: Date | null;
       }[];
     }[];
@@ -86,10 +86,14 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
   // `where`, so resolve open windows first and gate groups on the composite key.
   const openWindows = await db.courseEnrollmentWindow.findMany({
     where: { enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
-    select: { courseId: true, schoolYear: true },
+    select: { courseId: true, schoolYear: true, city: true },
   })
   if (openWindows.length === 0) return []
-  const openKeys = new Set(openWindows.map((w) => `${w.courseId}::${w.schoolYear}`))
+  // Windows are per-city: a group is enrollable only when ITS city's window
+  // is open — a Split window must never expose Šibenik groups or vice versa.
+  const openKeys = new Set(
+    openWindows.map((w) => `${w.courseId}::${w.schoolYear}::${w.city}`),
+  )
   const openCourseIds = Array.from(new Set(openWindows.map((w) => w.courseId)))
 
   const groups = await db.scheduledGroup.findMany({
@@ -117,6 +121,7 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
                 select: {
                   id: true,
                   schoolYear: true,
+                  city: true,
                   startDate: true,
                   endDate: true,
                 },
@@ -142,25 +147,26 @@ export async function getActivePrograms(): Promise<ActiveProgram[]> {
     orderBy: [{ course: { sortOrder: 'asc' } }, { createdAt: 'asc' }],
   })
 
-  // Group holidays by school year so each group resolves its arc against
-  // its OWN year's holiday set. Most realistic data has one current school
-  // year + at most one upcoming, so we end up with ≤2 distinct keys here
-  // and the same number of holiday-table queries — bounded, not per-group.
-  const distinctYears = new Set(groups.map((g) => g.schoolYear))
-  const holidaysByYear = new Map<string, Set<string>>()
+  // Group holidays by (school year, city) so each group resolves its arc
+  // against its OWN year's AND city's holiday set. Bounded: at most
+  // years × 2 cities distinct keys, one holiday-table query each — never
+  // per-group.
+  const distinctKeys = new Set(groups.map((g) => `${g.schoolYear}::${g.city}`))
+  const holidaysByYearCity = new Map<string, Set<string>>()
   await Promise.all(
-    Array.from(distinctYears).map(async (year) => {
-      holidaysByYear.set(year, await loadHolidayDateKeys(year))
+    Array.from(distinctKeys).map(async (key) => {
+      const [year, city] = key.split('::') as [string, (typeof groups)[number]['city']]
+      holidaysByYearCity.set(key, await loadHolidayDateKeys(year, city))
     }),
   )
 
   const courseMap = new Map<string, ActiveProgram>()
   for (const g of groups) {
-    // Gate on the group's own (course, year) window being open.
-    if (!openKeys.has(`${g.courseId}::${g.schoolYear}`)) continue
+    // Gate on the group's own (course, year, city) window being open.
+    if (!openKeys.has(`${g.courseId}::${g.schoolYear}::${g.city}`)) continue
     const activeGroup = toActiveGroup(
       g,
-      holidaysByYear.get(g.schoolYear) ?? new Set(),
+      holidaysByYearCity.get(`${g.schoolYear}::${g.city}`) ?? new Set(),
       now,
     )
     if (!activeGroup) continue

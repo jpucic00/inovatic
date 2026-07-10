@@ -11,18 +11,17 @@ import { adminAction } from '@/lib/admin-action'
 export async function upsertModuleSchedule(
   data: UpsertModuleScheduleInput,
 ): Promise<AdminActionResult> {
-  return adminAction(upsertModuleScheduleSchema, data, async ({ moduleId, schoolYear, startDate, endDate }) => {
+  return adminAction(upsertModuleScheduleSchema, data, async ({ moduleId, schoolYear, startDate, endDate }, { city }) => {
     const blocked = archivedYearError(schoolYear)
     if (blocked) return blocked
 
     try {
-      // TODO(city PR4): city from admin session instead of transitional SPLIT
       await db.moduleSchedule.upsert({
-        where: { moduleId_schoolYear_city: { moduleId, schoolYear, city: 'SPLIT' } },
+        where: { moduleId_schoolYear_city: { moduleId, schoolYear, city } },
         create: {
           moduleId,
           schoolYear,
-          city: 'SPLIT',
+          city,
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
         },

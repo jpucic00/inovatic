@@ -8,14 +8,23 @@ export type CanManageTarget =
 
 /**
  * Determines whether the session user may create/edit/delete a material at
- * the given scope. ADMIN → always; TEACHER → must have a TeacherAssignment
- * on the right ScheduledGroup(s) — resolved per scope.
+ * the given scope. ADMIN → any MODULE/COURSE material (shared curriculum,
+ * owner decision 2026-07-10) but GROUP materials only within their own city;
+ * TEACHER → must have a TeacherAssignment on the right ScheduledGroup(s) —
+ * resolved per scope.
  */
 export async function canManageMaterial(
   session: Session,
   target: CanManageTarget,
 ): Promise<boolean> {
-  if (session.user.role === 'ADMIN') return true
+  if (session.user.role === 'ADMIN') {
+    if (target.scope !== 'GROUP') return true
+    const group = await db.scheduledGroup.findUnique({
+      where: { id: target.scheduledGroupId },
+      select: { city: true },
+    })
+    return group !== null && group.city === session.user.city
+  }
   if (session.user.role !== 'TEACHER') return false
 
   const userId = session.user.id

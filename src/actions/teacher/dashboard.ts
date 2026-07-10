@@ -20,7 +20,9 @@ type TeacherGroupSummary = {
 /**
  * Returns the current school year's groups visible to the logged-in user.
  * TEACHER users see only groups they have a TeacherAssignment for.
- * ADMIN users see every group in the current school year (for support).
+ * ADMIN users see every group of THEIR CITY in the current school year — the
+ * tenant-bound pass-through that makes /nastavnik show Slavica exactly her
+ * Šibenik groups.
  */
 export async function getMyAssignedGroups(): Promise<TeacherGroupSummary[]> {
   const session = await requireTeacher()
@@ -31,7 +33,7 @@ export async function getMyAssignedGroups(): Promise<TeacherGroupSummary[]> {
     where: {
       schoolYear,
       ...(isAdmin
-        ? {}
+        ? { city: session.user.city }
         : { teacherAssignments: { some: { userId: session.user.id } } }),
     },
     orderBy: [{ course: { sortOrder: 'asc' } }, { name: 'asc' }, { createdAt: 'asc' }],

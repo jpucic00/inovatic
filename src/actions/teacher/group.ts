@@ -71,14 +71,19 @@ export async function getTeacherGroupDetail(groupId: string): Promise<TeacherGro
       id: group.course.id,
       title: group.course.title,
       isCustom: group.course.isCustom,
-      modules: group.course.modules.map((m) => ({
-        id: m.id,
-        title: m.title,
-        sortOrder: m.sortOrder,
-        schedule: m.schedules[0]
-          ? { startDate: m.schedules[0].startDate, endDate: m.schedules[0].endDate }
-          : null,
-      })),
+      modules: group.course.modules.map((m) => {
+        // Schedules are per-city rows — pick the group's own city's, never
+        // [0] of a two-city result.
+        const schedule = m.schedules.find((s) => s.city === group.city)
+        return {
+          id: m.id,
+          title: m.title,
+          sortOrder: m.sortOrder,
+          schedule: schedule
+            ? { startDate: schedule.startDate, endDate: schedule.endDate }
+            : null,
+        }
+      }),
     },
     location: { id: group.location.id, name: group.location.name },
     teacherNames: group.teacherAssignments.map(

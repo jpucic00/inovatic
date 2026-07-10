@@ -8,6 +8,7 @@
  * weekdays can return different modules on the same date (race-ahead from
  * `getGroupModuleArc`). Holidays slow down only the weekday they land on.
  */
+import type { City } from '@prisma/client'
 import {
   getActiveModuleForGroup,
   getGroupModuleArc,
@@ -20,6 +21,7 @@ type ModuleWithSchedule = {
   schedules: {
     id: string
     schoolYear: string
+    city: City
     startDate: Date | null
     endDate: Date | null
   }[]
@@ -40,13 +42,17 @@ export function getCurrentActiveModuleForGroup(input: {
   dayOfWeek: string | null
   modules: ModuleWithSchedule[]
   schoolYear: string
+  /** The group's city — schedules are per-city since the Šibenik expansion. */
+  city: City
   holidayDates: ReadonlySet<string>
   now?: Date
 }): ModuleWithSchedule | null {
   if (input.modules.length === 0) return null
 
   const arcInput = input.modules.map((m) => {
-    const schedule = m.schedules.find((s) => s.schoolYear === input.schoolYear)
+    const schedule = m.schedules.find(
+      (s) => s.schoolYear === input.schoolYear && s.city === input.city,
+    )
     return {
       id: m.id,
       title: m.title,

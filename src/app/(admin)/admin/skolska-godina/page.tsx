@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PartyPopper } from 'lucide-react'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
@@ -25,7 +25,7 @@ function formatCourseLabel(course: { title: string; level: string | null }): str
 }
 
 export default async function SchoolYearPage() {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const schoolYear = await getSelectedSchoolYear()
   const archived = isArchivedYear(schoolYear)
@@ -48,7 +48,8 @@ export default async function SchoolYearPage() {
             sortOrder: true,
             title: true,
             schedules: {
-              where: { schoolYear },
+              // Calendar shows the caller's city's planner rows only.
+              where: { schoolYear, city },
               select: { startDate: true, endDate: true },
             },
           },
@@ -60,7 +61,8 @@ export default async function SchoolYearPage() {
     db.course.findMany({
       where: {
         isCustom: true,
-        modules: { some: { schedules: { some: { schoolYear } } } },
+        OR: [{ city: null }, { city }],
+        modules: { some: { schedules: { some: { schoolYear, city } } } },
       },
       select: {
         id: true,
@@ -72,7 +74,7 @@ export default async function SchoolYearPage() {
             sortOrder: true,
             title: true,
             schedules: {
-              where: { schoolYear },
+              where: { schoolYear, city },
               select: { startDate: true, endDate: true },
             },
           },
@@ -84,6 +86,7 @@ export default async function SchoolYearPage() {
     db.scheduledGroup.findMany({
       where: {
         schoolYear,
+        city,
         course: { isCustom: true },
         dateStart: { not: null },
         dateEnd: { not: null },

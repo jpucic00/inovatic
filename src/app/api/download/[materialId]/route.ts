@@ -39,7 +39,16 @@ export async function GET(
   let allowed = false
 
   if (role === 'ADMIN') {
-    allowed = true
+    if (material.scheduledGroupId) {
+      // GROUP materials are per-city; MODULE/COURSE curriculum stays shared.
+      const group = await db.scheduledGroup.findUnique({
+        where: { id: material.scheduledGroupId },
+        select: { city: true },
+      })
+      allowed = group !== null && group.city === session.user.city
+    } else {
+      allowed = true
+    }
   } else if (role === 'TEACHER') {
     const target = materialTarget(material)
     allowed = target !== null && (await canManageMaterial(session, target))

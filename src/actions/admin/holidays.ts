@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { archivedYearError } from '@/lib/school-year-guard'
 import { fromDateKey, toDateKey } from '@/lib/session-dates'
 import {
@@ -51,11 +51,11 @@ type UpsertHolidayResult =
   | { success: true; requiresConfirmation: true; attendanceCount: number }
   | { success: false; error: string }
 
-/** All holidays for a school year, oldest first — matches the calendar order. */
+/** The caller's city's holidays for a school year, oldest first. */
 export async function listHolidays(schoolYear: string): Promise<HolidayRow[]> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   const rows = await db.schoolYearHoliday.findMany({
-    where: { schoolYear },
+    where: { schoolYear, city },
     orderBy: { date: 'asc' },
     include: {
       createdBy: { select: { firstName: true, lastName: true } },
@@ -96,7 +96,7 @@ export async function upsertHoliday(input: UpsertHolidayInput): Promise<UpsertHo
 export async function upsertHolidayRange(
   input: UpsertHolidayRangeInput,
 ): Promise<UpsertHolidayResult> {
-  const session = await requireAdmin()
+  const { session, city } = await requireAdminCtx()
 
   const parsed = upsertHolidayRangeSchema.safeParse(input)
   if (!parsed.success) {
@@ -115,7 +115,7 @@ export async function upsertHolidayRange(
     const attendanceCount = await db.attendance.count({
       where: {
         sessionDate: { in: dateValues },
-        enrollment: { scheduledGroup: { schoolYear: data.schoolYear } },
+        enrollment: { scheduledGroup: { schoolYear: data.schoolYear, city } },
       },
     })
     if (attendanceCount > 0) {
@@ -126,20 +126,21 @@ export async function upsertHolidayRange(
   try {
     await db.$transaction(async (tx) => {
       if (data.confirmDeleteAttendance) {
+        // City filter is load-bearing: this delete is irreversible, and a
+        // Šibenik closure must never destroy Split attendance rows.
         await tx.attendance.deleteMany({
           where: {
             sessionDate: { in: dateValues },
-            enrollment: { scheduledGroup: { schoolYear: data.schoolYear } },
+            enrollment: { scheduledGroup: { schoolYear: data.schoolYear, city } },
           },
         })
       }
       for (const dateUtc of dateValues) {
-        // TODO(city PR4): city from admin session instead of transitional SPLIT
         await tx.schoolYearHoliday.upsert({
-          where: { schoolYear_city_date: { schoolYear: data.schoolYear, city: 'SPLIT', date: dateUtc } },
+          where: { schoolYear_city_date: { schoolYear: data.schoolYear, city, date: dateUtc } },
           create: {
             schoolYear: data.schoolYear,
-            city: 'SPLIT',
+            city,
             date: dateUtc,
             name,
             createdById: session.user.id,
@@ -167,7 +168,7 @@ export async function upsertHolidayRange(
 export async function removeHolidayRange(
   input: RemoveHolidayRangeInput,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = removeHolidayRangeSchema.safeParse(input)
   if (!parsed.success) {
@@ -182,6 +183,7 @@ export async function removeHolidayRange(
     await db.schoolYearHoliday.deleteMany({
       where: {
         schoolYear: data.schoolYear,
+        city,
         date: { gte: fromDateKey(data.startDate), lte: fromDateKey(data.endDate) },
       },
     })
@@ -196,7 +198,7 @@ export async function removeHolidayRange(
 }
 
 export async function removeHoliday(input: RemoveHolidayInput): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = removeHolidaySchema.safeParse(input)
   if (!parsed.success) {
@@ -205,9 +207,10 @@ export async function removeHoliday(input: RemoveHolidayInput): Promise<AdminAct
 
   const row = await db.schoolYearHoliday.findUnique({
     where: { id: parsed.data.id },
-    select: { schoolYear: true },
+    select: { schoolYear: true, city: true },
   })
-  if (!row) {
+  // Cross-city rows answer exactly like nonexistent ones.
+  if (!row || row.city !== city) {
     return { success: false, error: 'Praznik nije pronađen.' }
   }
 
@@ -255,7 +258,7 @@ function datesForItem(item: FetchedHoliday | BulkImportHolidayItem): string[] {
 export async function previewHolidaysFromApi(
   schoolYear: string,
 ): Promise<PreviewHolidaysResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!/^\d{4}\/\d{4}$/.test(schoolYear)) {
     return { success: false, error: 'Nevažeća školska godina.' }
@@ -281,13 +284,13 @@ export async function previewHolidaysFromApi(
 
   const [existingRows, attendanceRows] = await Promise.all([
     db.schoolYearHoliday.findMany({
-      where: { schoolYear, date: { in: dateValues } },
+      where: { schoolYear, city, date: { in: dateValues } },
       select: { date: true },
     }),
     db.attendance.findMany({
       where: {
         sessionDate: { in: dateValues },
-        enrollment: { scheduledGroup: { schoolYear } },
+        enrollment: { scheduledGroup: { schoolYear, city } },
       },
       select: { sessionDate: true },
     }),
@@ -350,7 +353,7 @@ class AttendanceConfirmationRequired extends Error {
 export async function bulkImportHolidays(
   input: BulkImportHolidaysInput,
 ): Promise<BulkImportHolidaysResult> {
-  const session = await requireAdmin()
+  const { session, city } = await requireAdminCtx()
 
   const parsed = bulkImportHolidaysSchema.safeParse(input)
   if (!parsed.success) {
@@ -373,10 +376,12 @@ export async function bulkImportHolidays(
   try {
     await db.$transaction(async (tx) => {
       if (data.confirmDeleteAttendance) {
+        // City filter is load-bearing: this delete is irreversible, and a
+        // Šibenik import must never destroy Split attendance rows.
         await tx.attendance.deleteMany({
           where: {
             sessionDate: { in: dateValues },
-            enrollment: { scheduledGroup: { schoolYear: data.schoolYear } },
+            enrollment: { scheduledGroup: { schoolYear: data.schoolYear, city } },
           },
         })
       } else {
@@ -385,7 +390,7 @@ export async function bulkImportHolidays(
         const conflictRows = await tx.attendance.findMany({
           where: {
             sessionDate: { in: dateValues },
-            enrollment: { scheduledGroup: { schoolYear: data.schoolYear } },
+            enrollment: { scheduledGroup: { schoolYear: data.schoolYear, city } },
           },
           select: { sessionDate: true },
         })
@@ -401,12 +406,11 @@ export async function bulkImportHolidays(
 
       for (const [dateKey, name] of dateToName) {
         const dateUtc = fromDateKey(dateKey)
-        // TODO(city PR4): city from admin session instead of transitional SPLIT
         await tx.schoolYearHoliday.upsert({
-          where: { schoolYear_city_date: { schoolYear: data.schoolYear, city: 'SPLIT', date: dateUtc } },
+          where: { schoolYear_city_date: { schoolYear: data.schoolYear, city, date: dateUtc } },
           create: {
             schoolYear: data.schoolYear,
-            city: 'SPLIT',
+            city,
             date: dateUtc,
             name,
             createdById: session.user.id,

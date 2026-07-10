@@ -7,7 +7,8 @@ import { requireTeacher } from '@/lib/auth-guard'
  * Gates access to a ScheduledGroup-scoped teacher resource.
  *
  * TEACHER users may access only groups they have a TeacherAssignment for.
- * ADMIN users may access any group (needed for support + cross-role testing).
+ * ADMIN users may access any group IN THEIR CITY (support + Slavica teaching
+ * her own Šibenik groups); cross-city groups 404 like nonexistent ones.
  * If the group doesn't exist OR the teacher lacks an assignment → notFound().
  *
  * Returns the session + minimal group fields so callers don't re-fetch them.
@@ -29,11 +30,15 @@ export async function assertTeacherOwnsGroup(groupId: string): Promise<{
 
   const group = await db.scheduledGroup.findUnique({
     where: { id: groupId },
-    select: { id: true },
+    select: { id: true, city: true },
   })
   if (!group) notFound()
 
-  if (!isAdmin) {
+  if (isAdmin) {
+    // The admin pass-through is tenant-bound: an admin is never a teacher of
+    // the other city's groups.
+    if (group.city !== session.user.city) notFound()
+  } else {
     const assignment = await db.teacherAssignment.findUnique({
       where: {
         userId_scheduledGroupId: {
@@ -64,11 +69,14 @@ export async function assertTeacherCanViewStudent(studentId: string): Promise<{
 
   const student = await db.user.findUnique({
     where: { id: studentId, role: 'STUDENT' },
-    select: { id: true },
+    select: { id: true, city: true },
   })
   if (!student) notFound()
 
-  if (!isAdmin) {
+  if (isAdmin) {
+    // Tenant-bound admin pass-through: cross-city students 404.
+    if (student.city !== session.user.city) notFound()
+  } else {
     const shared = await db.enrollment.findFirst({
       where: {
         userId: studentId,

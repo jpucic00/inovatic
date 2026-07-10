@@ -27,6 +27,7 @@ const mkModule = (m: ModuleFixture) => ({
           {
             id: m.scheduleId,
             schoolYear: SCHOOL_YEAR,
+            city: 'SPLIT' as const,
             startDate: m.startDate,
             endDate: m.endDate,
           },
@@ -50,6 +51,7 @@ const mkGroup = (input: {
   reservedInquiriesCount?: number
 }): GroupCapacityRow => ({
   schoolYear: SCHOOL_YEAR,
+  city: 'SPLIT',
   dayOfWeek: input.dayOfWeek ?? 'Srijeda',
   maxStudents: input.maxStudents,
   enrollments: input.enrollments,

@@ -2,7 +2,7 @@
 
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import type { StaffMaterialRow } from '@/components/material/staff-material-list'
 
@@ -50,7 +50,7 @@ type ProgramDetail = {
  * Admin-only. Materials carry no per-group hide context here.
  */
 export async function getProgramDetail(courseId: string): Promise<ProgramDetail> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   const year = await getSelectedSchoolYear()
 
   const course = await db.course.findUnique({
@@ -60,12 +60,15 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       title: true,
       level: true,
       isCustom: true,
+      city: true,
       ageMin: true,
       ageMax: true,
       equipment: true,
-      _count: { select: { scheduledGroups: true } },
+      // Shared course, city-scoped view: only the caller's city's groups,
+      // window, and module dates.
+      _count: { select: { scheduledGroups: { where: { city } } } },
       enrollmentWindows: {
-        where: { schoolYear: year },
+        where: { schoolYear: year, city },
         select: { enrollmentStart: true, enrollmentEnd: true },
       },
       modules: {
@@ -75,7 +78,7 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
           title: true,
           sortOrder: true,
           schedules: {
-            where: { schoolYear: year },
+            where: { schoolYear: year, city },
             select: {
               id: true,
               startDate: true,
@@ -87,7 +90,8 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       },
     },
   })
-  if (!course) notFound()
+  // Cross-city radionice read as nonexistent (standard programs are shared).
+  if (!course || (course.city !== null && course.city !== city)) notFound()
 
   const moduleIds = course.modules.map((m) => m.id)
   const moduleTitles = new Map(course.modules.map((m) => [m.id, m.title]))

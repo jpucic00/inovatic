@@ -186,11 +186,14 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
   if (!group) notFound()
 
   const isCustom = group.course.isCustom
-  const holidayDates = await loadHolidayDateKeys(schoolYear)
+  // Pacing follows the group's own city: its holiday calendar and its city's
+  // module schedule rows (the resolver ignores the other city's schedules).
+  const holidayDates = await loadHolidayDateKeys(schoolYear, group.city)
   const activeModule = getCurrentActiveModuleForGroup({
     dayOfWeek: group.dayOfWeek,
     modules: group.course.modules,
     schoolYear,
+    city: group.city,
     holidayDates,
   })
 

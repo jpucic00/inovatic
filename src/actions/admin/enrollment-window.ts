@@ -11,7 +11,7 @@ import { adminAction } from '@/lib/admin-action'
 export async function upsertEnrollmentWindow(
   data: UpsertEnrollmentWindowInput,
 ): Promise<AdminActionResult> {
-  return adminAction(upsertEnrollmentWindowSchema, data, async ({ courseId, schoolYear, enrollmentStart, enrollmentEnd }) => {
+  return adminAction(upsertEnrollmentWindowSchema, data, async ({ courseId, schoolYear, enrollmentStart, enrollmentEnd }, { city }) => {
     const blocked = archivedYearError(schoolYear)
     if (blocked) return blocked
 
@@ -19,10 +19,9 @@ export async function upsertEnrollmentWindow(
     const end = enrollmentEnd ? new Date(enrollmentEnd) : null
 
     try {
-      // TODO(city PR4): city from admin session instead of transitional SPLIT
       await db.courseEnrollmentWindow.upsert({
-        where: { courseId_schoolYear_city: { courseId, schoolYear, city: 'SPLIT' } },
-        create: { courseId, schoolYear, city: 'SPLIT', enrollmentStart: start, enrollmentEnd: end },
+        where: { courseId_schoolYear_city: { courseId, schoolYear, city } },
+        create: { courseId, schoolYear, city, enrollmentStart: start, enrollmentEnd: end },
         update: { enrollmentStart: start, enrollmentEnd: end },
       })
     } catch (err) {

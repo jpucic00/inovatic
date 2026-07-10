@@ -15,7 +15,7 @@ const courseSelect = {
       title: true,
       sortOrder: true,
       schedules: {
-        select: { id: true, schoolYear: true, startDate: true, endDate: true },
+        select: { id: true, schoolYear: true, city: true, startDate: true, endDate: true },
       },
     },
   },
@@ -63,6 +63,7 @@ const baseEnrollmentSelect = {
     select: {
       id: true,
       name: true,
+      city: true,
       dayOfWeek: true,
       startTime: true,
       endTime: true,

@@ -297,8 +297,8 @@ export async function getGroupsForCourse(courseId: string) {
               title: true,
               sortOrder: true,
               schedules: {
-                where: { schoolYear: year },
-                select: { id: true, schoolYear: true, startDate: true, endDate: true },
+                where: { schoolYear: year, city },
+                select: { id: true, schoolYear: true, city: true, startDate: true, endDate: true },
               },
             },
           },
@@ -322,7 +322,7 @@ export async function getGroupsForCourse(courseId: string) {
   })
 
   const now = new Date()
-  const holidayDates = await loadHolidayDateKeys(year)
+  const holidayDates = await loadHolidayDateKeys(year, city)
   return groups.map((g) => {
     const { availableSpots, isFull } = computeGroupCapacity(g, holidayDates, now)
     return { ...g, availableSpots, isFull }
@@ -356,8 +356,8 @@ export async function getGroupsForCourseInSelectedYear(courseId: string) {
               title: true,
               sortOrder: true,
               schedules: {
-                where: { schoolYear: year },
-                select: { id: true, schoolYear: true, startDate: true, endDate: true },
+                where: { schoolYear: year, city },
+                select: { id: true, schoolYear: true, city: true, startDate: true, endDate: true },
               },
             },
           },
@@ -381,7 +381,7 @@ export async function getGroupsForCourseInSelectedYear(courseId: string) {
   })
 
   const now = new Date()
-  const holidayDates = await loadHolidayDateKeys(year)
+  const holidayDates = await loadHolidayDateKeys(year, city)
   return groups.map((g) => {
     const { availableSpots, isFull } = computeGroupCapacity(g, holidayDates, now)
     return { ...g, availableSpots, isFull }

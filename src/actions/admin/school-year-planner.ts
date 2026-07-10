@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { archivedYearError } from '@/lib/school-year-guard'
 import { fromDateKey } from '@/lib/session-dates'
 import { loadHolidayDateKeys } from '@/lib/holidays'
@@ -40,7 +40,7 @@ import type { AdminActionResult } from '@/lib/action-types'
 export async function completeSchoolYearPlan(
   input: CompleteSchoolYearPlanInput,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = completeSchoolYearPlanSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
@@ -52,12 +52,15 @@ export async function completeSchoolYearPlan(
   // Re-derive holidays server-side. Never trust the client. Active weekdays
   // are NOT a planner input — the calendar always plans for all 6 weekdays
   // (Pon–Sub) regardless of which weekdays currently have ScheduledGroups.
-  const holidayDates = await loadHolidayDateKeys(schoolYear)
+  const holidayDates = await loadHolidayDateKeys(schoolYear, city)
 
-  // Race-safe re-check: planner is only meant to seed an empty year.
+  // Race-safe re-check: planner is only meant to seed an empty year — for the
+  // caller's city. Each city plans the shared curriculum independently, so
+  // Split having dates must not block Šibenik's first planner run.
   const existingDated = await db.moduleSchedule.count({
     where: {
       schoolYear,
+      city,
       module: { course: { isCustom: false } },
       OR: [{ startDate: { not: null } }, { endDate: { not: null } }],
     },
@@ -120,14 +123,13 @@ export async function completeSchoolYearPlan(
     mods.forEach((m, position) => {
       const window = plan.modules[position]
       if (!window) return
-      // TODO(city PR4): city from admin session instead of transitional SPLIT
       upserts.push(
         db.moduleSchedule.upsert({
-          where: { moduleId_schoolYear_city: { moduleId: m.id, schoolYear, city: 'SPLIT' } },
+          where: { moduleId_schoolYear_city: { moduleId: m.id, schoolYear, city } },
           create: {
             moduleId: m.id,
             schoolYear,
-            city: 'SPLIT',
+            city,
             startDate: window.startDate,
             endDate: window.endDate,
           },

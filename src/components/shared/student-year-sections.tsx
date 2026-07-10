@@ -141,8 +141,10 @@ export function StudentYearSections({
               }))
 
               const availableModules = (sg.course.modules ?? []).flatMap((mod) => {
+                // Schedules are per-city rows — pair by the group's own city
+                // so the add-module offer never targets the other city's dates.
                 const modSchedule = mod.schedules.find(
-                  (s) => s.schoolYear === enrollment.schoolYear,
+                  (s) => s.schoolYear === enrollment.schoolYear && s.city === sg.city,
                 )
                 if (!modSchedule) return []
                 if (enrolledScheduleIds.has(modSchedule.id)) return []
