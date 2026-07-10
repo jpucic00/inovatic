@@ -1,7 +1,8 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
+import { assertInquiryInCity } from '@/lib/city-guard'
 import { InquiryStatus, InquiryType } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import {
@@ -38,18 +39,20 @@ function courseIdFilter(courseId: string | undefined) {
 
 type InquiryListRow = Awaited<ReturnType<typeof db.inquiry.findMany>>[number] & {
   isReturning: boolean
+  isReturningOtherCity: boolean
 }
 
 export async function getInquiries(
   filters: InquiryFilters = {},
 ): Promise<PaginatedResult<InquiryListRow>> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const { status, search, courseId, grade, type, page = 1, pageSize = 20 } = filters
   const schoolYear = await getSelectedSchoolYear()
 
   const where = {
     schoolYear,
+    city,
     ...(status && status !== 'ALL' ? { status } : {}),
     ...(type && type !== 'ALL' ? { type } : {}),
     ...(courseIdFilter(courseId)),
@@ -91,11 +94,29 @@ type ReturningStudentInfo = {
   }[]
 }
 
+// What a cross-city identity match is allowed to reveal: only that a matching
+// child exists somewhere else. Same shape as a real match so the page renders
+// it unchanged — empty id (no profile link works cross-city anyway), no DOB,
+// no enrollment history, and the neutral label in the name slots.
+const MASKED_CROSS_CITY_STUDENT: ReturningStudentInfo = {
+  id: '',
+  firstName: 'postojeći polaznik',
+  lastName: '(druga lokacija)',
+  dateOfBirth: null,
+  history: [],
+}
+
 /**
  * Returns the existing student matching this inquiry's child identity (firstName
  * + lastName + dateOfBirth), with their enrollment history grouped by school
  * year (newest first), or `null` when there is no DOB, no match, or the only
  * match is the student this inquiry itself created (`excludeStudentId`).
+ *
+ * Identity matching is deliberately global across cities (owner decision), but
+ * only a same-city match reveals details; a match living solely in the other
+ * city collapses to the masked variant. The admin's session city stands in for
+ * the inquiry's city here — the calling detail page already 404s cross-city
+ * inquiries, so the two are always equal.
  */
 export async function getReturningStudentInfo(input: {
   firstName: string
@@ -103,15 +124,16 @@ export async function getReturningStudentInfo(input: {
   dateOfBirth?: string | null
   excludeStudentId?: string | null
 }): Promise<ReturningStudentInfo | null> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const where = studentIdentityWhere(input)
   if (!where) return null
 
-  const student = await db.user.findFirst({
+  const students = await db.user.findMany({
     where,
     select: {
       id: true,
+      city: true,
       firstName: true,
       lastName: true,
       dateOfBirth: true,
@@ -130,8 +152,13 @@ export async function getReturningStudentInfo(input: {
     },
   })
 
-  if (!student) return null
-  if (input.excludeStudentId && student.id === input.excludeStudentId) return null
+  const candidates = students.filter((s) => s.id !== input.excludeStudentId)
+  if (candidates.length === 0) return null
+  // The same identity can exist in both cities — prefer the own-city record
+  // (full behavior) and only fall back to the masked flag when every match
+  // lives in the other city.
+  const student = candidates.find((s) => s.city === city)
+  if (!student) return MASKED_CROSS_CITY_STUDENT
 
   const byYear = new Map<string, ReturningStudentInfo['history'][number]['groups']>()
   for (const e of student.enrollments) {
@@ -157,23 +184,32 @@ export async function getReturningStudentInfo(input: {
 }
 
 export async function getInquiryCourses() {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   const year = await getSelectedSchoolYear()
 
   return db.course.findMany({
     // Mirror getCourses: standard courses are global; radionice are year-scoped,
     // so the Upiti program filter never lists other years' (always-empty) radionice.
-    where: { OR: [{ isCustom: false }, { schoolYear: year }] },
+    // City: shared standard programs (city null) plus own-city radionice — never
+    // the other city's radionice.
+    where: {
+      AND: [
+        { OR: [{ isCustom: false }, { schoolYear: year }] },
+        { OR: [{ city: null }, { city }] },
+      ],
+    },
     select: { id: true, title: true },
     orderBy: { title: 'asc' },
   })
 }
 
 export async function getInquiry(id: string) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
-  return db.inquiry.findUnique({
-    where: { id },
+  // findFirst so the city filter applies: a cross-city inquiry reads as null,
+  // indistinguishable from a nonexistent one (the page notFound()s on null).
+  return db.inquiry.findFirst({
+    where: { id, city },
     include: {
       course: {
         select: {
@@ -194,12 +230,15 @@ export async function declineInquiry(
   id: string,
   reason: string,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = declineInquirySchema.safeParse({ id, reason })
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
   }
+
+  // Outside the try so the notFound() throw isn't swallowed.
+  await assertInquiryInCity(parsed.data.id, city)
 
   try {
     await db.inquiry.update({
@@ -217,9 +256,11 @@ export async function declineInquiry(
 }
 
 export async function deleteInquiry(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!id) return { success: false, error: 'ID nije pronađen.' }
+
+  await assertInquiryInCity(id, city)
 
   try {
     await db.inquiry.delete({ where: { id } })
@@ -233,13 +274,16 @@ export async function deleteInquiry(id: string): Promise<AdminActionResult> {
 }
 
 export async function getGroupsForCourse(courseId: string) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   const year = await getSelectedSchoolYear()
 
   if (!courseId) return []
 
+  // Session city == inquiry city for every inquiry-driven picker (cross-city
+  // inquiries already read as nonexistent), so this offers only groups in the
+  // inquiry's own city.
   const groups = await db.scheduledGroup.findMany({
-    where: { courseId, schoolYear: year },
+    where: { courseId, schoolYear: year, city },
     include: {
       location: { select: { name: true } },
       course: {
@@ -292,13 +336,13 @@ export async function getGroupsForCourse(courseId: string) {
  * only the schedules for that same school year.
  */
 export async function getGroupsForCourseInSelectedYear(courseId: string) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!courseId) return []
 
   const year = await getSelectedSchoolYear()
 
   const groups = await db.scheduledGroup.findMany({
-    where: { courseId, schoolYear: year },
+    where: { courseId, schoolYear: year, city },
     include: {
       location: { select: { name: true } },
       course: {
@@ -348,11 +392,14 @@ export async function sendScheduleOptions(
   inquiryId: string,
   groupIds: string[],
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!inquiryId || !groupIds.length) {
     return { success: false, error: 'Nevaljani podaci.' }
   }
+
+  // Outside the try so the notFound() throw isn't swallowed.
+  await assertInquiryInCity(inquiryId, city)
 
   try {
     const inquiry = await db.inquiry.findUnique({
@@ -364,10 +411,15 @@ export async function sendScheduleOptions(
       return { success: false, error: 'Upit mora biti u statusu "Nova".' }
     }
 
+    // Every offered group must live in the inquiry's own city — a missing or
+    // cross-city id makes the whole send invalid.
     const groups = await db.scheduledGroup.findMany({
-      where: { id: { in: groupIds } },
+      where: { id: { in: groupIds }, city: inquiry.city },
       include: { location: true, course: { select: { isCustom: true } } },
     })
+    if (groups.length !== new Set(groupIds).size) {
+      return { success: false, error: 'Nevaljani podaci.' }
+    }
 
     const options = groups.map((g) => ({
       groupName: g.name ?? 'Grupa',
@@ -417,13 +469,16 @@ export async function sendScheduleOptions(
 export async function schedulePartyInquiry(
   input: SchedulePartyInput,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = schedulePartySchema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
   }
   const { id, confirmedDate, startTime } = parsed.data
+
+  // Outside the try so the notFound() throw isn't swallowed.
+  await assertInquiryInCity(id, city)
 
   try {
     const inquiry = await db.inquiry.findUnique({ where: { id }, select: { type: true } })
@@ -460,7 +515,7 @@ export async function schedulePartyInquiry(
  * regardless of which year's Upiti list the inquiry lives in.
  */
 export async function getScheduledParties(schoolYear: string) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const startYear = Number.parseInt(schoolYear.split('/')[0], 10)
   if (Number.isNaN(startYear)) return []
@@ -471,6 +526,7 @@ export async function getScheduledParties(schoolYear: string) {
     where: {
       type: 'PARTY',
       status: 'PARTY_SCHEDULED',
+      city,
       partyConfirmedDate: { gte: start, lt: end },
     },
     select: {

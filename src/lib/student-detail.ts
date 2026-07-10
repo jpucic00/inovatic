@@ -1,3 +1,4 @@
+import type { City } from '@prisma/client'
 import { db } from '@/lib/db'
 
 // ── Shared select fragments ──────────────────────────────────────────────────
@@ -110,9 +111,11 @@ type TeacherRaw = NonNullable<TeacherStudentResult>
 
 // ── Private fetchers ─────────────────────────────────────────────────────────
 
-function fetchForAdmin(id: string) {
+function fetchForAdmin(id: string, city?: City) {
   return db.user.findUnique({
-    where: { id, role: 'STUDENT' },
+    // A cross-city student resolves to null — indistinguishable from a
+    // nonexistent id, so admin callers surface it as a 404.
+    where: { id, role: 'STUDENT', ...(city ? { city } : {}) },
     select: {
       ...userBaseSelect,
       enrollments: {
@@ -159,8 +162,10 @@ function fetchForTeacher(id: string) {
 
 // ── Public builders ──────────────────────────────────────────────────────────
 
-export async function buildStudentDetailForAdmin(id: string): Promise<StudentDetail | null> {
-  return fetchForAdmin(id)
+// `city` scopes the lookup to the admin's tenant; teacher callers omit it
+// (teacher-side city scoping is PR4).
+export async function buildStudentDetailForAdmin(id: string, city?: City): Promise<StudentDetail | null> {
+  return fetchForAdmin(id, city)
 }
 
 export async function buildStudentDetailForTeacher(id: string): Promise<StudentDetail | null> {

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { getGroups } from '@/actions/admin/group'
 import { getAssignableTeachers } from '@/actions/admin/teacher'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
@@ -13,7 +13,7 @@ import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 export const metadata: Metadata = { title: 'Admin – Grupe' }
 
 export default async function GroupsPage() {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const selectedYear = await getSelectedSchoolYear()
   const editable = !isArchivedYear(selectedYear)
@@ -23,11 +23,18 @@ export default async function GroupsPage() {
     db.course.findMany({
       // Standard SLR programs are global (schoolYear = null) and always appear.
       // Radionice are year-scoped — only those stamped with the selected year.
-      where: { OR: [{ isCustom: false }, { schoolYear: selectedYear }] },
+      // Shared standard programs have city = null; radionice belong to one city.
+      where: {
+        AND: [
+          { OR: [{ isCustom: false }, { schoolYear: selectedYear }] },
+          { OR: [{ city: null }, { city }] },
+        ],
+      },
       orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }],
       select: { id: true, title: true, isCustom: true },
     }),
     db.location.findMany({
+      where: { city },
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     }),

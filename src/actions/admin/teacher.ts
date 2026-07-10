@@ -1,7 +1,8 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
+import { assertGroupInCity, assertUserInCity } from '@/lib/city-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
 import { archivedYearError } from '@/lib/school-year-guard'
@@ -83,13 +84,14 @@ type ResetPasswordResult =
 export async function getTeachers(
   filters: TeacherFilters = {},
 ): Promise<PaginatedResult<TeacherRow>> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const { search, page = 1, pageSize = 20 } = filters
 
   const where = {
     role: 'TEACHER' as const,
     deletedAt: null,
+    city,
     ...(search
       ? {
           OR: [
@@ -142,9 +144,9 @@ export async function getTeachers(
 }
 
 export async function getTeacher(id: string) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   return db.user.findUnique({
-    where: { id, role: 'TEACHER', deletedAt: null },
+    where: { id, role: 'TEACHER', deletedAt: null, city },
     include: {
       teacherAssignments: {
         include: {
@@ -162,7 +164,8 @@ export async function getTeacher(id: string) {
 
 /** Used by the "Assign" combobox on the teacher detail page. */
 export async function getAssignableGroupsForTeacher(teacherId: string) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
+  await assertUserInCity(teacherId, city)
   const assigned = await db.teacherAssignment.findMany({
     where: { userId: teacherId },
     select: { scheduledGroupId: true },
@@ -170,7 +173,7 @@ export async function getAssignableGroupsForTeacher(teacherId: string) {
   const assignedIds = assigned.map((a) => a.scheduledGroupId)
 
   return db.scheduledGroup.findMany({
-    where: { id: { notIn: assignedIds } },
+    where: { id: { notIn: assignedIds }, city },
     select: {
       id: true,
       name: true,
@@ -187,9 +190,11 @@ export async function getAssignableGroupsForTeacher(teacherId: string) {
 
 /** Lightweight teacher list for multi-select widgets. */
 export async function getAssignableTeachers() {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
+  // ADMIN included on purpose: a city admin who also teaches (e.g. Šibenik)
+  // must be assignable to her own groups.
   return db.user.findMany({
-    where: { role: 'TEACHER', deletedAt: null },
+    where: { role: { in: ['TEACHER', 'ADMIN'] }, deletedAt: null, city },
     select: { id: true, firstName: true, lastName: true, email: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   })
@@ -198,7 +203,7 @@ export async function getAssignableTeachers() {
 export async function createTeacher(
   input: CreateTeacherInput,
 ): Promise<CreateTeacherResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = createTeacherSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
@@ -224,8 +229,7 @@ export async function createTeacher(
         role: 'TEACHER',
         passwordHash,
         plainPassword: password,
-        // TODO(city PR3): city from admin session
-        city: 'SPLIT',
+        city,
       },
       select: { id: true },
     })
@@ -248,12 +252,15 @@ export async function createTeacher(
 export async function updateTeacher(
   input: UpdateTeacherInput,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = updateTeacherSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
   const { id, firstName, lastName, phone } = parsed.data
+
+  // Outside the try — the notFound() throw must not be swallowed by the catch.
+  await assertUserInCity(id, city)
 
   try {
     const teacher = await db.user.findUnique({
@@ -283,8 +290,10 @@ export async function updateTeacher(
 export async function resetTeacherPassword(
   id: string,
 ): Promise<ResetPasswordResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!id) return { success: false, error: 'ID nije pronađen.' }
+
+  await assertUserInCity(id, city)
 
   try {
     const teacher = await db.user.findUnique({
@@ -312,8 +321,10 @@ export async function resetTeacherPassword(
 }
 
 export async function deleteTeacher(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!id) return { success: false, error: 'ID nije pronađen.' }
+
+  await assertUserInCity(id, city)
 
   try {
     const teacher = await db.user.findUnique({
@@ -341,16 +352,22 @@ export async function deleteTeacher(id: string): Promise<AdminActionResult> {
 export async function assignTeacherToGroup(
   input: AssignTeacherInput,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = assignTeacherSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
   const { teacherId, scheduledGroupId } = parsed.data
 
+  // Both must live in the admin's city (which also forces assignee city ===
+  // group city). Outside the try so the notFound() throw isn't swallowed.
+  await assertUserInCity(teacherId, city)
+  await assertGroupInCity(scheduledGroupId, city)
+
   try {
     const [teacher, group] = await Promise.all([
       db.user.findUnique({
-        where: { id: teacherId, role: 'TEACHER' },
+        // ADMIN allowed: a city admin can be a named teacher on her groups.
+        where: { id: teacherId, role: { in: ['TEACHER', 'ADMIN'] } },
         select: { id: true },
       }),
       db.scheduledGroup.findUnique({
@@ -387,7 +404,7 @@ export async function assignTeacherToGroup(
 export async function unassignTeacherFromGroup(
   assignmentId: string,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!assignmentId) return { success: false, error: 'ID nije pronađen.' }
 
   try {
@@ -396,10 +413,13 @@ export async function unassignTeacherFromGroup(
       select: {
         userId: true,
         scheduledGroupId: true,
-        scheduledGroup: { select: { schoolYear: true } },
+        scheduledGroup: { select: { schoolYear: true, city: true } },
       },
     })
-    if (!assignment) return { success: false, error: 'Dodjela nije pronađena.' }
+    // Cross-city assignments are indistinguishable from nonexistent ones.
+    if (!assignment || assignment.scheduledGroup.city !== city) {
+      return { success: false, error: 'Dodjela nije pronađena.' }
+    }
 
     const blocked = archivedYearError(assignment.scheduledGroup.schoolYear)
     if (blocked) return blocked

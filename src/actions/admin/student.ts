@@ -1,8 +1,9 @@
 'use server'
 
-import type { Prisma } from '@prisma/client'
+import type { City, Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
+import { assertUserInCity } from '@/lib/city-guard'
 import { buildStudentDetailForAdmin } from '@/lib/student-detail'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
@@ -65,6 +66,22 @@ class InquiryDeclinedError extends Error {
 class GroupNotFoundError extends Error {
   constructor() {
     super('Group not found')
+  }
+}
+
+class GroupCityMismatchError extends Error {
+  constructor() {
+    super('Group city mismatch')
+  }
+}
+
+// Identity matching (name + DOB) is intentionally GLOBAL across cities
+// (owner decision 2026-07-10), but a cross-city match must never be silently
+// reused — the admin gets an escalation error instead of the other city's
+// account (and never its credentials).
+class CrossCityStudentError extends Error {
+  constructor() {
+    super('Student exists in the other city')
   }
 }
 
@@ -143,6 +160,8 @@ async function generateUsername(
 }
 
 type CoreInput = {
+  /** Tenant city stamped on a new account and required of the target group. */
+  city: City
   firstName: string
   lastName: string
   dateOfBirth?: string | null
@@ -182,9 +201,13 @@ async function findOrCreateStudent(
   const existingStudent = identityWhere
     ? await tx.user.findFirst({
         where: identityWhere,
-        select: { id: true, username: true, plainPassword: true },
+        select: { id: true, username: true, plainPassword: true, city: true },
       })
     : null
+
+  if (existingStudent && existingStudent.city !== input.city) {
+    throw new CrossCityStudentError()
+  }
 
   if (existingStudent) {
     const backfill: Prisma.UserUpdateInput = {}
@@ -225,8 +248,7 @@ async function findOrCreateStudent(
       parentPhone: input.parentPhone ?? null,
       childSchool: input.childSchool ?? null,
       gdprConsentAt: input.gdprConsentAt ?? null,
-      // TODO(city PR3): city from inquiry/admin session
-      city: 'SPLIT',
+      city: input.city,
     },
     select: { id: true, username: true },
   })
@@ -240,6 +262,7 @@ async function ensureEnrollment(
   userId: string,
   groupId: string,
   moduleScheduleIds: string[] | undefined,
+  city: City,
   options: { assertCapacity: boolean } = ENSURE_ENROLLMENT_DEFAULT_OPTIONS,
 ): Promise<{ enrollmentId: string; group: CoreResult['group'] }> {
   const sg = await tx.scheduledGroup.findUnique({
@@ -250,6 +273,7 @@ async function ensureEnrollment(
     },
   })
   if (!sg) throw new GroupNotFoundError()
+  if (sg.city !== city) throw new GroupCityMismatchError()
 
   const existingEnrollment = await tx.enrollment.findUnique({
     where: {
@@ -310,6 +334,7 @@ async function createStudentCore(tx: TxClient, input: CoreInput): Promise<CoreRe
     user.id,
     input.groupId,
     input.moduleScheduleIds,
+    input.city,
   )
   return { user, password, isExisting, enrollmentId, group }
 }
@@ -335,6 +360,16 @@ function mapStudentCreationError(err: unknown): CreateStudentResult | null {
   if (err instanceof GroupNotFoundError) {
     return { success: false, error: 'Grupa nije pronađena.' }
   }
+  if (err instanceof GroupCityMismatchError) {
+    return { success: false, error: 'Odabrana grupa je u drugom gradu.' }
+  }
+  if (err instanceof CrossCityStudentError) {
+    return {
+      success: false,
+      error:
+        'Dijete s ovim podacima već postoji u drugom gradu. Obratite se vlasniku udruge za ručno rješavanje.',
+    }
+  }
   return null
 }
 
@@ -343,15 +378,19 @@ export async function createStudentFromInquiry(
   groupId: string,
   moduleScheduleIds?: string[],
 ): Promise<CreateStudentResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = createStudentSchema.safeParse({ inquiryId, groupId })
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
   // Pre-flight status check so we can return a clean error without spinning
   // up a transaction. The tx body re-checks under serializable isolation.
+  // Cross-city inquiries read as nonexistent — this is a dialog-driven action,
+  // so it keeps the error-result contract instead of throwing notFound().
   const inquiryPreview = await db.inquiry.findUnique({ where: { id: inquiryId } })
-  if (!inquiryPreview) return { success: false, error: 'Upit nije pronađen.' }
+  if (!inquiryPreview || inquiryPreview.city !== city) {
+    return { success: false, error: 'Upit nije pronađen.' }
+  }
   if (inquiryPreview.status === 'ACCOUNT_CREATED') {
     return { success: false, error: 'Račun je već stvoren za ovaj upit.' }
   }
@@ -390,6 +429,10 @@ export async function createStudentFromInquiry(
       })
 
       const created = await createStudentCore(tx, {
+        // The new account belongs to the inquiry's city (=== admin's city per
+        // the pre-flight city check above); ensureEnrollment rejects a group
+        // from the other city before any enrollment/backfill is written.
+        city: fresh.city,
         firstName: fresh.childFirstName,
         lastName: fresh.childLastName,
         dateOfBirth: fresh.childDateOfBirth,
@@ -520,7 +563,7 @@ async function sendInquiryCredentialsEmail(
 export async function createStudentManually(
   input: CreateStudentManuallyInput,
 ): Promise<CreateStudentResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = createStudentManuallySchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
@@ -535,6 +578,7 @@ export async function createStudentManually(
   try {
     core = await runWithGroupCapacityGuard((tx) =>
       createStudentCore(tx, {
+        city,
         firstName: data.firstName,
         lastName: data.lastName,
         dateOfBirth: data.dateOfBirth ?? null,
@@ -596,24 +640,29 @@ export async function createStudentManually(
 export async function addEnrollment(
   input: AddEnrollmentInput,
 ): Promise<AdminActionResult & { enrollmentId?: string }> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = addEnrollmentSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
   const { studentId, groupId, moduleScheduleIds } = parsed.data
 
   // Lightweight pre-flight reads outside the tx for clean error mapping.
+  // Cross-city rows answer exactly like nonexistent ones.
   const student = await db.user.findUnique({
     where: { id: studentId, role: 'STUDENT' },
-    select: { id: true },
+    select: { id: true, city: true },
   })
-  if (!student) return { success: false, error: 'Učenik nije pronađen.' }
+  if (!student || student.city !== city) {
+    return { success: false, error: 'Učenik nije pronađen.' }
+  }
 
   const groupPreview = await db.scheduledGroup.findUnique({
     where: { id: groupId },
-    select: { id: true, schoolYear: true },
+    select: { id: true, schoolYear: true, city: true },
   })
-  if (!groupPreview) return { success: false, error: 'Grupa nije pronađena.' }
+  if (!groupPreview || groupPreview.city !== city) {
+    return { success: false, error: 'Grupa nije pronađena.' }
+  }
 
   const archived = archivedYearError(groupPreview.schoolYear)
   if (archived) return archived
@@ -621,7 +670,7 @@ export async function addEnrollment(
   let enrollmentId: string
   try {
     enrollmentId = await runWithGroupCapacityGuard(async (tx) => {
-      const { enrollmentId: id } = await ensureEnrollment(tx, studentId, groupId, moduleScheduleIds)
+      const { enrollmentId: id } = await ensureEnrollment(tx, studentId, groupId, moduleScheduleIds, city)
       return id
     })
   } catch (err) {
@@ -645,8 +694,16 @@ export async function removeModuleEnrollment(
   moduleEnrollmentId: string,
   studentId: string,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   if (!moduleEnrollmentId) return { success: false, error: 'ID nije pronađen.' }
+
+  const row = await db.moduleEnrollment.findUnique({
+    where: { id: moduleEnrollmentId },
+    select: { enrollment: { select: { scheduledGroup: { select: { city: true } } } } },
+  })
+  if (!row || row.enrollment.scheduledGroup.city !== city) {
+    return { success: false, error: 'Upis u modul nije pronađen.' }
+  }
 
   try {
     await db.moduleEnrollment.delete({ where: { id: moduleEnrollmentId } })
@@ -673,7 +730,7 @@ type StudentFilters = {
 export async function getStudents(
   filters: StudentFilters = {},
 ): Promise<PaginatedResult<StudentRow>> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const { search, courseId, groupId, scheduleId, schoolYear, paymentStatus, page = 1, pageSize = 20 } = filters
 
@@ -682,6 +739,7 @@ export async function getStudents(
 
   const where = {
     role: 'STUDENT' as const,
+    city,
     ...(search
       ? {
           OR: [
@@ -758,21 +816,24 @@ export async function getStudents(
 }
 
 export async function getStudent(id: string) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
+  await assertUserInCity(id, city)
   return buildStudentDetailForAdmin(id)
 }
 
 export async function deleteEnrollment(enrollmentId: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!enrollmentId) return { success: false, error: 'ID nije pronađen.' }
 
   try {
     const enrollment = await db.enrollment.findUnique({
       where: { id: enrollmentId },
-      select: { userId: true },
+      select: { userId: true, scheduledGroup: { select: { city: true } } },
     })
-    if (!enrollment) return { success: false, error: 'Upis nije pronađen.' }
+    if (!enrollment || enrollment.scheduledGroup.city !== city) {
+      return { success: false, error: 'Upis nije pronađen.' }
+    }
 
     await db.enrollment.delete({ where: { id: enrollmentId } })
 
@@ -786,9 +847,10 @@ export async function deleteEnrollment(enrollmentId: string): Promise<AdminActio
 }
 
 export async function deleteStudent(studentId: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!studentId) return { success: false, error: 'ID nije pronađen.' }
+  await assertUserInCity(studentId, city)
 
   try {
     await db.$transaction(async (tx) => {

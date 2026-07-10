@@ -16,12 +16,19 @@ export async function setModulePaid(
   moduleEnrollmentId: string,
   paid: boolean,
 ): Promise<AdminActionResult> {
-  return adminAction(setModulePaidSchema, { moduleEnrollmentId, paid }, async (d) => {
+  return adminAction(setModulePaidSchema, { moduleEnrollmentId, paid }, async (d, { city }) => {
     const row = await db.moduleEnrollment.findUnique({
       where: { id: d.moduleEnrollmentId },
-      select: { enrollment: { select: { userId: true } } },
+      select: {
+        enrollment: {
+          select: { userId: true, scheduledGroup: { select: { city: true } } },
+        },
+      },
     })
-    if (!row) return { success: false, error: 'Upis u modul nije pronađen.' }
+    // Cross-city rows answer exactly like nonexistent ones.
+    if (!row || row.enrollment.scheduledGroup.city !== city) {
+      return { success: false, error: 'Upis u modul nije pronađen.' }
+    }
 
     try {
       await db.moduleEnrollment.update({
@@ -43,12 +50,14 @@ export async function setEnrollmentYearPaid(
   enrollmentId: string,
   paid: boolean,
 ): Promise<AdminActionResult> {
-  return adminAction(setEnrollmentYearPaidSchema, { enrollmentId, paid }, async (d) => {
+  return adminAction(setEnrollmentYearPaidSchema, { enrollmentId, paid }, async (d, { city }) => {
     const row = await db.enrollment.findUnique({
       where: { id: d.enrollmentId },
-      select: { userId: true },
+      select: { userId: true, scheduledGroup: { select: { city: true } } },
     })
-    if (!row) return { success: false, error: 'Upis nije pronađen.' }
+    if (!row || row.scheduledGroup.city !== city) {
+      return { success: false, error: 'Upis nije pronađen.' }
+    }
 
     try {
       await db.enrollment.update({

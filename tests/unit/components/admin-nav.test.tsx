@@ -18,6 +18,7 @@ vi.mock('@/actions/logout', () => ({ logoutAction: vi.fn() }))
 
 const baseProps = {
   userName: 'Admin',
+  cityLabel: 'Split',
   years: ['2025/2026'],
   selectedYear: '2025/2026',
   currentYear: '2025/2026',

@@ -1,11 +1,13 @@
 'use server'
 
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
+import { assertUserInCity } from '@/lib/city-guard'
 import { buildStudentAttendanceHistory } from '@/lib/student-attendance'
 
 export type { StudentAttendanceEnrollment } from '@/lib/student-attendance'
 
 export async function getStudentAttendance(studentId: string) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
+  await assertUserInCity(studentId, city)
   return buildStudentAttendanceHistory(studentId)
 }

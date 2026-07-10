@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { getStudents } from '@/actions/admin/student'
 import { getCourses } from '@/actions/admin/course'
@@ -20,7 +20,7 @@ interface PageProps {
 }
 
 export default async function StudentsPage({ searchParams }: Readonly<PageProps>) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const params = await searchParams
   const search = params.search ?? ''
@@ -50,8 +50,8 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
     isModuleView ? Promise.resolve([]) : getCourses(),
     isModuleView ? Promise.resolve([]) : getGroups(groupFilter),
     scheduleId
-      ? db.moduleSchedule.findUnique({
-          where: { id: scheduleId },
+      ? db.moduleSchedule.findFirst({
+          where: { id: scheduleId, city },
           select: {
             schoolYear: true,
             module: { select: { title: true, course: { select: { title: true } } } },

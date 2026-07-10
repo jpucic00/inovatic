@@ -115,12 +115,17 @@ function PlanningWarning() {
   )
 }
 
-function UserFooter({ userName }: Readonly<{ userName: string }>) {
+function UserFooter({ userName, cityLabel }: Readonly<{ userName: string; cityLabel: string }>) {
   return (
     <div className="px-3 py-3 border-t border-gray-800">
       <div className="px-2 mb-3">
         <p className="text-xs text-gray-500 truncate">{userName}</p>
-        <p className="text-xs text-gray-600">Administrator</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs text-gray-600">Administrator</p>
+          <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
+            {cityLabel}
+          </span>
+        </div>
       </div>
       <form action={logoutAction}>
         <button
@@ -137,6 +142,7 @@ function UserFooter({ userName }: Readonly<{ userName: string }>) {
 
 interface AdminNavProps {
   userName: string
+  cityLabel: string
   years: string[]
   selectedYear: string
   currentYear: string
@@ -145,6 +151,7 @@ interface AdminNavProps {
 
 export function AdminDesktopSidebar({
   userName,
+  cityLabel,
   years,
   selectedYear,
   currentYear,
@@ -161,13 +168,14 @@ export function AdminDesktopSidebar({
       <nav className="flex-1 py-4 px-2">
         <NavLinks pathname={pathname} calendarNeedsPlanning={calendarNeedsPlanning} />
       </nav>
-      <UserFooter userName={userName} />
+      <UserFooter userName={userName} cityLabel={cityLabel} />
     </aside>
   )
 }
 
 export function AdminMobileNav({
   userName,
+  cityLabel,
   years,
   selectedYear,
   currentYear,
@@ -215,7 +223,7 @@ export function AdminMobileNav({
               onNavigate={() => setIsOpen(false)}
             />
           </div>
-          <UserFooter userName={userName} />
+          <UserFooter userName={userName} cityLabel={cityLabel} />
         </dialog>
       )}
     </>

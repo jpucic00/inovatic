@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Inbox, Users, CalendarDays, GraduationCap } from 'lucide-react'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { StatCard } from '@/components/admin/stat-card'
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 }
 
 export default async function AdminDashboard() {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   const schoolYear = await getSelectedSchoolYear()
 
   const [
@@ -27,12 +27,12 @@ export default async function AdminDashboard() {
     db.inquiry.groupBy({
       by: ['status'],
       _count: { status: true },
-      where: { schoolYear },
+      where: { schoolYear, city },
     }),
-    db.user.count({ where: { role: 'STUDENT' } }),
-    db.scheduledGroup.count({ where: { schoolYear } }),
+    db.user.count({ where: { role: 'STUDENT', city } }),
+    db.scheduledGroup.count({ where: { schoolYear, city } }),
     db.inquiry.findMany({
-      where: { schoolYear },
+      where: { schoolYear, city },
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: {
@@ -45,12 +45,14 @@ export default async function AdminDashboard() {
         studentId: true,
         status: true,
         createdAt: true,
+        // flagReturningInquiries compares each row's city against its matches.
+        city: true,
       },
     }),
     db.inquiry.groupBy({
       by: ['referralSource'],
       _count: { referralSource: true },
-      where: { schoolYear, referralSource: { not: null } },
+      where: { schoolYear, city, referralSource: { not: null } },
       orderBy: { _count: { referralSource: 'desc' } },
       take: 5,
     }),

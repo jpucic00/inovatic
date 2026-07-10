@@ -16,6 +16,12 @@ type ChildIdentity = {
  * Prisma `where` that matches the single existing STUDENT for this identity, or
  * `null` when DOB is missing — name alone is never enough to assert identity, so
  * a DOB-less identity intentionally matches nobody.
+ *
+ * Matching is intentionally GLOBAL across cities (owner decision 2026-07-10):
+ * the same child must never get a second account in the other city. Callers
+ * that act on a match are responsible for the cross-city handling — reuse is
+ * blocked with an escalation error and the match is surfaced only in masked
+ * form, never with the other city's credentials or history.
  */
 export function studentIdentityWhere(
   identity: ChildIdentity,

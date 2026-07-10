@@ -1,7 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import { createCourseSchema } from '@/lib/validators/admin/course'
 import type { CreateCourseInput } from '@/lib/validators/admin/course'
@@ -10,14 +10,18 @@ import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { archivedYearError } from '@/lib/school-year-guard'
 
 export async function getCourses() {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
   const year = await getSelectedSchoolYear()
 
   return db.course.findMany({
-    // Standard SLR courses are global (schoolYear = null) and always appear.
-    // Radionice are year-scoped — only those stamped with the selected year.
+    // Standard SLR courses are global (schoolYear/city = null) and always
+    // appear. Radionice are year- and city-scoped — only those stamped with
+    // the selected year and the admin's own city.
     where: {
-      OR: [{ isCustom: false }, { schoolYear: year }],
+      AND: [
+        { OR: [{ isCustom: false }, { schoolYear: year }] },
+        { OR: [{ city: null }, { city }] },
+      ],
     },
     orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
     select: {
@@ -36,7 +40,8 @@ export async function getCourses() {
       isCustom: true,
       createdAt: true,
       updatedAt: true,
-      _count: { select: { scheduledGroups: true } },
+      // Shared standard courses have groups in both cities — count own only.
+      _count: { select: { scheduledGroups: { where: { city } } } },
       modules: {
         orderBy: { sortOrder: 'asc' },
         select: {
@@ -44,7 +49,7 @@ export async function getCourses() {
           title: true,
           sortOrder: true,
           schedules: {
-            where: { schoolYear: year },
+            where: { schoolYear: year, city },
             select: {
               id: true,
               startDate: true,
@@ -61,7 +66,7 @@ export async function getCourses() {
 }
 
 export async function createCourse(data: CreateCourseInput): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const year = await getSelectedSchoolYear()
   const archived = archivedYearError(year)
@@ -96,6 +101,9 @@ export async function createCourse(data: CreateCourseInput): Promise<AdminAction
         imageUrl: imageUrl || null,
         isCustom: true,
         schoolYear: year,
+        // Radionice are venue-bound: owned by the creating admin's city
+        // (standard SLR programs stay city: null = shared catalog).
+        city,
         sortOrder: 99,
       },
     })
@@ -109,7 +117,7 @@ export async function createCourse(data: CreateCourseInput): Promise<AdminAction
 }
 
 export async function deleteCourse(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!id) return { success: false, error: 'ID nije pronađen.' }
 
@@ -118,11 +126,15 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
       where: { id },
       select: {
         isCustom: true,
+        city: true,
         _count: { select: { materials: true } },
         modules: { select: { _count: { select: { materials: true } } } },
       },
     })
-    if (!course) return { success: false, error: 'Program nije pronađen.' }
+    // Cross-city radionice read as nonexistent — same message as a missing id.
+    if (!course || (course.city !== null && course.city !== city)) {
+      return { success: false, error: 'Program nije pronađen.' }
+    }
     if (!course.isCustom) return { success: false, error: 'Standardni SLR programi se ne mogu brisati.' }
 
     const moduleMaterialCount = course.modules.reduce((sum, m) => sum + m._count.materials, 0)

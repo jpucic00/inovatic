@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, MapPin } from 'lucide-react'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
 import { getGroupDetail } from '@/actions/admin/group'
 import { getAssignableTeachers } from '@/actions/admin/teacher'
 import { db } from '@/lib/db'
@@ -22,17 +22,20 @@ interface PageProps {
 }
 
 export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const { id } = await params
   const [group, allTeachers, courses, locations] = await Promise.all([
     getGroupDetail(id),
     getAssignableTeachers(),
     db.course.findMany({
+      // Shared standard programs (city = null) plus own-city radionice.
+      where: { OR: [{ city: null }, { city }] },
       orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }],
       select: { id: true, title: true, isCustom: true },
     }),
     db.location.findMany({
+      where: { city },
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     }),

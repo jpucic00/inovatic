@@ -1,7 +1,8 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
+import { assertGroupInCity, assertUserInCity } from '@/lib/city-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import { createCommentSchema } from '@/lib/validators/admin/student-comment'
@@ -14,13 +15,17 @@ export async function createComment(data: {
   type?: 'COMMENT' | 'MODULE_REVIEW'
   moduleId?: string
 }): Promise<AdminActionResult> {
-  const session = await requireAdmin()
+  const { session, city } = await requireAdminCtx()
 
   const parsed = createCommentSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
   const authorId = session.user.id
   if (!authorId) return { success: false, error: 'Neautorizirano.' }
+
+  // Cross-city targets 404 like nonexistent ids — city comes from the session only.
+  await assertGroupInCity(parsed.data.groupId, city)
+  await assertUserInCity(parsed.data.studentId, city)
 
   try {
     await insertStudentComment(
@@ -41,17 +46,20 @@ export async function createComment(data: {
 }
 
 export async function deleteComment(commentId: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!commentId) return { success: false, error: 'ID nije pronađen.' }
 
-  try {
-    const comment = await db.studentComment.findUnique({
-      where: { id: commentId },
-      select: { studentId: true, groupId: true },
-    })
-    if (!comment) return { success: false, error: 'Komentar nije pronađen.' }
+  const comment = await db.studentComment.findUnique({
+    where: { id: commentId },
+    select: { studentId: true, groupId: true },
+  })
+  if (!comment) return { success: false, error: 'Komentar nije pronađen.' }
 
+  // Outside the try so the cross-city notFound() isn't swallowed by the catch.
+  await assertGroupInCity(comment.groupId, city)
+
+  try {
     await db.studentComment.delete({ where: { id: commentId } })
 
     revalidatePath(`/admin/ucenici/${comment.studentId}`)

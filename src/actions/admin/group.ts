@@ -1,7 +1,9 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdminCtx } from '@/lib/auth-guard'
+import { assertGroupInCity } from '@/lib/city-guard'
+import type { City } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { createGroupSchema, updateGroupSchema } from '@/lib/validators/admin/group'
 import type { CreateGroupInput, UpdateGroupInput } from '@/lib/validators/admin/group'
@@ -16,12 +18,13 @@ type GroupFilters = {
 }
 
 export async function getGroups(filters: GroupFilters = {}) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const year = await getSelectedSchoolYear()
 
   const where = {
     schoolYear: year,
+    city,
     ...(filters.courseId ? { courseId: filters.courseId } : {}),
     ...(filters.locationId ? { locationId: filters.locationId } : {}),
   }
@@ -36,8 +39,9 @@ export async function getGroups(filters: GroupFilters = {}) {
           title: true,
           level: true,
           isCustom: true,
+          // Windows are per (course, schoolYear, city) — only this city's.
           enrollmentWindows: {
-            where: { schoolYear: year },
+            where: { schoolYear: year, city },
             select: { enrollmentStart: true, enrollmentEnd: true },
           },
         },
@@ -71,7 +75,8 @@ export async function getGroups(filters: GroupFilters = {}) {
 }
 
 export async function getGroupDetail(id: string) {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
+  await assertGroupInCity(id, city)
 
   // First get the group's school year to filter module schedules
   const groupMeta = await db.scheduledGroup.findUnique({
@@ -86,7 +91,7 @@ export async function getGroupDetail(id: string) {
       course: {
         include: {
           enrollmentWindows: {
-            where: { schoolYear: year },
+            where: { schoolYear: year, city },
             select: { enrollmentStart: true, enrollmentEnd: true },
           },
           modules: {
@@ -95,8 +100,9 @@ export async function getGroupDetail(id: string) {
               id: true,
               title: true,
               sortOrder: true,
+              // Module dates are planned per city — show this city's only.
               schedules: {
-                where: { schoolYear: year },
+                where: { schoolYear: year, city },
                 select: { id: true, startDate: true, endDate: true },
               },
             },
@@ -129,8 +135,30 @@ export async function getGroupDetail(id: string) {
   })
 }
 
+// The teacher pickers only offer own-city staff, but teacherIds arrive as raw
+// ids and land in a createMany — re-verify server-side that every assignee is
+// an active TEACHER/ADMIN from the group's own city.
+async function invalidAssigneesError(
+  teacherIds: string[],
+  city: City,
+): Promise<AdminActionResult | null> {
+  const distinct = [...new Set(teacherIds)]
+  const valid = await db.user.count({
+    where: {
+      id: { in: distinct },
+      role: { in: ['TEACHER', 'ADMIN'] },
+      city,
+      deletedAt: null,
+    },
+  })
+  if (valid !== distinct.length) {
+    return { success: false, error: 'Neki od odabranih voditelja ne postoje ili ne pripadaju vašem gradu.' }
+  }
+  return null
+}
+
 export async function createGroup(data: CreateGroupInput): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = createGroupSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
@@ -159,10 +187,30 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
   // attaching a stale radionica from another school year.
   const course = await db.course.findUnique({
     where: { id: courseId },
-    select: { isCustom: true, schoolYear: true },
+    select: { isCustom: true, schoolYear: true, city: true },
   })
   if (!course || (course.isCustom && course.schoolYear !== schoolYear)) {
     return { success: false, error: 'Odabrani program ne pripada ovoj školskoj godini.' }
+  }
+  // Shared standard programs (city = null) are open to both cities; a
+  // radionica is venue-bound and must belong to the admin's own city.
+  if (course.city && course.city !== city) {
+    return { success: false, error: 'Odabrani program ne pripada vašem gradu.' }
+  }
+
+  // Friendly pre-check of the composite (locationId, city) FK: the venue must
+  // exist and sit in the admin's own city; the group inherits that city.
+  const location = await db.location.findUnique({
+    where: { id: locationId },
+    select: { city: true },
+  })
+  if (!location || location.city !== city) {
+    return { success: false, error: 'Odabrana lokacija ne pripada vašem gradu.' }
+  }
+
+  if (teacherIds && teacherIds.length > 0) {
+    const invalid = await invalidAssigneesError(teacherIds, city)
+    if (invalid) return invalid
   }
 
   try {
@@ -179,8 +227,7 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
           endTime,
           schoolYear,
           maxStudents: maxStudents ?? 12,
-          // TODO(city PR3): derive from the validated location's city
-          city: 'SPLIT',
+          city: location.city,
         },
       })
 
@@ -234,15 +281,44 @@ async function syncTeacherAssignments(
 }
 
 export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   const parsed = updateGroupSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
   const { id, courseId, locationId, name, dateStart, dateEnd, dayOfWeek, startTime, endTime, maxStudents, teacherIds } = parsed.data
 
+  await assertGroupInCity(id, city)
+
   const blocked = await archivedGroupError(id)
   if (blocked) return blocked
+
+  // A group's city is fixed at creation (mirrors the composite (locationId,
+  // city) FK): moving it to the other city's venue is not a thing.
+  if (locationId !== undefined) {
+    const location = await db.location.findUnique({
+      where: { id: locationId },
+      select: { city: true },
+    })
+    if (!location || location.city !== city) {
+      return { success: false, error: 'Odabrana lokacija ne pripada vašem gradu.' }
+    }
+  }
+
+  if (courseId !== undefined) {
+    const course = await db.course.findUnique({
+      where: { id: courseId },
+      select: { city: true },
+    })
+    if (!course || (course.city && course.city !== city)) {
+      return { success: false, error: 'Odabrani program ne pripada vašem gradu.' }
+    }
+  }
+
+  if (teacherIds !== undefined && teacherIds.length > 0) {
+    const invalid = await invalidAssigneesError(teacherIds, city)
+    if (invalid) return invalid
+  }
 
   try {
     await db.$transaction(async (tx) => {
@@ -276,9 +352,11 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
 }
 
 export async function deleteGroup(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!id) return { success: false, error: 'ID nije pronađen.' }
+
+  await assertGroupInCity(id, city)
 
   try {
     const group = await db.scheduledGroup.findUnique({

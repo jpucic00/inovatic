@@ -1,13 +1,13 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth-guard'
+import { requireAdmin, requireAdminCtx } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import { archivedYearError } from '@/lib/school-year-guard'
 
 export async function deleteModuleEnrollment(id: string): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!id) return { success: false, error: 'ID nije pronađen.' }
 
@@ -15,10 +15,19 @@ export async function deleteModuleEnrollment(id: string): Promise<AdminActionRes
     const moduleEnrollment = await db.moduleEnrollment.findUnique({
       where: { id },
       select: {
-        enrollment: { select: { scheduledGroupId: true, schoolYear: true } },
+        enrollment: {
+          select: {
+            scheduledGroupId: true,
+            schoolYear: true,
+            scheduledGroup: { select: { city: true } },
+          },
+        },
       },
     })
-    if (!moduleEnrollment) return { success: false, error: 'Upis u modul nije pronađen.' }
+    // Cross-city rows answer exactly like nonexistent ones.
+    if (!moduleEnrollment || moduleEnrollment.enrollment.scheduledGroup.city !== city) {
+      return { success: false, error: 'Upis u modul nije pronađen.' }
+    }
 
     const blocked = archivedYearError(moduleEnrollment.enrollment.schoolYear)
     if (blocked) return blocked
@@ -83,7 +92,7 @@ export async function addModuleEnrollment(
   enrollmentId: string,
   moduleScheduleId: string,
 ): Promise<AdminActionResult> {
-  await requireAdmin()
+  const { city } = await requireAdminCtx()
 
   if (!enrollmentId || !moduleScheduleId) {
     return { success: false, error: 'Enrollment ID i modul su obavezni.' }
@@ -92,9 +101,11 @@ export async function addModuleEnrollment(
   try {
     const enrollment = await db.enrollment.findUnique({
       where: { id: enrollmentId },
-      select: { schoolYear: true },
+      select: { schoolYear: true, scheduledGroup: { select: { city: true } } },
     })
-    if (!enrollment) return { success: false, error: 'Upis nije pronađen.' }
+    if (!enrollment || enrollment.scheduledGroup.city !== city) {
+      return { success: false, error: 'Upis nije pronađen.' }
+    }
 
     const blocked = archivedYearError(enrollment.schoolYear)
     if (blocked) return blocked
