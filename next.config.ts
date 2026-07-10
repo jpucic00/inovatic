@@ -7,6 +7,13 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'res.cloudinary.com' },
     ],
   },
+  async redirects() {
+    // /kontakt was split into per-city pages under /lokacije. Keep the old URL
+    // working (already-sent emails, external inbound links) with a permanent 308.
+    return [
+      { source: '/kontakt', destination: '/lokacije', permanent: true },
+    ]
+  },
 }
 
 export default nextConfig

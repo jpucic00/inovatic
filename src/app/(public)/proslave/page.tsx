@@ -189,8 +189,8 @@ export default function CelebrationsPage() {
               099 393 6993
             </a>{' '}
             ·{' '}
-            <Link href="/kontakt" className="text-cyan-600 font-medium hover:underline">
-              Kontakt informacije
+            <Link href="/lokacije" className="text-cyan-600 font-medium hover:underline">
+              Lokacije i kontakt
             </Link>
           </p>
         </div>

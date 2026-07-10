@@ -4,7 +4,7 @@ import { BASE } from './shared'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // NAVIGATION
 // Ensures the main navigation bar contains links to all key public routes:
-// /programi, /o-nama, /novosti, /kontakt, /upisi, /proslave.
+// /programi, /o-nama, /novosti, /lokacije (+ Split/Šibenik dropdown), /upisi.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 test.describe('Navigation — Main menu links to all public sections', () => {
@@ -23,7 +23,9 @@ test.describe('Navigation — Main menu links to all public sections', () => {
       }
     })
 
-    const expectedRoutes = ['/programi', '/o-nama', '/novosti', '/kontakt', '/upisi']
+    // Includes the "Lokacije" parent plus its dropdown children (Split / Šibenik),
+    // which render in the DOM even before hover (opacity-based reveal).
+    const expectedRoutes = ['/programi', '/o-nama', '/novosti', '/lokacije', '/lokacije/split', '/lokacije/sibenik', '/upisi']
     await test.step(`Verify all expected routes are present: ${expectedRoutes.join(', ')}`, async () => {
       for (const route of expectedRoutes) {
         const found = hrefs.some(h => h.includes(route))

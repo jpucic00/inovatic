@@ -10,6 +10,8 @@ export const ALL_PAGES = [
   { path: '/o-nama', name: 'About page' },
   { path: '/novosti', name: 'News listing' },
   { path: '/upisi', name: 'Inquiry form' },
-  { path: '/kontakt', name: 'Contact page' },
+  { path: '/lokacije', name: 'Locations overview' },
+  { path: '/lokacije/split', name: 'Split location page' },
+  { path: '/lokacije/sibenik', name: 'Šibenik location page' },
   { path: '/proslave', name: 'Birthday parties' },
 ]
