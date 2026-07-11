@@ -17,6 +17,7 @@ const navLinks: NavItem[] = [
   { href: '/proslave', label: 'Proslave' },
   { href: '/novosti', label: 'Novosti' },
   { href: '/o-nama', label: 'O nama' },
+  { href: '/donacije', label: 'Donacije' },
   {
     href: '/lokacije',
     label: 'Lokacije',
