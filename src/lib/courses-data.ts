@@ -39,23 +39,23 @@ export const courses: Course[] = [
     description:
       'Program Svijet LEGO robotike 1 prvi je stupanj našeg edukacijskog kurikuluma robotike i namijenjen je djeci koja tek ulaze u svijet tehnologije, robotike i programiranja. Program je prilagođen uzrastu od 6 do 8 godina, uključujući i predškolce koji pokazuju interes za tehniku i kreativno stvaranje.\n\n' +
       'Kroz igru, kreativne projekte i praktičan rad polaznici otkrivaju kako nastaju roboti te kako ih samostalno izgraditi i programirati.\n\n' +
-      'Korištenjem LEGO WeDo 2.0 edukacijskih setova i WeDo blokovskog programskog sučelja, djeca razvijaju osnovne STEM vještine poput logičkog razmišljanja, rješavanja problema, kreativnosti i timskog rada. Vizualno programsko okruženje temeljeno na blokovima omogućuje djeci da na jednostavan i intuitivan način razumiju osnovne principe programiranja.\n\n' +
+      'Korištenjem LEGO SPIKE Essential edukacijskih setova i LEGO Education SPIKE programskog okruženja, djeca razvijaju osnovne STEM vještine poput logičkog razmišljanja, rješavanja problema, kreativnosti i timskog rada. Vizualno programsko okruženje temeljeno na blokovima omogućuje djeci da na jednostavan i intuitivan način razumiju osnovne principe programiranja.\n\n' +
       'Svaki projekt potiče djecu na istraživanje i eksperimentiranje te im pomaže razumjeti kako tehnologija funkcionira u stvarnom svijetu.\n\n' +
       'Program se sastoji od 16 zanimljivih robotičkih projekata raspoređenih u četiri tematska modula. Kroz njih djeca uče kako izgraditi robota, kako ga programirati te kako povezati robotiku s pojavama i sustavima koji nas svakodnevno okružuju.\n\n' +
       'Radionice su osmišljene tako da djeca uče kroz praksu i zabavu, a svaki završeni projekt donosi osjećaj uspjeha i dodatnu motivaciju za daljnje istraživanje tehnologije.\n\n' +
       'Po završetku programa polaznici mogu nastaviti svoje učenje u naprednijem programu Svijet LEGO robotike 2.',
     ageMin: 6,
     ageMax: 8,
-    equipment: 'LEGO WeDo 2.0',
-    tools: 'WeDo ikone',
+    equipment: 'LEGO SPIKE Essential',
+    tools: 'SPIKE Essential ikone',
     priceYear: 400,
     priceModule: 110,
     hours: 56,
     sessionDuration: 90,
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
-    groupSize: 8,
-    coverImage: '/images/courses/slr-1/cover.jpg',
+    groupSize: 10,
+    coverImage: '/images/courses/slr-1/cover.webp',
     modules: [
       {
         title: 'Zabavni sustavi 1.0',
@@ -122,8 +122,8 @@ export const courses: Course[] = [
     sessionDuration: 90,
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
-    groupSize: 8,
-    coverImage: '/images/courses/slr-2/cover.jpg',
+    groupSize: 10,
+    coverImage: '/images/courses/slr-2/cover.webp',
     modules: [
       {
         title: 'Zabavni sustavi 2.0',
@@ -189,8 +189,8 @@ export const courses: Course[] = [
     sessionDuration: 90,
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
-    groupSize: 8,
-    coverImage: '/images/courses/slr-3/cover.jpg',
+    groupSize: 10,
+    coverImage: '/images/courses/slr-3/cover.webp',
     modules: [
       {
         title: 'Zabavni sustavi 3.0',
@@ -256,8 +256,8 @@ export const courses: Course[] = [
     sessionDuration: 90,
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
-    groupSize: 8,
-    coverImage: '/images/courses/slr-4/cover.jpg',
+    groupSize: 10,
+    coverImage: '/images/courses/slr-4/cover.webp',
     modules: [
       {
         title: 'Zabavni sustavi 4.0',

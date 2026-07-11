@@ -88,7 +88,7 @@ const statCards = [
   { value: '2014.', label: 'Osnivanje', icon: BookOpen, bg: 'bg-cyan-50', border: 'border-cyan-200', color: 'text-cyan-600' },
   { value: '4', label: 'Razine programa', icon: Trophy, bg: 'bg-yellow-50', border: 'border-yellow-200', color: 'text-yellow-600' },
   { value: '3', label: 'Lokacije u 2 grada', icon: MapPin, bg: 'bg-emerald-50', border: 'border-emerald-200', color: 'text-emerald-600' },
-  { value: '≤ 8', label: 'Djece po grupi', icon: Users, bg: 'bg-purple-50', border: 'border-purple-200', color: 'text-purple-600' },
+  { value: '≤ 10', label: 'Djece po grupi', icon: Users, bg: 'bg-purple-50', border: 'border-purple-200', color: 'text-purple-600' },
 ]
 
 export default function AboutPage() {
@@ -132,7 +132,7 @@ export default function AboutPage() {
                   eksperimentirati, griješiti i učiti iz pogrešaka.
                 </p>
                 <p>
-                  S malim grupama (do 8 polaznika), stručnim robo trenerima i strukturiranim
+                  S malim grupama (do 10 polaznika), stručnim robo trenerima i strukturiranim
                   programom u 4 razine, pratimo svako dijete individualno i poticemo ga da razvije
                   vlastiti potencijal.
                 </p>

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Clock, Users, Calendar, Wrench, CheckCircle, Euro } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Clock, Users, Calendar, Wrench, CheckCircle, Sparkles } from 'lucide-react'
 import { courses, getCourseBySlug } from '@/lib/courses-data'
 
 export function generateStaticParams() {
@@ -27,6 +27,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
     alternates: { canonical: `https://udruga-inovatic.hr/programi/${slug}` },
   }
+}
+
+function ProbniSatCallout({ className = '' }: { readonly className?: string }) {
+  return (
+    <div className={`flex items-start gap-4 rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 to-yellow-50 p-5 ${className}`}>
+      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-cyan-500 text-white">
+        <Sparkles className="h-5 w-5" />
+      </div>
+      <div>
+        <h3 className="font-bold text-gray-900">Probni sat</h3>
+        <p className="mt-1 text-sm text-gray-600 leading-relaxed">
+          Prije upisa vaše dijete može doći na probni sat i isprobati program — bez obveze. Za dogovor termina slobodno nam se javite.
+        </p>
+      </div>
+    </div>
+  )
 }
 
 export default async function CourseDetailPage({ params }: PageProps) {
@@ -77,24 +93,28 @@ export default async function CourseDetailPage({ params }: PageProps) {
           >
             <ArrowLeft className="w-4 h-4" /> Svi programi
           </Link>
-          <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${course.gradient}`}>
+          <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${course.gradient} min-h-[280px] md:min-h-[340px] flex items-center`}>
             <Image
               src={course.coverImage}
               alt={course.title}
               fill
-              className="object-cover object-center scale-90 origin-center"
+              className="object-cover object-center"
               priority
             />
-            <div className={`absolute inset-0 bg-gradient-to-br ${course.gradient} opacity-85`} />
-            <div className="relative px-8 py-12">
-              <span className="text-white/70 text-sm font-semibold uppercase tracking-widest">
+            <div className={`absolute inset-0 bg-gradient-to-br ${course.gradient} opacity-30`} />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/10 to-transparent" />
+            <div className="relative px-8 py-10">
+              <span className="text-white text-sm font-semibold uppercase tracking-widest [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]">
                 Razina {courseIndex + 1} od 4
               </span>
-              <h1 className="text-3xl md:text-5xl font-extrabold text-white mt-1 leading-tight">
+              <h1 className="text-3xl md:text-5xl font-extrabold text-white mt-1 leading-tight [text-shadow:0_2px_12px_rgba(0,0,0,0.65)]">
                 {course.title}
               </h1>
             </div>
           </div>
+
+          {/* Probni sat */}
+          <ProbniSatCallout className="mt-6" />
         </div>
       </section>
 
@@ -121,10 +141,6 @@ export default async function CourseDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-cyan-500" />
               <span><strong className="text-gray-800">{course.season}</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Euro className="w-4 h-4 text-cyan-500" />
-              <span><strong className="text-gray-800">{course.priceYear} EUR</strong> / god.</span>
             </div>
           </div>
         </div>
@@ -199,10 +215,11 @@ export default async function CourseDetailPage({ params }: PageProps) {
                   'Nastava jednom tjedno, 90 minuta',
                   `Korištenje opreme (${course.equipment} + laptop)`,
                   `Alati: ${course.tools}`,
-                  'Mala grupa (do 8 polaznika)',
+                  'Mala grupa (do 10 polaznika)',
                   'Stručni robo treneri',
                   'Diploma o završetku',
                   'Pristup materijalima',
+                  'Probni sat bez obveze',
                 ].map((item) => (
                   <div key={item} className="flex items-center gap-2.5">
                     <CheckCircle className="w-4 h-4 text-cyan-500 flex-shrink-0" />

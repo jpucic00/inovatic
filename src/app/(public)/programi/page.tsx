@@ -83,7 +83,7 @@ export default function ProgramiPage() {
             </div>
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-cyan-500" />
-              <span>Do 8 polaznika po grupi</span>
+              <span>Do 10 polaznika po grupi</span>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-cyan-500" />
@@ -113,7 +113,7 @@ export default function ProgramiPage() {
                       src={course.coverImage}
                       alt={course.title}
                       fill
-                      className="object-cover object-center scale-90 origin-center"
+                      className="object-cover object-center"
                       sizes="(max-width: 768px) 100vw, 224px"
                     />
                     <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent md:bg-gradient-to-t md:from-black/50 md:via-black/10 md:to-transparent flex items-end justify-start p-3">
@@ -225,7 +225,7 @@ export default function ProgramiPage() {
             size={36}
             className="absolute -top-2 right-4 text-yellow-300 opacity-70 pointer-events-none"
           />
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-4">Nije sigurni koji program odabrati?</h2>
+          <h2 className="text-2xl font-extrabold text-gray-900 mb-4">Niste sigurni koji program odabrati?</h2>
           <p className="text-gray-500 mb-6">
             Zainteresirani ste? Provjerite slobodne termine i osigurajte svom djetetu mjesto u jednom od naših programa –
             korak bliže zabavi, učenju i stvaranju!
