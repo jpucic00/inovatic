@@ -53,6 +53,7 @@ async function wipeSibenikTenant() {
   await db.attendance.deleteMany({ where: { enrollment: { scheduledGroup: { city: 'SIBENIK' } } } })
   await db.moduleEnrollment.deleteMany({ where: { enrollment: { scheduledGroup: { city: 'SIBENIK' } } } })
   await db.studentComment.deleteMany({ where: { group: { city: 'SIBENIK' } } })
+  await db.studentAssessment.deleteMany({ where: { group: { city: 'SIBENIK' } } })
   await db.enrollment.deleteMany({ where: { scheduledGroup: { city: 'SIBENIK' } } })
   await db.material.deleteMany({ where: { scheduledGroup: { city: 'SIBENIK' } } })
   await db.galleryImage.deleteMany({ where: { scheduledGroup: { city: 'SIBENIK' } } })

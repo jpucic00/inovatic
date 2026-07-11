@@ -40,6 +40,7 @@ afterEach(async () => {
   await db.moduleEnrollment.deleteMany({})
   await db.enrollment.deleteMany({})
   await db.teacherAssignment.deleteMany({})
+  await db.studentAssessment.deleteMany({})
   await db.moduleSchedule.deleteMany({})
   await db.scheduledGroup.deleteMany({})
   await db.courseModule.deleteMany({})

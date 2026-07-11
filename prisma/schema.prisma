@@ -43,9 +43,16 @@ enum InquiryType {
   PARTY
 }
 
-enum CommentType {
-  COMMENT
-  MODULE_REVIEW
+enum SkillLevel {
+  POCETNO
+  U_RAZVOJU
+  OSTVARENO
+}
+
+enum RecommendationKind {
+  COURSE
+  COMPETITION_PREP
+  COMPETITION_PROGRAM
 }
 
 enum MaterialType {
@@ -90,10 +97,12 @@ model User {
   articles             Article[]
   materials            Material[]
   galleryImages        GalleryImage[]
-  createdFromInquiries Inquiry[]          @relation("CreatedStudent")
-  authoredComments     StudentComment[]   @relation("CommentAuthor")
-  studentComments      StudentComment[]   @relation("CommentStudent")
-  recordedAttendances  Attendance[]       @relation("AttendanceRecorder")
+  createdFromInquiries Inquiry[]           @relation("CreatedStudent")
+  authoredComments     StudentComment[]    @relation("CommentAuthor")
+  studentComments      StudentComment[]    @relation("CommentStudent")
+  studentAssessments   StudentAssessment[] @relation("AssessmentStudent")
+  authoredAssessments  StudentAssessment[] @relation("AssessmentAuthor")
+  recordedAttendances  Attendance[]        @relation("AttendanceRecorder")
   createdHolidays      SchoolYearHoliday[] @relation("HolidayCreator")
 
   @@index([role, city])
@@ -126,6 +135,8 @@ model Course {
   inquiries         Inquiry[]
   materials         Material[]
   enrollmentWindows CourseEnrollmentWindow[]
+
+  recommendedInAssessments StudentAssessment[]
 }
 
 // Per-school-year public signup window for a program. Keyed by
@@ -156,11 +167,10 @@ model CourseModule {
   description String? @db.Text
   sortOrder   Int     @default(0)
 
-  course          Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  schedules       ModuleSchedule[]
-  materials       Material[]
-  galleryImages   GalleryImage[]
-  studentComments StudentComment[]
+  course        Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  schedules     ModuleSchedule[]
+  materials     Material[]
+  galleryImages GalleryImage[]
 }
 
 model ModuleSchedule {
@@ -213,12 +223,12 @@ model SchoolYearHoliday {
 }
 
 model Location {
-  id       String  @id @default(cuid())
-  name     String
-  address  String
-  phone    String?
-  email    String?
-  city     City
+  id      String  @id @default(cuid())
+  name    String
+  address String
+  phone   String?
+  email   String?
+  city    City
 
   scheduledGroups ScheduledGroup[]
 
@@ -229,37 +239,38 @@ model Location {
 }
 
 model ScheduledGroup {
-  id              String    @id @default(cuid())
-  courseId        String
-  locationId      String
+  id          String   @id @default(cuid())
+  courseId    String
+  locationId  String
   // Denormalized from the venue (stamped server-side at create; cross-city
   // location moves are rejected). The composite FK below makes drift from
   // Location.city impossible at the DB level.
-  city            City
-  name            String?
+  city        City
+  name        String?
   // For radionice (Course.isCustom = true): closed YYYY-MM-DD range — the group runs every day in
   // [dateStart, dateEnd] at the same startTime/endTime. For standard programs both are null and
   // `dayOfWeek` is used instead.
-  dateStart       String?
-  dateEnd         String?
-  dayOfWeek       String?
-  startTime       String?
-  endTime         String?
-  schoolYear      String
-  maxStudents     Int       @default(12)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  dateStart   String?
+  dateEnd     String?
+  dayOfWeek   String?
+  startTime   String?
+  endTime     String?
+  schoolYear  String
+  maxStudents Int      @default(12)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  course               Course               @relation(fields: [courseId], references: [id])
-  location             Location             @relation(fields: [locationId, city], references: [id, city])
-  teacherAssignments   TeacherAssignment[]
-  enrollments          Enrollment[]
-  materials            Material[]
-  materialHides        MaterialGroupHide[]
-  galleryImages        GalleryImage[]
-  assignedInquiries    Inquiry[]            @relation("AssignedGroup")
-  preferredInquiries   Inquiry[]            @relation("PreferredGroup")
-  studentComments      StudentComment[]
+  course             Course              @relation(fields: [courseId], references: [id])
+  location           Location            @relation(fields: [locationId, city], references: [id, city])
+  teacherAssignments TeacherAssignment[]
+  enrollments        Enrollment[]
+  materials          Material[]
+  materialHides      MaterialGroupHide[]
+  galleryImages      GalleryImage[]
+  assignedInquiries  Inquiry[]           @relation("AssignedGroup")
+  preferredInquiries Inquiry[]           @relation("PreferredGroup")
+  studentComments    StudentComment[]
+  studentAssessments StudentAssessment[]
 
   @@index([city, schoolYear])
 }
@@ -276,43 +287,43 @@ model TeacherAssignment {
 }
 
 model Inquiry {
-  id              String        @id @default(cuid())
-  type            InquiryType   @default(COURSE)
+  id                 String        @id @default(cuid())
+  type               InquiryType   @default(COURSE)
   // Required (not derivable): PARTY inquiries have no group→location chain.
   // COURSE inquiries persist the parent's mandatory city choice from /upisi.
-  city            City
-  parentName      String
-  parentEmail     String
-  parentPhone     String
+  city               City
+  parentName         String
+  parentEmail        String
+  parentPhone        String
   // Null for PARTY inquiries (no enrolling child); required for COURSE via the
   // public inquiry Zod schema.
-  childFirstName      String?
-  childLastName       String?
-  childDateOfBirth    String?
-  childSchool         String?
-  childGrade          String?
-  courseId        String?
-  scheduledGroupId String?
-  message         String?       @db.Text
-  referralSource  String?
+  childFirstName     String?
+  childLastName      String?
+  childDateOfBirth   String?
+  childSchool        String?
+  childGrade         String?
+  courseId           String?
+  scheduledGroupId   String?
+  message            String?       @db.Text
+  referralSource     String?
   // PARTY only: parent's optional preferred date from the public form.
-  partyProposedDate  DateTime?  @db.Date
+  partyProposedDate  DateTime?     @db.Date
   // PARTY only: admin-agreed date + "HH:mm" start time, set when scheduling.
-  partyConfirmedDate DateTime?  @db.Date
+  partyConfirmedDate DateTime?     @db.Date
   partyStartTime     String?
-  consentGivenAt  DateTime?
-  status          InquiryStatus @default(NEW)
-  schoolYear      String?
-  declineReason   String?       @db.Text
-  assignedGroupId String?
-  studentId       String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  consentGivenAt     DateTime?
+  status             InquiryStatus @default(NEW)
+  schoolYear         String?
+  declineReason      String?       @db.Text
+  assignedGroupId    String?
+  studentId          String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
-  course           Course?         @relation(fields: [courseId], references: [id])
-  scheduledGroup   ScheduledGroup? @relation("PreferredGroup", fields: [scheduledGroupId], references: [id])
-  assignedGroup    ScheduledGroup? @relation("AssignedGroup", fields: [assignedGroupId], references: [id])
-  student          User?           @relation("CreatedStudent", fields: [studentId], references: [id])
+  course         Course?         @relation(fields: [courseId], references: [id])
+  scheduledGroup ScheduledGroup? @relation("PreferredGroup", fields: [scheduledGroupId], references: [id])
+  assignedGroup  ScheduledGroup? @relation("AssignedGroup", fields: [assignedGroupId], references: [id])
+  student        User?           @relation("CreatedStudent", fields: [studentId], references: [id])
 
   @@index([scheduledGroupId])
   @@index([status])
@@ -323,7 +334,6 @@ model Inquiry {
   @@index([type, status])
   @@index([city, schoolYear, status])
 }
-
 
 model Enrollment {
   id               String    @id @default(cuid())
@@ -379,10 +389,10 @@ model Material {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  scheduledGroup ScheduledGroup? @relation(fields: [scheduledGroupId], references: [id], onDelete: Restrict)
-  course         Course?         @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  module         CourseModule?   @relation(fields: [moduleId], references: [id], onDelete: Restrict)
-  uploadedBy     User            @relation(fields: [uploadedById], references: [id])
+  scheduledGroup ScheduledGroup?     @relation(fields: [scheduledGroupId], references: [id], onDelete: Restrict)
+  course         Course?             @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  module         CourseModule?       @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  uploadedBy     User                @relation(fields: [uploadedById], references: [id])
   hiddenInGroups MaterialGroupHide[]
 
   @@index([scope, moduleId])
@@ -456,7 +466,7 @@ model Article {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  author User          @relation(fields: [authorId], references: [id])
+  author User           @relation(fields: [authorId], references: [id])
   tags   ArticleTag[]
   images ArticleImage[]
 
@@ -492,18 +502,47 @@ model ArticleTag {
 }
 
 model StudentComment {
-  id        String      @id @default(cuid())
+  id        String   @id @default(cuid())
   studentId String
   groupId   String
   authorId  String
-  content   String      @db.Text
-  type      CommentType @default(COMMENT)
-  moduleId  String?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   student User           @relation("CommentStudent", fields: [studentId], references: [id], onDelete: Cascade)
   group   ScheduledGroup @relation(fields: [groupId], references: [id])
   author  User           @relation("CommentAuthor", fields: [authorId], references: [id])
-  module  CourseModule?  @relation(fields: [moduleId], references: [id])
+}
+
+model StudentAssessment {
+  id        String @id @default(cuid())
+  studentId String
+  groupId   String
+  authorId  String
+
+  // PRAKTIČNE VJEŠTINE
+  slaganje      SkillLevel?
+  programiranje SkillLevel?
+  inovacije     SkillLevel?
+
+  // TIMSKE VJEŠTINE
+  suradnja     SkillLevel?
+  komunikacija SkillLevel?
+  zabava       SkillLevel?
+
+  opisnaOcjena        String?             @db.Text
+  recommendationKind  RecommendationKind?
+  recommendedCourseId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student           User           @relation("AssessmentStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  group             ScheduledGroup @relation(fields: [groupId], references: [id])
+  author            User           @relation("AssessmentAuthor", fields: [authorId], references: [id])
+  recommendedCourse Course?        @relation(fields: [recommendedCourseId], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, groupId])
+  @@index([groupId])
 }

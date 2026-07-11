@@ -64,6 +64,7 @@ async function wipePlannerTables() {
   await db.moduleEnrollment.deleteMany({})
   await db.enrollment.deleteMany({})
   await db.studentComment.deleteMany({})
+  await db.studentAssessment.deleteMany({})
   await db.teacherAssignment.deleteMany({})
   await db.inquiry.deleteMany({})
   await db.material.deleteMany({})

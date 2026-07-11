@@ -4,10 +4,10 @@ import type { StudentDetail } from '@/lib/student-detail'
 import type { StudentAttendanceEnrollment } from '@/lib/student-attendance'
 import type { AdminActionResult } from '@/lib/action-types'
 import type {
-  AdminCommentsPanelSection,
-  AdminCommentsPanelTab,
-} from '@/components/admin/students/student-comments-panel'
-import type { CommentListItem } from '@/components/shared/comment-list'
+  AssessmentSaveInput,
+  GradebookYearTab,
+} from '@/lib/student-assessment-view'
+import type { RecommendationOption } from '@/lib/assessment-rubric'
 import { DeleteStudentDialog } from '@/components/admin/students/delete-student-dialog'
 import { StudentYearSections } from '@/components/shared/student-year-sections'
 import { CopyButton } from './copy-button'
@@ -19,17 +19,25 @@ type CreateCommentAction = (input: {
   studentId: string
   groupId: string
   content: string
-  type: 'COMMENT' | 'MODULE_REVIEW'
-  moduleId?: string
 }) => Promise<AdminActionResult>
 
 type DeleteCommentAction = (commentId: string) => Promise<AdminActionResult>
+
+type SaveAssessmentAction = (
+  input: AssessmentSaveInput,
+) => Promise<AdminActionResult>
+
+type ClearAssessmentAction = (input: {
+  studentId: string
+  groupId: string
+}) => Promise<AdminActionResult>
 
 interface Props {
   viewerRole: 'ADMIN' | 'TEACHER'
   student: StudentWithRelations
   attendance: StudentAttendanceEnrollment[]
-  commentsPanelTabs: AdminCommentsPanelTab[]
+  gradebookTabs: GradebookYearTab[]
+  recommendationOptions: RecommendationOption[]
   /** Required for ADMIN viewer (powers AddEnrollmentDialog). */
   courses?: { id: string; title: string }[]
   /** Year the page-level selector opens on — admin: cookie year; teacher: computed current year. */
@@ -40,6 +48,8 @@ interface Props {
   backLabel: string
   onCreateComment: CreateCommentAction
   onDeleteComment: DeleteCommentAction
+  onSaveAssessment: SaveAssessmentAction
+  onClearAssessment: ClearAssessmentAction
 }
 
 function DetailRow({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
@@ -55,7 +65,8 @@ export function StudentDetailView({
   viewerRole,
   student,
   attendance,
-  commentsPanelTabs,
+  gradebookTabs,
+  recommendationOptions,
   courses,
   defaultYear,
   selectedYear,
@@ -63,6 +74,8 @@ export function StudentDetailView({
   backLabel,
   onCreateComment,
   onDeleteComment,
+  onSaveAssessment,
+  onClearAssessment,
 }: Readonly<Props>) {
   const isAdmin = viewerRole === 'ADMIN'
   const fullName = `${student.firstName} ${student.lastName}`
@@ -184,12 +197,15 @@ export function StudentDetailView({
         defaultYear={defaultYear}
         enrollments={student.enrollments}
         attendance={attendance}
-        commentsPanelTabs={commentsPanelTabs}
+        gradebookTabs={gradebookTabs}
+        recommendationOptions={recommendationOptions}
         isAdmin={isAdmin}
         courses={courseOptions}
         selectedYear={selectedYear}
         onCreateComment={onCreateComment}
         onDeleteComment={onDeleteComment}
+        onSaveAssessment={onSaveAssessment}
+        onClearAssessment={onClearAssessment}
       />
 
       {/* Danger zone — admin only */}
@@ -207,98 +223,3 @@ export function StudentDetailView({
   )
 }
 
-function groupLabelOf(name: string | null, courseTitle: string): string {
-  return name ? `${courseTitle} — ${name}` : courseTitle
-}
-
-export function buildCommentsPanelTabs(
-  student: StudentWithRelations,
-  attendance: StudentAttendanceEnrollment[],
-  canDelete: (authorId: string) => boolean,
-): AdminCommentsPanelTab[] {
-  type SectionMeta = {
-    groupId: string
-    groupLabel: string
-    schoolYear: string
-    modules: { id: string; title: string }[]
-    currentlyEnrolled: boolean
-  }
-
-  const sectionMeta = new Map<string, SectionMeta>()
-
-  for (const e of student.enrollments) {
-    const sg = e.scheduledGroup
-    sectionMeta.set(sg.id, {
-      groupId: sg.id,
-      groupLabel: groupLabelOf(sg.name, sg.course.title),
-      schoolYear: e.schoolYear,
-      modules: (sg.course.modules ?? []).map((m) => ({
-        id: m.id,
-        title: m.title,
-      })),
-      currentlyEnrolled: true,
-    })
-  }
-
-  for (const c of student.studentComments) {
-    if (sectionMeta.has(c.group.id)) continue
-    sectionMeta.set(c.group.id, {
-      groupId: c.group.id,
-      groupLabel: groupLabelOf(c.group.name, c.group.course.title),
-      schoolYear: c.group.schoolYear,
-      modules: [],
-      currentlyEnrolled: false,
-    })
-  }
-
-  const attendanceByGroup = new Map(
-    attendance.map((a) => [
-      a.groupId,
-      { present: a.presentCount, absent: a.absentCount, total: a.rows.length },
-    ]),
-  )
-
-  const commentsByGroup = new Map<string, CommentListItem[]>()
-  for (const c of student.studentComments) {
-    const item: CommentListItem = {
-      id: c.id,
-      content: c.content,
-      type: c.type,
-      createdAt: c.createdAt,
-      authorName: `${c.author.firstName} ${c.author.lastName}`.trim(),
-      authorRole: c.author.role,
-      authorDeleted: c.author.deletedAt != null,
-      moduleTitle: c.module?.title ?? null,
-      groupLabel: null,
-      canDelete: canDelete(c.author.id),
-    }
-    const bucket = commentsByGroup.get(c.group.id) ?? []
-    bucket.push(item)
-    commentsByGroup.set(c.group.id, bucket)
-  }
-
-  const byYear = new Map<string, AdminCommentsPanelSection[]>()
-  for (const meta of sectionMeta.values()) {
-    const section: AdminCommentsPanelSection = {
-      groupId: meta.groupId,
-      groupLabel: meta.groupLabel,
-      schoolYear: meta.schoolYear,
-      modules: meta.modules,
-      attendance: attendanceByGroup.get(meta.groupId) ?? null,
-      comments: commentsByGroup.get(meta.groupId) ?? [],
-      currentlyEnrolled: meta.currentlyEnrolled,
-    }
-    const bucket = byYear.get(meta.schoolYear) ?? []
-    bucket.push(section)
-    byYear.set(meta.schoolYear, bucket)
-  }
-
-  return Array.from(byYear.entries())
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([schoolYear, sections]) => ({
-      schoolYear,
-      sections: [...sections].sort((a, b) =>
-        a.groupLabel.localeCompare(b.groupLabel, 'hr'),
-      ),
-    }))
-}

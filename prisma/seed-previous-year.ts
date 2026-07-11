@@ -15,7 +15,7 @@ import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 dotenv.config({ path: '.env' })
 
-import { CommentType, PrismaClient, UserRole } from '@prisma/client'
+import { PrismaClient, UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 import { computeExpectedSessions } from '../src/lib/session-dates'
@@ -334,42 +334,48 @@ async function main() {
   }
   console.log(`✅ ${attendanceCount} attendance rows created (~85% present)`)
 
-  // ── Comments + Module reviews ─────────────────────────────────────────────
+  // ── Comments + report cards ───────────────────────────────────────────────
   let commentCount = 0
+  let assessmentCount = 0
   for (const g of createdGroups) {
     const groupEnrollments = enrolled.filter((e) => e.groupSpec.key === g.spec.key)
     const sample = groupEnrollments.slice(0, 6)
 
     for (let i = 0; i < sample.length; i++) {
       const e = sample[i]
-      const isReview = i >= 3
-      if (isReview) {
-        const ms = g.moduleSchedules[(i - 3) % g.moduleSchedules.length]
-        await prisma.studentComment.create({
-          data: {
-            studentId: e.studentId,
-            groupId: g.groupId,
-            authorId: g.teacherId,
-            content: MODULE_REVIEW_BODIES[(i - 3) % MODULE_REVIEW_BODIES.length],
-            type: CommentType.MODULE_REVIEW,
-            moduleId: ms.moduleId,
-          },
-        })
-      } else {
-        await prisma.studentComment.create({
-          data: {
-            studentId: e.studentId,
-            groupId: g.groupId,
-            authorId: g.teacherId,
-            content: COMMENT_BODIES[i % COMMENT_BODIES.length],
-            type: CommentType.COMMENT,
-          },
-        })
-      }
+      await prisma.studentComment.create({
+        data: {
+          studentId: e.studentId,
+          groupId: g.groupId,
+          authorId: g.teacherId,
+          content: COMMENT_BODIES[i % COMMENT_BODIES.length],
+        },
+      })
       commentCount++
+
+      // A structured report card for the second half of the sample.
+      if (i >= 3) {
+        await prisma.studentAssessment.create({
+          data: {
+            studentId: e.studentId,
+            groupId: g.groupId,
+            authorId: g.teacherId,
+            slaganje: 'OSTVARENO',
+            programiranje: 'U_RAZVOJU',
+            inovacije: 'OSTVARENO',
+            suradnja: 'OSTVARENO',
+            komunikacija: 'U_RAZVOJU',
+            zabava: 'OSTVARENO',
+            opisnaOcjena: MODULE_REVIEW_BODIES[(i - 3) % MODULE_REVIEW_BODIES.length],
+          },
+        })
+        assessmentCount++
+      }
     }
   }
-  console.log(`✅ ${commentCount} student comments created (COMMENT + MODULE_REVIEW)`)
+  console.log(
+    `✅ ${commentCount} student comments + ${assessmentCount} report cards created`,
+  )
 
   // ── Summary ───────────────────────────────────────────────────────────────
   console.log('')

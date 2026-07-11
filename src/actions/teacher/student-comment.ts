@@ -16,8 +16,6 @@ export async function createTeacherComment(input: {
   groupId: string
   studentId: string
   content: string
-  type?: 'COMMENT' | 'MODULE_REVIEW'
-  moduleId?: string
 }): Promise<AdminActionResult> {
   const parsed = createCommentSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
@@ -31,8 +29,6 @@ export async function createTeacherComment(input: {
         studentId: parsed.data.studentId,
         groupId: parsed.data.groupId,
         content: parsed.data.content,
-        type: parsed.data.type ?? 'COMMENT',
-        moduleId: parsed.data.moduleId ?? null,
       },
       session.user.id,
     )

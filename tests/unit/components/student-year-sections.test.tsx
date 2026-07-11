@@ -4,21 +4,19 @@ import type { ComponentProps } from 'react'
 import type { getStudent } from '@/actions/admin/student'
 import type { StudentAttendanceEnrollment } from '@/actions/admin/attendance'
 import type {
-  AdminCommentsPanelSection,
-  AdminCommentsPanelTab,
-} from '@/components/admin/students/student-comments-panel'
+  GradebookSection,
+  GradebookYearTab,
+} from '@/lib/student-assessment-view'
 import { StudentYearSections } from '@/components/shared/student-year-sections'
 
 // The heavy children pull server actions (addEnrollment, deleteEnrollment,
 // module-enrollment CRUD) and next/navigation — mock them down to divs that
 // echo the props the parent is responsible for filtering/forwarding.
-vi.mock('@/components/admin/students/student-comments-panel', () => ({
-  StudentCommentsPanel: ({
-    tabs,
-  }: Readonly<{ tabs: { schoolYear: string; sections: unknown[] }[] }>) => (
-    <div data-testid="comments-panel">
-      {tabs.map((t) => `${t.schoolYear}:${t.sections.length}`).join('|')}
-    </div>
+vi.mock('@/components/shared/student-gradebook-section', () => ({
+  StudentGradebookSection: ({
+    sections,
+  }: Readonly<{ sections: unknown[] }>) => (
+    <div data-testid="gradebook-section">{sections.length}</div>
   ),
 }))
 
@@ -120,22 +118,24 @@ function makeAttendance(
   }
 }
 
-function makeSection(groupId: string, schoolYear: string): AdminCommentsPanelSection {
+function makeSection(groupId: string, schoolYear: string): GradebookSection {
   return {
     groupId,
-    groupLabel: `Grupa ${groupId}`,
     schoolYear,
-    modules: [],
-    attendance: null,
+    program: `Program ${groupId}`,
+    groupLabel: `Grupa ${groupId}`,
+    teacherNames: [],
+    canGrade: false,
+    canComment: true,
+    assessment: null,
     comments: [],
-    currentlyEnrolled: true,
   }
 }
 
 function makeTab(
   schoolYear: string,
-  sections: AdminCommentsPanelSection[] = [],
-): AdminCommentsPanelTab {
+  sections: GradebookSection[] = [],
+): GradebookYearTab {
   return { schoolYear, sections }
 }
 
@@ -150,10 +150,13 @@ function renderSections(
       defaultYear="2026/2027"
       enrollments={[]}
       attendance={[]}
-      commentsPanelTabs={[]}
+      gradebookTabs={[]}
+      recommendationOptions={[]}
       isAdmin={false}
       onCreateComment={noopAction}
       onDeleteComment={noopAction}
+      onSaveAssessment={noopAction}
+      onClearAssessment={noopAction}
       {...overrides}
     />,
   )
@@ -170,7 +173,7 @@ describe('StudentYearSections — year selector', () => {
         makeEnrollment({ id: 'e1', schoolYear: '2025/2026', courseTitle: 'SLR 1' }),
       ],
       attendance: [makeAttendance('e0', '2024/2025')],
-      commentsPanelTabs: [makeTab('2027/2028')],
+      gradebookTabs: [makeTab('2027/2028')],
     })
 
     expect(yearButtons()).toEqual(['2027/2028', '2026/2027', '2025/2026', '2024/2025'])
@@ -206,7 +209,7 @@ describe('StudentYearSections — year selector', () => {
         makeAttendance('att-current', '2026/2027'),
         makeAttendance('att-past', '2025/2026'),
       ],
-      commentsPanelTabs: [
+      gradebookTabs: [
         makeTab('2026/2027', [makeSection('g1', '2026/2027')]),
         makeTab('2025/2026', [
           makeSection('g2', '2025/2026'),
@@ -222,8 +225,8 @@ describe('StudentYearSections — year selector', () => {
     expect(screen.getByTestId('attendance-panel').textContent).toBe(
       'att-past:2025/2026',
     )
-    // Exactly one tab is forwarded — the selected year's, with both sections.
-    expect(screen.getByTestId('comments-panel').textContent).toBe('2025/2026:2')
+    // Exactly the selected year's sections are forwarded — both of them.
+    expect(screen.getByTestId('gradebook-section').textContent).toBe('2')
   })
 
   it('per-year empty state names the active year', () => {
@@ -231,7 +234,7 @@ describe('StudentYearSections — year selector', () => {
       enrollments: [
         makeEnrollment({ id: 'e1', schoolYear: '2026/2027', courseTitle: 'SLR 2' }),
       ],
-      commentsPanelTabs: [makeTab('2024/2025')],
+      gradebookTabs: [makeTab('2024/2025')],
     })
 
     fireEvent.click(screen.getByRole('button', { name: '2024/2025' }))
@@ -240,7 +243,7 @@ describe('StudentYearSections — year selector', () => {
       screen.getByText('Nema upisa za školsku godinu 2024/2025.'),
     ).toBeInTheDocument()
     // No tab data either — the component synthesizes an empty tab for the year.
-    expect(screen.getByTestId('comments-panel').textContent).toBe('2024/2025:0')
+    expect(screen.getByTestId('gradebook-section').textContent).toBe('0')
   })
 })
 

@@ -62,6 +62,7 @@ afterAll(async () => {
   await db.materialGroupHide.deleteMany({})
   await db.material.deleteMany({})
   await db.studentComment.deleteMany({})
+  await db.studentAssessment.deleteMany({})
   await db.galleryImage.deleteMany({})
   await db.inquiry.deleteMany({})
   await db.courseEnrollmentWindow.deleteMany({})

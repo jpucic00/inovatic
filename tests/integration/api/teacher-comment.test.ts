@@ -100,7 +100,6 @@ describe('deleteTeacherComment — server-action authz', () => {
         groupId: group.id,
         authorId,
         content: 'Bilješka',
-        type: 'COMMENT',
       },
       select: { id: true },
     })

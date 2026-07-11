@@ -12,8 +12,6 @@ export async function createComment(data: {
   studentId: string
   groupId: string
   content: string
-  type?: 'COMMENT' | 'MODULE_REVIEW'
-  moduleId?: string
 }): Promise<AdminActionResult> {
   const { session, city } = await requireAdminCtx()
 
@@ -33,8 +31,6 @@ export async function createComment(data: {
         studentId: parsed.data.studentId,
         groupId: parsed.data.groupId,
         content: parsed.data.content,
-        type: parsed.data.type ?? 'COMMENT',
-        moduleId: parsed.data.moduleId ?? null,
       },
       authorId,
     )

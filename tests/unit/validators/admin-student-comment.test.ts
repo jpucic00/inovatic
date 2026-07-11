@@ -8,23 +8,9 @@ const minimal = {
 }
 
 describe('createCommentSchema', () => {
-  it('accepts a minimal valid comment (defaults to COMMENT)', () => {
+  it('accepts a minimal valid comment', () => {
     const result = createCommentSchema.parse(minimal)
-    expect(result.type).toBe('COMMENT')
-  })
-
-  it('accepts type=MODULE_REVIEW with moduleId', () => {
-    const result = createCommentSchema.parse({
-      ...minimal,
-      type: 'MODULE_REVIEW',
-      moduleId: 'm1',
-    })
-    expect(result.type).toBe('MODULE_REVIEW')
-    expect(result.moduleId).toBe('m1')
-  })
-
-  it('rejects unknown type', () => {
-    expect(createCommentSchema.safeParse({ ...minimal, type: 'BOGUS' }).success).toBe(false)
+    expect(result.content).toBe('Test comment')
   })
 
   it('rejects empty content', () => {

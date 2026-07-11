@@ -30,8 +30,16 @@ function setSelectedYearCookie(value: string | undefined): void {
   })
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   setSelectedYearCookie('2026/2027')
+  // getSelectedSchoolYear only honours the cookie when the year is registered;
+  // register it so this file is self-contained (doesn't rely on another file
+  // leaving a SchoolYear row behind).
+  await db.schoolYear.upsert({
+    where: { label: '2026/2027' },
+    create: { label: '2026/2027' },
+    update: {},
+  })
 })
 
 // This file seeds enrollments + teacher assignments + groups that other files
@@ -50,6 +58,7 @@ afterAll(async () => {
   await db.materialGroupHide.deleteMany({})
   await db.material.deleteMany({})
   await db.studentComment.deleteMany({})
+  await db.studentAssessment.deleteMany({})
   await db.galleryImage.deleteMany({})
   await db.inquiry.deleteMany({})
   await db.moduleSchedule.deleteMany({})

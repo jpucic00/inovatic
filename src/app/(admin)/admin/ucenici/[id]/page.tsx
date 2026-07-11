@@ -5,11 +5,14 @@ import { getStudent } from '@/actions/admin/student'
 import { getCourses } from '@/actions/admin/course'
 import { getStudentAttendance } from '@/actions/admin/attendance'
 import { createComment, deleteComment } from '@/actions/admin/student-comment'
-import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import {
-  StudentDetailView,
-  buildCommentsPanelTabs,
-} from '@/components/shared/student-detail-view'
+  clearAssessment,
+  upsertAssessment,
+} from '@/actions/admin/student-assessment'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
+import { getRecommendationOptions } from '@/lib/student-detail'
+import { buildGradebookTabs } from '@/lib/student-assessment-view'
+import { StudentDetailView } from '@/components/shared/student-detail-view'
 
 export const metadata: Metadata = { title: 'Admin – Učenik' }
 
@@ -21,24 +24,27 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
   await requireAdmin()
 
   const { id } = await params
-  const [student, courses, attendance, defaultYear] = await Promise.all([
-    getStudent(id),
-    getCourses(),
-    getStudentAttendance(id),
-    getSelectedSchoolYear(),
-  ])
+  const [student, courses, attendance, defaultYear, recommendationOptions] =
+    await Promise.all([
+      getStudent(id),
+      getCourses(),
+      getStudentAttendance(id),
+      getSelectedSchoolYear(),
+      getRecommendationOptions(),
+    ])
 
   if (!student) notFound()
 
   const courseOptions = courses.map((c) => ({ id: c.id, title: c.title }))
-  const commentsPanelTabs = buildCommentsPanelTabs(student, attendance, () => true)
+  const gradebookTabs = buildGradebookTabs(student, () => true)
 
   return (
     <StudentDetailView
       viewerRole="ADMIN"
       student={student}
       attendance={attendance}
-      commentsPanelTabs={commentsPanelTabs}
+      gradebookTabs={gradebookTabs}
+      recommendationOptions={recommendationOptions}
       courses={courseOptions}
       defaultYear={defaultYear}
       selectedYear={defaultYear}
@@ -46,6 +52,8 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
       backLabel="Natrag na učenike"
       onCreateComment={createComment}
       onDeleteComment={deleteComment}
+      onSaveAssessment={upsertAssessment}
+      onClearAssessment={clearAssessment}
     />
   )
 }

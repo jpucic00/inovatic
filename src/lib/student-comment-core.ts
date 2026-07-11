@@ -6,8 +6,6 @@ export async function insertStudentComment(
     studentId: string
     groupId: string
     content: string
-    type: 'COMMENT' | 'MODULE_REVIEW'
-    moduleId: string | null
   },
   authorId: string,
 ): Promise<void> {
@@ -17,8 +15,6 @@ export async function insertStudentComment(
       groupId: data.groupId,
       authorId,
       content: data.content,
-      type: data.type,
-      moduleId: data.moduleId,
     },
   })
 

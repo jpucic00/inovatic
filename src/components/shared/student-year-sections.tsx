@@ -4,10 +4,12 @@ import { useMemo, useState } from 'react'
 import type { StudentDetail } from '@/lib/student-detail'
 import type { StudentAttendanceEnrollment } from '@/lib/student-attendance'
 import type { AdminActionResult } from '@/lib/action-types'
-import {
-  StudentCommentsPanel,
-  type AdminCommentsPanelTab,
-} from '@/components/admin/students/student-comments-panel'
+import { StudentGradebookSection } from '@/components/shared/student-gradebook-section'
+import type {
+  AssessmentSaveInput,
+  GradebookYearTab,
+} from '@/lib/student-assessment-view'
+import type { RecommendationOption } from '@/lib/assessment-rubric'
 import { AttendancePanel } from '@/components/admin/students/attendance-panel'
 import { DeleteEnrollmentButton } from '@/components/admin/students/delete-enrollment-button'
 import { AddEnrollmentDialog } from '@/components/admin/students/add-enrollment-dialog'
@@ -21,11 +23,18 @@ type CreateCommentAction = (input: {
   studentId: string
   groupId: string
   content: string
-  type: 'COMMENT' | 'MODULE_REVIEW'
-  moduleId?: string
 }) => Promise<AdminActionResult>
 
 type DeleteCommentAction = (commentId: string) => Promise<AdminActionResult>
+
+type SaveAssessmentAction = (
+  input: AssessmentSaveInput,
+) => Promise<AdminActionResult>
+
+type ClearAssessmentAction = (input: {
+  studentId: string
+  groupId: string
+}) => Promise<AdminActionResult>
 
 interface Props {
   studentId: string
@@ -33,7 +42,8 @@ interface Props {
   defaultYear: string
   enrollments: StudentEnrollments
   attendance: StudentAttendanceEnrollment[]
-  commentsPanelTabs: AdminCommentsPanelTab[]
+  gradebookTabs: GradebookYearTab[]
+  recommendationOptions: RecommendationOption[]
   isAdmin: boolean
   /** Required for ADMIN viewer (powers AddEnrollmentDialog). */
   courses?: { id: string; title: string }[]
@@ -41,6 +51,8 @@ interface Props {
   selectedYear?: string
   onCreateComment: CreateCommentAction
   onDeleteComment: DeleteCommentAction
+  onSaveAssessment: SaveAssessmentAction
+  onClearAssessment: ClearAssessmentAction
 }
 
 /**
@@ -55,26 +67,29 @@ export function StudentYearSections({
   defaultYear,
   enrollments,
   attendance,
-  commentsPanelTabs,
+  gradebookTabs,
+  recommendationOptions,
   isAdmin,
   courses,
   selectedYear,
   onCreateComment,
   onDeleteComment,
+  onSaveAssessment,
+  onClearAssessment,
 }: Readonly<Props>) {
   const years = useMemo(() => {
     const set = new Set<string>([defaultYear])
     for (const e of enrollments) set.add(e.schoolYear)
     for (const a of attendance) set.add(a.schoolYear)
-    for (const t of commentsPanelTabs) set.add(t.schoolYear)
+    for (const t of gradebookTabs) set.add(t.schoolYear)
     return Array.from(set).sort((a, b) => b.localeCompare(a))
-  }, [defaultYear, enrollments, attendance, commentsPanelTabs])
+  }, [defaultYear, enrollments, attendance, gradebookTabs])
 
   const [activeYear, setActiveYear] = useState(defaultYear)
 
   const yearEnrollments = enrollments.filter((e) => e.schoolYear === activeYear)
   const yearAttendance = attendance.filter((a) => a.schoolYear === activeYear)
-  const activeTab = commentsPanelTabs.find((t) => t.schoolYear === activeYear) ?? {
+  const activeTab = gradebookTabs.find((t) => t.schoolYear === activeYear) ?? {
     schoolYear: activeYear,
     sections: [],
   }
@@ -218,18 +233,21 @@ export function StudentYearSections({
         <AttendancePanel enrollments={yearAttendance} />
       </div>
 
-      {/* Bilješke i recenzije */}
+      {/* Ocjene i bilješke */}
       <div className="bg-white rounded-xl border p-6 mb-6">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">
-          Bilješke i recenzije
+          Ocjene i bilješke
         </h2>
-        {/* key={activeYear} remounts so the panel re-initializes to the selected year */}
-        <StudentCommentsPanel
+        {/* key={activeYear} remounts so cards re-initialize to the selected year */}
+        <StudentGradebookSection
           key={activeYear}
           studentId={studentId}
-          tabs={[activeTab]}
-          onCreate={onCreateComment}
-          onDelete={onDeleteComment}
+          sections={activeTab.sections}
+          recommendationOptions={recommendationOptions}
+          onSaveAssessment={onSaveAssessment}
+          onClearAssessment={onClearAssessment}
+          onCreateComment={onCreateComment}
+          onDeleteComment={onDeleteComment}
         />
       </div>
     </>

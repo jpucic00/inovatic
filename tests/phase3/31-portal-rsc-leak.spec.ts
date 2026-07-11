@@ -67,12 +67,11 @@ const FORBIDDEN_HTML_TOKENS = [
   REVIEW_BODY,
   ATTENDANCE_NOTE,
   '"studentComments"',
+  '"studentAssessments"',
+  '"opisnaOcjena"',
   '"attendances"',
   '"recordedBy"',
   '"sessionDate"',
-  '"MODULE_REVIEW"',
-  '"COMMENT"',
-  'CommentType',
 ]
 
 type Seeded = {
@@ -116,16 +115,16 @@ test.describe('Phase 3 — Portal RSC payload leak guard', () => {
         groupId,
         authorId: t.teacherId,
         content: COMMENT_BODY,
-        type: 'COMMENT',
       },
     })
-    await db.studentComment.create({
+    // Report card — its opisna ocjena must also never leak into portal HTML.
+    await db.studentAssessment.create({
       data: {
         studentId: s.studentId,
         groupId,
         authorId: t.teacherId,
-        content: REVIEW_BODY,
-        type: 'MODULE_REVIEW',
+        slaganje: 'OSTVARENO',
+        opisnaOcjena: REVIEW_BODY,
       },
     })
     await db.attendance.create({

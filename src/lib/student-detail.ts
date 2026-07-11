@@ -1,5 +1,10 @@
 import type { City } from '@prisma/client'
 import { db } from '@/lib/db'
+import {
+  RECOMMENDATION_SPECIALS,
+  encodeRecommendation,
+  type RecommendationOption,
+} from '@/lib/assessment-rubric'
 
 // ── Shared select fragments ──────────────────────────────────────────────────
 
@@ -35,16 +40,13 @@ const moduleEnrollmentSelect = {
 const commentSelect = {
   id: true,
   content: true,
-  type: true,
   createdAt: true,
-  moduleId: true,
   groupId: true,
   studentId: true,
   authorId: true,
   author: {
     select: { id: true, firstName: true, lastName: true, role: true, deletedAt: true },
   },
-  module: { select: { id: true, title: true } },
   group: {
     select: {
       id: true,
@@ -53,6 +55,23 @@ const commentSelect = {
       course: { select: { title: true } },
     },
   },
+} as const
+
+const assessmentSelect = {
+  id: true,
+  groupId: true,
+  slaganje: true,
+  programiranje: true,
+  inovacije: true,
+  suradnja: true,
+  komunikacija: true,
+  zabava: true,
+  opisnaOcjena: true,
+  recommendationKind: true,
+  recommendedCourseId: true,
+  updatedAt: true,
+  recommendedCourse: { select: { title: true } },
+  author: { select: { firstName: true, lastName: true } },
 } as const
 
 const baseEnrollmentSelect = {
@@ -71,6 +90,9 @@ const baseEnrollmentSelect = {
       dateEnd: true,
       course: { select: courseSelect },
       location: { select: { name: true, address: true } },
+      teacherAssignments: {
+        select: { user: { select: { firstName: true, lastName: true } } },
+      },
     },
   },
   moduleEnrollments: {
@@ -134,6 +156,9 @@ function fetchForAdmin(id: string, city?: City) {
         orderBy: { createdAt: 'desc' },
         select: commentSelect,
       },
+      studentAssessments: {
+        select: assessmentSelect,
+      },
     },
   })
 }
@@ -156,6 +181,9 @@ function fetchForTeacher(id: string) {
       studentComments: {
         orderBy: { createdAt: 'desc' },
         select: commentSelect,
+      },
+      studentAssessments: {
+        select: assessmentSelect,
       },
     },
   })
@@ -181,4 +209,26 @@ export async function buildStudentDetailForTeacher(id: string): Promise<StudentD
       moduleEnrollments: e.moduleEnrollments.map((me) => ({ ...me, paidAt: null })),
     })),
   }
+}
+
+/**
+ * PREPORUKA dropdown feed: the standard SLR courses (shared across cities) plus
+ * the two special competition tracks. Not city-scoped — the SLR catalog is
+ * deliberately shared.
+ */
+export async function getRecommendationOptions(): Promise<RecommendationOption[]> {
+  const courses = await db.course.findMany({
+    where: { isCustom: false, level: { not: null } },
+    orderBy: { level: 'asc' },
+    select: { id: true, title: true },
+  })
+  const courseOptions = courses.map((c) => ({
+    value: encodeRecommendation('COURSE', c.id),
+    label: c.title,
+  }))
+  const specialOptions = RECOMMENDATION_SPECIALS.map((s) => ({
+    value: s.kind,
+    label: s.label,
+  }))
+  return [...courseOptions, ...specialOptions]
 }
