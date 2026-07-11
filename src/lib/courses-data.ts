@@ -64,7 +64,7 @@ export const courses: Course[] = [
           'U ovom modulu djeca kroz robotiku istražuju kako nastaju sustavi koji reagiraju na korisnika i stvaraju pokret. Uče kako kombinacijom motora i senzora mogu "oživjeti" svoje modele i pretvoriti ih u interaktivne igračke.\n\n' +
           'Izgradnjom projekata poput vrtuljka, leptira i humanoidnog robota, polaznici upoznaju osnovne principe mehanike, prijenosa gibanja i rada senzora. Poseban naglasak stavlja se na kreativnost – djeca ne samo da slijede upute, već se potiču da osmisle vlastite verzije i nadogradnje projekata.\n\n' +
           'Kroz ovaj modul razvijaju razumijevanje razlike između pasivnih i interaktivnih sustava te prvi put doživljavaju kako njihova ideja postaje funkcionalan model.',
-        image: '/images/courses/slr-1/module-1.png',
+        image: '/images/courses/slr-1/module-1.jpg',
       },
       {
         title: 'Prometni sustavi 1.0',
@@ -73,7 +73,7 @@ export const courses: Course[] = [
           'U ovom modulu djeca kroz praktične projekte upoznaju kako funkcioniraju prometni sustavi i koja je uloga tehnologije u svakodnevnom kretanju ljudi i robe.\n\n' +
           'Gradnjom i programiranjem različitih vozila, poput automobila za utrke, motocikla i vatrogasnog vozila, polaznici istražuju pojmove brzine, smjera kretanja, ravnoteže i upravljanja. Uče kako programirati robota da se kreće na određeni način te kako prilagoditi njegovo ponašanje različitim situacijama.\n\n' +
           'Osim tehničkih znanja, djeca razvijaju i svijest o važnosti sigurnosti u prometu te razumiju kako tehnologija doprinosi organizaciji i učinkovitosti prometnih sustava.',
-        image: '/images/courses/slr-1/module-2.png',
+        image: '/images/courses/slr-1/module-2.jpg',
       },
       {
         title: 'Industrijski sustavi 1.0',
@@ -82,7 +82,7 @@ export const courses: Course[] = [
           'Kroz izgradnju funkcionalnih modela poput dizala, viličara i robotičkog manipulatora, polaznici upoznaju osnovne principe rada strojeva koji se koriste u svakodnevnom životu, od skladišta do tvornica.\n\n' +
           'Djeca uče kako podizati, prenositi i manipulirati objektima pomoću robota, te kako programirati precizne i ponovljive radnje. Time razvijaju razumijevanje automatizacije i shvaćaju kako tehnologija olakšava i ubrzava rad u industriji.\n\n' +
           'Ovaj modul posebno potiče logičko razmišljanje i rješavanje problema, jer djeca kroz pokušaje i pogreške dolaze do funkcionalnih rješenja.',
-        image: '/images/courses/slr-1/module-3.png',
+        image: '/images/courses/slr-1/module-3.jpg',
       },
       {
         title: 'Svemirski sustavi',
@@ -91,7 +91,7 @@ export const courses: Course[] = [
           'U ovom modulu polaznici kroz robotiku ulaze u svijet svemirskih istraživanja i otkrivaju kako tehnologija omogućuje istraživanje udaljenih planeta.\n\n' +
           'Izgradnjom i programiranjem modela poput Mars rovera, svemirske letjelice i svemirskog topa, djeca upoznaju osnovne koncepte kretanja u svemiru, istraživanja površine planeta i funkcioniranja svemirskih misija.\n\n' +
           'Kroz projekte razvijaju razumijevanje fizike, inženjerstva i logike koja stoji iza stvarnih svemirskih tehnologija, a istovremeno potiču maštu i znatiželju kroz teme koje su djeci posebno inspirativne.',
-        image: '/images/courses/slr-1/module-4.png',
+        image: '/images/courses/slr-1/module-4.jpg',
       },
     ],
     color: 'text-cyan-600',

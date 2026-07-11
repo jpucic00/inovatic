@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight, ArrowUpRight, Trophy, Users, MapPin, BookOpen, Award } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Trophy, Users, Award, Star, Clock } from 'lucide-react'
 import { GearDecor } from '@/components/shared/decorations'
 
 export const metadata: Metadata = {
@@ -85,10 +85,10 @@ const memberships = [
 ]
 
 const statCards = [
-  { value: '2014.', label: 'Osnivanje', icon: BookOpen, bg: 'bg-cyan-50', border: 'border-cyan-200', color: 'text-cyan-600' },
-  { value: '4', label: 'Razine programa', icon: Trophy, bg: 'bg-yellow-50', border: 'border-yellow-200', color: 'text-yellow-600' },
-  { value: '3', label: 'Lokacije u 2 grada', icon: MapPin, bg: 'bg-emerald-50', border: 'border-emerald-200', color: 'text-emerald-600' },
-  { value: '≤ 10', label: 'Djece po grupi', icon: Users, bg: 'bg-purple-50', border: 'border-purple-200', color: 'text-purple-600' },
+  { value: '2014.', label: 'Godina osnivanja', icon: Star, bg: 'bg-yellow-50', border: 'border-yellow-200', color: 'text-yellow-600' },
+  { value: '2000+', label: 'Polaznika', icon: Users, bg: 'bg-emerald-50', border: 'border-emerald-200', color: 'text-emerald-600' },
+  { value: '50+', label: 'Natjecanja', icon: Trophy, bg: 'bg-orange-50', border: 'border-orange-200', color: 'text-orange-600' },
+  { value: '450+', label: 'Radionica godišnje', icon: Clock, bg: 'bg-cyan-50', border: 'border-cyan-200', color: 'text-cyan-600' },
 ]
 
 export default function AboutPage() {
@@ -146,6 +146,12 @@ export default function AboutPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="mt-10 pt-8 border-t border-gray-100 text-xs text-gray-400 flex flex-wrap gap-x-6 gap-y-1">
+            <span>OIB: 83709136328</span>
+            <span>MB: 04562704</span>
+            <span>Sjedište: Požeška 9, 21000 Split</span>
           </div>
         </div>
       </section>

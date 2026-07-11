@@ -176,7 +176,7 @@ export default async function HomePage() {
             Zainteresirani ste?
           </h2>
           <p className="text-gray-500 mb-8 text-lg">
-            Ispunite kratku prijavu i mi ćemo vas kontaktirati s raspoloživim terminima. Bez obaveza.
+            Ispunite kratku upisnu formu i mi ćemo vas kontaktirati u najkraćem mogućem roku. Bez obaveza.
           </p>
           <Link
             href="/upisi"

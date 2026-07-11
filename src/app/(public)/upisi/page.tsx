@@ -57,7 +57,7 @@ export default async function InquiryPage() {
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Upisi</span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Upiši dijete</h1>
           <p className="text-gray-600 text-lg max-w-xl mx-auto">
-            Ispunite kratki obrazac ispod i naš tim će vas kontaktirati s dostupnim terminima i grupama.
+            Ispunite kratki obrazac ispod i naš tim će vas kontaktirati u najkraćem mogućem roku.
           </p>
         </div>
       </section>
@@ -71,10 +71,10 @@ export default async function InquiryPage() {
                 <h2 className="font-bold text-gray-900 mb-4">Kako funkcionira?</h2>
                 <div className="space-y-3">
                   {[
-                    { n: '1', text: 'Ispunite upit s podacima o roditelju i djetetu.' },
-                    { n: '2', text: 'Mi pregledamo upit i provjerimo slobodna mjesta.' },
-                    { n: '3', text: 'Šaljemo vam email s dostupnim terminima.' },
-                    { n: '4', text: 'Dogovorite termin i upišemo dijete.' },
+                    { n: '1', text: 'Ispunite prijavu i odaberite željenu grupu.' },
+                    { n: '2', text: 'Provjeravamo dostupnost i kontaktiramo vas.' },
+                    { n: '3', text: 'Dogovaramo termin probnog sata.' },
+                    { n: '4', text: 'Nakon probnog sata upisujemo dijete.' },
                   ].map((item, i) => (
                     <div key={item.n} className="flex gap-3">
                       <div
@@ -107,7 +107,10 @@ export default async function InquiryPage() {
                   info@udruga-inovatic.hr
                 </a>
                 <a href="tel:+385993936993" className="text-cyan-500 hover:underline block">
-                  +385 99 393 6993
+                  +385 99 393 6993 <span className="text-gray-400">(Split)</span>
+                </a>
+                <a href="tel:+385921689987" className="text-cyan-500 hover:underline block">
+                  +385 92 168 9987 <span className="text-gray-400">(Šibenik)</span>
                 </a>
               </div>
             </div>
@@ -126,7 +129,10 @@ export default async function InquiryPage() {
                 info@udruga-inovatic.hr
               </a>
               <a href="tel:+385993936993" className="text-cyan-500 hover:underline block">
-                +385 99 393 6993
+                +385 99 393 6993 <span className="text-gray-400">(Split)</span>
+              </a>
+              <a href="tel:+385921689987" className="text-cyan-500 hover:underline block">
+                +385 92 168 9987 <span className="text-gray-400">(Šibenik)</span>
               </a>
             </div>
           </div>

@@ -32,11 +32,11 @@ export function CoursesPreview() {
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 />
                 <div className={`absolute inset-0 bg-gradient-to-t ${course.gradient} opacity-70`} />
-                <div className="absolute inset-0 flex flex-col items-center justify-center relative z-10">
-                  <span className="text-5xl font-extrabold text-white/90 tracking-tight drop-shadow">
+                <div className="absolute bottom-3 left-3 z-10 flex flex-col items-start">
+                  <span className="text-3xl font-extrabold text-white/90 tracking-tight drop-shadow leading-none">
                     {course.title.split(' ').pop()}
                   </span>
-                  <span className="text-xs text-white/90 font-semibold mt-1 drop-shadow">
+                  <span className="text-[10px] text-white/80 font-semibold drop-shadow uppercase tracking-wide">
                     {course.ageMin}–{course.ageMax} godina
                   </span>
                 </div>

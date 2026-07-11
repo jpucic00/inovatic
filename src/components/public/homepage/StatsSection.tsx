@@ -2,9 +2,9 @@ import { Clock, Users, Trophy, Star } from 'lucide-react'
 
 const stats = [
   { value: '2014.', label: 'Godina osnivanja', icon: Star, bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600' },
-  { value: '56h', label: 'Nastave godišnje', icon: Clock, bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-600' },
-  { value: '≤ 10', label: 'Djece po grupi', icon: Users, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-600' },
-  { value: '4', label: 'Razine programa', icon: Trophy, bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600' },
+  { value: '2000+', label: 'Polaznika', icon: Users, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-600' },
+  { value: '50+', label: 'Natjecanja', icon: Trophy, bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600' },
+  { value: '450+', label: 'Radionica godišnje', icon: Clock, bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-600' },
 ]
 
 export function StatsSection() {
