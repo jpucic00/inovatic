@@ -1526,12 +1526,6 @@ async function main() {
             { type: 'text', text: `Organizator FIRST LEGO League natjecanja u Hrvatskoj je Hrvatski robotički savez, a natjecanje se provodi u suradnji s partnerima iz Slovenije Zavod Super Glavce, koji su nositelji licence za našu regiju.`, styles: {} },
           ],
         },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija:`, styles: {'bold': true} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -1725,12 +1719,6 @@ async function main() {
             { type: 'link', href: `https://sciencecomestotown.eu/hr`, content: [{ type: 'text', text: `Science comes to town`, styles: {} }] },
           ],
         },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija sa otvaranja:`, styles: {'bold': true} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -1781,12 +1769,6 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Treneri na zimskim radionica bili su: Bruno Bešlić, Vito Drnjević i Ivano Tabak.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija:`, styles: {'bold': true} },
           ],
         },
       ],
@@ -1895,12 +1877,6 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Vjerujemo da je naša priča inspiracija i za mlade koji razmišljaju o karijeri u STEM području, i za institucije, partnere i sponzore koji žele podržati napredak i obrazovanje mladih u tehnološkim disciplinama. Budući razvoj CroSpec tima i Udruga Inovatic planiramo proširiti kroz daljnje projekte i natjecanja te ovim putem upućujemo poziv za medijsku, institucionalnu i poslovnu suradnju i podršku.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija:`, styles: {'bold': true} },
           ],
         },
       ],
@@ -2039,12 +2015,6 @@ async function main() {
             { type: 'text', text: `Također, veliko hvala svim našim vrijednim robo trenerima na posvećenom i predanom radu u ovoj školskoj godini: Bruno Bešlić, Josip Stepinac, Ivan Stepinac, Duje Topić i Vito Drnjević.`, styles: {} },
           ],
         },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija:`, styles: {'bold': true} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -2145,13 +2115,13 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Prijava:`, styles: {'bold': true} },
+            { type: 'text', text: `Upisi:`, styles: {'bold': true} },
           ],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
         {
@@ -2205,30 +2175,6 @@ async function main() {
           props: {
             url: `https://res.cloudinary.com/dgc2tp4f8/video/upload/v1773657927/articles/inline/ljetne-radionice-2025/Video-projekata_Ljetne-2025.mp4`,
           },
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija 1. ciklusa 2025.`, styles: {'bold': true} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija 2. ciklusa 2025.`, styles: {'bold': true} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija 3. ciklusa 2025.`, styles: {'bold': true} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija 4. ciklusa 2025.`, styles: {'bold': true} },
-          ],
         },
       ],
       authorId: admin.id,
@@ -2285,12 +2231,6 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Hvala svim našim vrijednim robo trenerima na posvećenom i predanom radu u ovoj školskoj godini: Bruno Bešlić, Marta Vukić, Duje Topić, Ivan Stepinac, Vito Drnjević i Jozo Pivac.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija:`, styles: {} },
           ],
         },
       ],
@@ -2390,7 +2330,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
       ],
@@ -2533,20 +2473,19 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Predbilježbu djeteta za radionice izvršava roditelj/skrbnik preko ispod navedene forme.`, styles: {} },
+            { type: 'text', text: `Prijavite se za program putem stranice za upise.`, styles: {} },
           ],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Predbilježba`, styles: {'bold': true} },
-            { type: 'text', text: `;`, styles: {} },
+            { type: 'text', text: `Upisi:`, styles: {'bold': true} },
           ],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
         {
@@ -2701,7 +2640,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Rad je planiran u parovima te je broj mjesta u grupama ograničen na osam polaznika, stoga se požurite prijaviti putem ispod navedene prijavne forme.`, styles: {} },
+            { type: 'text', text: `Rad je planiran u parovima te je broj mjesta u grupama ograničen na osam polaznika, stoga se požurite prijaviti putem stranice za upise.`, styles: {} },
           ],
         },
         {
@@ -2798,12 +2737,6 @@ async function main() {
             { type: 'text', text: ` i `, styles: {} },
             { type: 'link', href: `http://hrobos.hr`, content: [{ type: 'text', text: `HROBOS-u`, styles: {} }] },
             { type: 'text', text: ` koji nas podržavaju i sufinanciraju u dijelu provedbe naših cjelogodišnjih programa.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija:`, styles: {'bold': true} },
           ],
         },
       ],
@@ -3113,7 +3046,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Rad je planiran u parovima te je broj mjesta u grupama ograničen na osam polaznika, stoga se požurite prijaviti putem ispod navedene prijavne forme.`, styles: {} },
+            { type: 'text', text: `Rad je planiran u parovima te je broj mjesta u grupama ograničen na osam polaznika, stoga se požurite prijaviti putem stranice za upise.`, styles: {} },
           ],
         },
         {
@@ -3126,7 +3059,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
       ],
@@ -3234,13 +3167,13 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Prijavna forma:`, styles: {} },
+            { type: 'text', text: `Upisi:`, styles: {} },
           ],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
       ],
@@ -3420,13 +3353,13 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Rad je planiran u parovima te je broj mjesta u grupama ograničen na osam polaznika, stoga se požurite prijaviti putem ispod navedene prijavne forme.`, styles: {} },
+            { type: 'text', text: `Rad je planiran u parovima te je broj mjesta u grupama ograničen na osam polaznika, stoga se požurite prijaviti putem stranice za upise.`, styles: {} },
           ],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
         {
@@ -3530,7 +3463,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
       ],
@@ -3605,12 +3538,6 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Program je sufinanciran sredstvima Grada Splita iz Javnog poziva za prijavu programa namijenjenih zadovoljavanju javnih potreba u tehničkoj kulturi Grada Splita za 2022.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
           ],
         },
       ],
@@ -3782,12 +3709,6 @@ async function main() {
             { type: 'text', text: `Program je sufinanciran sredstvima Grada Splita iz Javnog poziva za prijavu programa namijenjenih zadovoljavanju javnih potreba u tehničkoj kulturi Grada Splita za 2022.`, styles: {} },
           ],
         },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -3896,7 +3817,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Prijavu na Ljetnu školu robotike možete izvršiti putem navedene prijavne forme. Broj mjesta je ograničen na osam učenika po grupi stoga se požurite.`, styles: {} },
+            { type: 'text', text: `Prijavu na Ljetnu školu robotike možete izvršiti putem stranice za upise. Broj mjesta je ograničen na osam učenika po grupi stoga se požurite.`, styles: {} },
             { type: 'text', text: `Uz poslanu prijavu potrebno je rezervirati sudjelovanje na radionicama uplatom u iznosu od 500,00 kn.`, styles: {} },
             { type: 'text', text: `Podaci za uplatu rezervacije će Vam stići na e-poštu nakon što pošaljete prijavu (provjerite neželjenu poštu).`, styles: {} },
           ],
@@ -3918,7 +3839,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
       ],
@@ -4171,12 +4092,6 @@ async function main() {
             { type: 'text', text: `Program je sufinanciran sredstvima Grada Splita iz Javnog poziva za prijavu programa namijenjenih zadovoljavanju javnih potreba u tehničkoj kulturi Grada Splita za 2022.`, styles: {} },
           ],
         },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija:`, styles: {'bold': true} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -4255,12 +4170,6 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Veselimo se sljedećem ljetnom kampu robotike na Zvjezdanom selu Mosor koji će se održati u periodu 30.7. – 4.8.2022.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija fotografija:`, styles: {'bold': true} },
           ],
         },
       ],
@@ -4439,7 +4348,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Prijavu na Ljetnu školu robotike možete izvršiti putem navedene prijavne forme. Broj mjesta je ograničen na osam učenika po grupi stoga se požurite.`, styles: {} },
+            { type: 'text', text: `Prijavu na Ljetnu školu robotike možete izvršiti putem stranice za upise. Broj mjesta je ograničen na osam učenika po grupi stoga se požurite.`, styles: {} },
             { type: 'text', text: `Uz poslanu prijavu potrebno je za rezervirati sudjelovanje na radionicama izvršiti uplatu u iznosu od 500,00 kn.`, styles: {'bold': true} },
             { type: 'text', text: `Podaci za uplatu rezervacije će Vam stići na e-poštu nakon što pošaljete prijavu.`, styles: {} },
           ],
@@ -4461,7 +4370,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
       ],
@@ -4590,9 +4499,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Ako ste zainteresirana udruga koja radi sa jednom od navedenih skupina djece molimo Vas da prijavite Vaše stručne djelatnike i/ili volontere te Vaše krajnje korisnike (djecu) na jedan od dva ljetna kampa robotike popunjavajući ispod navedenu `, styles: {} },
-            { type: 'text', text: `online prijavnu formu`, styles: {'bold': true} },
-            { type: 'text', text: `.`, styles: {} },
+            { type: 'text', text: `Ako ste zainteresirana udruga koja radi sa jednom od navedenih skupina djece molimo Vas da prijavite Vaše stručne djelatnike i/ili volontere te Vaše krajnje korisnike (djecu) na jedan od dva ljetna kampa robotike putem stranice za upise.`, styles: {} },
           ],
         },
         {
@@ -4661,7 +4568,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
         {
@@ -4836,14 +4743,6 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Voditelj radionica je profesor Jozo Pivac, a predavači i asistenti na projektu su volonteri: Josip Stepinac, Ivan Stepinac, Roko Kljaković Gašpić i Mijo Ljubić.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Za galeriju slika kliknite `, styles: {} },
-            { type: 'link', href: `https://drive.google.com/drive/folders/1DVgw1PkFuX62pU8MmXi6WGlcbBE4uNq4?usp=sharing`, content: [{ type: 'text', text: `OVDJE`, styles: {} }] },
-            { type: 'text', text: `.`, styles: {} },
           ],
         },
       ],
@@ -5485,14 +5384,13 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Prijavu djeteta za radionice izvršava roditelj/skrbnik preko ispod navedene prijavne forme. `, styles: {} },
-            { type: 'text', text: `Prijavna forma:`, styles: {} },
+            { type: 'text', text: `Upisi:`, styles: {'bold': true} },
           ],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
       ],
@@ -5720,31 +5618,19 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Prijavu djeteta za radionice izvršava roditelj/skrbnik preko ispod navedene prijavne forme. `, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
             { type: 'text', text: `Broj mjesta je ograničen na osam polaznika unutar svake grupe.`, styles: {} },
           ],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Napomena: Dostupni termini su vidljivi u formi kada odaberete željeni ciklus.`, styles: {'italic': true} },
+            { type: 'text', text: `Upisi:`, styles: {'bold': true} },
           ],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Prijavna forma:`, styles: {'bold': true} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
       ],
@@ -5824,8 +5710,6 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Program je sufinanciran sredstvima Grada Splita iz Javnog poziva za prijavu programa namijenjenih zadovoljavanju javnih potreba u tehničkoj kulturi Grada Splita za 2022.`, styles: {} },
-            { type: 'text', text: `Galeriju slika i dio atmosfere sa radionica pogledajte ovdje`, styles: {'bold': true} },
-            { type: 'text', text: `:`, styles: {} },
           ],
         },
       ],
@@ -5866,12 +5750,6 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Hvala Gradu Splitu i Hrvatskom robotičkom savezu koji nas podržavaju i sufinanciraju u dijelu provedbe naših izvanškolskih aktivnosti. `, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
           ],
         },
       ],
@@ -6003,9 +5881,7 @@ async function main() {
           content: [
             { type: 'text', text: `Planirani početak radionica je `, styles: {} },
             { type: 'text', text: `16.11.2020`, styles: {'bold': true} },
-            { type: 'text', text: `. stoga se `, styles: {} },
-            { type: 'text', text: `požurite prijaviti i odabrati jedan od ponuđenih termina`, styles: {'bold': true} },
-            { type: 'text', text: ` unutar prijavne forme, s tim da ako je određeni termin koji vam odgovara trenutno popunjen, svakako ga možete odabrati u slučaju da netko odustane.`, styles: {} },
+            { type: 'text', text: `. Stoga se što prije prijavite putem stranice za upise.`, styles: {} },
           ],
         },
         {
@@ -6028,18 +5904,6 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Vaš Inovatic team!`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika prostora:`, styles: {'bold': true} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Nema odabrana galerija ili galerija je izbrisan.`, styles: {'bold': true} },
           ],
         },
       ],
@@ -6157,18 +6021,6 @@ async function main() {
             { type: 'text', text: `Jutarnje radionice su trajale  svaki dan od 10:00-13:00h,a popodnevne od 17:00-20:00h.`, styles: {} },
           ],
         },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Dio vesele atmosfere sa radionica možete pogledati u našoj galeriji slika!`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -6213,7 +6065,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Dio odlične atmosfere sa radionica možete pogledati na snimkama projekata kao i u našoj galeriji slika!`, styles: {} },
+            { type: 'text', text: `Dio odlične atmosfere sa radionica možete pogledati na snimkama projekata!`, styles: {} },
           ],
         },
         {
@@ -6299,12 +6151,6 @@ async function main() {
             { type: 'link', href: `https://drive.google.com/file/d/1RtJwXHE4GVW_N0KrlsVmKuMDHwZL0sFH/view?usp=sharing`, content: [{ type: 'text', text: `Zabavni park-Microbit&Fischertechnik`, styles: {} }] },
           ],
         },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -6349,7 +6195,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Dio fantastične atmosfere sa radionica možete pogledati na snimkama projekata kao i u našoj galeriji slika!`, styles: {} },
+            { type: 'text', text: `Dio fantastične atmosfere sa radionica možete pogledati na snimkama projekata!`, styles: {} },
           ],
         },
         {
@@ -6407,12 +6253,6 @@ async function main() {
             { type: 'link', href: `https://drive.google.com/file/d/1KCxpaqf4sF2khsQiQSR3pLkmJMg-BTox/view?usp=sharing`, content: [{ type: 'text', text: `Lego WeDo 2.0-Formula`, styles: {} }] },
           ],
         },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -6463,7 +6303,7 @@ async function main() {
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Dio fantastične atmosfere sa radionica možete pogledati na snimkama projekata te u našoj galeriji slika!`, styles: {} },
+            { type: 'text', text: `Dio fantastične atmosfere sa radionica možete pogledati na snimkama projekata!`, styles: {} },
           ],
         },
         {
@@ -6532,12 +6372,6 @@ async function main() {
           content: [
             { type: 'text', text: `3.`, styles: {} },
             { type: 'link', href: `https://drive.google.com/file/d/1AXQKmZZdt-AhoUwZFVpV78okye_3IzqC/view?usp=sharing`, content: [{ type: 'text', text: `Codey Rocky- Staza s kartama`, styles: {} }] },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
           ],
         },
       ],
@@ -7068,13 +6902,13 @@ Plan i program ljetnih radionica će biti osmišljen kroz izradu i sastavljanje 
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Prijava za online edukacije:`, styles: {'bold': true} },
+            { type: 'text', text: `Upisi:`, styles: {'bold': true} },
           ],
         },
         {
           type: 'paragraph',
           content: [
-            { type: 'link', href: `/kontakt`, content: [{ type: 'text', text: `Prijavite se putem kontakt forme`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
           ],
         },
       ],
@@ -7111,7 +6945,7 @@ Nadahnuti zimskim praznicima pripremili smo projekte tematskog sadržaja poput; 
         {
           type: 'paragraph',
           content: [
-            { type: 'text', text: `Dio fantastične atmosfere sa radionica možete pogledati na snimkama projekata te u našoj galeriji slika!`, styles: {} },
+            { type: 'text', text: `Dio fantastične atmosfere sa radionica možete pogledati na snimkama projekata!`, styles: {} },
           ],
         },
         {
@@ -7121,18 +6955,6 @@ Nadahnuti zimskim praznicima pripremili smo projekte tematskog sadržaja poput; 
             { type: 'link', href: `https://drive.google.com/open?id=1AFz7e-GY98EGlCmN6gRBJPwnMd21ko5f`, content: [{ type: 'text', text: `Lego WeDo 2.0 Rudolf`, styles: {} }] },
             { type: 'link', href: `https://drive.google.com/open?id=18O8PN7VMFD5ke0HTVxviwfJjJ5c-pTmR`, content: [{ type: 'text', text: `Lego WeDo 2.o Djed Mraz`, styles: {} }] },
             { type: 'link', href: `https://drive.google.com/open?id=16mOmykApAGdfNM0G8cbNmj6CqxXtJxFn`, content: [{ type: 'text', text: `Lego WeDo 2.0 Skijaš`, styles: {} }] },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika;`, styles: {'bold': true} },
-            { type: 'text', text: `«`, styles: {} },
-            { type: 'text', text: `‹`, styles: {} },
-            { type: 'text', text: `										od										`, styles: {} },
-            { type: 'text', text: `											2										`, styles: {} },
-            { type: 'link', href: `/wp-json/wp/v2/posts/1705?_fields=content&#038;page_number_0=2`, content: [{ type: 'text', text: `›`, styles: {} }] },
-            { type: 'link', href: `/wp-json/wp/v2/posts/1705?_fields=content&#038;page_number_0=2`, content: [{ type: 'text', text: `»`, styles: {} }] },
           ],
         },
       ],
@@ -7168,7 +6990,7 @@ Slagati razne konstrukcije i mehanizme, koristiti elektroničke elemente, motore
             { type: 'text', text: `
 Osim izrade spomenutih projekata polaznici su sudjelovali u raznim međusobnim natjecanjima poput borbi robota, savladavanju raznih robotskih staza te igre robota nogometaša.`, styles: {} },
             { type: 'text', text: `
-Veselimo se nadolazećim zimskim radionicama, a do tada možete pogledati najistaknutija videa i slike sa naših ljetnih radionica 🙂`, styles: {} },
+Veselimo se nadolazećim zimskim radionicama!`, styles: {} },
           ],
         },
         {
@@ -7246,13 +7068,7 @@ Veselimo se nadolazećim zimskim radionicama, a do tada možete pogledati najist
           content: [
             { type: 'text', text: `U razdoblju 1.7.2019. – 5.7.2019. je održan prvi ciklus Ljetnih radionica robotike na kojem je sudjelovalo četrdesetak učenik osnovnih škola, podijeljenih u dvije dobne skupine.`, styles: {} },
             { type: 'text', text: `
-Učenici su uz vodstvo naših predavača slagali i programirali zanimljive Lego projekte koje možete vidjeti u našoj galeriji slika sa ljetnih radionica.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
+Učenici su uz vodstvo naših predavača slagali i programirali zanimljive Lego projekte.`, styles: {} },
           ],
         },
       ],
@@ -7341,13 +7157,6 @@ Učenici su uz vodstvo naših predavača slagali i programirali zanimljive Lego 
             { type: 'text', text: `Sa radionica:`, styles: {'bold': true} },
           ],
         },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `
-Galerija slika:`, styles: {'bold': true} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -7396,18 +7205,6 @@ Mlađa dobna skupina je koristila `, styles: {} },
           type: 'paragraph',
           content: [
             { type: 'text', text: `Učenici su kroz igru rješavali projektne zadatke te tako ovladali osnovama rada i upravljanja motora i senzora te početnim znanjima iz programiranja.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Neke najzanimljivije trenutke sa radionica možete pogledati u našoj galeriji slika 🙂`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
           ],
         },
       ],
@@ -7480,12 +7277,6 @@ Mlađa dobna skupina je koristila `, styles: {} },
           content: [
             { type: 'text', text: `
 Kamion za recikliranje otpada:`, styles: {'bold': true} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Galerija slika:`, styles: {'bold': true} },
           ],
         },
       ],
@@ -7608,24 +7399,6 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
             { type: 'text', text: `U svakoj grupi je nagrađen po jedan najuspješniji učenik sa lego poklon paketom 🙂`, styles: {} },
           ],
         },
-        {
-          type: 'heading',
-          props: {
-            level: 3,
-          },
-          content: [
-            { type: 'text', text: `Kratki video zapisi sa radionica;`, styles: {} },
-          ],
-        },
-        {
-          type: 'heading',
-          props: {
-            level: 3,
-          },
-          content: [
-            { type: 'text', text: `Galerija slika sa radionica;`, styles: {} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -7681,15 +7454,6 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
             { type: 'text', text: `Pogledajte u našem videu djeličak atmosfere sa radionica:`, styles: {} },
           ],
         },
-        {
-          type: 'heading',
-          props: {
-            level: 3,
-          },
-          content: [
-            { type: 'text', text: `Galerija fotografija sa radionica:`, styles: {} },
-          ],
-        },
       ],
       authorId: admin.id,
       isPublished: true,
@@ -7728,12 +7492,6 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
           type: 'paragraph',
           content: [
             { type: 'text', text: `Uz micro:bit, djeca su se upoznala i sa radom mBot robota. Naučili su programirati kretnje robota, koristiti senzore za prepoznavanje crne i bijele boje.`, styles: {} },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: `Pogledajte galeriju slika sa radionica;`, styles: {} },
           ],
         },
       ],
@@ -7865,7 +7623,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
           content: [
             { type: 'text', text: `Pozivamo sve osnovnoškolce koji vole slagati LEGO kockice i ROBOTIKA im predstavlja izazov da se prijave na Zimsku školu LEGO robotike.  Učenici će imati priliku slagati lego konstrukcije božićnih saonica, Djeda Božićnjaka i druge slične božićne konstrukcije koje će zatim programirati pomoću računala da izvršavaju određene zadatke i izazove poput vožnje saonica po snježnoj stazi uz razne prepreke, nebi li Djed Božićnjak što prije došao do cilja sa darovima. Udruga INOVATIC će naposljetku organizirati natjecanje gdje će najspretnije i najsretnije nagraditi određenim prigodnim darovima. Učenici će raditi u paru te svaki par će imati svoje računalo i LEGO opremu. Voditelji radionice su profesori Jozo Pivac i Goran Samardžić.`, styles: {} },
             { type: 'text', text: `
-Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u periodu od 02. siječnja do 05. siječnja 2017. g u teminima od 17:00h do 19:00h. Broj prijava je ograničen. Cijena kotizacije za radionicu iznosi 250 kn. Prijavu za radionicu ispunite putem dolje navedene prijavne forme.`, styles: {} },
+Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u periodu od 02. siječnja do 05. siječnja 2017. g u teminima od 17:00h do 19:00h. Broj prijava je ograničen. Cijena kotizacije za radionicu iznosi 250 kn. Prijavite se za program putem stranice za upise.`, styles: {} },
           ],
         },
         {
@@ -7894,11 +7652,619 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
     ],
   })
 
+  // [70/72] ljetni-kampovi-lego-robotike-2026 — 2026-05-15
+  const a70 = await prisma.article.create({
+    data: {
+      city: 'SPLIT',
+      slug: 'ljetni-kampovi-lego-robotike-2026',
+      title: `Ljetni kampovi LEGO robotike 2026.`,
+      excerpt: `Udruga Inovatic organizira Ljetni kamp LEGO robotike 2026. za djecu od 6 do 14 godina kroz četiri ciklusa u srpnju i kolovozu. Programiranje LEGO robota, STEM aktivnosti i puno zabave na Velebitskoj 32 u Splitu. Cijena: 150 EUR po ciklusu.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ljetni kamp LEGO robotike 2026.`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ljeto, zabava, kreativnost i robotika — sve na jednom mjestu!`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Udruga Inovatic i ove godine organizira popularni Ljetni kamp LEGO robotike 2026., namijenjen djeci koja vole istraživati, stvarati i učiti kroz igru i praktičan rad.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Kroz zanimljive STEM aktivnosti, djeca će imati priliku graditi i programirati vlastite LEGO robote, razvijati kreativnost, logičko razmišljanje i timski rad — uz puno zabave i novih prijateljstava.`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Kada?`, styles: {} }],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `1. ciklus: 13.07. – 17.07. `, styles: {} },
+            { type: 'text', text: `(POPUNJEN)`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `2. ciklus: 27.07. – 31.07.`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `3. ciklus: 17.08. – 21.08.`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `4. ciklus: 24.08. – 28.08.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Svi kampovi traju pet dana u vremenu: 09:00 – 13:00`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Gdje?`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Velebitska 32, Split`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Za koga?`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Djeca u dobi od 6 do 14 godina, podijeljena u manje grupe prema uzrastu i predznanju.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Predznanje nije potrebno — program je prilagođen i početnicima i djeci koja već imaju iskustva u području robotike.`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Što očekuje polaznike?`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Polaznici će tijekom radionica:`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `slagati i konstruirati LEGO robotske modele`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `učiti osnove programiranja i automatizacije`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `rješavati zabavne inženjerske izazove`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `razvijati kreativnost, preciznost i logičko razmišljanje`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `sudjelovati u natjecateljskim i timskim aktivnostima`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na radionicama koristimo moderne edukacijske setove poput LEGO WeDo 2.0, LEGO Spike Essential i LEGO Spike Prime, uz rad na računalima i praktičnim projektima prilagođenim dobi djece.`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Primjer dnevnog rasporeda`, styles: {} }],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `09:00 – 09:15 — Uvod u dnevni projektni zadatak`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `09:15 – 10:30 — Konstrukcija i nadogradnja robota`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `10:30 – 11:00 — Pauza za užinu`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `11:00 – 12:30 — Programiranje, testiranje i natjecateljski izazovi`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `12:30 – 13:00 — Prezentacija projekata, pospremanje i odlazak`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Što je uključeno?`, styles: {} }],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Stručno vodstvo iskusnih robo-trenera`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Sav potreban edukacijski materijal i oprema`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Svakodnevna užina i osvježavajući napitci`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Diploma o sudjelovanju`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Puno zabave, druženja i STEM avantura`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Cijena`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Cijena po ciklusu radionica: 150 EUR.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Popusti:`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Cijena za drugo dijete iz iste obitelji: 130 EUR.`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Cijena za polaznike naših cjelogodišnjih programa: 130 EUR.`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Prijave`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Broj mjesta po grupama je ograničen, stoga preporučujemo pravovremenu prijavu.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Za dodatne informacije kontaktirajte nas:`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `e-mail: upisi@udruga-inovatic.hr`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Telefon: 098 960 2238`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Kontakt osoba: Bruno Bešlić`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ne propustite priliku da ovo ljeto pretvorite u nezaboravnu STEM avanturu!`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Upisi:`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `Prijavite se za program`, styles: {} }] },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2026-05-15'),
+      coverImage: 'https://udruga-inovatic.hr/wp-content/uploads/2024/06/WEB_1.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a70.id, tagId: tagRadionice.id },
+    ],
+  })
+
+  // [71/72] wro-2026-drzavno-finale — 2026-07-08
+  const a71 = await prisma.article.create({
+    data: {
+      city: 'SPLIT',
+      slug: 'wro-2026-drzavno-finale',
+      title: `Inovatic ostvario povijesni uspjeh na državnom finalu World Robot Olympiad 2026 – pet trofeja, europski i svjetski plasman!`,
+      excerpt: `Na državnom finalu World Robot Olympiad 2026. u Samoboru, Inovatic je s devet ekipa osvojio pet trofeja, četiri plasmana na Europsko i jedan plasman na Svjetsko natjecanje — najveći uspjeh u povijesti udruge.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Udruga za robotiku „Inovatic" ostvarila je najveći uspjeh u svojoj povijesti na državnom finalu World Robot Olympiad (WRO) natjecanja, održanom 20. lipnja 2026. godine u Samoboru.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na najvećem i najbrojnijem WRO državnom finalu dosad, koje je okupilo više od 70 ekipa iz cijele Hrvatske, Inovatic je nastupio s čak devet ekipa u kategorijama RoboMission, Future Innovators i Future Engineers te osvojio pet trofeja, četiri plasmana na Europsko prvenstvo i jedan plasman na Svjetsko prvenstvo.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `World Robot Olympiad jedno je od najvećih međunarodnih natjecanja u području edukacijske robotike koje se održava u više od stotinu država svijeta. Ovogodišnji rezultati svrstavaju Udrugu „Inovatic" među najuspješnije hrvatske organizacije u području edukacijske robotike i STEM obrazovanja.`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Rezultati naših ekipa`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Pametni kist`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Vito Tonšić i Jure Vukušić, mentor: Bruno Bešlić`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `1. mjesto u kategoriji Future Innovators`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Titula apsolutnih pobjednika među svim dobnim skupinama`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Plasman na Svjetsko finale, Portoriko, prosinac 2026.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Specijalci`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Ivano Tabak i Mihovil Letina, mentor: Jozo Pivac`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `2. mjesto u RoboMission seniorskoj kategoriji`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Plasman na Europsko finale, Zagreb, listopad 2026.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Inovatic`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Josip Stepinac, Ivan Stepinac i Vito Drnjević, mentor: Jozo Pivac`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `2. mjesto u kategoriji Future Engineers`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Plasman na Europsko finale, Zagreb, listopad 2026.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `EthnoSync`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Lora Bavčević i Karlo Čagalj, mentor: Bruno Bešlić`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `3. mjesto u kategoriji Future Innovators`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Plasman na Europsko finale, Zagreb, listopad 2026.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `BrickBros`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Niko Kokan i Damjan Marović, mentor: Bruno Bešlić`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `3. mjesto u RoboMission juniorskoj kategoriji`, styles: {} },
+          ],
+        },
+        {
+          type: 'bulletListItem',
+          content: [
+            { type: 'text', text: `Plasman na Europsko finale, Zagreb, listopad 2026.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Osim osvajača medalja, i preostale Inovaticove ekipe ostvarile su zapažene nastupe, potvrđujući kvalitetu rada, predanost mentora te kontinuirani razvoj mladih talenata u području robotike, programiranja i inovatorstva.`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Slijede europski i svjetski izazovi`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Pred našim natjecateljima sada su novi međunarodni izazovi. Europsko prvenstvo World Robot Olympiad natjecanja održat će se u Zagrebu tijekom listopada 2026. godine, dok će se Svjetsko prvenstvo održati u prosincu 2026. godine u Portoriku, gdje će nastupiti najbolje ekipe iz cijeloga svijeta.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Posebnu vrijednost ovom uspjehu daje činjenica da su se među najboljim hrvatskim ekipama našli učenici osnovnih i srednjih škola iz Splita i okolice, potvrđujući kako kontinuirano ulaganje u STEM obrazovanje, robotiku i tehničku kulturu donosi rezultate prepoznate i na nacionalnoj i međunarodnoj razini.`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Hvala našim partnerima`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ovakvi rezultati potvrda su dugogodišnjeg sustavnog rada s djecom i mladima te snažne podrške naših partnera i suradnika. Posebno zahvaljujemo Splitsko-dalmatinskoj županiji, Gradu Splitu kroz projekt Science Comes to Town, Zajednici tehničke kulture grada Splita te Prirodoslovno-matematičkom fakultetu u Splitu. Njihova podrška omogućuje stvaranje poticajnog okruženja u kojem mladi razvijaju znanja i vještine iz STEM područja te ostvaruju uspjehe na najvišoj razini.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ponosni smo na svih devet ekipa, njihove mentore i obitelji koje ih svakodnevno podržavaju. Ostvareni rezultati predstavljaju najuspješniju godinu u povijesti Udruge „Inovatic" te snažan poticaj za daljnji razvoj robotike, inovatorstva i STEM obrazovanja među djecom i mladima.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Pet osvojenih trofeja, četiri plasmana na Europsko prvenstvo i jedan plasman na Svjetsko prvenstvo dokaz su da se predanim radom, znanjem i zajedničkom podrškom mogu ostvariti rezultati vrijedni europske i svjetske pozornice.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2026-07-08'),
+      coverImage: 'https://udruga-inovatic.hr/wp-content/uploads/2026/07/Web_Cover.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a71.id, tagId: tagNatjecanja.id },
+      { articleId: a71.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [72/72] zavrsena-skolska-godina-radionica-robotike — 2026-07-10
+  const a72 = await prisma.article.create({
+    data: {
+      city: 'SPLIT',
+      slug: 'zavrsena-skolska-godina-radionica-robotike',
+      title: `Završena još jedna uspješna školska godina cjelogodišnjih radionica robotike`,
+      excerpt: `S posljednjim radionicama uspješno smo zaključili još jednu ispunjenu školsku godinu programa robotike. Polaznici su usvajali nova znanja, razvijali vještine i stvarali prijateljstva — na Anića zgradi i PMF-u u Splitu.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `S posljednjim radionicama uspješno smo zaključili još jednu ispunjenu školsku godinu naših programa robotike. Tijekom proteklih mjeseci naši su polaznici usvajali nova znanja, razvijali tehničke i programske vještine, rješavali brojne robotske izazove te stvarali prijateljstva koja često nadilaze same radionice.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Radionice su se tijekom cijele školske godine održavale na dvije lokacije:`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Anića zgrada`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na ovoj su lokaciji polaznici u dobi od 6 do 14 godina pohađali programe Svijet LEGO robotike 1 – 4, kroz koje su se upoznavali s osnovama konstruiranja, programiranja i robotike te postupno razvijali logičko razmišljanje, kreativnost i timski rad.`, styles: {} },
+          ],
+        },
+        {
+          type: 'heading',
+          props: { level: 2 },
+          content: [{ type: 'text', text: `Prirodoslovno-matematički fakultet u Splitu`, styles: {} }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na PMF-u se provodio Natjecateljski program za polaznike u dobi od 11 do 21 godine, namijenjen onima koji žele svoje znanje podići na višu razinu i pripremati se za najveća domaća i međunarodna natjecanja iz robotike.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Kraj školske godine obilježili smo svečanom podjelom diploma, zajedničkim fotografiranjem i ugodnim druženjem uz malu zakusku. Bio je to lijep trenutak za prisjećanje na sve što smo zajedno ostvarili tijekom proteklih mjeseci.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Posebno smo ponosni na naše natjecateljske ekipe koje su ove godine ostvarile iznimne rezultate na državnim natjecanjima FIRST LEGO League (FLL) i World Robot Olympiad (WRO), osvojivši brojne medalje, pehare te plasmane na europska i svjetska natjecanja. Njihovi uspjesi rezultat su velikog truda, upornosti i predanog rada tijekom cijele godine.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Od srca zahvaljujemo svim našim polaznicima na uloženom trudu, njihovim roditeljima na ukazanom povjerenju te svim predavačima, mentorima i volonterima koji su svojim znanjem i predanošću omogućili da još jedna školska godina bude ispunjena učenjem, stvaranjem i uspjesima.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Svim našim polaznicima i njihovim obiteljima želimo ugodno, veselo i bezbrižno ljeto. Veselimo se ponovnom druženju i novim robotskim izazovima u sljedećoj školskoj godini!`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2026-07-10'),
+      coverImage: 'https://udruga-inovatic.hr/wp-content/uploads/2026/07/Web_Cover-1.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a72.id, tagId: tagRadionice.id },
+      { articleId: a72.id, tagId: tagRezultati.id },
+    ],
+  })
+
   void velebitska
   void boskovica
   void trokut
 
-  console.log('✅ Articles and tags seeded (69 articles)')
+  console.log('✅ Articles and tags seeded (72 articles)')
 
   // ── Article gallery images (Cloudinary) ──────────────────────────────────
   console.log('')
