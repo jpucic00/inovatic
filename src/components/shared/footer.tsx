@@ -88,7 +88,7 @@ export function Footer() {
                 <div className="space-y-1">
                   <Link href="/lokacije/split" className="block hover:text-cyan-400 transition-colors">Velebitska 32, Split</Link>
                   <Link href="/lokacije/split" className="block hover:text-cyan-400 transition-colors">Ruđera Boškovića 33, Split</Link>
-                  <Link href="/lokacije/sibenik" className="block hover:text-cyan-400 transition-colors">Trokut inkubator, Šibenik</Link>
+                  <Link href="/lokacije/sibenik" className="block hover:text-cyan-400 transition-colors">Velimira Škorpika 7/a, Šibenik</Link>
                 </div>
               </div>
             </div>

@@ -3,22 +3,22 @@ import { MapPin, ArrowRight } from 'lucide-react'
 
 const locations = [
   {
-    name: 'Velebitska 32',
     address: 'Velebitska 32, 21000 Split',
+    venue: 'Anića zgrada',
     href: '/lokacije/split',
     badge: null,
     description: 'Dvije prostrane učionice namijenjene provedbi kurikuluma Svijet LEGO Robotike.',
   },
   {
-    name: 'Ruđera Boškovića 33',
     address: 'Ruđera Boškovića 33, 21000 Split',
+    venue: 'Prirodoslovno-matematički fak.',
     href: '/lokacije/split',
-    badge: 'Prirodoslovno-matematički fakultet',
+    badge: null,
     description: 'Lokacija namijenjena natjecateljskim programima.',
   },
   {
-    name: 'Trokut inkubator',
     address: 'Ul. Velimira Škorpika 7/a, 22000 Šibenik',
+    venue: 'Trokut Šibenik – centar poduzetništva',
     href: '/lokacije/sibenik',
     badge: 'Novo',
     description: 'Naša nova lokacija u Šibeniku – isti kurikulum Svijet LEGO Robotike.',
@@ -36,7 +36,7 @@ export function LocationsSection() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {locations.map((loc) => (
-            <Link key={loc.name} href={loc.href} className="relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-100 transition-all">
+            <Link key={loc.address} href={loc.href} className="relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-100 transition-all">
               {loc.badge === 'Novo' && (
                 <span className="pointer-events-none absolute -right-12 top-5 w-40 rotate-45 bg-yellow-400 py-1 text-center text-[11px] font-extrabold uppercase tracking-wider text-yellow-950 shadow-sm">
                   Novo
@@ -45,13 +45,8 @@ export function LocationsSection() {
               <div className="w-10 h-10 bg-cyan-50 rounded-xl flex items-center justify-center mb-4">
                 <MapPin className="w-5 h-5 text-cyan-500" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-1">{loc.name}</h3>
-              {loc.badge && loc.badge !== 'Novo' && (
-                <p className="text-xs font-semibold text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-full px-2.5 py-0.5 inline-block mb-2">
-                  {loc.badge}
-                </p>
-              )}
-              <p className="text-sm text-cyan-600 mb-2">{loc.address}</p>
+              <h3 className="font-bold text-gray-900 mb-1">{loc.address}</h3>
+              <p className="text-xs text-cyan-600 mb-2">{loc.venue}</p>
               <p className="text-sm text-gray-500">{loc.description}</p>
             </Link>
           ))}
