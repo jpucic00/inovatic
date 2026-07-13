@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, ArrowUpRight, Trophy, Users, Award, Star, Clock } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Trophy, Award } from 'lucide-react'
 import { GearDecor } from '@/components/shared/decorations'
 
 export const metadata: Metadata = {
@@ -16,13 +17,14 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://udruga-inovatic.hr/o-nama' },
 }
 
-const team = [
+const team: { name: string; role: string; description: string; accent: string; image?: string }[] = [
   {
     name: 'Jozo Pivac',
     role: 'Predsjednik udruge',
     description:
       'Profesor informatike i tehničke kulture. Osnivač Inovatic udruge i vizionar iza programa koji spaja zabavu s pravim STEM znanjem.',
     accent: 'border-cyan-400',
+    image: '/images/predavaci/jozo-pivac.jpeg',
   },
   {
     name: 'Snježana Pivac',
@@ -48,12 +50,6 @@ const competitions = [
     url: 'https://wro-association.org/',
   },
   {
-    name: 'Croatian Makers League',
-    description: 'Hrvatsko natjecanje za mlade robotičare i makere.',
-    icon: Trophy,
-    url: 'https://croatianmakers.hr/',
-  },
-  {
     name: 'Natjecanje mladih tehničara (NMT)',
     description: 'Nacionalno natjecanje u tehničkoj kulturi i robotici.',
     icon: Trophy,
@@ -67,15 +63,15 @@ const competitions = [
   },
 ]
 
-const trainers = [
-  { name: 'Jozo Pivac', title: 'prof. inf. i tehničke kulture' },
-  { name: 'Bruno Bešlić', title: 'mag. educ. informatike i tehnike' },
+const trainers: { name: string; title: string; image?: string }[] = [
+  { name: 'Jozo Pivac', title: 'prof. inf. i tehničke kulture', image: '/images/predavaci/jozo-pivac.jpeg' },
+  { name: 'Bruno Bešlić', title: 'mag. educ. informatike i tehnike', image: '/images/predavaci/bruno-beslic.jpeg' },
   { name: 'Slavica Jurčević', title: 'mag. educ. inf.' },
   { name: 'Duje Topić', title: 'student Filozofskog fakulteta Split' },
-  { name: 'Josip Stepinac', title: 'student PMF-a, usmjerenje informatika i tehnika' },
-  { name: 'Ivan Stepinac', title: 'student FESB-a, smjer računarstvo' },
-  { name: 'Vito Drnjević', title: 'student FESB-a, smjer računarstvo' },
-  { name: 'Ivano Tabak', title: 'maturant, Elektrotehnička škola' },
+  { name: 'Josip Stepinac', title: 'student PMF-a, usmjerenje informatika i tehnika', image: '/images/predavaci/josip-stepinac.jpeg' },
+  { name: 'Ivan Stepinac', title: 'student FESB-a, smjer računarstvo', image: '/images/predavaci/ivan-stepinac.jpeg' },
+  { name: 'Vito Drnjević', title: 'student FESB-a, smjer računarstvo', image: '/images/predavaci/vito-drnjevic.jpeg' },
+  { name: 'Ivano Tabak', title: 'maturant, Elektrotehnička škola', image: '/images/predavaci/ivano-tabak.jpeg' },
 ]
 
 const memberships = [
@@ -85,10 +81,11 @@ const memberships = [
 ]
 
 const statCards = [
-  { value: '2014.', label: 'Godina osnivanja', icon: Star, bg: 'bg-yellow-50', border: 'border-yellow-200', color: 'text-yellow-600' },
-  { value: '2000+', label: 'Polaznika', icon: Users, bg: 'bg-emerald-50', border: 'border-emerald-200', color: 'text-emerald-600' },
-  { value: '50+', label: 'Natjecanja', icon: Trophy, bg: 'bg-orange-50', border: 'border-orange-200', color: 'text-orange-600' },
-  { value: '450+', label: 'Radionica godišnje', icon: Clock, bg: 'bg-cyan-50', border: 'border-cyan-200', color: 'text-cyan-600' },
+  { value: '2014.', label: 'Godina osnutka', bg: 'bg-cyan-50', border: 'border-cyan-200', color: 'text-cyan-600' },
+  { value: '30+', label: 'Partnerskih škola i ustanova', bg: 'bg-emerald-50', border: 'border-emerald-200', color: 'text-emerald-600' },
+  { value: '100+', label: 'Volontera, mentora i suradnika', bg: 'bg-blue-50', border: 'border-blue-200', color: 'text-blue-600' },
+  { value: '2', label: 'Nacionalna priznanja', bg: 'bg-amber-50', border: 'border-amber-200', color: 'text-amber-600' },
+  { value: '2', label: 'EU projekta', bg: 'bg-orange-50', border: 'border-orange-200', color: 'text-orange-600' },
 ]
 
 export default function AboutPage() {
@@ -140,7 +137,7 @@ export default function AboutPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               {statCards.map((item) => (
-                <div key={item.label} className={`${item.bg} border ${item.border} rounded-2xl p-5 text-center`}>
+                <div key={item.label} className={`${item.bg} border ${item.border} rounded-2xl p-5 text-center last:col-span-2`}>
                   <div className={`text-2xl font-extrabold ${item.color} mb-1`}>{item.value}</div>
                   <div className="text-xs text-gray-500">{item.label}</div>
                 </div>
@@ -166,9 +163,21 @@ export default function AboutPage() {
           <div className="grid md:grid-cols-2 gap-6 mb-4">
             {team.map((member) => (
               <div key={member.name} className={`bg-white rounded-2xl p-7 border border-gray-100 shadow-sm border-l-4 ${member.accent}`}>
-                <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg mb-4">
-                  {member.name.charAt(0)}
-                </div>
+                {member.image ? (
+                  <div className="relative w-12 h-12 mb-4 rounded-2xl overflow-hidden shadow-sm">
+                    <Image
+                      src={member.image}
+                      alt={member.name}
+                      fill
+                      sizes="48px"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg mb-4">
+                    {member.name.charAt(0)}
+                  </div>
+                )}
                 <h3 className="font-bold text-gray-900 text-lg mb-0.5">{member.name}</h3>
                 <p className="text-cyan-600 text-sm font-semibold mb-3">{member.role}</p>
                 <p className="text-gray-600 text-sm leading-relaxed">{member.description}</p>
@@ -191,9 +200,21 @@ export default function AboutPage() {
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
             {trainers.map((trainer) => (
               <div key={trainer.name} className="bg-cyan-50/60 border border-cyan-100 rounded-2xl p-5 text-center">
-                <div className="w-11 h-11 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-xl flex items-center justify-center text-white font-extrabold text-base mx-auto mb-3">
-                  {trainer.name.charAt(0)}
-                </div>
+                {trainer.image ? (
+                  <div className="relative w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden ring-2 ring-cyan-200 shadow-sm">
+                    <Image
+                      src={trainer.image}
+                      alt={trainer.name}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center text-white font-extrabold text-2xl mx-auto mb-3">
+                    {trainer.name.charAt(0)}
+                  </div>
+                )}
                 <h3 className="font-bold text-gray-900 text-sm mb-1">{trainer.name}</h3>
                 <p className="text-xs text-gray-500 leading-snug">{trainer.title}</p>
               </div>
