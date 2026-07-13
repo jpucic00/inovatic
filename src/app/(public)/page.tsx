@@ -119,7 +119,6 @@ export default async function HomePage() {
               {[
                 { name: 'FLL', url: 'https://www.firstlegoleague.org/' },
                 { name: 'WRO', url: 'https://wro-association.org/' },
-                { name: 'Croatian Makers League', url: 'https://croatianmakers.hr/' },
                 { name: 'NMT', url: 'https://www.hztk.hr/' },
                 { name: 'RoboCup', url: 'https://www.robocup.org/' },
               ].map((comp) => (
