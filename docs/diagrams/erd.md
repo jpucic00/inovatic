@@ -234,9 +234,23 @@ erDiagram
         string studentId FK
         string groupId FK
         string authorId FK
-        string moduleId FK "nullable"
         string content
-        CommentType type "COMMENT - MODULE_REVIEW"
+    }
+
+    StudentAssessment {
+        string id PK
+        string studentId FK "unique with groupId - one card per student per group"
+        string groupId FK
+        string authorId FK
+        SkillLevel slaganje "nullable - prakticne vjestine"
+        SkillLevel programiranje "nullable"
+        SkillLevel inovacije "nullable"
+        SkillLevel suradnja "nullable - timske vjestine"
+        SkillLevel komunikacija "nullable"
+        SkillLevel zabava "nullable"
+        string opisnaOcjena "nullable text"
+        RecommendationKind recommendationKind "nullable"
+        string recommendedCourseId FK "nullable - SetNull"
     }
 
     Course ||--o{ CourseModule : "has modules"
@@ -247,7 +261,6 @@ erDiagram
     CourseModule ||--o{ ModuleSchedule : "year instances"
     CourseModule ||--o{ Material : "MODULE scope content"
     CourseModule ||--o{ GalleryImage : "module gallery"
-    CourseModule ||--o{ StudentComment : "template reviews"
 
     ScheduledGroup ||--o{ TeacherAssignment : "assigned teachers"
     ScheduledGroup ||--o{ Enrollment : "students enrolled"
@@ -255,6 +268,7 @@ erDiagram
     ScheduledGroup ||--o{ MaterialGroupHide : "hides materials"
     ScheduledGroup ||--o{ GalleryImage : "gallery photos"
     ScheduledGroup ||--o{ StudentComment : "group notes"
+    ScheduledGroup ||--o{ StudentAssessment : "report cards"
 
     Course ||--o{ Material : "COURSE scope materials"
     Material ||--o{ MaterialGroupHide : "hidden in groups"
@@ -266,6 +280,9 @@ erDiagram
     User ||--o{ Attendance : "recordedBy"
     User ||--o{ StudentComment : "authored"
     User ||--o{ StudentComment : "about student"
+    User ||--o{ StudentAssessment : "authored"
+    User ||--o{ StudentAssessment : "assessed student"
+    Course ||--o{ StudentAssessment : "recommendedCourse - SetNull"
     User ||--o{ SchoolYearHoliday : "createdBy - nullable"
 
     SchoolYear ||--o{ SchoolYearHoliday : "year holidays"
@@ -294,7 +311,8 @@ erDiagram
 | CourseLevel | `SLR_1`, `SLR_2`, `SLR_3`, `SLR_4` |
 | InquiryType | `COURSE`, `PARTY` |
 | InquiryStatus | `NEW`, `PARTY_SCHEDULED`, `ACCOUNT_CREATED`, `DECLINED` |
-| CommentType | `COMMENT`, `MODULE_REVIEW` |
+| SkillLevel | `POCETNO`, `U_RAZVOJU`, `OSTVARENO` — the three report-card skill grades |
+| RecommendationKind | `COURSE`, `COMPETITION_PREP`, `COMPETITION_PROGRAM` — `COURSE` pairs with `recommendedCourseId` |
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
 | MaterialScope | `MODULE`, `COURSE`, `GROUP` |
 
@@ -367,7 +385,7 @@ Split and Šibenik run as fully separated tenants inside one app. "City" is the 
 
 **Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `SchoolYearHoliday`, and `Course` (nullable — `null` = shared standard SLR program, set = per-city radionica).
 
-**Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`Attendance`/`GalleryImage`/`TeacherAssignment`/`StudentComment`/`MaterialGroupHide` through their group, `ArticleImage`/`ArticleTag` through their article.
+**Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`Attendance`/`GalleryImage`/`TeacherAssignment`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `ArticleImage`/`ArticleTag` through their article.
 
 **Deliberately shared (no city):** the `SchoolYear` label registry, the `Tag` taxonomy, `CourseModule` templates, and MODULE/COURSE-scoped `Material` rows (one curriculum for both cities). GROUP-scoped materials are per-group, hence per-city.
 
@@ -415,7 +433,7 @@ But each `ScheduledGroup` runs on its own `dayOfWeek`, and `SchoolYearHoliday` r
 | MODULE-scoped material | `Material.moduleId → CourseModule` | No — inherited forward, shared by all cohorts |
 | COURSE-scoped material | `Material.courseId → Course` | No — applies program-wide (standard and radionice) |
 | GROUP-scoped material | `Material.scheduledGroupId → ScheduledGroup` | Yes — specific to one cohort/group |
-| Student feedback / module reviews | `StudentComment.moduleId → CourseModule` | Stays on the template |
+| Student feedback | `StudentComment` (notes) + `StudentAssessment` (report card, unique per `studentId+groupId`) | Group-scoped — no template link since 2026-07 (MODULE_REVIEW removed) |
 
 ### Unique constraint
 
