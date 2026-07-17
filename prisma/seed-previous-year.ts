@@ -126,6 +126,7 @@ async function checkPrerequisites() {
 async function cleanup() {
   await prisma.attendance.deleteMany({ where: { enrollment: { schoolYear: SCHOOL_YEAR } } })
   await prisma.studentComment.deleteMany({ where: { group: { schoolYear: SCHOOL_YEAR } } })
+  await prisma.studentAssessment.deleteMany({ where: { group: { schoolYear: SCHOOL_YEAR } } })
   await prisma.moduleEnrollment.deleteMany({ where: { enrollment: { schoolYear: SCHOOL_YEAR } } })
   await prisma.enrollment.deleteMany({ where: { schoolYear: SCHOOL_YEAR } })
   await prisma.teacherAssignment.deleteMany({ where: { scheduledGroup: { schoolYear: SCHOOL_YEAR } } })

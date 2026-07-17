@@ -1291,6 +1291,7 @@ async function main() {
   await prisma.inquiry.deleteMany()
   await prisma.teacherAssignment.deleteMany()
   await prisma.studentComment.deleteMany()
+  await prisma.studentAssessment.deleteMany()
   await prisma.scheduledGroup.deleteMany()
   await prisma.courseModule.deleteMany()
   await prisma.course.deleteMany()
@@ -2005,7 +2006,7 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Čestitamo svim našim polaznicima koji su vrijedno i marljivo radili ovu godinu te se veselimo novoj školskoj godini za koju se već sad možete predbilježiti za `, styles: {} },
-            { type: 'link', href: `https://udruga-inovatic.hr/prijave/`, content: [{ type: 'text', text: `ogledne radionice`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `ogledne radionice`, styles: {} }] },
             { type: 'text', text: ` u rujnu.`, styles: {} },
           ],
         },
@@ -2223,7 +2224,7 @@ async function main() {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Čestitamo svim našim polaznicima koji su vrijedno i marljivo radili ovu godinu te se veselimo novoj školskoj godini za koju se već sad možete predbilježiti za `, styles: {} },
-            { type: 'link', href: `https://udruga-inovatic.hr/prijave/`, content: [{ type: 'text', text: `ogledne radionice`, styles: {} }] },
+            { type: 'link', href: `/upisi`, content: [{ type: 'text', text: `ogledne radionice`, styles: {} }] },
             { type: 'text', text: ` u rujnu.`, styles: {} },
           ],
         },
@@ -7951,7 +7952,7 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2026-05-15'),
-      coverImage: 'https://udruga-inovatic.hr/wp-content/uploads/2024/06/WEB_1.jpg',
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784273273/articles/covers/ljetni-kampovi-lego-robotike-2026.jpg',
     },
   })
 
@@ -8168,7 +8169,7 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2026-07-08'),
-      coverImage: 'https://udruga-inovatic.hr/wp-content/uploads/2026/07/Web_Cover.jpg',
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784273274/articles/covers/wro-2026-drzavno-finale.jpg',
     },
   })
 
@@ -8249,7 +8250,7 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
       authorId: admin.id,
       isPublished: true,
       publishedAt: new Date('2026-07-10'),
-      coverImage: 'https://udruga-inovatic.hr/wp-content/uploads/2026/07/Web_Cover-1.jpg',
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784273275/articles/covers/zavrsena-skolska-godina-radionica-robotike.jpg',
     },
   })
 
