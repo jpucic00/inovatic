@@ -119,21 +119,17 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await page.getByRole('button', { name: 'Spremi' }).click()
     await expect(page.getByText('Evidencija spremljena.')).toBeVisible({ timeout: 30000 })
 
+    // Fill the structured report card (Ocjena) — replaced MODULE_REVIEW 2026-07.
     await page.goto(`${BASE}/nastavnik/ucenik/${seeded.studentId}`)
     await page.waitForLoadState('domcontentloaded')
-    const textarea = page.getByPlaceholder(/Napišite komentar o polazniku|Napišite ocjenu modula/)
-    await textarea.waitFor({ state: 'visible', timeout: 30000 })
-    await page.getByRole('button', { name: 'Ocjena modula' }).click()
-    const moduleTrigger = page.getByRole('combobox', { name: /Modul/ })
-    if (await moduleTrigger.isVisible()) {
-      await moduleTrigger.click()
-      await page.getByRole('option').first().click()
-    }
-    await textarea.fill(REVIEW_TEXT)
-    const submit = page.getByRole('button', { name: /Dodaj komentar|Dodaj ocjenu/ })
-    await expect(submit).toBeEnabled({ timeout: 10000 })
-    await submit.click()
-    await expect(page.getByText(/Komentar dodan\.|Ocjena dodana\./)).toBeVisible({ timeout: 30000 })
+    const opisnaInput = page.getByLabel('Opisna ocjena')
+    await opisnaInput.waitFor({ state: 'visible', timeout: 30000 })
+    await page.getByRole('button', { name: 'Ostvareno' }).first().click()
+    await opisnaInput.fill(REVIEW_TEXT)
+    const saveCard = page.getByRole('button', { name: 'Spremi ocjenu' })
+    await expect(saveCard).toBeEnabled({ timeout: 10000 })
+    await saveCard.click()
+    await expect(page.getByText('Ocjena spremljena.')).toBeVisible({ timeout: 30000 })
   })
 
   test('admin sees attendance + review on the student page for the current school year', async ({ page }) => {
@@ -146,7 +142,10 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await expect(page.getByText(/10\.\s?03\.\s?2026\./).first()).toBeVisible()
     await expect(page.getByText('Prisutan').first()).toBeVisible()
 
-    await expect(page.getByText(REVIEW_TEXT)).toBeVisible()
+    await expect(page.getByLabel('Opisna ocjena').first()).toHaveValue(REVIEW_TEXT)
+    await expect(
+      page.getByRole('button', { name: 'Ostvareno' }).first(),
+    ).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByText(/20\d{2}\/20\d{2}/).first()).toBeVisible()
   })
 
@@ -167,8 +166,8 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
       expect(body).not.toContain(REVIEW_TEXT.toLowerCase())
       expect(body).not.toContain('evidencija dolaska')
       expect(body).not.toContain('odsutan')
-      expect(body).not.toContain('ocjena modula')
-      expect(body).not.toContain('bilješke i recenzije')
+      expect(body).not.toContain('opisna ocjena')
+      expect(body).not.toContain('preporuka')
     }
   })
 

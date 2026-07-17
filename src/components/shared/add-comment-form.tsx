@@ -51,6 +51,7 @@ export function AddCommentForm({
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
+        aria-label="Komentar o polazniku"
         placeholder="Napišite komentar o polazniku..."
         rows={2}
         maxLength={2000}

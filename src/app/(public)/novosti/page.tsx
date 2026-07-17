@@ -81,11 +81,20 @@ function NewsCityFilter({ active }: Readonly<{ active: City | null }>) {
     ].join(' ')
   return (
     <div className="flex flex-wrap justify-center gap-2 mb-10">
-      <Link href="/novosti" className={pillClass(!active)}>
+      <Link
+        href="/novosti"
+        className={pillClass(!active)}
+        aria-current={active ? undefined : 'page'}
+      >
         Sve
       </Link>
       {CITY_VALUES.map((c) => (
-        <Link key={c} href={`/novosti?grad=${citySlug(c)}`} className={pillClass(active === c)}>
+        <Link
+          key={c}
+          href={`/novosti?grad=${citySlug(c)}`}
+          className={pillClass(active === c)}
+          aria-current={active === c ? 'page' : undefined}
+        >
           {CITY_LABELS[c]}
         </Link>
       ))}

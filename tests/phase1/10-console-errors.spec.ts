@@ -34,7 +34,7 @@ test.describe('Console Errors — No JavaScript errors on any public page', () =
 
   test('All public pages produce zero console errors', async ({ page }) => {
     const errorsByPage: Record<string, string[]> = {}
-    const paths = ['/', '/programi', '/programi/slr-1', '/o-nama', '/novosti', '/upisi', '/lokacije', '/lokacije/split', '/lokacije/sibenik', '/proslave']
+    const paths = ['/', '/programi', '/programi/slr-1', '/o-nama', '/novosti', '/upisi', '/lokacije', '/lokacije/split', '/lokacije/sibenik', '/proslave', '/donacije']
 
     for (const path of paths) {
       await test.step(`Check ${path} for JavaScript errors`, async () => {

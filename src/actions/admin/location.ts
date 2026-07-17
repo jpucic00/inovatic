@@ -52,7 +52,7 @@ export async function deleteLocation(id: string): Promise<AdminActionResult> {
     where: { id },
     select: { city: true },
   })
-  if (!location || location.city !== city) notFound()
+  if (location?.city !== city) notFound()
 
   try {
     await db.location.delete({ where: { id } })

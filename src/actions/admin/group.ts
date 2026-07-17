@@ -204,7 +204,7 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
     where: { id: locationId },
     select: { city: true },
   })
-  if (!location || location.city !== city) {
+  if (location?.city !== city) {
     return { success: false, error: 'Odabrana lokacija ne pripada vašem gradu.' }
   }
 
@@ -300,7 +300,7 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
       where: { id: locationId },
       select: { city: true },
     })
-    if (!location || location.city !== city) {
+    if (location?.city !== city) {
       return { success: false, error: 'Odabrana lokacija ne pripada vašem gradu.' }
     }
   }
@@ -369,6 +369,7 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
             preferredInquiries: true,
             materials: true,
             studentComments: true,
+            studentAssessments: true,
             galleryImages: true,
           },
         },
@@ -391,6 +392,9 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
     }
     if (group._count.studentComments > 0) {
       return { success: false, error: 'Grupa ima komentare i ne može se obrisati.' }
+    }
+    if (group._count.studentAssessments > 0) {
+      return { success: false, error: 'Grupa ima ocjene i ne može se obrisati.' }
     }
     if (group._count.galleryImages > 0) {
       return { success: false, error: 'Grupa ima slike u galeriji i ne može se obrisati.' }

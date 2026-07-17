@@ -417,7 +417,7 @@ export async function unassignTeacherFromGroup(
       },
     })
     // Cross-city assignments are indistinguishable from nonexistent ones.
-    if (!assignment || assignment.scheduledGroup.city !== city) {
+    if (assignment?.scheduledGroup.city !== city) {
       return { success: false, error: 'Dodjela nije pronađena.' }
     }
 

@@ -44,7 +44,6 @@ export function Navbar() {
                 <div key={link.href} className="relative group">
                   <Link
                     href={link.href}
-                    aria-haspopup="menu"
                     className={cn(
                       'flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-md transition-colors',
                       isActive(link.href)

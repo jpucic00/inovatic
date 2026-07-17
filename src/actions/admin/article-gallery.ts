@@ -37,7 +37,7 @@ export async function addGalleryImages(
       where: { id: articleId },
       select: { slug: true, isPublished: true, city: true },
     })
-    if (!article || article.city !== city) {
+    if (article?.city !== city) {
       return { success: false, error: 'Članak nije pronađen.' }
     }
 
@@ -84,7 +84,7 @@ export async function removeGalleryImage(
         article: { select: { id: true, slug: true, isPublished: true, city: true } },
       },
     })
-    if (!image || image.article.city !== city) {
+    if (image?.article.city !== city) {
       return { success: false, error: 'Slika nije pronađena.' }
     }
 
@@ -122,7 +122,7 @@ export async function reorderGalleryImage(
         article: { select: { slug: true, isPublished: true, city: true } },
       },
     })
-    if (!current || current.article.city !== city) {
+    if (current?.article.city !== city) {
       return { success: false, error: 'Slika nije pronađena.' }
     }
 

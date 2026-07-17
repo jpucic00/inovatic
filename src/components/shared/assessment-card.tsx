@@ -145,10 +145,9 @@ export function AssessmentCard({
     })
   }
 
+  const authorSuffix = initial?.authorName ? ` · ${initial.authorName}` : ''
   const savedLine = initial?.updatedAt
-    ? `Spremljeno ${formatDate(new Date(initial.updatedAt))}${
-        initial.authorName ? ` · ${initial.authorName}` : ''
-      }`
+    ? `Spremljeno ${formatDate(new Date(initial.updatedAt))}${authorSuffix}`
     : 'Još nije ocijenjeno'
 
   return (
@@ -182,6 +181,7 @@ export function AssessmentCard({
                     {skill.label}
                   </span>
                   <SkillLevelControl
+                    label={skill.label}
                     value={skills[skill.key]}
                     onChange={(v) => setSkill(skill.key, v)}
                     disabled={isPending}

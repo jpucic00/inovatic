@@ -52,4 +52,45 @@ test.describe('News & Articles — Listing, detail pages, and 404 handling', () 
       expect(response?.status()).toBe(404)
     })
   })
+
+  test('City filter: pills render, ?grad=sibenik activates Šibenik, unknown grad falls back to Sve', async ({ page }) => {
+    await test.step('Default /novosti shows all three pills with "Sve" active', async () => {
+      await page.goto(`${BASE}/novosti`)
+      for (const label of ['Sve', 'Split', 'Šibenik']) {
+        await expect(
+          page.getByRole('link', { name: label, exact: true }).first(),
+          `filter pill "${label}" is rendered`,
+        ).toBeVisible()
+      }
+      await expect(
+        page.getByRole('link', { name: 'Sve', exact: true }),
+        '"Sve" pill is marked as the active filter',
+      ).toHaveAttribute('aria-current', 'page')
+    })
+
+    await test.step('?grad=sibenik marks the Šibenik pill active and keeps grad in pagination', async () => {
+      await page.goto(`${BASE}/novosti?grad=sibenik`)
+      await expect(
+        page.getByRole('link', { name: 'Šibenik', exact: true }),
+        'Šibenik pill is active under ?grad=sibenik',
+      ).toHaveAttribute('aria-current', 'page')
+
+      // Pagination only renders past one page of articles — assert the filter
+      // is preserved in its hrefs whenever it is present.
+      const pagLinks = page.locator('a[href*="stranica="]')
+      const count = await pagLinks.count()
+      for (let i = 0; i < count; i++) {
+        const href = await pagLinks.nth(i).getAttribute('href')
+        expect(href, 'pagination link preserves the grad filter').toContain('grad=sibenik')
+      }
+    })
+
+    await test.step('Unknown ?grad=zagreb falls back to the unfiltered list', async () => {
+      await page.goto(`${BASE}/novosti?grad=zagreb`)
+      await expect(
+        page.getByRole('link', { name: 'Sve', exact: true }),
+        'invalid grad param resolves to "Sve"',
+      ).toHaveAttribute('aria-current', 'page')
+    })
+  })
 })

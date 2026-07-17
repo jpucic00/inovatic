@@ -8,6 +8,7 @@ import {
   createInquiry,
   createGroup,
   createMaterial,
+  createTeacher,
 } from './helpers/factory'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -62,5 +63,17 @@ describe('deleteStudent — atomic detach (P3)', () => {
     expect(await db.user.count({ where: { id: student.id } })).toBe(1)
     const after = await db.inquiry.findUnique({ where: { id: inquiry.id } })
     expect(after?.studentId).toBe(student.id)
+  })
+
+  it('refuses to hard-delete a TEACHER id — wrong-role ids read as missing', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    // Same city, wrong role: staff accounts are soft-deleted via deleteTeacher
+    // and must never be reachable through the student hard-delete.
+    const teacher = await createTeacher()
+
+    await expect(deleteStudent(teacher.id)).rejects.toThrow()
+    expect(await db.user.count({ where: { id: teacher.id } })).toBe(1)
   })
 })

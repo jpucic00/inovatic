@@ -25,7 +25,7 @@ export async function deleteModuleEnrollment(id: string): Promise<AdminActionRes
       },
     })
     // Cross-city rows answer exactly like nonexistent ones.
-    if (!moduleEnrollment || moduleEnrollment.enrollment.scheduledGroup.city !== city) {
+    if (moduleEnrollment?.enrollment.scheduledGroup.city !== city) {
       return { success: false, error: 'Upis u modul nije pronađen.' }
     }
 
@@ -69,7 +69,7 @@ export async function closeModuleSchedule(
     })
     // Schedules are per-city rows: closing by id only ever ends the caller's
     // city's module. Cross-city ids read as nonexistent.
-    if (!schedule || schedule.city !== city) {
+    if (schedule?.city !== city) {
       return { success: false, error: 'Modul nije pronađen.' }
     }
 
@@ -108,7 +108,7 @@ export async function addModuleEnrollment(
       where: { id: enrollmentId },
       select: { schoolYear: true, scheduledGroup: { select: { city: true } } },
     })
-    if (!enrollment || enrollment.scheduledGroup.city !== city) {
+    if (enrollment?.scheduledGroup.city !== city) {
       return { success: false, error: 'Upis nije pronađen.' }
     }
 
@@ -122,7 +122,7 @@ export async function addModuleEnrollment(
       where: { id: moduleScheduleId },
       select: { city: true },
     })
-    if (!schedule || schedule.city !== enrollment.scheduledGroup.city) {
+    if (schedule?.city !== enrollment.scheduledGroup.city) {
       return { success: false, error: 'Modul nije pronađen.' }
     }
 

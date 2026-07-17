@@ -23,6 +23,7 @@ test.describe('Public Pages — All routes return HTTP 200', () => {
     { path: '/lokacije/split', name: 'Split — venues, coordinators, maps' },
     { path: '/lokacije/sibenik', name: 'Šibenik — Trokut inkubator' },
     { path: '/proslave', name: 'Birthday parties — LEGO robotics celebrations' },
+    { path: '/donacije', name: 'Donations — WRO olympiad fundraising' },
   ]
 
   for (const p of pages) {
@@ -33,4 +34,19 @@ test.describe('Public Pages — All routes return HTTP 200', () => {
       })
     })
   }
+
+  test('Legacy /kontakt permanently redirects to /lokacije', async ({ page }) => {
+    await test.step('GET /kontakt and follow the redirect chain', async () => {
+      const response = await page.goto(`${BASE}/kontakt`)
+      expect(response?.status(), 'redirect target should render OK').toBe(200)
+      expect(page.url(), 'old contact URL must land on /lokacije').toBe(`${BASE}/lokacije`)
+    })
+  })
+
+  test('Unknown city slug under /lokacije returns HTTP 404', async ({ page }) => {
+    await test.step('GET /lokacije/zagreb', async () => {
+      const response = await page.goto(`${BASE}/lokacije/zagreb`)
+      expect(response?.status(), 'cityFromSlug must fail closed').toBe(404)
+    })
+  })
 })

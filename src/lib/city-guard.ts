@@ -11,7 +11,7 @@ export async function assertGroupInCity(groupId: string, city: City): Promise<vo
     where: { id: groupId },
     select: { city: true },
   })
-  if (!row || row.city !== city) notFound()
+  if (row?.city !== city) notFound()
 }
 
 export async function assertUserInCity(userId: string, city: City): Promise<void> {
@@ -19,7 +19,7 @@ export async function assertUserInCity(userId: string, city: City): Promise<void
     where: { id: userId },
     select: { city: true },
   })
-  if (!row || row.city !== city) notFound()
+  if (row?.city !== city) notFound()
 }
 
 export async function assertInquiryInCity(inquiryId: string, city: City): Promise<void> {
@@ -27,7 +27,7 @@ export async function assertInquiryInCity(inquiryId: string, city: City): Promis
     where: { id: inquiryId },
     select: { city: true },
   })
-  if (!row || row.city !== city) notFound()
+  if (row?.city !== city) notFound()
 }
 
 export async function assertArticleInCity(articleId: string, city: City): Promise<void> {
@@ -35,5 +35,5 @@ export async function assertArticleInCity(articleId: string, city: City): Promis
     where: { id: articleId },
     select: { city: true },
   })
-  if (!row || row.city !== city) notFound()
+  if (row?.city !== city) notFound()
 }

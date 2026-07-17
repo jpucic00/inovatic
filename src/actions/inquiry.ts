@@ -67,7 +67,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
         // Fail closed: a group must belong to the submitted city. The client
         // only offers same-city groups, so a mismatch is a stale/tampered
         // payload — reject rather than mis-file the inquiry cross-city.
-        if (!group || group.city !== city) throw new GroupCityMismatchError()
+        if (group?.city !== city) throw new GroupCityMismatchError()
         schoolYear = group.schoolYear
       }
       return tx.inquiry.create({

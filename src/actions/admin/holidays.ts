@@ -210,7 +210,7 @@ export async function removeHoliday(input: RemoveHolidayInput): Promise<AdminAct
     select: { schoolYear: true, city: true },
   })
   // Cross-city rows answer exactly like nonexistent ones.
-  if (!row || row.city !== city) {
+  if (row?.city !== city) {
     return { success: false, error: 'Praznik nije pronađen.' }
   }
 

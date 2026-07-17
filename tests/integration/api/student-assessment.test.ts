@@ -74,6 +74,7 @@ describe('upsertAssessment / clearAssessment — admin', () => {
     mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
     const student = await createStudent({ city: 'SPLIT' })
     const group = await createGroup({ city: 'SPLIT' })
+    await createEnrollment(student.id, group.id, { schoolYear: group.schoolYear })
     const slr2 = await createStandardCourseWithLevel()
 
     const res = await upsertAssessment({
@@ -96,6 +97,7 @@ describe('upsertAssessment / clearAssessment — admin', () => {
     mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
     const student = await createStudent({ city: 'SPLIT' })
     const group = await createGroup({ city: 'SPLIT' })
+    await createEnrollment(student.id, group.id, { schoolYear: group.schoolYear })
     const radionica = await createCourse({ isCustom: true })
 
     const res = await upsertAssessment({
@@ -118,6 +120,7 @@ describe('upsertAssessment / clearAssessment — admin', () => {
     const student = await createStudent({ city: 'SPLIT' })
     const radionicaCourse = await createCourse({ isCustom: true })
     const group = await createGroup({ city: 'SPLIT', courseId: radionicaCourse.id })
+    await createEnrollment(student.id, group.id, { schoolYear: group.schoolYear })
 
     const res = await upsertAssessment({
       studentId: student.id,
@@ -125,6 +128,26 @@ describe('upsertAssessment / clearAssessment — admin', () => {
       slaganje: 'OSTVARENO',
     })
     expect(res.success).toBe(false)
+    expect(
+      await db.studentAssessment.findMany({ where: { groupId: group.id } }),
+    ).toHaveLength(0)
+  })
+
+  it('rejects grading a student who is not enrolled in the group', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    const student = await createStudent({ city: 'SPLIT' })
+    const group = await createGroup({ city: 'SPLIT' })
+
+    const res = await upsertAssessment({
+      studentId: student.id,
+      groupId: group.id,
+      slaganje: 'OSTVARENO',
+    })
+    expect(res).toEqual({
+      success: false,
+      error: 'Učenik nije upisan u ovu grupu.',
+    })
     expect(
       await db.studentAssessment.findMany({ where: { groupId: group.id } }),
     ).toHaveLength(0)
@@ -222,6 +245,23 @@ describe('upsertTeacherAssessment / clearTeacherAssessment — teacher', () => {
     ).rejects.toThrow()
     expect(
       await db.studentAssessment.findMany({ where: { groupId: group.id } }),
+    ).toHaveLength(0)
+  })
+
+  it('rejects an assigned teacher grading a student enrolled only in a different group (404)', async () => {
+    const teacher = await createTeacher()
+    const groupA = await createGroup()
+    const groupB = await createGroup()
+    const student = await createStudent()
+    await createEnrollment(student.id, groupB.id, { schoolYear: groupB.schoolYear })
+    await createTeacherAssignment(teacher.id, groupA.id)
+    mockSession({ id: teacher.id, role: 'TEACHER' })
+
+    await expect(
+      upsertTeacherAssessment({ studentId: student.id, groupId: groupA.id }),
+    ).rejects.toThrow()
+    expect(
+      await db.studentAssessment.findMany({ where: { groupId: groupA.id } }),
     ).toHaveLength(0)
   })
 

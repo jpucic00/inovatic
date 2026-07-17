@@ -26,7 +26,7 @@ export async function setModulePaid(
       },
     })
     // Cross-city rows answer exactly like nonexistent ones.
-    if (!row || row.enrollment.scheduledGroup.city !== city) {
+    if (row?.enrollment.scheduledGroup.city !== city) {
       return { success: false, error: 'Upis u modul nije pronađen.' }
     }
 
@@ -55,7 +55,7 @@ export async function setEnrollmentYearPaid(
       where: { id: d.enrollmentId },
       select: { userId: true, scheduledGroup: { select: { city: true } } },
     })
-    if (!row || row.scheduledGroup.city !== city) {
+    if (row?.scheduledGroup.city !== city) {
       return { success: false, error: 'Upis nije pronađen.' }
     }
 

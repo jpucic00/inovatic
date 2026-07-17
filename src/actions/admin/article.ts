@@ -196,7 +196,7 @@ export async function autosaveArticle(
       },
     })
     // Fail closed: a cross-city id is indistinguishable from a missing one.
-    if (!existing || existing.city !== city) {
+    if (existing?.city !== city) {
       return { success: false, error: 'Članak nije pronađen.' }
     }
 
@@ -261,7 +261,7 @@ export async function publishArticle(id: string): Promise<AdminActionResult> {
       where: { id },
       select: { slug: true, publishedAt: true, city: true },
     })
-    if (!article || article.city !== city) {
+    if (article?.city !== city) {
       return { success: false, error: 'Članak nije pronađen.' }
     }
 
@@ -292,7 +292,7 @@ export async function unpublishArticle(id: string): Promise<AdminActionResult> {
       where: { id },
       select: { slug: true, city: true },
     })
-    if (!article || article.city !== city) {
+    if (article?.city !== city) {
       return { success: false, error: 'Članak nije pronađen.' }
     }
 
@@ -326,7 +326,7 @@ export async function deleteArticle(id: string): Promise<AdminActionResult> {
         images: { select: { url: true } },
       },
     })
-    if (!article || article.city !== city) {
+    if (article?.city !== city) {
       return { success: false, error: 'Članak nije pronađen.' }
     }
 

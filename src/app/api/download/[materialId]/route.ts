@@ -7,6 +7,45 @@ import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
 
 export const runtime = 'nodejs'
 
+/** A student may download a material iff it is visible in one of their groups. */
+async function studentAllowed(
+  userId: string,
+  materialId: string,
+): Promise<boolean> {
+  const enrollments = await db.enrollment.findMany({
+    where: { userId },
+    select: {
+      scheduledGroup: {
+        select: {
+          id: true,
+          course: {
+            select: {
+              id: true,
+              isCustom: true,
+              modules: { select: { id: true } },
+            },
+          },
+        },
+      },
+    },
+  })
+  if (enrollments.length === 0) return false
+
+  const whereClauses = enrollments.map((e) =>
+    buildEffectiveMaterialsWhere({
+      scheduledGroupId: e.scheduledGroup.id,
+      courseId: e.scheduledGroup.course.id,
+      moduleIds: e.scheduledGroup.course.modules.map((m) => m.id),
+    }),
+  )
+
+  const visible = await db.material.findFirst({
+    where: { AND: [{ id: materialId }, { OR: whereClauses }] },
+    select: { id: true },
+  })
+  return visible !== null
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ materialId: string }> },
@@ -53,40 +92,7 @@ export async function GET(
     const target = materialTarget(material)
     allowed = target !== null && (await canManageMaterial(session, target))
   } else if (role === 'STUDENT') {
-    const enrollments = await db.enrollment.findMany({
-      where: { userId: session.user.id },
-      select: {
-        scheduledGroup: {
-          select: {
-            id: true,
-            course: {
-              select: {
-                id: true,
-                isCustom: true,
-                modules: { select: { id: true } },
-              },
-            },
-          },
-        },
-      },
-    })
-
-    if (enrollments.length > 0) {
-      const whereClauses = enrollments.map((e) =>
-        buildEffectiveMaterialsWhere({
-          scheduledGroupId: e.scheduledGroup.id,
-          courseId: e.scheduledGroup.course.id,
-          moduleIds: e.scheduledGroup.course.modules.map((m) => m.id),
-        }),
-      )
-
-      const visible = await db.material.findFirst({
-        where: { AND: [{ id: materialId }, { OR: whereClauses }] },
-        select: { id: true },
-      })
-
-      allowed = visible !== null
-    }
+    allowed = await studentAllowed(session.user.id, materialId)
   }
 
   if (!allowed) {

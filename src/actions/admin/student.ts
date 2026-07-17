@@ -6,6 +6,7 @@ import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertUserInCity } from '@/lib/city-guard'
 import { buildStudentDetailForAdmin } from '@/lib/student-detail'
 import { revalidatePath } from 'next/cache'
+import { notFound } from 'next/navigation'
 import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
 import {
   createStudentSchema,
@@ -193,6 +194,16 @@ type CoreResult = {
   } | null
 }
 
+function buildParentBackfill(input: CoreInput): Prisma.UserUpdateInput {
+  const backfill: Prisma.UserUpdateInput = {}
+  if (input.parentName) backfill.parentName = input.parentName
+  if (input.parentEmail) backfill.parentEmail = input.parentEmail
+  if (input.parentPhone) backfill.parentPhone = input.parentPhone
+  if (input.childSchool) backfill.childSchool = input.childSchool
+  if (input.gdprConsentAt) backfill.gdprConsentAt = input.gdprConsentAt
+  return backfill
+}
+
 async function findOrCreateStudent(
   tx: TxClient,
   input: CoreInput,
@@ -210,12 +221,7 @@ async function findOrCreateStudent(
   }
 
   if (existingStudent) {
-    const backfill: Prisma.UserUpdateInput = {}
-    if (input.parentName) backfill.parentName = input.parentName
-    if (input.parentEmail) backfill.parentEmail = input.parentEmail
-    if (input.parentPhone) backfill.parentPhone = input.parentPhone
-    if (input.childSchool) backfill.childSchool = input.childSchool
-    if (input.gdprConsentAt) backfill.gdprConsentAt = input.gdprConsentAt
+    const backfill = buildParentBackfill(input)
     if (Object.keys(backfill).length > 0) {
       await tx.user.update({
         where: { id: existingStudent.id },
@@ -388,7 +394,7 @@ export async function createStudentFromInquiry(
   // Cross-city inquiries read as nonexistent — this is a dialog-driven action,
   // so it keeps the error-result contract instead of throwing notFound().
   const inquiryPreview = await db.inquiry.findUnique({ where: { id: inquiryId } })
-  if (!inquiryPreview || inquiryPreview.city !== city) {
+  if (inquiryPreview?.city !== city) {
     return { success: false, error: 'Upit nije pronađen.' }
   }
   if (inquiryPreview.status === 'ACCOUNT_CREATED') {
@@ -653,7 +659,7 @@ export async function addEnrollment(
     where: { id: studentId, role: 'STUDENT' },
     select: { id: true, city: true },
   })
-  if (!student || student.city !== city) {
+  if (student?.city !== city) {
     return { success: false, error: 'Učenik nije pronađen.' }
   }
 
@@ -661,7 +667,7 @@ export async function addEnrollment(
     where: { id: groupId },
     select: { id: true, schoolYear: true, city: true },
   })
-  if (!groupPreview || groupPreview.city !== city) {
+  if (groupPreview?.city !== city) {
     return { success: false, error: 'Grupa nije pronađena.' }
   }
 
@@ -702,7 +708,7 @@ export async function removeModuleEnrollment(
     where: { id: moduleEnrollmentId },
     select: { enrollment: { select: { scheduledGroup: { select: { city: true } } } } },
   })
-  if (!row || row.enrollment.scheduledGroup.city !== city) {
+  if (row?.enrollment.scheduledGroup.city !== city) {
     return { success: false, error: 'Upis u modul nije pronađen.' }
   }
 
@@ -819,7 +825,7 @@ export async function getStudents(
 export async function getStudent(id: string) {
   const { city } = await requireAdminCtx()
   await assertUserInCity(id, city)
-  return buildStudentDetailForAdmin(id)
+  return buildStudentDetailForAdmin(id, city)
 }
 
 export async function deleteEnrollment(enrollmentId: string): Promise<AdminActionResult> {
@@ -832,7 +838,7 @@ export async function deleteEnrollment(enrollmentId: string): Promise<AdminActio
       where: { id: enrollmentId },
       select: { userId: true, scheduledGroup: { select: { city: true } } },
     })
-    if (!enrollment || enrollment.scheduledGroup.city !== city) {
+    if (enrollment?.scheduledGroup.city !== city) {
       return { success: false, error: 'Upis nije pronađen.' }
     }
 
@@ -851,7 +857,15 @@ export async function deleteStudent(studentId: string): Promise<AdminActionResul
   const { city } = await requireAdminCtx()
 
   if (!studentId) return { success: false, error: 'ID nije pronađen.' }
-  await assertUserInCity(studentId, city)
+
+  // Hard-delete is for STUDENT rows only — a same-city TEACHER/ADMIN id must
+  // not bypass deleteTeacher's soft-delete. Wrong-role and cross-city ids both
+  // read as missing, matching the city-guard notFound() convention.
+  const target = await db.user.findFirst({
+    where: { id: studentId, role: 'STUDENT' },
+    select: { city: true },
+  })
+  if (target?.city !== city) notFound()
 
   try {
     await db.$transaction(async (tx) => {

@@ -51,6 +51,13 @@ test.describe('SEO — Sitemap, robots.txt, article OG tags, and JSON-LD', () =>
       const content = await page.content()
       expect(content).toContain('urlset')
     })
+
+    await test.step('Verify sitemap lists the 2026-07 routes (donacije + lokacije)', async () => {
+      const content = await page.content()
+      for (const path of ['/donacije', '/lokacije', '/lokacije/split', '/lokacije/sibenik']) {
+        expect(content, `sitemap should contain ${path}`).toContain(path)
+      }
+    })
   })
 
   test('Robots.txt is accessible, allows public routes, and blocks private routes', async ({ page }) => {

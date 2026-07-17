@@ -17,10 +17,12 @@ import {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Phase 3 Step 15 — Comments UI (consolidated)
 // 10 single-assertion tests merged into 3 flow tests:
-//   1. teacher comment-lifecycle (add COMMENT + MODULE_REVIEW + delete own)
+//   1. teacher comment-lifecycle (add COMMENT + fill the report card + delete own)
 //   2. cross-author authz (admin can delete teacher's; teacher cannot delete
 //      admin's; teacher B 404 on teacher A's student)
 //   3. hard gates (portal leakage + cross-group create rejection)
+// 2026-07: MODULE_REVIEW was replaced by the structured StudentAssessment
+// report card (Ocjena) — the review branches now drive the AssessmentCard.
 // Each merged test uses test.step() blocks so the HTML report still pinpoints
 // which assertion failed; descriptive `expect(..., 'why')` labels are added.
 //
@@ -75,25 +77,32 @@ async function submitStudentComment(
   page: Page,
   studentId: string,
   content: string,
-  type: 'COMMENT' | 'MODULE_REVIEW',
 ) {
   await page.goto(`${BASE}/nastavnik/ucenik/${studentId}`)
   await page.waitForLoadState('domcontentloaded')
-  const textarea = page.getByPlaceholder(/Napišite komentar o polazniku|Napišite ocjenu modula/)
+  const textarea = page.getByPlaceholder(/Napišite komentar o polazniku/)
   await textarea.waitFor({ state: 'visible', timeout: 30000 })
-  if (type === 'MODULE_REVIEW') {
-    await page.getByRole('button', { name: 'Ocjena modula' }).click()
-    const moduleTrigger = page.getByRole('combobox', { name: /Modul/ })
-    if (await moduleTrigger.isVisible()) {
-      await moduleTrigger.click()
-      await page.getByRole('option').first().click()
-    }
-  }
   await textarea.fill(content)
-  const submit = page.getByRole('button', { name: /Dodaj komentar|Dodaj ocjenu/ })
+  const submit = page.getByRole('button', { name: /Dodaj komentar/ })
   await expect(submit).toBeEnabled({ timeout: 10000 })
   await submit.click()
-  await expect(page.getByText(/Komentar dodan\.|Ocjena dodana\./)).toBeVisible({ timeout: 30000 })
+  await expect(page.getByText('Komentar dodan.')).toBeVisible({ timeout: 30000 })
+}
+
+/** Fills the structured report card (Ocjena): first skill → Ostvareno, opisna
+ *  ocjena text, then Spremi. The student is enrolled in exactly one standard
+ *  group, so exactly one AssessmentCard is on the page. */
+async function fillAssessment(page: Page, studentId: string, opisna: string) {
+  await page.goto(`${BASE}/nastavnik/ucenik/${studentId}`)
+  await page.waitForLoadState('domcontentloaded')
+  const opisnaInput = page.getByLabel('Opisna ocjena')
+  await opisnaInput.waitFor({ state: 'visible', timeout: 30000 })
+  await page.getByRole('button', { name: 'Ostvareno' }).first().click()
+  await opisnaInput.fill(opisna)
+  const save = page.getByRole('button', { name: 'Spremi ocjenu' })
+  await expect(save).toBeEnabled({ timeout: 10000 })
+  await save.click()
+  await expect(page.getByText('Ocjena spremljena.')).toBeVisible({ timeout: 30000 })
 }
 
 async function addAdminComment(page: Page, studentId: string, content: string) {
@@ -138,18 +147,18 @@ test.describe('Phase 3 Step 15 — Comments UI', () => {
     }
   })
 
-  test('teacher comment lifecycle: add COMMENT + MODULE_REVIEW → admin sees both → filter → delete own', async ({ page }) => {
+  test('teacher comment lifecycle: add COMMENT + report card → admin sees both → delete own', async ({ page }) => {
     test.setTimeout(240000)
     if (!seeded) throw new Error('not seeded')
 
-    await test.step('Teacher A adds both a COMMENT and a MODULE_REVIEW', async () => {
+    await test.step('Teacher A adds a COMMENT and fills the report card', async () => {
       await loginWithEmail(page, seeded!.teacherA.email, seeded!.teacherA.password)
       await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-      await submitStudentComment(page, seeded!.studentId, TEACHER_COMMENT, 'COMMENT')
-      await submitStudentComment(page, seeded!.studentId, TEACHER_REVIEW, 'MODULE_REVIEW')
+      await submitStudentComment(page, seeded!.studentId, TEACHER_COMMENT)
+      await fillAssessment(page, seeded!.studentId, TEACHER_REVIEW)
     })
 
-    await test.step('Admin sees both entries on the student detail page', async () => {
+    await test.step('Admin sees the comment and the saved report card', async () => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/ucenici/${seeded!.studentId}`)
       await expect(
@@ -157,33 +166,16 @@ test.describe('Phase 3 Step 15 — Comments UI', () => {
         'teacher COMMENT is visible to admin',
       ).toBeVisible()
       await expect(
-        page.getByText(TEACHER_REVIEW),
-        'teacher MODULE_REVIEW is visible to admin',
-      ).toBeVisible()
-    })
-
-    await test.step('Admin "Ocjene modula" filter hides COMMENT but keeps MODULE_REVIEW; "Sve" restores both', async () => {
-      const panelRegion = page
-        .getByRole('heading', { name: /Bilješke i recenzije/i })
-        .locator('..')
-      await panelRegion.getByRole('button', { name: /^Ocjene modula$/ }).click()
+        page.getByLabel('Opisna ocjena').first(),
+        'opisna ocjena persisted and is visible to admin',
+      ).toHaveValue(TEACHER_REVIEW)
       await expect(
-        page.getByText(TEACHER_REVIEW),
-        'MODULE_REVIEW stays visible under "Ocjene modula"',
-      ).toBeVisible()
+        page.getByRole('button', { name: 'Ostvareno' }).first(),
+        'saved skill level renders as pressed',
+      ).toHaveAttribute('aria-pressed', 'true')
       await expect(
-        page.getByText(TEACHER_COMMENT),
-        'plain COMMENT is hidden under "Ocjene modula"',
-      ).toHaveCount(0)
-
-      await panelRegion.getByRole('button', { name: /^Sve$/ }).click()
-      await expect(
-        page.getByText(TEACHER_COMMENT),
-        'COMMENT reappears under "Sve"',
-      ).toBeVisible()
-      await expect(
-        page.getByText(TEACHER_REVIEW),
-        'MODULE_REVIEW still visible under "Sve"',
+        page.getByText(/Spremljeno/).first(),
+        'card footer shows the saved-at line with the author',
       ).toBeVisible()
     })
 
@@ -201,7 +193,7 @@ test.describe('Phase 3 Step 15 — Comments UI', () => {
     await test.step('Teacher creates a throwaway comment and deletes it', async () => {
       await loginWithEmail(page, seeded!.teacherA.email, seeded!.teacherA.password)
       await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
-      await submitStudentComment(page, seeded!.studentId, OWN_DELETE_COMMENT, 'COMMENT')
+      await submitStudentComment(page, seeded!.studentId, OWN_DELETE_COMMENT)
       await expect(
         page.getByText(OWN_DELETE_COMMENT),
         'own comment is visible before delete',
@@ -308,10 +300,10 @@ test.describe('Phase 3 Step 15 — Comments UI', () => {
         expect(body, `${path} hides TEACHER_COMMENT`).not.toContain(TEACHER_COMMENT.toLowerCase())
         expect(body, `${path} hides TEACHER_REVIEW`).not.toContain(TEACHER_REVIEW.toLowerCase())
         expect(body, `${path} hides ADMIN_COMMENT`).not.toContain(ADMIN_COMMENT.toLowerCase())
-        expect(body, `${path} hides "bilješke i recenzije" heading`).not.toContain(
-          'bilješke i recenzije',
+        expect(body, `${path} hides the report-card "opisna ocjena" label`).not.toContain(
+          'opisna ocjena',
         )
-        expect(body, `${path} hides "ocjena modula" type label`).not.toContain('ocjena modula')
+        expect(body, `${path} hides the report-card "preporuka" label`).not.toContain('preporuka')
       }
     })
 

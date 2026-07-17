@@ -10,6 +10,8 @@ const ACTIVE_CLASS: Record<SkillLevel, string> = {
 }
 
 interface Props {
+  /** Skill name announced to assistive tech (the visible label sits outside). */
+  label: string
   value: SkillLevel | null
   onChange: (value: SkillLevel | null) => void
   disabled?: boolean
@@ -20,15 +22,14 @@ interface Props {
  * Clicking the active segment again clears it (back to "not graded").
  */
 export function SkillLevelControl({
+  label,
   value,
   onChange,
   disabled,
 }: Readonly<Props>) {
   return (
-    <div
-      className="inline-flex overflow-hidden rounded-md border border-gray-200"
-      role="group"
-    >
+    <fieldset className="inline-flex overflow-hidden rounded-md border border-gray-200">
+      <legend className="sr-only">{label}</legend>
       {SKILL_LEVELS.map((level, i) => {
         const isActive = value === level
         return (
@@ -50,6 +51,6 @@ export function SkillLevelControl({
           </button>
         )
       })}
-    </div>
+    </fieldset>
   )
 }
