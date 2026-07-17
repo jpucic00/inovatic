@@ -23,6 +23,29 @@ export function GearDecor({ size, className }: Readonly<{ size: number; classNam
   )
 }
 
+export function ConfettiDecor({ className }: Readonly<{ className?: string }>) {
+  return (
+    <svg
+      viewBox="0 0 1280 600"
+      preserveAspectRatio="xMidYMid slice"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="1050" cy="90" r="7" fill="#facc15" opacity="0.9" />
+      <circle cx="1180" cy="200" r="5" fill="#4ade80" opacity="0.85" />
+      <circle cx="920" cy="60" r="4" fill="#f87171" opacity="0.85" />
+      <circle cx="1230" cy="420" r="6" fill="#a78bfa" opacity="0.8" />
+      <circle cx="860" cy="520" r="5" fill="#facc15" opacity="0.7" />
+      <rect x="990" y="300" width="12" height="12" rx="3" fill="#4BBDCA" transform="rotate(24 996 306)" opacity="0.9" />
+      <rect x="1120" y="120" width="10" height="10" rx="2" fill="#f87171" transform="rotate(-18 1125 125)" opacity="0.85" />
+      <rect x="1210" y="520" width="11" height="11" rx="2" fill="#4ade80" transform="rotate(30 1215 525)" opacity="0.8" />
+      <rect x="890" y="180" width="9" height="9" rx="2" fill="#a78bfa" transform="rotate(12 894 184)" opacity="0.8" />
+      <path d="M 1060 480 q 8 -14 16 0 q 8 14 16 0" stroke="#facc15" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.8" />
+      <path d="M 940 400 q 7 -12 14 0 q 7 12 14 0" stroke="#4BBDCA" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.8" />
+    </svg>
+  )
+}
+
 export function StarDecor({ size, className }: Readonly<{ size: number; className?: string }>) {
   const c = size / 2
   const r1 = size / 2

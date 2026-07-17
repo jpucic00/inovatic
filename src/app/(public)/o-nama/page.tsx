@@ -288,9 +288,6 @@ export default function AboutPage() {
               </a>
             ))}
           </div>
-          <p className="text-center text-xs text-gray-400 mt-5">
-            OIB: 83709136328 | MB: 04562704 | Sjedište: Požeška 9, 21000 Split
-          </p>
         </div>
       </section>
 

@@ -19,12 +19,14 @@ interface HeroImage {
 interface HeroCarouselProps {
   images: HeroImage[]
   overlayClassName?: string
+  minHeightClassName?: string
   children: React.ReactNode
 }
 
 export function HeroCarousel({
   images,
   overlayClassName,
+  minHeightClassName = 'min-h-[34rem] lg:min-h-[36rem]',
   children,
 }: Readonly<HeroCarouselProps>) {
   const [api, setApi] = useState<CarouselApi>()
@@ -79,16 +81,16 @@ export function HeroCarousel({
         </CarouselContent>
       </Carousel>
 
-      {/* Dimmed overlay */}
+      {/* Dimmed overlay — brand teal (#08232a), transparent gradient on desktop */}
       <div
         className={cn(
-          'absolute inset-0 z-10 bg-black/50 lg:bg-gradient-to-r lg:from-black/65 lg:via-black/45 lg:to-black/25',
+          'absolute inset-0 z-10 bg-[#08232a]/50 lg:bg-transparent lg:bg-gradient-to-r lg:from-[#08232a]/80 lg:via-[#08232a]/45 lg:to-[#08232a]/12',
           overlayClassName
         )}
       />
 
       {/* Text content — relative, drives the section height */}
-      <div className="relative z-20 flex items-center min-h-[34rem] lg:min-h-[36rem] py-16 pb-20">
+      <div className={cn('relative z-20 flex items-center py-16 pb-20', minHeightClassName)}>
         <div className="container mx-auto max-w-6xl px-4">{children}</div>
       </div>
 

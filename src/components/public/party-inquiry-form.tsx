@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CheckCircle, Loader2, PartyPopper } from 'lucide-react'
+import { CheckCircle, Loader2 } from 'lucide-react'
 import { partyInquirySchema, type PartyInquiryFormData } from '@/lib/validators/inquiry'
 import { submitPartyInquiry } from '@/actions/inquiry'
 import { DateInput } from '@/components/ui/date-input'
@@ -71,14 +71,6 @@ export function PartyInquiryForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
-      <div className="flex items-center gap-2 mb-1">
-        <PartyPopper className="w-5 h-5 text-fuchsia-500" />
-        <h2 className="text-xl font-bold text-gray-900">Zatražite ponudu za proslavu</h2>
-      </div>
-      <p className="text-gray-500 text-sm -mt-3">
-        Ispunite obrazac i javit ćemo vam se s dostupnim terminima i detaljima.
-      </p>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor="parentFirstName" className="block text-sm font-medium text-gray-700 mb-1.5">
