@@ -1,14 +1,14 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
-import { ArrowUpRight, Trophy, Award, Calendar, MapPin, QrCode, Landmark } from 'lucide-react'
+import { ArrowUpRight, Trophy, Award, Calendar, MapPin, ScanBarcode, Landmark } from 'lucide-react'
 import { GearDecor } from '@/components/shared/decorations'
 import { CopyButton } from '@/components/shared/copy-button'
 import { DonationGallery } from '@/components/donacije/donation-gallery'
+import { DonationBarcode } from '@/components/donacije/donation-barcode'
 
 export const metadata: Metadata = {
   title: 'Donacije',
   description:
-    'Podržite naše timove na putu na europsko (Zagreb, listopad 2026.) i svjetsko (Portoriko, prosinac 2026.) natjecanje World Robot Olympiad. Donirajte skeniranjem QR koda ili uplatom na IBAN.',
+    'Podržite naše timove na putu na europsko (Zagreb, listopad 2026.) i svjetsko (Portoriko, prosinac 2026.) natjecanje World Robot Olympiad. Donirajte skeniranjem barkoda ili uplatom na IBAN.',
   openGraph: {
     title: 'Donacije – Podržite naše timove na World Robot Olympiad',
     description:
@@ -19,6 +19,7 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://udruga-inovatic.hr/donacije' },
 }
 
+const RECIPIENT = 'Udruga za robotiku "Inovatic"'
 const IBAN = 'HR7223400091110811408'
 const PAYMENT_DESCRIPTION = 'Za put na europsko i svjetsko natjecanje'
 
@@ -67,7 +68,7 @@ export default function DonacijePage() {
             href="#doniraj"
             className="mt-8 inline-flex items-center gap-2 px-7 py-3.5 bg-yellow-400 text-gray-900 font-semibold rounded-xl hover:bg-yellow-300 transition-colors shadow-sm"
           >
-            Doniraj sada <QrCode className="w-4 h-4" />
+            Doniraj sada <ScanBarcode className="w-4 h-4" />
           </a>
         </div>
       </section>
@@ -96,7 +97,7 @@ export default function DonacijePage() {
                   2026 Season – WRO Association
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
-                .
+                {'.'}
               </p>
             </div>
           </div>
@@ -146,18 +147,15 @@ export default function DonacijePage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 items-center bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm">
-            {/* QR code */}
+            {/* Payment barcode */}
             <div className="flex flex-col items-center text-center">
-              <Image
-                src="/images/donacije/qr-kod.jpeg"
-                alt="QR kôd za doniranje Udruzi Inovatic"
-                width={240}
-                height={300}
-                className="rounded-xl border border-gray-100 shadow-sm"
+              <DonationBarcode
+                src="/images/donacije/barkod.jpeg"
+                alt="2D barkod za uplatu donacije Udruzi Inovatic"
               />
               <p className="text-sm text-gray-500 mt-4 inline-flex items-center gap-1.5">
-                <QrCode className="w-4 h-4 text-cyan-500" />
-                Skenirajte kôd mobitelom za brzu uplatu
+                <ScanBarcode className="w-4 h-4 text-cyan-500" />
+                Skenirajte barkod u mobilnoj bankovnoj aplikaciji
               </p>
             </div>
 
@@ -170,7 +168,10 @@ export default function DonacijePage() {
               <dl className="space-y-4">
                 <div>
                   <dt className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">Primatelj</dt>
-                  <dd className="font-semibold text-gray-900">Udruga za robotiku &quot;Inovatic&quot;</dd>
+                  <dd className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900">{RECIPIENT}</span>
+                    <CopyButton value={RECIPIENT} label="primatelja" />
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">IBAN</dt>
