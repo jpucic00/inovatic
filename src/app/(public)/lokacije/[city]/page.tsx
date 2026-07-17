@@ -175,8 +175,10 @@ export default async function CityLocationPage({ params }: PageProps) {
                         <MapPin className="w-4 h-4 text-cyan-600" />
                       </div>
                       <div className="min-w-0">
-                        <div className="font-semibold text-gray-900">{venue.name}</div>
-                        <div className="text-sm text-gray-500">{venue.address}, {venue.postal}</div>
+                        <div className="font-semibold text-gray-900">{venue.address}, {venue.postal}</div>
+                        {venue.institution && (
+                          <div className="text-xs text-cyan-600 font-medium mt-0.5">{venue.institution}</div>
+                        )}
                       </div>
                       <a
                         href={`https://www.google.com/maps/search/?api=1&query=${venue.mapQuery}`}
@@ -205,7 +207,7 @@ export default async function CityLocationPage({ params }: PageProps) {
                           <Mail className="w-3.5 h-3.5" /> {venue.coordinator.email}
                         </a>
                         <a
-                          href={`tel:${venue.coordinator.phone.replace(/\s/g, '')}`}
+                          href={`tel:${venue.coordinator.phone.replaceAll(/\s/g, '')}`}
                           className="inline-flex items-center gap-1.5 text-sm text-yellow-700 hover:text-yellow-800 font-medium"
                         >
                           <Phone className="w-3.5 h-3.5" /> {venue.coordinator.phone}
@@ -218,7 +220,7 @@ export default async function CityLocationPage({ params }: PageProps) {
                           rel="noopener noreferrer"
                           className="mt-3 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-cyan-600 font-medium"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" /> Više o prostoru: Trokut inkubator
+                          <ExternalLink className="w-3.5 h-3.5" /> Više o prostoru: {venue.name}
                         </a>
                       )}
                     </div>

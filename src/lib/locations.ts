@@ -15,6 +15,8 @@ interface Venue {
   name: string
   address: string
   postal: string
+  /** Institution or building name shown below the address in small blue text. */
+  institution?: string
   /** Pre-encoded Google Maps `query` param (used for both the embed and the "open in maps" link). */
   mapQuery: string
   image: string
@@ -57,6 +59,7 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
         name: 'Velebitska 32',
         address: 'Velebitska 32',
         postal: '21000 Split',
+        institution: 'Anica zgrada',
         mapQuery: 'Velebitska+32,+Split,+Croatia',
         image: '/images/locations/split-velebitska.jpg',
         imageAlt: 'Učionica Udruge Inovatic na lokaciji Velebitska 32 u Splitu',
@@ -73,12 +76,14 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
         name: 'Ruđera Boškovića 33',
         address: 'Ruđera Boškovića 33',
         postal: '21000 Split',
+        institution: 'Prirodoslovno-matematički fak.',
         mapQuery: 'Ru%C4%91era+Bo%C5%A1kovi%C4%87a+33,+Split,+Croatia',
         image: '/images/locations/split-pmf.jpg',
         imageAlt: 'Prostor na Prirodoslovno-matematičkom fakultetu, Ruđera Boškovića 33, Split',
         description:
-          'Dvorana B1-07 na Odjelu za politehniku PMF-a — lokacija namijenjena natjecateljskim programima (WRO i FLL).',
+          'Dvorana B1-07 na Odjelu za politehniku PMF-a — lokacija namijenjena natjecateljskim programima.',
         badge: 'Prirodoslovno-matematički fakultet',
+        website: 'https://www.pmfst.unist.hr',
         coordinator: {
           name: 'Jozo Pivac',
           role: 'Voditelj natjecateljskih programa',
@@ -92,12 +97,13 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
     slug: 'sibenik',
     label: 'Šibenik',
     intro:
-      'Naša najnovija lokacija (2026.) — isti kurikulum Svijet LEGO Robotike, u prostoru Trokut inkubatora.',
+      'Naša nova lokacija (2026.) — isti kurikulum Svijet LEGO Robotike.',
     venues: [
       {
         name: 'Trokut inkubator',
-        address: 'Ul. Velimira Škorpika 7/a',
+        address: 'Velimira Škorpika 7/a',
         postal: '22000 Šibenik',
+        institution: 'Trokut Šibenik – centar poduzetništva',
         mapQuery: 'Trokut+inkubator,+Ul.+Velimira+%C5%A0korpika+7a,+22000+%C5%A0ibenik,+Croatia',
         image: '/images/locations/sibenik-trokut.jpg',
         imageAlt: 'Zgrada Trokut inkubatora u Šibeniku',

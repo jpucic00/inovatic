@@ -99,7 +99,7 @@ const localBusinessJsonLd = {
       name: 'Trokut inkubator',
       address: {
         '@type': 'PostalAddress',
-        streetAddress: 'Ul. Velimira Škorpika 7/a',
+        streetAddress: 'Velimira Škorpika 7/a',
         addressLocality: 'Šibenik',
         postalCode: '22000',
         addressCountry: 'HR',
