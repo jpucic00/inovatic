@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Clock, Users, Calendar, Wrench, Euro } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { courses } from '@/lib/courses-data'
-import { GearDecor, StarDecor } from '@/components/shared/decorations'
 
 export const metadata: Metadata = {
   title: 'Programi',
@@ -34,12 +33,20 @@ const coursesJsonLd = {
   })),
 }
 
-const cardBorders = [
-  'border-l-cyan-400',
-  'border-l-blue-400',
-  'border-l-indigo-400',
-  'border-l-purple-400',
+const quickFacts = [
+  { value: '56 sati', label: 'nastave godišnje' },
+  { value: 'Do 10', label: 'polaznika po grupi' },
+  { value: 'Listopad – Svibanj', label: 'trajanje programa' },
+  { value: '400 EUR/god.', label: 'ili 110 EUR/modul' },
 ]
+
+// Abbreviations like "(3. i 4. razred)" contain ". " — a sentence only ends
+// where the period is followed by an uppercase letter.
+function firstSentence(text: string): string {
+  const firstParagraph = text.split('\n\n')[0]
+  const end = /\.(?=\s+[A-ZČĆĐŠŽ])/.exec(firstParagraph)
+  return end ? firstParagraph.slice(0, end.index + 1) : firstParagraph
+}
 
 export default function ProgramiPage() {
   return (
@@ -49,194 +56,144 @@ export default function ProgramiPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(coursesJsonLd) }}
       />
       {/* Hero */}
-      <section className="relative bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-16 px-4 overflow-hidden">
+      <section className="relative overflow-hidden border-b border-gray-100 bg-gradient-to-br from-cyan-50 via-white to-blue-50">
         {/* Blob decorations */}
-        <div className="absolute -top-10 -right-10 w-72 h-72 bg-cyan-400 rounded-full blur-3xl opacity-40 pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-yellow-300 rounded-full blur-3xl opacity-40 pointer-events-none" />
-        {/* Gear decoration */}
-        <GearDecor
-          size={48}
-          className="absolute bottom-6 right-8 text-cyan-200 opacity-60 pointer-events-none"
-        />
-        <div className="container mx-auto max-w-3xl text-center relative">
-          <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">
-            Jedinstveni kurikulum
-          </span>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4 leading-tight">
-            <span className="text-cyan-500">Svijet LEGO Robotike</span>
-          </h1>
-          <p className="text-gray-600 text-lg leading-relaxed">
-            Omogućite svom djetetu da ne bude samo korisnik tehnologije, već njezin kreator. Od prvog robota do vlastitih
-            tehnoloških rješenja – kroz igru, kreativnost i praktičan rad gradimo znanje, samopouzdanje i ljubav prema
-            tehnologiji.
-          </p>
-        </div>
-      </section>
-
-      {/* Info bar */}
-      <section className="bg-cyan-50 border-b border-cyan-100 py-5 px-4">
-        <div className="container mx-auto">
-          <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-cyan-500" />
-              <span>56 sati nastave godišnje</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-cyan-500" />
-              <span>Do 10 polaznika po grupi</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-cyan-500" />
-              <span>Listopad – Svibanj</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Euro className="w-4 h-4 text-cyan-500" />
-              <span>400 EUR/god. ili 110 EUR/modul</span>
-            </div>
+        <div className="pointer-events-none absolute -top-10 -right-10 h-[200px] w-[200px] rounded-full bg-cyan-400 opacity-40 blur-3xl md:h-72 md:w-72" />
+        <div className="pointer-events-none absolute -bottom-10 -left-10 h-[180px] w-[180px] rounded-full bg-yellow-300 opacity-40 blur-3xl md:h-64 md:w-64" />
+        <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-10 text-center md:grid md:grid-cols-[1fr_240px] md:items-start md:gap-10 md:px-10 md:pt-20 md:pb-16 md:text-left lg:grid-cols-[1fr_280px] lg:gap-16 lg:px-24">
+          <div>
+            <span className="mb-3 inline-block text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-600 md:mb-4 md:text-xs">
+              Jedinstveni kurikulum
+            </span>
+            <h1 className="mb-4 text-[34px] font-extrabold leading-[1.12] tracking-[-0.02em] text-gray-900 md:mb-5 md:text-[52px] md:leading-[1.08]">
+              Svijet <span className="text-cyan-600">LEGO</span> Robotike
+            </h1>
+            <p className="text-[15.5px] leading-[1.65] text-gray-600 md:max-w-[620px] md:text-lg">
+              Omogućite svom djetetu da ne bude samo korisnik tehnologije, već njezin kreator. Od prvog robota do
+              vlastitih tehnoloških rješenja – kroz igru, kreativnost i praktičan rad gradimo znanje, samopouzdanje i
+              ljubav prema tehnologiji.
+            </p>
           </div>
-        </div>
-      </section>
-
-      {/* Course cards */}
-      <section className="py-16 px-4 bg-white">
-        <div className="container mx-auto max-w-5xl">
-          <div className="space-y-8">
-            {courses.map((course, i) => (
-              <div
-                key={course.slug}
-                className={`group bg-white rounded-2xl border border-gray-100 border-l-4 ${cardBorders[i]} overflow-hidden shadow-sm hover:shadow-md hover:shadow-cyan-100 transition-shadow`}
-              >
-                <div className="md:flex">
-                  {/* Cover image */}
-                  <div className={`relative md:w-56 h-44 md:h-auto flex-shrink-0 overflow-hidden bg-gradient-to-br ${course.gradient}`}>
-                    <Image
-                      src={course.coverImage}
-                      alt={course.title}
-                      fill
-                      className="object-cover object-center"
-                      sizes="(max-width: 768px) 100vw, 224px"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent md:bg-gradient-to-t md:from-black/50 md:via-black/10 md:to-transparent flex items-end justify-start p-3">
-                      <div className="text-white drop-shadow">
-                        <div className="text-2xl font-extrabold leading-none">SLR {i + 1}</div>
-                        <div className="text-xs font-medium opacity-90">
-                          {course.ageMin}–{course.ageMax} god.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-6 md:p-8 flex-1">
-                    <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
-                      <div>
-                        <h2 className="text-xl font-bold text-gray-900">{course.title}</h2>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
-                        <Euro className="w-3.5 h-3.5" />
-                        400 / god.
-                      </div>
-                    </div>
-
-                    <p className="text-gray-600 text-sm leading-relaxed mb-5 line-clamp-2">
-                      {course.description}
-                    </p>
-
-                    {/* Tags */}
-                    <div className="flex flex-wrap gap-2 mb-5">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
-                        <Wrench className="w-3 h-3" /> {course.equipment}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
-                        {course.tools}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
-                        <Users className="w-3 h-3" /> do {course.groupSize} polaznika
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-100">
-                        <Clock className="w-3 h-3" /> {course.hours}h / {course.sessionDuration} min tjedno
-                      </span>
-                    </div>
-
-                    {/* Modules preview */}
-                    <div className="flex flex-wrap gap-2 mb-6">
-                      {course.modules.map((mod) => (
-                        <span
-                          key={mod.title}
-                          className="text-xs px-2.5 py-1 bg-cyan-50 border border-cyan-100 text-cyan-700 rounded-lg"
-                        >
-                          {mod.title.split('–')[0].trim()}
-                        </span>
-                      ))}
-                    </div>
-
-                    <Link
-                      href={`/programi/${course.slug}`}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-500 text-white text-sm font-semibold rounded-xl hover:bg-cyan-600 transition-colors shadow-sm"
-                    >
-                      Saznaj više <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
+          {/* Quick facts */}
+          <div className="mt-10 grid grid-cols-2 gap-x-3 gap-y-4 text-left md:mt-3 md:flex md:flex-col md:gap-[18px] md:border-l-2 md:border-cyan-200 md:pl-7">
+            {quickFacts.map((fact) => (
+              <div key={fact.label} className="border-l-2 border-cyan-200 pl-3.5 md:border-l-0 md:pl-0">
+                <div className="text-[17px] font-extrabold text-gray-900 md:text-xl">{fact.value}</div>
+                <div className="text-[12.5px] text-gray-500 md:text-[13px]">{fact.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section className="py-16 px-4 bg-yellow-50">
-        <div className="container mx-auto max-w-3xl">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-3">Cijene</h2>
-            <p className="text-gray-500">Sve razine programa imaju jednaku cijenu.</p>
+      {/* Course rows */}
+      <section className="bg-white">
+        <div className="mx-auto max-w-7xl px-6 pt-2 pb-12 md:px-10 md:pt-12 md:pb-18 lg:px-24">
+          <div className="divide-y divide-gray-200">
+            {courses.map((course, i) => (
+              <article
+                key={course.slug}
+                className="grid grid-cols-[auto_1fr] gap-x-3.5 py-9 last:pb-0 md:grid-cols-[110px_1fr_240px] md:gap-x-10 md:py-10 lg:grid-cols-[110px_1fr_300px]"
+              >
+                <div className="col-start-1 row-start-1 mb-3.5 self-baseline text-[38px] font-extrabold leading-none text-cyan-200 md:row-span-6 md:mb-0 md:self-center md:text-[56px]">
+                  {String(i + 1).padStart(2, '0')}
+                </div>
+                <h2 className="col-start-2 row-start-1 mb-3.5 self-baseline text-[21px] font-extrabold text-gray-900 md:row-start-2 md:mb-2.5 md:self-auto md:text-2xl">
+                  {course.title}
+                </h2>
+                <div className="relative col-span-2 col-start-1 row-start-2 mb-4 h-[190px] overflow-hidden rounded-[6px] md:col-span-1 md:col-start-3 md:row-span-6 md:row-start-1 md:mb-0 md:self-center">
+                  <Image
+                    src={course.coverImage}
+                    alt={course.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 300px"
+                  />
+                </div>
+                <div className="col-span-2 col-start-1 row-start-3 mb-2 text-[11.5px] font-bold uppercase tracking-[0.08em] text-cyan-600 md:col-span-1 md:col-start-2 md:row-start-1 md:text-xs md:tracking-[0.1em]">
+                  {course.subtitle}
+                </div>
+                <p className="col-span-2 col-start-1 row-start-4 mb-3 text-[14.5px] leading-[1.6] text-gray-500 md:col-span-1 md:col-start-2 md:row-start-3 md:mb-3.5 md:max-w-[560px] md:text-[15px]">
+                  {firstSentence(course.description)}
+                </p>
+                <div className="col-span-2 col-start-1 row-start-5 mb-3 md:col-span-1 md:col-start-2 md:row-start-4 md:mb-2.5">
+                  <div className="mb-2 text-[11.5px] font-bold uppercase tracking-[0.08em] text-gray-400">Moduli</div>
+                  <div className="flex flex-wrap gap-2">
+                    {course.modules.map((mod) => (
+                      <span
+                        key={mod.title}
+                        className="rounded-[6px] border border-cyan-100 bg-cyan-50 px-[11px] py-[5px] text-[12.5px] font-medium text-cyan-800"
+                      >
+                        {mod.title}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="col-span-2 col-start-1 row-start-6 mb-3.5 text-[13px] text-gray-400 md:col-span-1 md:col-start-2 md:row-start-5 md:mb-4 md:text-[13.5px]">
+                  {course.equipment} · {course.tools}
+                </div>
+                <Link
+                  href={`/programi/${course.slug}`}
+                  className="col-span-2 col-start-1 row-start-7 inline-flex items-center gap-1.5 justify-self-start py-1.5 text-sm font-semibold text-cyan-600 transition-colors hover:text-cyan-700 md:col-span-1 md:col-start-2 md:row-start-6 md:py-0"
+                >
+                  Saznaj više <ArrowRight className="h-[15px] w-[15px]" />
+                </Link>
+              </article>
+            ))}
           </div>
-          <div className="grid sm:grid-cols-2 gap-6">
-            <div className="bg-white rounded-2xl p-7 border border-yellow-200 shadow-sm text-center">
-              <div className="text-4xl font-extrabold text-yellow-500 mb-1">110 EUR</div>
-              <div className="text-gray-700 font-semibold mb-2">po modulu</div>
-              <p className="text-sm text-gray-500">
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section className="border-t border-gray-100 bg-gray-50 px-6 py-12 md:px-10 md:py-16 lg:px-24">
+        <div className="mx-auto max-w-[860px]">
+          <h2 className="mb-1.5 text-center text-2xl font-extrabold text-gray-900 md:text-[28px]">Cijene</h2>
+          <p className="mb-6 text-center text-[14.5px] text-gray-500 md:mb-8 md:text-[15px]">
+            Sve razine programa imaju jednaku cijenu.
+          </p>
+          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-0">
+            <div className="rounded-[12px] border border-gray-200 bg-white p-7 md:rounded-r-none md:border-r-0 md:px-10 md:py-9">
+              <div className="text-[30px] font-extrabold text-gray-900 md:text-4xl">110 EUR</div>
+              <div className="mt-1 mb-2.5 text-sm font-semibold text-gray-500 md:mb-3">po modulu</div>
+              <p className="text-sm leading-[1.6] text-gray-500">
                 Idealno za isprobavanje. Jedan modul traje 14 školskih sati (otprilike 7 tjedana).
               </p>
             </div>
-            <div className="bg-cyan-500 rounded-2xl p-7 border border-cyan-500 shadow-sm text-center relative overflow-hidden">
-              <div className="absolute top-3 right-3">
-                <span className="text-xs bg-yellow-400 text-gray-900 font-bold px-2.5 py-1 rounded-full">
+            <div className="relative rounded-[12px] border border-gray-200 bg-white p-7 md:rounded-l-none md:px-10 md:py-9">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[30px] font-extrabold text-cyan-600 md:text-4xl">400 EUR</div>
+                <span className="shrink-0 rounded-full bg-yellow-400 px-2.5 py-1 text-[11px] font-bold text-gray-900 md:absolute md:top-5 md:right-5">
                   Najpovoljnije
                 </span>
               </div>
-              <div className="text-4xl font-extrabold text-white mb-1">400 EUR</div>
-              <div className="text-cyan-100 font-semibold mb-2">godišnja pretplata</div>
-              <p className="text-sm text-cyan-100">
+              <div className="mt-1 mb-2.5 text-sm font-semibold text-gray-500 md:mb-3">godišnja pretplata</div>
+              <p className="text-sm leading-[1.6] text-gray-500">
                 Sva 4 modula kroz školsku godinu. Uštedite 40 EUR u usporedbi s plaćanjem modula zasebno.
               </p>
             </div>
           </div>
-          <p className="text-center text-sm text-gray-500 mt-5">
-            Popust za brata/sestru: <strong>10%</strong> na drugu i svaku sljedeću prijavu iz iste obitelji.
+          <p className="mt-5 text-center text-[13.5px] leading-[1.6] text-gray-500 md:text-sm">
+            Popust za brata/sestru: <strong className="text-gray-900">10%</strong> na drugu i svaku sljedeću prijavu iz
+            iste obitelji.
           </p>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="py-16 px-4 bg-white">
-        <div className="container mx-auto text-center max-w-xl relative">
-          <StarDecor
-            size={36}
-            className="absolute -top-2 right-4 text-yellow-300 opacity-70 pointer-events-none"
-          />
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-4">Niste sigurni koji program odabrati?</h2>
-          <p className="text-gray-500 mb-6">
-            Zainteresirani ste? Provjerite slobodne termine i osigurajte svom djetetu mjesto u jednom od naših programa –
-            korak bliže zabavi, učenju i stvaranju!
-          </p>
-          <Link
-            href="/upisi"
-            className="inline-flex items-center gap-2 px-7 py-3.5 bg-yellow-400 text-gray-900 font-semibold rounded-xl hover:bg-yellow-500 transition-colors shadow-sm"
-          >
-            Pošalji upit <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
+      <section className="bg-gradient-to-r from-cyan-500 to-cyan-600 px-6 py-12 text-center md:px-10 md:py-16 lg:px-24">
+        <h2 className="mb-3 text-[22px] font-extrabold text-white md:text-[26px]">
+          Niste sigurni koji program odabrati?
+        </h2>
+        <p className="mx-auto mb-6 max-w-[520px] text-[14.5px] leading-[1.65] text-cyan-100 md:mb-7 md:text-[15px] md:leading-[1.6]">
+          Zainteresirani ste? Provjerite slobodne termine i osigurajte svom djetetu mjesto u jednom od naših programa –
+          korak bliže zabavi, učenju i stvaranju!
+        </p>
+        <Link
+          href="/upisi"
+          className="inline-flex w-full max-w-[280px] items-center justify-center gap-2 rounded-[12px] bg-yellow-400 px-8 py-3.5 text-[15px] font-bold text-gray-900 transition-colors hover:bg-yellow-500 md:w-auto md:max-w-none md:text-base"
+        >
+          Pošalji upit <ArrowRight className="h-4 w-4" />
+        </Link>
       </section>
     </>
   )

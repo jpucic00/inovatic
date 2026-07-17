@@ -2,8 +2,6 @@ const GEAR_INNER_RADIUS_RATIO = 0.55
 const GEAR_TOOTH_WIDTH_RATIO = 0.18
 const GEAR_TOOTH_HEIGHT_RATIO = 0.14
 const GEAR_TOOTH_ROUNDING = 0.3
-const STAR_INNER_RADIUS_RATIO = 0.38
-const STAR_POINTS_COUNT = 10
 
 export function GearDecor({ size, className }: Readonly<{ size: number; className?: string }>) {
   const r = size / 2
@@ -42,22 +40,6 @@ export function ConfettiDecor({ className }: Readonly<{ className?: string }>) {
       <rect x="890" y="180" width="9" height="9" rx="2" fill="#a78bfa" transform="rotate(12 894 184)" opacity="0.8" />
       <path d="M 1060 480 q 8 -14 16 0 q 8 14 16 0" stroke="#facc15" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.8" />
       <path d="M 940 400 q 7 -12 14 0 q 7 12 14 0" stroke="#4BBDCA" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.8" />
-    </svg>
-  )
-}
-
-export function StarDecor({ size, className }: Readonly<{ size: number; className?: string }>) {
-  const c = size / 2
-  const r1 = size / 2
-  const r2 = size * STAR_INNER_RADIUS_RATIO
-  const points = Array.from({ length: STAR_POINTS_COUNT }, (_, i) => {
-    const angle = (i * Math.PI) / 5 - Math.PI / 2
-    const r = i % 2 === 0 ? r1 : r2
-    return `${c + r * Math.cos(angle)},${c + r * Math.sin(angle)}`
-  }).join(' ')
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="currentColor" className={className} aria-hidden="true">
-      <polygon points={points} />
     </svg>
   )
 }
