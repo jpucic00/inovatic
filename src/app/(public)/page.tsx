@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Trophy, ArrowRight } from 'lucide-react'
 import { RobotSvg } from '@/components/shared/robot-svg'
+import { RobotHeadSvg } from '@/components/shared/robot-head-svg'
 import { GearDecor } from '@/components/shared/decorations'
-import { HeroCarousel } from '@/components/shared/hero-carousel'
 import { db } from '@/lib/db'
 import { StatsSection } from '@/components/public/homepage/StatsSection'
 import { CoursesPreview } from '@/components/public/homepage/CoursesPreview'
@@ -54,45 +55,53 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Hero */}
-      <HeroCarousel
-        images={[
-          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656903/articles/covers/zavrsetak-cjelogodisnje-aktivnosti-2024-2025.jpg', alt: 'Djeca na radionici LEGO robotike' },
-          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656871/articles/covers/odrzane-zimske-radionice-robotike-2026.jpg', alt: 'Zimske radionice robotike' },
-          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656863/articles/covers/odrzan-prvi-splitski-kamp-robotike.jpg', alt: 'Splitski kamp robotike' },
-          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656909/articles/covers/zavrsetak-slr-2023-2024.jpg', alt: 'Završetak SLR programa' },
-        ]}
-      >
-        <div className="text-center lg:text-left max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-400/25 text-yellow-300 border border-yellow-400/40 rounded-full text-xs sm:text-sm font-semibold mb-8">
-            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400 flex-shrink-0" />
-            <span>Tim CroSpec – srebrna medalja WRO 2025, Singapur</span>
-          </div>
+      {/* Hero — static photo, bottom-anchored content on mobile, centered on desktop */}
+      <section className="relative flex min-h-[560px] items-end overflow-hidden lg:items-center">
+        <Image
+          src="https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656903/articles/covers/zavrsetak-cjelogodisnje-aktivnosti-2024-2025.jpg"
+          alt="Djeca na radionici LEGO robotike"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,35,42,0.15)_0%,rgba(8,35,42,0.45)_45%,rgba(8,35,42,0.88)_100%)] lg:bg-[linear-gradient(90deg,rgba(8,35,42,0.82)_0%,rgba(8,35,42,0.45)_52%,rgba(8,35,42,0.10)_100%)]" />
+        <div className="relative w-full pt-24 pb-8 lg:py-16">
+          <div className="container mx-auto max-w-6xl px-6 lg:px-4">
+            <div className="flex max-w-[620px] flex-col items-start gap-4 lg:gap-5">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-[7px] bg-yellow-400/18 text-yellow-300 border border-yellow-400/35 rounded-full text-[11px] sm:text-[13px] font-semibold leading-[1.35]">
+                <Trophy className="w-3.5 h-3.5 sm:w-[15px] sm:h-[15px] text-yellow-400 flex-shrink-0" />
+                <span>Tim CroSpec – srebrna medalja WRO 2025, Singapur</span>
+              </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-white mb-6 leading-tight tracking-tight">
-            Otkrijte{' '}
-            <span className="text-cyan-400">Svijet LEGO Robotike</span>
-          </h1>
-          <p className="text-xl text-white/85 mb-10 leading-relaxed max-w-xl mx-auto lg:mx-0">
-            Učimo djecu od 6 do 14 godina STEM vještine kroz igru, kreativnost i programiranje.
-            Splitska udruga za robotiku s tradicijom od 2014. godine.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-            <Link
-              href="/upisi"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-yellow-400 text-gray-900 font-bold rounded-xl hover:bg-yellow-300 transition-colors shadow-md text-base"
-            >
-              Upiši dijete <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/programi"
-              className="inline-flex items-center justify-center px-8 py-3.5 bg-white/15 text-white font-semibold rounded-xl border-2 border-white/30 hover:bg-white/25 hover:border-white/50 transition-colors text-base backdrop-blur-sm"
-            >
-              Pogledaj programe
-            </Link>
+              <h1 className="text-[33px] sm:text-5xl lg:text-[56px] font-extrabold text-white leading-[1.12] lg:leading-[1.08] tracking-[-0.5px] lg:tracking-[-1px]">
+                Otkrijte{' '}
+                <span className="text-cyan-400">Svijet LEGO Robotike</span>
+              </h1>
+              <p className="text-[15px] sm:text-lg lg:text-[19px] text-white/82 lg:text-white/85 leading-[1.55] lg:leading-[1.6] max-w-[560px]">
+                Učimo djecu od 6 do 14 godina STEM vještine kroz igru, kreativnost i programiranje.
+                <span className="hidden sm:inline">
+                  {' '}Splitska udruga za robotiku s tradicijom od 2014. godine.
+                </span>
+              </p>
+              <div className="flex w-full flex-col sm:w-auto sm:flex-row gap-4 lg:mt-2">
+                <Link
+                  href="/upisi"
+                  className="inline-flex items-center justify-center gap-2 px-8 py-[15px] sm:py-3.5 bg-yellow-400 text-gray-900 font-bold rounded-xl hover:bg-yellow-300 transition-colors shadow-[0_2px_6px_rgba(0,0,0,0.15)] text-base"
+                >
+                  Upiši dijete <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  href="/programi"
+                  className="hidden sm:inline-flex items-center justify-center px-8 py-3.5 bg-white/15 text-white font-semibold rounded-xl border-2 border-white/30 hover:bg-white/25 hover:border-white/50 transition-colors text-base backdrop-blur-sm"
+                >
+                  Pogledaj programe
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
-      </HeroCarousel>
+      </section>
 
       <StatsSection />
       <CoursesPreview />
@@ -154,22 +163,7 @@ export default async function HomePage() {
         </div>
         <div className="container mx-auto text-center max-w-2xl relative">
           <div className="flex justify-center mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-16 h-16" aria-hidden="true">
-              <line x1="50" y1="19" x2="43" y2="6" stroke="#AAAAAA" strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="41" cy="4" r="5.5" fill="#F5A200"/>
-              <circle cx="39" cy="2.5" r="2" fill="#FFD060" opacity="0.75"/>
-              <polygon points="11,91 89,91 89,51 50,17 11,51" fill="#4BBDCA"/>
-              <polygon points="50,17 89,51 89,91 50,54" fill="#2A9EAD" opacity="0.25"/>
-              <polygon points="11,51 50,17 50,54 11,91" fill="white" opacity="0.07"/>
-              <rect x="23" y="46" width="22" height="4.5" rx="2.25" fill="#2A8A9A"/>
-              <rect x="55" y="46" width="22" height="4.5" rx="2.25" fill="#2A8A9A"/>
-              <circle cx="34" cy="67" r="13.5" fill="#F5C018"/>
-              <circle cx="66" cy="67" r="13.5" fill="#F5C018"/>
-              <circle cx="34" cy="67" r="8.5" fill="#E88200"/>
-              <circle cx="66" cy="67" r="8.5" fill="#E88200"/>
-              <circle cx="29" cy="62" r="3.5" fill="white" opacity="0.65"/>
-              <circle cx="61" cy="62" r="3.5" fill="white" opacity="0.65"/>
-            </svg>
+            <RobotHeadSvg className="w-[120px] h-auto" />
           </div>
           <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">
             Zainteresirani ste?

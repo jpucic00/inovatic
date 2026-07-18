@@ -27,7 +27,7 @@ const locations = [
 
 export function LocationsSection() {
   return (
-    <section className="py-20 px-4 bg-gray-50">
+    <section className="py-20 px-4 bg-white">
       <div className="container mx-auto">
         <div className="text-center mb-12">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Lokacije</span>
@@ -45,7 +45,7 @@ export function LocationsSection() {
               <div className="w-10 h-10 bg-cyan-50 rounded-xl flex items-center justify-center mb-4">
                 <MapPin className="w-5 h-5 text-cyan-500" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-1">{loc.address}</h3>
+              <h3 className={`font-bold text-gray-900 mb-1${loc.badge === 'Novo' ? ' pr-14' : ''}`}>{loc.address}</h3>
               <p className="text-xs text-cyan-600 mb-2">{loc.venue}</p>
               <p className="text-sm text-gray-500">{loc.description}</p>
             </Link>
