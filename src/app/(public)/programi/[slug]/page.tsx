@@ -56,7 +56,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
   const nextCourse = courses[courseIndex + 1]
 
   const includedItems = [
-    'Nastava jednom tjedno, 90 minuta',
+    `Nastava jednom tjedno, ${course.sessionDuration} minuta`,
     `Korištenje opreme (${course.equipment} + laptop)`,
     `Alati: ${course.tools}`,
     'Mala grupa (do 10 polaznika)',
@@ -144,7 +144,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
             <div className="order-2 flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-4 md:order-1 md:px-6 md:py-[22px]">
               <div>
                 <div className="text-sm font-bold text-gray-900 md:text-[15px]">Po modulu</div>
-                <div className="text-xs text-gray-500 md:text-[13px]">14 školskih sati</div>
+                <div className="text-xs text-gray-500 md:text-[13px]">7 radionica</div>
               </div>
               <div className="text-right">
                 <div className="text-[22px] font-extrabold text-gray-700 md:text-[28px]">{course.priceModule} EUR</div>
@@ -158,7 +158,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
               </span>
               <div>
                 <div className="text-sm font-bold text-gray-900 md:text-[15px]">Godišnja pretplata</div>
-                <div className="text-xs text-gray-500 md:text-[13px]">Sva 4 modula · 56 sati</div>
+                <div className="text-xs text-gray-500 md:text-[13px]">Sva 4 modula · {course.hours} sati</div>
               </div>
               <div className="text-right">
                 <div className="text-[22px] font-extrabold text-cyan-600 md:text-[28px]">{course.priceYear} EUR</div>

@@ -34,7 +34,7 @@ const coursesJsonLd = {
 }
 
 const quickFacts = [
-  { value: '56 sati', label: 'nastave godišnje' },
+  { value: '28 radionica', label: 'godišnje' },
   { value: 'Do 10', label: 'polaznika po grupi' },
   { value: 'Listopad – Svibanj', label: 'trajanje programa' },
   { value: '400 EUR/god.', label: 'ili 110 EUR/modul' },
@@ -160,7 +160,7 @@ export default function ProgramiPage() {
               <div className="text-[30px] font-extrabold text-gray-900 md:text-4xl">110 EUR</div>
               <div className="mt-1 mb-2.5 text-sm font-semibold text-gray-500 md:mb-3">po modulu</div>
               <p className="text-sm leading-[1.6] text-gray-500">
-                Idealno za isprobavanje. Jedan modul traje 14 školskih sati (otprilike 7 tjedana).
+                Idealno za isprobavanje. Jedan modul traje 7 sati (kroz 7 tjedana).
               </p>
             </div>
             <div className="relative rounded-[12px] border border-gray-200 bg-white p-7 md:rounded-l-none md:px-10 md:py-9">
