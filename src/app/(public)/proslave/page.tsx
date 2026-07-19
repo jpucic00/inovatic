@@ -42,7 +42,7 @@ const quickInfo = [
 ]
 
 const steps = [
-  { number: '1', title: 'Kontaktirajte nas', description: 'Pošaljite email na info@udruga-inovatic.hr ili nazovite na 099 393 6993 s datumom, brojem i dobi djece.' },
+  { number: '1', title: 'Kontaktirajte nas', description: 'Popunite kontakt formu ispod ili nazovite na 099 393 6993 s datumom, brojem i dobi djece.' },
   { number: '2', title: 'Dogovorimo detalje', description: 'Dogovaramo termin i prilagođavamo radionicu uzrastu i iskustvu sudionika.' },
   { number: '3', title: 'Proslavite uz robotiku!', description: 'Nije potrebno predznanje – iskusni robo trener vodi kroz početne izazove robotike.' },
 ]
