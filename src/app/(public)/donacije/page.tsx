@@ -61,7 +61,7 @@ const teamMembers = [
     name: 'Bruno Bešlić',
     photo: '/images/donacije/pametni-kist/bruno.webp',
     role: 'Mentor · mag. edu. inf. et techn.',
-    bio: 'Istaknuti učitelj informatike i tehničke kulture (OŠ Vjekoslava Paraća, Solin) te vanjski suradnik na splitskom PMF-u. S više od deset godina mentorskog staža, od čega osam u Inovaticu, Bruno uspješno usmjerava mlade talente prema vrhunskim rezultatima.',
+    bio: 'Istaknuti učitelj informatike i tehničke kulture (OŠ Vjekoslava Paraća, Solin) te vanjski suradnik na splitskom Prirodoslovno-matematičkom fakultetu. S više od deset godina mentorskog staža, od čega osam u Inovaticu, Bruno uspješno usmjerava mlade talente prema vrhunskim rezultatima.',
     quote: null,
   },
 ] as const
@@ -85,7 +85,7 @@ const techFeatures = [
 ]
 
 const recognitions = [
-  'Zavod za forenziku PMF-a u Splitu omogućio im je testiranje kista na pravim ljudskim kostima, što je prošlo s vrhunskim rezultatima.',
+  'Zavod za forenziku Prirodoslovno-matematičkog fakulteta u Splitu omogućio im je testiranje kista na pravim ljudskim kostima, što je prošlo s vrhunskim rezultatima.',
   'Arheolozi iz Muzeja hrvatskih arheoloških spomenika (MHAS) i restauratorica Petra Perlain potvrdili su veliku korist alata u svakodnevnom radu.',
   'Hrvatsko restauratorsko društvo (HRD), na čelu s Markom Buljanom, pozvalo je tim da svoj izum predstavi na Međunarodnoj konferenciji studija konzervacije-restauracije pred vodećim svjetskim tvrtkama, uz mogućnost financijske potpore za daljnji razvoj.',
 ]

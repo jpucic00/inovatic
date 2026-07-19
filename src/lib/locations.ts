@@ -76,13 +76,12 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
         name: 'Ruđera Boškovića 33',
         address: 'Ruđera Boškovića 33',
         postal: '21000 Split',
-        institution: 'Prirodoslovno-matematički fak.',
+        institution: 'Prirodoslovno-matematički fakultet',
         mapQuery: 'Ru%C4%91era+Bo%C5%A1kovi%C4%87a+33,+Split,+Croatia',
         image: '/images/locations/split-pmf.jpg',
         imageAlt: 'Prostor na Prirodoslovno-matematičkom fakultetu, Ruđera Boškovića 33, Split',
         description:
-          'Dvorana B1-07 na Odjelu za politehniku PMF-a — lokacija namijenjena natjecateljskim programima.',
-        badge: 'Prirodoslovno-matematički fakultet',
+          'Dvorana B1-07 na Odjelu za politehniku Prirodoslovno-matematičkog fakulteta — lokacija namijenjena natjecateljskim programima.',
         website: 'https://www.pmfst.unist.hr',
         coordinator: {
           name: 'Jozo Pivac',

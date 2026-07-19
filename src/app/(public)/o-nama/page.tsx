@@ -68,7 +68,7 @@ const trainers: { name: string; title: string; image?: string }[] = [
   { name: 'Bruno Bešlić', title: 'mag. educ. informatike i tehnike', image: '/images/predavaci/bruno-beslic.jpeg' },
   { name: 'Slavica Jurčević', title: 'mag. educ. inf.' },
   { name: 'Duje Topić', title: 'student Filozofskog fakulteta Split' },
-  { name: 'Josip Stepinac', title: 'student PMF-a, usmjerenje informatika i tehnika', image: '/images/predavaci/josip-stepinac.jpeg' },
+  { name: 'Josip Stepinac', title: 'student Prirodoslovno-matematičkog fakulteta, usmjerenje informatika i tehnika', image: '/images/predavaci/josip-stepinac.jpeg' },
   { name: 'Ivan Stepinac', title: 'student FESB-a, smjer računarstvo', image: '/images/predavaci/ivan-stepinac.jpeg' },
   { name: 'Vito Drnjević', title: 'student FESB-a, smjer računarstvo', image: '/images/predavaci/vito-drnjevic.jpeg' },
   { name: 'Ivano Tabak', title: 'maturant, Elektrotehnička škola', image: '/images/predavaci/ivano-tabak.jpeg' },

@@ -11,7 +11,7 @@ const locations = [
   },
   {
     address: 'Ruđera Boškovića 33, 21000 Split',
-    venue: 'Prirodoslovno-matematički fak.',
+    venue: 'Prirodoslovno-matematički fakultet',
     href: '/lokacije/split',
     badge: null,
     description: 'Lokacija namijenjena natjecateljskim programima.',
