@@ -13,7 +13,7 @@ interface AccountCredentialsProps {
   locationAddress: string
 }
 
-export function AccountCredentialsEmail({
+function AccountCredentialsEmail({
   parentName,
   childName,
   username,
@@ -115,3 +115,17 @@ const locationAddressText = {
   color: '#6b7280',
   fontSize: '13px',
 }
+
+// Sample data for the `react-email` preview server (`npm run email`).
+AccountCredentialsEmail.PreviewProps = {
+  parentName: 'Ana Anić',
+  childName: 'Marko Anić',
+  username: 'marko.anic',
+  password: 'Xk7mQ2ph',
+  groupName: 'SLR 2 – utorkom',
+  schedule: 'Utorak, 17:00–18:30',
+  locationName: 'OŠ Meje',
+  locationAddress: 'Prilaz braće Kaliterna 10, 21000 Split',
+} satisfies AccountCredentialsProps
+
+export default AccountCredentialsEmail

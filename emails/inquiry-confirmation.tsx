@@ -16,7 +16,7 @@ interface InquiryConfirmationProps {
   courseLevelPref?: string
 }
 
-export function InquiryConfirmationEmail({
+function InquiryConfirmationEmail({
   parentName,
   childName,
   childDateOfBirth,
@@ -57,3 +57,15 @@ export function InquiryConfirmationEmail({
     </EmailLayout>
   )
 }
+
+// Sample data for the `react-email` preview server (`npm run email`) — shows the
+// optional city + course-preference lines populated.
+InquiryConfirmationEmail.PreviewProps = {
+  parentName: 'Ana Anić',
+  childName: 'Marko Anić',
+  childDateOfBirth: '15.06.2016.',
+  cityLabel: 'Šibenik',
+  courseLevelPref: 'SLR_2',
+} satisfies InquiryConfirmationProps
+
+export default InquiryConfirmationEmail

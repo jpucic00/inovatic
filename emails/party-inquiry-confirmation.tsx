@@ -7,7 +7,7 @@ interface PartyInquiryConfirmationProps {
   proposedDate?: string
 }
 
-export function PartyInquiryConfirmationEmail({
+function PartyInquiryConfirmationEmail({
   parentName,
   proposedDate,
 }: PartyInquiryConfirmationProps) {
@@ -39,3 +39,12 @@ export function PartyInquiryConfirmationEmail({
     </EmailLayout>
   )
 }
+
+// Sample data for the `react-email` preview server (`npm run email`) — with an
+// optional proposed date populated.
+PartyInquiryConfirmationEmail.PreviewProps = {
+  parentName: 'Ana Anić',
+  proposedDate: '15.08.2026.',
+} satisfies PartyInquiryConfirmationProps
+
+export default PartyInquiryConfirmationEmail

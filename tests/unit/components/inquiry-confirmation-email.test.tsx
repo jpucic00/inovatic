@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@react-email/components'
-import { InquiryConfirmationEmail } from '../../../emails/inquiry-confirmation'
+import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
 
 const base = {
   parentName: 'Marija Horvat',

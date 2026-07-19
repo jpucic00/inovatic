@@ -21,10 +21,9 @@ import {
   assertGroupHasAvailableSpot,
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
-import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
+import { sendStudentCredentialsEmail } from '@/lib/email'
 import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 import { studentIdentityWhere } from '@/lib/student-match'
-import { AccountCredentialsEmail } from '../../../emails/account-credentials'
 import { formatGroupSchedule } from '@/lib/format'
 import { computeSchoolYear } from '@/lib/school-year'
 import {
@@ -524,13 +523,13 @@ type InquiryEmailContext = {
   parentEmail: string
 }
 
-async function sendStudentCredentialsEmail(
+async function dispatchStudentCredentials(
   to: string,
   parentName: string,
   childName: string,
   core: CoreResult,
 ): Promise<void> {
-  if (!process.env.RESEND_API_KEY || !core.group) return
+  if (!core.group) return
 
   const schedule = formatGroupSchedule({
     isCustom: core.group.course.isCustom,
@@ -541,21 +540,16 @@ async function sendStudentCredentialsEmail(
     endTime: core.group.endTime,
   })
 
-  await resend.emails.send({
-    from: FROM_EMAIL,
-    replyTo: REPLY_TO,
+  await sendStudentCredentialsEmail({
     to,
-    subject: `Pristupni podaci za ${childName} – Inovatic`,
-    react: AccountCredentialsEmail({
-      parentName,
-      childName,
-      username: core.user.username ?? '',
-      password: core.password,
-      groupName: core.group.name ?? core.group.course.title,
-      schedule,
-      locationName: core.group.location.name,
-      locationAddress: core.group.location.address,
-    }),
+    parentName,
+    childName,
+    username: core.user.username ?? '',
+    password: core.password,
+    groupName: core.group.name ?? core.group.course.title,
+    schedule,
+    locationName: core.group.location.name,
+    locationAddress: core.group.location.address,
   })
 }
 
@@ -564,7 +558,7 @@ async function sendInquiryCredentialsEmail(
   core: CoreResult,
 ): Promise<void> {
   const childName = `${inquiry.childFirstName ?? ''} ${inquiry.childLastName ?? ''}`.trim()
-  await sendStudentCredentialsEmail(inquiry.parentEmail, inquiry.parentName, childName, core)
+  await dispatchStudentCredentials(inquiry.parentEmail, inquiry.parentName, childName, core)
 }
 
 export async function createStudentManually(
@@ -618,7 +612,7 @@ export async function createStudentManually(
   if (!core.isExisting && parentEmail && core.group) {
     try {
       const childName = `${data.firstName} ${data.lastName}`.trim()
-      await sendStudentCredentialsEmail(parentEmail, data.parentName ?? '', childName, core)
+      await dispatchStudentCredentials(parentEmail, data.parentName ?? '', childName, core)
     } catch (err) {
       emailFailed = true
       console.error(

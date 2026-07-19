@@ -14,6 +14,9 @@
 /.next/
 /out/
 
+# react-email preview server working dir (npm run email)
+/.react-email/
+
 # Production
 /build
 

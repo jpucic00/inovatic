@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from 'vitest'
-import type { Mock } from 'vitest'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
 import {
@@ -14,17 +13,15 @@ import {
 // outside a request scope; stub it so the action body runs to completion.
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
-// Replace the whole email module (the exact specifier src/actions/admin/student.ts
-// imports) so resend.emails.send is a controllable mock and the test never
-// instantiates a real Resend client, let alone hits the network.
-vi.mock('@/lib/email', () => ({
-  resend: { emails: { send: vi.fn() } },
-  FROM_EMAIL: 'Inovatic <noreply@test.local>',
-  REPLY_TO: 'prijave@test.local',
+// Mock the Resend SDK — the only thing src/lib/email/client.ts instantiates —
+// so the real sender service runs but no Resend client is built and nothing
+// hits the network. `sendMock` is the controllable emails.send.
+const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
+vi.mock('resend', () => ({
+  Resend: class {
+    emails = { send: sendMock }
+  },
 }))
-
-import { resend } from '@/lib/email'
-const sendMock = resend.emails.send as unknown as Mock
 
 beforeAll(() => {
   // Both actions short-circuit the email branch when RESEND_API_KEY is absent.

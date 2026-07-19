@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@react-email/components'
-import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
-import { AccountCredentialsEmail } from '../../../emails/account-credentials'
+import ScheduleOptionsEmail from '../../../emails/schedule-options'
+import AccountCredentialsEmail from '../../../emails/account-credentials'
 
 // City tenancy PR8: a bare venue name like "Trokut" is ambiguous to a parent,
 // so both transactional emails render the full venue address (which carries the

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import type { Mock } from 'vitest'
 import { db } from '@/lib/db'
-import { resend } from '@/lib/email'
 import { mockSession } from './setup'
 import {
   createAdmin,
@@ -23,6 +22,15 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 // request scope in vitest.
 vi.mock('next/headers', () => ({
   cookies: vi.fn(),
+}))
+
+// Mock the Resend SDK so the real sender service runs without building a client
+// or hitting the network; emailSend is the controllable emails.send.
+const { emailSend } = vi.hoisted(() => ({ emailSend: vi.fn() }))
+vi.mock('resend', () => ({
+  Resend: class {
+    emails = { send: emailSend }
+  },
 }))
 
 import { cookies } from 'next/headers'
@@ -477,21 +485,16 @@ describe('group pickers — scope by selected school year', () => {
 
 describe('createStudent* — Resend failure is non-fatal', () => {
   // The file's beforeAll deletes RESEND_API_KEY so the email branch is normally
-  // skipped. Here we set a dummy key + spy on resend.emails.send so the branch
-  // actually runs without touching the network, then restore both per test.
-  let sendSpy: ReturnType<typeof vi.spyOn>
-
+  // skipped. Here we set a dummy key so the real sender reaches the mocked Resend
+  // SDK (emailSend) without touching the network, then reset both per test.
   beforeEach(() => {
     process.env.RESEND_API_KEY = 'test_resend_key'
-    sendSpy = vi
-      .spyOn(resend.emails, 'send')
-      .mockResolvedValue({ data: { id: 'sent' }, error: null } as Awaited<
-        ReturnType<typeof resend.emails.send>
-      >)
+    emailSend.mockReset()
+    emailSend.mockResolvedValue({ data: { id: 'sent' }, error: null })
   })
 
   afterEach(() => {
-    sendSpy.mockRestore()
+    emailSend.mockReset()
     delete process.env.RESEND_API_KEY
   })
 
@@ -507,7 +510,7 @@ describe('createStudent* — Resend failure is non-fatal', () => {
   }
 
   it('createStudentFromInquiry: email throw → account still created + emailFailed flag', async () => {
-    sendSpy.mockRejectedValue(new Error('boom'))
+    emailSend.mockRejectedValue(new Error('boom'))
     const admin = await createAdmin()
     const { radionica, group } = await makeRadionicaGroup()
 
@@ -535,7 +538,7 @@ describe('createStudent* — Resend failure is non-fatal', () => {
       expect(res.emailFailed).toBe(true)
       expect(res.studentId).toBeDefined()
     }
-    expect(sendSpy).toHaveBeenCalledTimes(1)
+    expect(emailSend).toHaveBeenCalledTimes(1)
 
     // Success-path contract held despite the throw: account + enrollment exist,
     // inquiry flipped to ACCOUNT_CREATED and back-references the student.
@@ -576,14 +579,14 @@ describe('createStudent* — Resend failure is non-fatal', () => {
 
     expect(res.success).toBe(true)
     if (res.success) expect(res.emailFailed).toBeUndefined()
-    expect(sendSpy).toHaveBeenCalledTimes(1)
+    expect(emailSend).toHaveBeenCalledTimes(1)
 
     const refreshed = await db.inquiry.findUnique({ where: { id: inquiry.id } })
     expect(refreshed?.status).toBe('ACCOUNT_CREATED')
   })
 
   it('createStudentManually: email throw → student still created + emailFailed flag', async () => {
-    sendSpy.mockRejectedValue(new Error('boom'))
+    emailSend.mockRejectedValue(new Error('boom'))
     const admin = await createAdmin()
     const { group } = await makeRadionicaGroup()
 
@@ -605,7 +608,7 @@ describe('createStudent* — Resend failure is non-fatal', () => {
       expect(res.emailFailed).toBe(true)
       expect(res.studentId).toBeDefined()
     }
-    expect(sendSpy).toHaveBeenCalledTimes(1)
+    expect(emailSend).toHaveBeenCalledTimes(1)
 
     const created = await db.user.findFirst({
       where: { firstName: 'Manual', lastName: 'Mailfail' },
@@ -636,7 +639,7 @@ describe('createStudent* — Resend failure is non-fatal', () => {
 
     expect(res.success).toBe(true)
     if (res.success) expect(res.emailFailed).toBeUndefined()
-    expect(sendSpy).toHaveBeenCalledTimes(1)
+    expect(emailSend).toHaveBeenCalledTimes(1)
 
     const created = await db.user.findFirst({
       where: { firstName: 'Manual', lastName: 'Mailok' },

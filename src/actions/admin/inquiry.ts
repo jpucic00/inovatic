@@ -11,8 +11,7 @@ import {
   type SchedulePartyInput,
 } from '@/lib/validators/admin/inquiry'
 import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
-import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
-import { ScheduleOptionsEmail } from '../../../emails/schedule-options'
+import { sendScheduleOptionsEmail } from '@/lib/email'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { computeGroupCapacity } from '@/lib/group-capacity'
 import { loadHolidayDateKeys } from '@/lib/holidays'
@@ -437,19 +436,12 @@ export async function sendScheduleOptions(
 
     const childName = `${inquiry.childFirstName} ${inquiry.childLastName}`.trim()
 
-    if (process.env.RESEND_API_KEY) {
-      await resend.emails.send({
-        from: FROM_EMAIL,
-        replyTo: REPLY_TO,
-        to: inquiry.parentEmail,
-        subject: `Dostupni termini za ${childName} – Inovatic`,
-        react: ScheduleOptionsEmail({
-          parentName: inquiry.parentName,
-          childName,
-          options,
-        }),
-      })
-    }
+    await sendScheduleOptionsEmail({
+      to: inquiry.parentEmail,
+      parentName: inquiry.parentName,
+      childName,
+      options,
+    })
   } catch (err) {
     console.error('sendScheduleOptions failed:', err)
     return { success: false, error: 'Greška pri slanju rasporeda.' }

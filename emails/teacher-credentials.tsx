@@ -9,7 +9,7 @@ interface TeacherCredentialsProps {
   loginUrl: string
 }
 
-export function TeacherCredentialsEmail({
+function TeacherCredentialsEmail({
   firstName,
   lastName,
   email,
@@ -94,3 +94,14 @@ const button = {
   fontWeight: '600' as const,
   display: 'inline-block',
 }
+
+// Sample data for the `react-email` preview server (`npm run email`).
+TeacherCredentialsEmail.PreviewProps = {
+  firstName: 'Ivana',
+  lastName: 'Kovač',
+  email: 'ivana.kovac@udruga-inovatic.hr',
+  password: 'Xk7mQ2ph',
+  loginUrl: 'https://udruga-inovatic.hr/prijava',
+} satisfies TeacherCredentialsProps
+
+export default TeacherCredentialsEmail

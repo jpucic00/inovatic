@@ -15,8 +15,7 @@ import {
   type AssignTeacherInput,
 } from '@/lib/validators/admin/teacher'
 import { hashPassword, generateSimplePassword } from '@/lib/password'
-import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
-import { TeacherCredentialsEmail } from '../../../emails/teacher-credentials'
+import { sendTeacherCredentialsEmail } from '@/lib/email'
 
 type TeacherRow = {
   id: string
@@ -42,31 +41,19 @@ type TeacherFilters = {
   pageSize?: number
 }
 
-async function sendTeacherCredentialsEmail(
+async function dispatchTeacherCredentials(
   teacher: { email: string; firstName: string; lastName: string },
   password: string,
-  subject: string,
+  variant: 'new' | 'reset',
 ): Promise<boolean> {
-  if (!process.env.RESEND_API_KEY) return false
   try {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ??
-      process.env.NEXTAUTH_URL ??
-      'https://udruga-inovatic.hr'
-    await resend.emails.send({
-      from: FROM_EMAIL,
-      replyTo: REPLY_TO,
+    return await sendTeacherCredentialsEmail({
       to: teacher.email,
-      subject,
-      react: TeacherCredentialsEmail({
-        firstName: teacher.firstName,
-        lastName: teacher.lastName,
-        email: teacher.email,
-        password,
-        loginUrl: `${baseUrl}/prijava`,
-      }),
+      firstName: teacher.firstName,
+      lastName: teacher.lastName,
+      password,
+      variant,
     })
-    return true
   } catch (err) {
     console.error('Failed to send teacher credentials email:', err)
     return false
@@ -234,10 +221,10 @@ export async function createTeacher(
       select: { id: true },
     })
 
-    const emailSent = await sendTeacherCredentialsEmail(
+    const emailSent = await dispatchTeacherCredentials(
       { email, firstName: data.firstName, lastName: data.lastName },
       password,
-      'Pristupni podaci – Inovatic',
+      'new',
     )
 
     revalidatePath('/admin/nastavnici')
@@ -310,7 +297,7 @@ export async function resetTeacherPassword(
       data: { passwordHash, plainPassword: password },
     })
 
-    const emailSent = await sendTeacherCredentialsEmail(teacher, password, 'Nova lozinka – Inovatic')
+    const emailSent = await dispatchTeacherCredentials(teacher, password, 'reset')
 
     revalidatePath(`/admin/nastavnici/${id}`)
     return { success: true, password, emailSent }

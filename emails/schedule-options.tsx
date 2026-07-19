@@ -1,7 +1,7 @@
 import { Heading, Hr, Link, Section, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
 
-interface GroupOption {
+export interface GroupOption {
   groupName: string
   /** Pre-formatted schedule string, e.g. "Ponedjeljak, 17:00–18:30" for standard
    * programs or "15.07.2026. – 21.07.2026., 09:00–11:00" for radionice. */
@@ -18,7 +18,7 @@ interface ScheduleOptionsProps {
   options: GroupOption[]
 }
 
-export function ScheduleOptionsEmail({
+function ScheduleOptionsEmail({
   parentName,
   childName,
   options,
@@ -82,3 +82,26 @@ const locationAddress = {
   color: '#6b7280',
   fontSize: '13px',
 }
+
+// Sample data for the `react-email` preview server (`npm run email`) — two
+// options showing both schedule formats (weekly + radionica date-range).
+ScheduleOptionsEmail.PreviewProps = {
+  parentName: 'Ana Anić',
+  childName: 'Marko Anić',
+  options: [
+    {
+      groupName: 'SLR 2 – utorkom',
+      schedule: 'Utorak, 17:00–18:30',
+      locationName: 'OŠ Meje',
+      locationAddress: 'Prilaz braće Kaliterna 10, 21000 Split',
+    },
+    {
+      groupName: 'Ljetna radionica robotike',
+      schedule: '14.07.2026. – 18.07.2026., 09:00–11:00',
+      locationName: 'Trokut inkubator',
+      locationAddress: 'Ul. Velimira Škorpika 7/a, 22000 Šibenik',
+    },
+  ],
+} satisfies ScheduleOptionsProps
+
+export default ScheduleOptionsEmail

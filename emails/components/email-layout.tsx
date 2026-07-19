@@ -4,10 +4,19 @@ import {
   Head,
   Hr,
   Html,
+  Img,
+  Link,
   Preview,
+  Section,
   Text,
 } from '@react-email/components'
 import type { ReactNode } from 'react'
+
+// The apex domain still serves the old WordPress site, so the new app's public
+// assets aren't reachable there — the logo is hosted on the project's Cloudinary
+// CDN (same host as every other image). `w_280` = 2× the 140px display width.
+const LOGO_URL =
+  'https://res.cloudinary.com/dgc2tp4f8/image/upload/w_280/branding/inovatic-logo.png'
 
 export const emailStyles = {
   main: {
@@ -18,6 +27,10 @@ export const emailStyles = {
     margin: '0 auto',
     padding: '40px 24px',
     maxWidth: '560px',
+  },
+  header: {
+    textAlign: 'center' as const,
+    margin: '0 0 24px',
   },
   h1: {
     color: '#0891b2',
@@ -64,6 +77,16 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
       <Preview>{preview}</Preview>
       <Body style={emailStyles.main}>
         <Container style={emailStyles.container}>
+          <Section style={emailStyles.header}>
+            <Link href="https://udruga-inovatic.hr">
+              <Img
+                src={LOGO_URL}
+                alt="Inovatic – Udruga za robotiku"
+                width={140}
+                height={80}
+              />
+            </Link>
+          </Section>
           {children}
           <Hr style={emailStyles.hr} />
           <Text style={emailStyles.footer}>

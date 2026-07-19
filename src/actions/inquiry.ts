@@ -2,7 +2,7 @@
 
 import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
-import { resend, FROM_EMAIL, REPLY_TO } from '@/lib/email'
+import { sendInquiryConfirmationEmail, sendPartyInquiryConfirmationEmail } from '@/lib/email'
 import {
   inquirySchema,
   partyInquirySchema,
@@ -16,10 +16,7 @@ import {
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
 import { CITY_LABELS } from '@/lib/city'
-import { InquiryConfirmationEmail } from '../../emails/inquiry-confirmation'
-import { PartyInquiryConfirmationEmail } from '../../emails/party-inquiry-confirmation'
 import { computeSchoolYear } from '@/lib/school-year'
-import { createElement } from 'react'
 
 // Thrown when a submitted group does not belong to the submitted city — a
 // stale/tampered payload the client-side city filter would normally prevent.
@@ -114,20 +111,13 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
   }
 
   try {
-    if (process.env.RESEND_API_KEY) {
-      await resend.emails.send({
-        from: FROM_EMAIL,
-        replyTo: REPLY_TO,
-        to: parentEmail,
-        subject: `Zaprimili smo vašu prijavu – Inovatic`,
-        react: createElement(InquiryConfirmationEmail, {
-          parentName,
-          childName: `${childFirstName} ${childLastName}`,
-          childDateOfBirth,
-          cityLabel: CITY_LABELS[city],
-        }),
-      })
-    }
+    await sendInquiryConfirmationEmail({
+      to: parentEmail,
+      parentName,
+      childName: `${childFirstName} ${childLastName}`,
+      childDateOfBirth,
+      cityLabel: CITY_LABELS[city],
+    })
   } catch (err) {
     console.error('Failed to send inquiry confirmation email:', err)
   }
@@ -187,18 +177,11 @@ export async function submitPartyInquiry(
   }
 
   try {
-    if (process.env.RESEND_API_KEY) {
-      await resend.emails.send({
-        from: FROM_EMAIL,
-        replyTo: REPLY_TO,
-        to: parentEmail,
-        subject: 'Zaprimili smo vaš upit za proslavu – Inovatic',
-        react: createElement(PartyInquiryConfirmationEmail, {
-          parentName,
-          proposedDate: proposedIso ? isoToCroatianDate(proposedIso) : undefined,
-        }),
-      })
-    }
+    await sendPartyInquiryConfirmationEmail({
+      to: parentEmail,
+      parentName,
+      proposedDate: proposedIso ? isoToCroatianDate(proposedIso) : undefined,
+    })
   } catch (err) {
     console.error('Failed to send party inquiry confirmation email:', err)
   }
