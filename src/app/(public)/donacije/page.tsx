@@ -1,5 +1,23 @@
 import type { Metadata } from 'next'
-import { ArrowUpRight, Trophy, Award, Calendar, MapPin, ScanBarcode, Landmark } from 'lucide-react'
+import Image from 'next/image'
+import {
+  ArrowUpRight,
+  Trophy,
+  Award,
+  Calendar,
+  MapPin,
+  ScanBarcode,
+  Landmark,
+  FileText,
+  Download,
+  Sparkles,
+  Paintbrush,
+  Gauge,
+  Cpu,
+  Blocks,
+  CheckCircle2,
+  Quote,
+} from 'lucide-react'
 import { GearDecor } from '@/components/shared/decorations'
 import { CopyButton } from '@/components/shared/copy-button'
 import { DonationGallery } from '@/components/donacije/donation-gallery'
@@ -22,6 +40,55 @@ export const metadata: Metadata = {
 const RECIPIENT = 'Udruga za robotiku "Inovatic"'
 const IBAN = 'HR7223400091110811408'
 const PAYMENT_DESCRIPTION = 'Za put na europsko i svjetsko natjecanje'
+const DONATION_CONTRACT_HREF = '/documents/ugovor-o-donaciji-wro-2026.docx'
+
+const teamMembers = [
+  {
+    name: 'Vito Tonšić',
+    photo: '/images/donacije/pametni-kist/vito.webp',
+    role: 'Elektronika i programiranje',
+    bio: 'Mladi inovator zadužen za „srce i mozak” projekta – dizajniranje elektroničkih shema i programiranje. Iza sebe ima godine rada u udruzi Inovatic i sudjelovanja na natjecanjima poput FLL-a, WRO-a, Robokupa i Robosima.',
+    quote: 'Ako imate ideju koja zvuči ludo, pokušajte je ostvariti. Kroz pokušaje i pogreške uči se najviše!',
+  },
+  {
+    name: 'Jure Vukušić',
+    photo: '/images/donacije/pametni-kist/jure.webp',
+    role: 'Konstrukcija i ergonomija',
+    bio: 'Kreativna snaga tima zadužena za konstrukciju, ergonomiju i mehaniku kista. Koristeći CAD softvere i 3D print, pretvorio je ideju u funkcionalan, lagan i ergonomski ručni alat. Sudionik je brojnih robotičkih natjecanja i zaljubljenik u tehničko rješavanje problema.',
+    quote: 'Upornost i detaljna priprema ključ su svakog uspjeha. Robotika nam daje moć da stvaramo opipljive promjene u svijetu.',
+  },
+  {
+    name: 'Bruno Bešlić',
+    photo: '/images/donacije/pametni-kist/bruno.webp',
+    role: 'Mentor · mag. edu. inf. et techn.',
+    bio: 'Istaknuti učitelj informatike i tehničke kulture (OŠ Vjekoslava Paraća, Solin) te vanjski suradnik na splitskom PMF-u. S više od deset godina mentorskog staža, od čega osam u Inovaticu, Bruno uspješno usmjerava mlade talente prema vrhunskim rezultatima.',
+    quote: null,
+  },
+] as const
+
+const techFeatures = [
+  {
+    icon: Gauge,
+    title: 'Senzor sile (FSR)',
+    text: 'Ugrađeni mikrosenzor sile u stvarnom vremenu mjeri pritisak. Pritisne li korisnik previše jako, kist odmah reagira i upozorava svjetlom, zvukom i vibracijom.',
+  },
+  {
+    icon: Cpu,
+    title: 'Napredna tehnologija',
+    text: 'Razvijena su tri modela. Najnapredniji pokreće Arduino NANO ESP32, ima OLED zaslon, punjivu bateriju te mogućnost Bluetooth povezivanja.',
+  },
+  {
+    icon: Blocks,
+    title: 'Modularnost',
+    text: 'Sustav brze izmjene glava omogućuje prilagodbu različitim vrstama materijala na terenu.',
+  },
+]
+
+const recognitions = [
+  'Zavod za forenziku PMF-a u Splitu omogućio im je testiranje kista na pravim ljudskim kostima, što je prošlo s vrhunskim rezultatima.',
+  'Arheolozi iz Muzeja hrvatskih arheoloških spomenika (MHAS) i restauratorica Petra Perlain potvrdili su veliku korist alata u svakodnevnom radu.',
+  'Hrvatsko restauratorsko društvo (HRD), na čelu s Markom Buljanom, pozvalo je tim da svoj izum predstavi na Međunarodnoj konferenciji studija konzervacije-restauracije pred vodećim svjetskim tvrtkama, uz mogućnost financijske potpore za daljnji razvoj.',
+]
 
 const competitions = [
   {
@@ -45,6 +112,14 @@ const galleryImages = Array.from({ length: 21 }, (_, i) => {
   return {
     src: `/images/donacije/gallery/${n}.webp`,
     alt: `WRO 2026 državno prvenstvo u Samoboru – fotografija ${i + 1}`,
+  }
+})
+
+const pametniKistImages = Array.from({ length: 9 }, (_, i) => {
+  const n = String(i + 1).padStart(2, '0')
+  return {
+    src: `/images/donacije/pametni-kist/${n}.webp`,
+    alt: `Startup projekt „Pametni kist” – fotografija ${i + 1}`,
   }
 })
 
@@ -190,6 +265,156 @@ export default function DonacijePage() {
               </dl>
             </div>
           </div>
+
+          {/* Donation contract for legal entities */}
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-4 bg-white rounded-2xl p-5 md:p-6 border border-gray-100 shadow-sm">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="w-11 h-11 rounded-xl bg-cyan-100 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 text-cyan-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900">Ugovor o donaciji za pravne osobe</h3>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  Donirate kao tvrtka ili pravna osoba? Preuzmite predložak ugovora o donaciji.
+                </p>
+              </div>
+            </div>
+            <a
+              href={DONATION_CONTRACT_HREF}
+              download
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-cyan-500 text-white font-semibold rounded-xl hover:bg-cyan-600 transition-colors shadow-sm flex-shrink-0"
+            >
+              <Download className="w-4 h-4" />
+              Preuzmi predložak
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Pametni kist – featured startup project */}
+      <section className="py-16 px-4 bg-white">
+        <div className="container mx-auto max-w-4xl">
+          <div className="text-center mb-10">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">
+              <Sparkles className="w-3.5 h-3.5" />
+              Naši inovatori
+            </span>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-5">
+              Mladi splitski inovatori osvajaju znanstvenu scenu: upoznajte tim „Pametni kist”!
+            </h2>
+          </div>
+
+          {/* Intro + team photo */}
+          <div className="grid md:grid-cols-2 gap-8 items-center mb-12">
+            <p className="text-gray-600 leading-relaxed order-2 md:order-1">
+              Nakon velikog uspjeha ekipe CroSpec, Udruga za robotiku „Inovatic” iz Splita predstavlja još
+              jednu sjajnu ekipu mladih genijalaca. Članovi tima „Pametni kist” – Vito Tonšić i Jure Vukušić,
+              pod vodstvom mentora Brune Bešlića – osmislili su istoimeni revolucionarni uređaj koji spaja
+              modernu tehnologiju s očuvanjem kulturne baštine.
+            </p>
+            <div className="order-1 md:order-2 relative aspect-[4/3] rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+              <Image
+                src="/images/donacije/pametni-kist/tim.webp"
+                alt="Tim „Pametni kist” na Danu karijere"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
+            </div>
+          </div>
+
+          {/* Team members */}
+          <h3 className="text-xl font-bold text-gray-900 text-center mb-6">Upoznajte članove tima</h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+            {teamMembers.map((member) => (
+              <div key={member.name} className="rounded-2xl border border-gray-100 shadow-sm bg-white p-5 flex flex-col">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="relative w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                    <Image
+                      src={member.photo}
+                      alt={member.name}
+                      fill
+                      className="object-cover object-top"
+                      sizes="80px"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-gray-900">{member.name}</h4>
+                    <span className="block text-xs font-semibold uppercase tracking-wide text-cyan-600 mt-0.5">{member.role}</span>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed">{member.bio}</p>
+                {member.quote && (
+                  <blockquote className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-700 italic relative">
+                    <Quote className="w-4 h-4 text-cyan-300 mb-1" />
+                    {member.quote}
+                  </blockquote>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Project – innovation that preserves history */}
+          <div className="rounded-2xl bg-cyan-50/50 border border-cyan-100 p-6 md:p-8 mb-10">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500 flex items-center justify-center flex-shrink-0">
+                <Paintbrush className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900">Projekt „Pametni kist” – inovacija koja čuva povijest</h3>
+            </div>
+            <p className="text-gray-600 leading-relaxed mb-6">
+              Pri čišćenju iznimno krhkih arheoloških nalaza, starih slika ili kostiju, i najmanji preveliki
+              pritisak ruke može nepovratno uništiti povijesno blago. Projekt „Pametni kist” rješava taj problem.
+            </p>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {techFeatures.map((feature) => (
+                <div key={feature.title} className="bg-white rounded-xl p-5 border border-gray-100">
+                  <div className="w-10 h-10 rounded-lg bg-cyan-100 flex items-center justify-center mb-3">
+                    <feature.icon className="w-5 h-5 text-cyan-600" />
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-1.5">{feature.title}</h4>
+                  <p className="text-sm text-gray-600 leading-relaxed">{feature.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recognition */}
+          <div className="max-w-3xl mx-auto">
+            <h3 className="text-xl font-bold text-gray-900 mb-3">
+              Testiran na pravim ljudskim kostima i prepoznat od struke
+            </h3>
+            <p className="text-gray-600 leading-relaxed mb-5">
+              Ova inovacija nije ostala samo u radionici. Tim je ostvario nevjerojatne suradnje koje dokazuju
+              praktičnu vrijednost uređaja:
+            </p>
+            <ul className="space-y-3 mb-6">
+              {recognitions.map((item) => (
+                <li key={item} className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-500 flex-shrink-0 mt-0.5" />
+                  <span className="text-gray-600 leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-gray-600 leading-relaxed">
+              Uređaj ima puni potencijal da postane globalni startup proizvod, a mladi inovatori već su
+              pripremili i patentnu prijavu kako bi u potpunosti zaštitili svoj izum. Pred splitskim timom
+              „Pametni kist” bez sumnje je sjajna tehnološka budućnost!
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Pametni kist gallery */}
+      <section className="py-16 px-4 bg-cyan-50/30">
+        <div className="container mx-auto max-w-4xl">
+          <div className="text-center mb-10">
+            <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Galerija</span>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">
+              Startup projekt „Pametni kist”
+            </h2>
+          </div>
+          <DonationGallery images={pametniKistImages} />
         </div>
       </section>
 
