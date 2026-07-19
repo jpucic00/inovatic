@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Clock, Users, Calendar, Wrench, CheckCircle, Sparkles } from 'lucide-react'
+import { ArrowRight, CheckCircle, Sparkles } from 'lucide-react'
 import { courses, getCourseBySlug } from '@/lib/courses-data'
+import { CourseModuleAccordion } from '@/components/public/course-module-accordion'
+import { CourseStickyCta } from '@/components/public/course-sticky-cta'
+import { CourseHero } from '@/components/public/course-hero'
 
 export function generateStaticParams() {
   return courses.map((c) => ({ slug: c.slug }))
@@ -53,6 +55,17 @@ export default async function CourseDetailPage({ params }: PageProps) {
   const courseIndex = courses.findIndex((c) => c.slug === slug)
   const nextCourse = courses[courseIndex + 1]
 
+  const includedItems = [
+    'Nastava jednom tjedno, 90 minuta',
+    `Korištenje opreme (${course.equipment} + laptop)`,
+    `Alati: ${course.tools}`,
+    'Mala grupa (do 10 polaznika)',
+    'Stručni robo treneri',
+    'Diploma o završetku',
+    'Pristup materijalima',
+    'Probni sat bez obveze',
+  ]
+
   const courseJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Course',
@@ -84,230 +97,112 @@ export default async function CourseDetailPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(courseJsonLd) }}
       />
-      {/* Header */}
-      <section className="py-8 px-4 bg-gray-50">
-        <div className="container mx-auto max-w-4xl">
-          <Link
-            href="/programi"
-            className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm font-medium mb-4 transition-colors"
+
+      <CourseHero course={course} level={courseIndex + 1} />
+
+      {/* Single reading column */}
+      <div className="mx-auto max-w-[768px] px-5 pb-12 pt-5 md:px-6 md:pb-14 md:pt-10">
+        <ProbniSatCallout className="mb-6 md:mb-10" />
+
+        <h2 className="mb-2.5 text-lg font-bold text-gray-900 md:mb-4 md:text-[22px]">O programu</h2>
+        {course.description.split('\n').filter(Boolean).map((para) => (
+          <p
+            key={para.slice(0, 40)}
+            className="mb-2.5 text-sm leading-[1.65] text-gray-600 last:mb-0 md:mb-3.5 md:text-[15.5px] md:leading-[1.7]"
           >
-            <ArrowLeft className="w-4 h-4" /> Svi programi
-          </Link>
-          <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${course.gradient} min-h-[280px] md:min-h-[340px] flex items-center`}>
-            <Image
-              src={course.coverImage}
-              alt={course.title}
-              fill
-              className="object-cover object-center"
-              priority
-            />
-            <div className={`absolute inset-0 bg-gradient-to-br ${course.gradient} opacity-30`} />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/10 to-transparent" />
-            <div className="relative px-8 py-10">
-              <span className="text-white text-sm font-semibold uppercase tracking-widest [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]">
-                Razina {courseIndex + 1} od 4
-              </span>
-              <h1 className="text-3xl md:text-5xl font-extrabold text-white mt-1 leading-tight [text-shadow:0_2px_12px_rgba(0,0,0,0.65)]">
-                {course.title}
-              </h1>
-            </div>
-          </div>
+            {para}
+          </p>
+        ))}
 
-          {/* Probni sat */}
-          <ProbniSatCallout className="mt-6" />
+        <h2 className="mb-3 mt-8 text-lg font-bold text-gray-900 md:mb-5 md:mt-11 md:text-[22px]">Moduli programa</h2>
+        <CourseModuleAccordion modules={course.modules} gradient={course.gradient} />
+
+        <h2 className="mb-3 mt-8 text-lg font-bold text-gray-900 md:mb-5 md:mt-11 md:text-[22px]">Što je uključeno</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {includedItems.map((item) => (
+            <div key={item} className="flex items-center gap-2.5">
+              <CheckCircle className="h-4 w-4 flex-shrink-0 text-cyan-500" />
+              <span className="text-sm text-gray-600">{item}</span>
+            </div>
+          ))}
         </div>
-      </section>
-
-      {/* Quick facts */}
-      <section className="bg-white border-b border-gray-100 py-5 px-4">
-        <div className="container mx-auto max-w-4xl">
-          <div className="flex flex-wrap gap-6 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-cyan-500" />
-              <span>Dob: <strong className="text-gray-800">{course.ageMin}–{course.ageMax} godina</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Wrench className="w-4 h-4 text-cyan-500" />
-              <span>Oprema: <strong className="text-gray-800">{course.equipment}</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Wrench className="w-4 h-4 text-cyan-500" />
-              <span>Alati: <strong className="text-gray-800">{course.tools}</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-cyan-500" />
-              <span><strong className="text-gray-800">{course.hours} sati</strong> godišnje</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-cyan-500" />
-              <span><strong className="text-gray-800">{course.season}</strong></span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="container mx-auto max-w-4xl px-4 py-12">
-        <div className="grid lg:grid-cols-3 gap-10">
-          {/* Main content */}
-          <div className="lg:col-span-2 space-y-10">
-            {/* Description */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">O programu</h2>
-              {course.description.split('\n').filter(Boolean).map((para) => (
-                <p key={para} className="text-gray-600 leading-relaxed text-justify mb-3 last:mb-0">
-                  {para}
-                </p>
-              ))}
-            </div>
-
-            {/* Modules */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-5">Moduli programa</h2>
-              <div className="space-y-4">
-                {course.modules.map((mod, i) => (
-                  <div
-                    key={mod.title}
-                    className="flex flex-col sm:flex-row gap-4 p-5 rounded-xl border border-gray-100 bg-gray-50 hover:border-cyan-200 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 sm:flex-col sm:items-start sm:gap-0">
-                      <div className="relative w-24 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
-                        <Image
-                          src={mod.image}
-                          alt={mod.title}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 sm:hidden mt-0">
-                        <span
-                          className={`w-6 h-6 rounded-md bg-gradient-to-br ${course.gradient} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
-                        >
-                          {i + 1}
-                        </span>
-                        <h3 className="font-semibold text-gray-900 text-sm">{mod.title}</h3>
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="hidden sm:flex items-center gap-2 mb-1">
-                        <span
-                          className={`w-6 h-6 rounded-md bg-gradient-to-br ${course.gradient} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
-                        >
-                          {i + 1}
-                        </span>
-                        <h3 className="font-semibold text-gray-900 text-sm">{mod.title}</h3>
-                      </div>
-                      {mod.description.split('\n').filter(Boolean).map((para) => (
-                        <p key={para.slice(0, 40)} className="text-sm text-gray-500 leading-relaxed text-justify mb-2 last:mb-0">
-                          {para}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* What's included */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-5">Što je uključeno</h2>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {[
-                  'Nastava jednom tjedno, 90 minuta',
-                  `Korištenje opreme (${course.equipment} + laptop)`,
-                  `Alati: ${course.tools}`,
-                  'Mala grupa (do 10 polaznika)',
-                  'Stručni robo treneri',
-                  'Diploma o završetku',
-                  'Pristup materijalima',
-                  'Probni sat bez obveze',
-                ].map((item) => (
-                  <div key={item} className="flex items-center gap-2.5">
-                    <CheckCircle className="w-4 h-4 text-cyan-500 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="flex flex-col space-y-6 lg:sticky lg:top-20 lg:self-start">
-            {/* Pricing card */}
-            <div className="order-2 lg:order-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h3 className="font-bold text-gray-900 mb-4">Cijene</h3>
-              <div className="space-y-3 mb-5">
-                <div className="flex items-center justify-between py-3 border-b border-gray-50">
-                  <div>
-                    <div className="font-semibold text-gray-800 text-sm">Godišnja pretplata</div>
-                    <div className="text-xs text-gray-400">Sva 4 modula</div>
-                  </div>
-                  <div className="text-xl font-extrabold text-cyan-500">{course.priceYear} EUR</div>
-                </div>
-                <div className="flex items-center justify-between py-3">
-                  <div>
-                    <div className="font-semibold text-gray-800 text-sm">Po modulu</div>
-                    <div className="text-xs text-gray-400">14 školskih sati</div>
-                  </div>
-                  <div className="text-xl font-extrabold text-gray-700">{course.priceModule} EUR</div>
-                </div>
-              </div>
-              <p className="text-xs text-gray-400 mb-5">
-                Popust 10% za drugu i svaku sljedeću prijavu iz iste obitelji.
-              </p>
-              <Link
-                href="/upisi"
-                className="block w-full text-center px-5 py-3 bg-cyan-500 text-white font-semibold rounded-xl hover:bg-cyan-600 transition-colors shadow-sm text-sm"
-              >
-                Pošalji upit za upis
-              </Link>
-              <a
-                href="mailto:prijave@udruga-inovatic.hr"
-                className="block w-full text-center px-5 py-3 mt-3 text-cyan-600 font-semibold rounded-xl hover:bg-cyan-50 transition-colors text-sm border border-cyan-200"
-              >
-                Kontaktiraj nas emailom
-              </a>
-            </div>
-
-            {/* Course details */}
-            <div className="order-1 lg:order-2 bg-gray-50 rounded-2xl p-5 text-sm space-y-3">
-              <h3 className="font-bold text-gray-900 mb-3">Detalji programa</h3>
-              {[
-                ['Dob', `${course.ageMin}–${course.ageMax} god.`],
-                ['Oprema', course.equipment],
-                ['Alati', course.tools],
-                ['Trajanje sata', `${course.sessionDuration} min`],
-                ['Učestalost', course.sessionFrequency],
-                ['Sezona', course.season],
-                ['Broj modula', '4'],
-                ['Ukupno sati', `${course.hours}h`],
-                ['Veličina grupe', `do ${course.groupSize} polaznika`],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-4">
-                  <span className="text-gray-500 shrink-0">{label}</span>
-                  <span className="font-medium text-gray-800 text-right">{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Next course */}
-        {nextCourse && (
-          <div className="mt-12 pt-10 border-t border-gray-100">
-            <p className="text-sm text-gray-500 mb-3 font-medium">Sljedeća razina</p>
-            <Link
-              href={`/programi/${nextCourse.slug}`}
-              className="group flex items-center justify-between p-5 bg-gray-50 rounded-2xl border border-gray-200 hover:border-cyan-300 hover:bg-cyan-50 transition-all"
-            >
-              <div>
-                <div className="font-bold text-gray-900">{nextCourse.title}</div>
-                <div className="text-sm text-gray-500">{nextCourse.ageMin}–{nextCourse.ageMax} god. | {nextCourse.equipment}</div>
-              </div>
-              <ArrowRight className="w-5 h-5 text-cyan-500 group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </div>
-        )}
       </div>
+
+      {/* Pricing band — full-width, in flow */}
+      <section
+        id="cijene"
+        className="scroll-mt-20 border-t border-cyan-100 bg-gradient-to-b from-cyan-50 to-white px-5 pb-6 pt-6 md:px-6 md:pb-14 md:pt-12"
+      >
+        <div className="mx-auto max-w-[768px]">
+          <h2 className="mb-1 text-center text-lg font-bold text-gray-900 md:mb-1.5 md:text-[22px]">Cijene i upis</h2>
+          <p className="mb-4 text-center text-[12.5px] text-gray-500 md:mb-7 md:text-sm">
+            Popust 10% za drugu i svaku sljedeću prijavu iz iste obitelji.
+          </p>
+
+          <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
+            {/* Po modulu — left on desktop, second on mobile */}
+            <div className="order-2 flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-4 md:order-1 md:px-6 md:py-[22px]">
+              <div>
+                <div className="text-sm font-bold text-gray-900 md:text-[15px]">Po modulu</div>
+                <div className="text-xs text-gray-500 md:text-[13px]">14 školskih sati</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[22px] font-extrabold text-gray-700 md:text-[28px]">{course.priceModule} EUR</div>
+                <div className="hidden text-xs font-medium text-gray-400 md:block">/ modul</div>
+              </div>
+            </div>
+            {/* Godišnja pretplata — right on desktop, first on mobile */}
+            <div className="relative order-1 mt-2 flex items-center justify-between gap-4 rounded-2xl border-2 border-cyan-500 bg-white p-4 md:order-2 md:mt-0 md:px-6 md:py-[22px]">
+              <span className="absolute -top-2.5 left-3.5 rounded-full bg-yellow-400 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.05em] text-gray-900 md:-top-[11px] md:left-5 md:text-[11px]">
+                Najpovoljnije
+              </span>
+              <div>
+                <div className="text-sm font-bold text-gray-900 md:text-[15px]">Godišnja pretplata</div>
+                <div className="text-xs text-gray-500 md:text-[13px]">Sva 4 modula · 56 sati</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[22px] font-extrabold text-cyan-600 md:text-[28px]">{course.priceYear} EUR</div>
+                <div className="hidden text-xs font-medium text-gray-400 md:block">/ godina</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2.5 md:flex-row md:justify-center md:gap-3">
+            <Link
+              href="/upisi"
+              className="rounded-xl bg-cyan-500 px-8 py-3.5 text-center text-sm font-semibold text-white transition-colors hover:bg-cyan-600 md:text-[15px]"
+            >
+              Pošalji upit za upis
+            </Link>
+            <a
+              href="mailto:prijave@udruga-inovatic.hr"
+              className="rounded-xl border border-cyan-200 bg-white px-8 py-3.5 text-center text-sm font-semibold text-cyan-600 transition-colors hover:bg-cyan-50 md:text-[15px]"
+            >
+              Kontaktiraj nas emailom
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Next course */}
+      {nextCourse && (
+        <div className="mx-auto max-w-[768px] px-5 pb-7 pt-5 md:px-6 md:pb-12 md:pt-8">
+          <p className="mb-3 text-sm font-medium text-gray-500">Sljedeća razina</p>
+          <Link
+            href={`/programi/${nextCourse.slug}`}
+            className="group flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 p-5 transition-all hover:border-cyan-300 hover:bg-cyan-50"
+          >
+            <div>
+              <div className="font-bold text-gray-900">{nextCourse.title}</div>
+              <div className="text-sm text-gray-500">{nextCourse.ageMin}–{nextCourse.ageMax} god. | {nextCourse.equipment}</div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-cyan-500 transition-transform group-hover:translate-x-1" />
+          </Link>
+        </div>
+      )}
+
+      {/* Mobile sticky CTA bar — hides once the pricing band is in view */}
+      <CourseStickyCta priceYear={course.priceYear} priceModule={course.priceModule} targetId="cijene" />
     </>
   )
 }

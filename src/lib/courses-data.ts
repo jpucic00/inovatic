@@ -6,7 +6,13 @@ interface CourseModule {
   image: string
 }
 
-interface Course {
+interface HeroRobot {
+  src: string
+  width: number
+  height: number
+}
+
+export interface Course {
   slug: string
   level: CourseLevel
   title: string
@@ -24,6 +30,8 @@ interface Course {
   season: string
   groupSize: number
   coverImage: string
+  heroBg: string
+  heroRobot: HeroRobot
   modules: CourseModule[]
   color: string
   gradient: string
@@ -56,6 +64,8 @@ export const courses: Course[] = [
     season: 'Listopad – Svibanj',
     groupSize: 10,
     coverImage: '/images/courses/slr-1/cover.webp',
+    heroBg: '/images/courses/slr-1/hero-bg.webp',
+    heroRobot: { src: '/images/courses/slr-1/hero-robot.webp', width: 1100, height: 943 },
     modules: [
       {
         title: 'Zabavni sustavi 1.0',
@@ -124,6 +134,8 @@ export const courses: Course[] = [
     season: 'Listopad – Svibanj',
     groupSize: 10,
     coverImage: '/images/courses/slr-2/cover.webp',
+    heroBg: '/images/courses/slr-2/hero-bg.webp',
+    heroRobot: { src: '/images/courses/slr-2/hero-robot.webp', width: 1100, height: 827 },
     modules: [
       {
         title: 'Zabavni sustavi 2.0',
@@ -191,6 +203,8 @@ export const courses: Course[] = [
     season: 'Listopad – Svibanj',
     groupSize: 10,
     coverImage: '/images/courses/slr-3/cover.webp',
+    heroBg: '/images/courses/slr-3/hero-bg.webp',
+    heroRobot: { src: '/images/courses/slr-3/hero-robot.webp', width: 1100, height: 1179 },
     modules: [
       {
         title: 'Zabavni sustavi 3.0',
@@ -258,6 +272,8 @@ export const courses: Course[] = [
     season: 'Listopad – Svibanj',
     groupSize: 10,
     coverImage: '/images/courses/slr-4/cover.webp',
+    heroBg: '/images/courses/slr-4/hero-bg.webp',
+    heroRobot: { src: '/images/courses/slr-4/hero-robot.webp', width: 1100, height: 801 },
     modules: [
       {
         title: 'Zabavni sustavi 4.0',

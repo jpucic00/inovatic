@@ -52,3 +52,6 @@ next-env.d.ts
 
 # Test fixtures (generated at runtime)
 tests/fixtures/phase3-state.json
+
+# Design handoff bundles — transient reference material, not part of the codebase
+/design_handoff_*/
