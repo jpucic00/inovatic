@@ -62,6 +62,7 @@ export function InquiryForm({
     setValue,
     reset,
     getValues,
+    clearErrors,
     formState: { errors },
   } = useForm<InquiryFormData>({
     resolver: zodResolver(inquirySchema),
@@ -112,7 +113,14 @@ export function InquiryForm({
     let valid = false
     if (step === 1) valid = await trigger(step1Fields as unknown as (keyof InquiryFormData)[])
     if (step === 2) valid = await trigger(step2Fields as unknown as (keyof InquiryFormData)[])
-    if (valid) setStep((s) => s + 1)
+    if (valid) {
+      // Validating the current step against the merged schema also flags the
+      // later required fields (grade, consent). Clear those so they don't render
+      // the instant Step 3 mounts, before the user has touched anything — the
+      // final submit re-validates everything.
+      clearErrors()
+      setStep((s) => s + 1)
+    }
   }
 
   function handleBack() {
@@ -234,8 +242,7 @@ export function InquiryForm({
 
           {step < 3 ? (
             <button
-              type="button"
-              onClick={handleNext}
+              type="submit"
               className="flex items-center gap-2 px-6 py-2.5 bg-cyan-500 text-white font-semibold rounded-lg hover:bg-cyan-600 transition text-sm shadow-sm"
             >
               Dalje <ArrowRight className="w-4 h-4" />
