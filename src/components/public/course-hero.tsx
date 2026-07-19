@@ -43,11 +43,15 @@ export function CourseHero({ course, level }: { readonly course: Course; readonl
 
         {/* Layered banner: background image + robot cutout + text overlay. */}
         <div className="relative flex h-[430px] overflow-hidden rounded-[14px] min-[480px]:h-auto min-[480px]:min-h-[280px] min-[480px]:rounded-2xl">
+          {/* Both hero layers are pre-optimized static WebPs, so serve them directly
+              (`unoptimized`) — running them back through /_next/image only added an
+              on-demand optimization delay that made the robot pop in after the bg. */}
           <Image
             src={course.heroBg}
             alt=""
             fill
             priority
+            unoptimized
             sizes="(max-width: 767px) 100vw, 768px"
             className="object-cover"
           />
@@ -57,6 +61,7 @@ export function CourseHero({ course, level }: { readonly course: Course; readonl
             width={course.heroRobot.width}
             height={course.heroRobot.height}
             priority
+            unoptimized
             sizes="(max-width: 479px) 78vw, 360px"
             className="pointer-events-none absolute bottom-[18px] left-1/2 h-auto max-h-[42%] w-auto max-w-[78%] -translate-x-1/2 object-contain [filter:drop-shadow(0_12px_20px_rgba(10,10,30,0.3))] min-[480px]:bottom-auto min-[480px]:left-auto min-[480px]:right-6 min-[480px]:top-1/2 min-[480px]:max-h-[calc(100%-44px)] min-[480px]:max-w-[42%] min-[480px]:-translate-y-1/2 min-[480px]:translate-x-0 min-[480px]:[filter:drop-shadow(0_14px_22px_rgba(10,10,30,0.3))]"
           />

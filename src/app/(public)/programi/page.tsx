@@ -101,15 +101,19 @@ export default function ProgramiPage() {
                 <h2 className="col-start-2 row-start-1 mb-3.5 self-baseline text-[21px] font-extrabold text-gray-900 md:row-start-2 md:mb-2.5 md:self-auto md:text-2xl">
                   {course.title}
                 </h2>
-                <div className="relative col-span-2 col-start-1 row-start-2 mb-4 h-[190px] overflow-hidden rounded-[6px] md:col-span-1 md:col-start-3 md:row-span-6 md:row-start-1 md:mb-0 md:self-center">
+                <Link
+                  href={`/programi/${course.slug}`}
+                  aria-label={course.title}
+                  className="group relative col-span-2 col-start-1 row-start-2 mb-4 block h-[190px] overflow-hidden rounded-[6px] md:col-span-1 md:col-start-3 md:row-span-6 md:row-start-1 md:mb-0 md:self-center"
+                >
                   <Image
                     src={course.coverImage}
                     alt={course.title}
                     fill
-                    className="object-cover"
+                    className="object-cover transition-transform duration-300 group-hover:scale-105"
                     sizes="(max-width: 768px) 100vw, 300px"
                   />
-                </div>
+                </Link>
                 <div className="col-span-2 col-start-1 row-start-3 mb-2 text-[11.5px] font-bold uppercase tracking-[0.08em] text-cyan-600 md:col-span-1 md:col-start-2 md:row-start-1 md:text-xs md:tracking-[0.1em]">
                   {course.subtitle}
                 </div>
