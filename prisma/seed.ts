@@ -1,7 +1,8 @@
-import { PrismaClient, CourseLevel, UserRole, type City } from '@prisma/client'
+import { PrismaClient, CourseLevel, UserRole, Prisma, type City } from '@prisma/client'
 // courses-data.ts is the source of truth for standard SLR program content.
 import { courses as coursesData } from '../src/lib/courses-data'
 import bcrypt from 'bcryptjs'
+import path from 'node:path'
 
 // ── BlockNote JSON helpers ────────────────────────────────────────────────────
 // Produces PartialBlock-compatible JSON that BlockNote can load directly.
@@ -21,7 +22,29 @@ const video = (url: string): BNBlock    => ({ type: 'video', props: { url } })
 // Any future seeded rows that have string-date fields (dateOfBirth, dateStart,
 // dateEnd) must use ISO literals — e.g. '1999-03-15', not locale strings.
 // The Zod validators at the action boundary enforce this format.
-const prisma = new PrismaClient()
+export const prisma = new PrismaClient()
+
+// Upserts one article by its (unique) slug — refreshing an existing row in
+// place (clearing its tags/images first so re-adds never duplicate) instead
+// of a blind create. This is what lets `db:seed:articles` re-run against a
+// live/production database, touching only the articles it manages.
+async function upsertArticleBySlug(args: { data: Prisma.ArticleUncheckedCreateInput }) {
+  const { data } = args
+  const existing = await prisma.article.findUnique({
+    where: { slug: data.slug },
+    select: { id: true },
+  })
+  if (existing) {
+    await prisma.articleTag.deleteMany({ where: { articleId: existing.id } })
+    await prisma.articleImage.deleteMany({ where: { articleId: existing.id } })
+  }
+  const { slug, ...rest } = data
+  return prisma.article.upsert({
+    where: { slug },
+    create: data,
+    update: rest as Prisma.ArticleUncheckedUpdateInput,
+  })
+}
 
 // ── Article gallery images (Cloudinary URLs) ─────────────────────────────────
 const GALLERY_IMAGES: Record<string, string[]> = {
@@ -1256,6 +1279,17 @@ const GALLERY_IMAGES: Record<string, string[]> = {
     'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657843/articles/gallery/zimska-skola-lego-robotike/333facebook.jpg',
     'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773657843/articles/gallery/zimska-skola-lego-robotike/plakatarduinosnow.jpg',
   ],
+  'mladi-splitski-inovatori-osvajaju-znanstvenu-scenu': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455883/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455885/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455887/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455890/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455891/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455893/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455895/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/07.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455896/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/08.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455898/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/09.jpg',
+  ],
 }
 
 async function seedGalleryImages() {
@@ -1426,11 +1460,53 @@ async function main() {
 
   console.log('✅ Tags created')
 
+  await seedArticles({
+    authorId: admin.id,
+    tags: {
+      natjecanja: tagNatjecanja,
+      radionice: tagRadionice,
+      rezultati: tagRezultati,
+      obavijesti: tagObavijesti,
+      euProjekt: tagEuProjekt,
+    },
+  })
+
+  void velebitska
+  void boskovica
+  void trokut
+
+  console.log('')
+  console.log('🎉 Seed complete!')
+  console.log('')
+  console.log('Demo accounts (all password: admin123):')
+  console.log('  Admin: jpucic00@gmail.com')
+  console.log('  Admin: jozo.pivac@udruga-inovatic.hr')
+  console.log('  Admin: bruno.beslic@udruga-inovatic.hr')
+  console.log('  Admin (Šibenik): slavica.jurcevic@udruga-inovatic.hr')
+}
+
+export async function seedArticles(deps: {
+  authorId: string
+  tags: {
+    natjecanja: { id: string }
+    radionice: { id: string }
+    rezultati: { id: string }
+    obavijesti: { id: string }
+    euProjekt: { id: string }
+  }
+}) {
+  const admin = { id: deps.authorId }
+  const tagNatjecanja = deps.tags.natjecanja
+  const tagRadionice = deps.tags.radionice
+  const tagRezultati = deps.tags.rezultati
+  const tagObavijesti = deps.tags.obavijesti
+  const tagEuProjekt = deps.tags.euProjekt
+
 
   // Content is stored as BlockNote JSON (PartialBlock[]).
 
   // [1/69] regionalno-fll-2026
-  const a1 = await prisma.article.create({
+  const a1 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'regionalno-fll-2026',
@@ -1542,7 +1618,7 @@ async function main() {
   })
 
   // [2/69] science-comes-to-town
-  const a2 = await prisma.article.create({
+  const a2 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'science-comes-to-town',
@@ -1735,7 +1811,7 @@ async function main() {
   })
 
   // [3/69] odrzane-zimske-radionice-robotike-2026
-  const a3 = await prisma.article.create({
+  const a3 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzane-zimske-radionice-robotike-2026',
@@ -1788,7 +1864,7 @@ async function main() {
   })
 
   // [4/69] splitska-udruga-inovatic-osvojila-srebro-na-svjetskom-finalu-robotike-u-singapuru
-  const a4 = await prisma.article.create({
+  const a4 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'splitska-udruga-inovatic-osvojila-srebro-na-svjetskom-finalu-robotike-u-singapuru',
@@ -1896,7 +1972,7 @@ async function main() {
   })
 
   // [5/69] zimske-radionice-2026
-  const a5 = await prisma.article.create({
+  const a5 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zimske-radionice-2026',
@@ -1941,7 +2017,7 @@ async function main() {
   })
 
   // [6/69] donacija-singapur
-  const a6 = await prisma.article.create({
+  const a6 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'donacija-singapur',
@@ -1975,7 +2051,7 @@ async function main() {
   })
 
   // [7/69] zavrsetak-cjelogodisnje-aktivnosti-2024-2025
-  const a7 = await prisma.article.create({
+  const a7 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zavrsetak-cjelogodisnje-aktivnosti-2024-2025',
@@ -2031,7 +2107,7 @@ async function main() {
   })
 
   // [8/69] ljetne-radionice-2025
-  const a8 = await prisma.article.create({
+  const a8 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'ljetne-radionice-2025',
@@ -2192,7 +2268,7 @@ async function main() {
   })
 
   // [9/69] zavrsetak-slr-2023-2024
-  const a9 = await prisma.article.create({
+  const a9 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zavrsetak-slr-2023-2024',
@@ -2249,7 +2325,7 @@ async function main() {
   })
 
   // [10/69] zimska-skola-2024
-  const a10 = await prisma.article.create({
+  const a10 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zimska-skola-2024',
@@ -2349,7 +2425,7 @@ async function main() {
   })
 
   // [11/69] upisi-2023-24
-  const a11 = await prisma.article.create({
+  const a11 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'upisi-2023-24',
@@ -2573,7 +2649,7 @@ async function main() {
   })
 
   // [12/69] besplatne-ljetne-radionice-2023-bilo-kuda-stem-svuda
-  const a12 = await prisma.article.create({
+  const a12 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'besplatne-ljetne-radionice-2023-bilo-kuda-stem-svuda',
@@ -2693,7 +2769,7 @@ async function main() {
   })
 
   // [13/69] zavrsetak-cjelogodisnjih-radionica-2022-2023
-  const a13 = await prisma.article.create({
+  const a13 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zavrsetak-cjelogodisnjih-radionica-2022-2023',
@@ -2756,7 +2832,7 @@ async function main() {
   })
 
   // [14/69] robosim
-  const a14 = await prisma.article.create({
+  const a14 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'robosim',
@@ -2985,7 +3061,7 @@ async function main() {
   })
 
   // [15/69] besplatne-proljetne-radionice-2023
-  const a15 = await prisma.article.create({
+  const a15 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'besplatne-proljetne-radionice-2023',
@@ -3078,7 +3154,7 @@ async function main() {
   })
 
   // [16/69] prijave-elementarna-robotika
-  const a16 = await prisma.article.create({
+  const a16 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'prijave-elementarna-robotika',
@@ -3192,7 +3268,7 @@ async function main() {
   })
 
   // [17/69] prijave-festival-znanosti-2023
-  const a17 = await prisma.article.create({
+  const a17 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'prijave-festival-znanosti-2023',
@@ -3292,7 +3368,7 @@ async function main() {
   })
 
   // [18/69] besplatne-zimske-radionice-2023
-  const a18 = await prisma.article.create({
+  const a18 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'besplatne-zimske-radionice-2023',
@@ -3393,7 +3469,7 @@ async function main() {
   })
 
   // [19/69] male-bistre-glavice
-  const a19 = await prisma.article.create({
+  const a19 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'male-bistre-glavice',
@@ -3482,7 +3558,7 @@ async function main() {
   })
 
   // [20/69] odrzana-treca-ljetna-skola-robotike-za-djecu-10-14-godina
-  const a20 = await prisma.article.create({
+  const a20 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzana-treca-ljetna-skola-robotike-za-djecu-10-14-godina',
@@ -3557,7 +3633,7 @@ async function main() {
   })
 
   // [21/69] odrzane-tri-ljetne-skole-robotike-na-bracu-u-sklopu-eu-projekta-bilo-kuda-stem-svuda
-  const a21 = await prisma.article.create({
+  const a21 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzane-tri-ljetne-skole-robotike-na-bracu-u-sklopu-eu-projekta-bilo-kuda-stem-svuda',
@@ -3641,7 +3717,7 @@ async function main() {
   })
 
   // [22/69] odrzana-druga-ljetna-skola-robotike-za-djecu-6-9-godina
-  const a22 = await prisma.article.create({
+  const a22 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzana-druga-ljetna-skola-robotike-za-djecu-6-9-godina',
@@ -3726,7 +3802,7 @@ async function main() {
   })
 
   // [23/69] prijave-za-ljetnu-2022-stariji-uzrast
-  const a23 = await prisma.article.create({
+  const a23 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'prijave-za-ljetnu-2022-stariji-uzrast',
@@ -3858,7 +3934,7 @@ async function main() {
   })
 
   // [24/69] odrzan-drugi-ljetni-kamp-robotike-zsm
-  const a24 = await prisma.article.create({
+  const a24 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzan-drugi-ljetni-kamp-robotike-zsm',
@@ -3935,7 +4011,7 @@ async function main() {
   })
 
   // [25/69] odrzan-prvi-splitski-kamp-robotike
-  const a25 = await prisma.article.create({
+  const a25 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzan-prvi-splitski-kamp-robotike',
@@ -4012,7 +4088,7 @@ async function main() {
   })
 
   // [26/69] odrzana-prva-ljetna-skola-robotike-za-djecu-6-9-godina
-  const a26 = await prisma.article.create({
+  const a26 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzana-prva-ljetna-skola-robotike-za-djecu-6-9-godina',
@@ -4109,7 +4185,7 @@ async function main() {
   })
 
   // [27/69] zavrsen-prvi-ljetni-kamp-zsm
-  const a27 = await prisma.article.create({
+  const a27 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zavrsen-prvi-ljetni-kamp-zsm',
@@ -4189,7 +4265,7 @@ async function main() {
   })
 
   // [28/69] zavrsetak-cjelogodisnje-2022
-  const a28 = await prisma.article.create({
+  const a28 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zavrsetak-cjelogodisnje-2022',
@@ -4243,7 +4319,7 @@ async function main() {
   })
 
   // [29/69] ljetna-skola-2022
-  const a29 = await prisma.article.create({
+  const a29 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'ljetna-skola-2022',
@@ -4389,7 +4465,7 @@ async function main() {
   })
 
   // [30/69] poziv-ljetni-kamp
-  const a30 = await prisma.article.create({
+  const a30 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'poziv-ljetni-kamp',
@@ -4633,7 +4709,7 @@ async function main() {
   })
 
   // [31/69] ljetni-kamp-robotike-2022-na-zvjezdanom-selu-mosor
-  const a31 = await prisma.article.create({
+  const a31 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'ljetni-kamp-robotike-2022-na-zvjezdanom-selu-mosor',
@@ -4717,7 +4793,7 @@ async function main() {
   })
 
   // [32/69] zavrsen-1-ciklus-besplatnih-radionica-iz-elementarne-robotike
-  const a32 = await prisma.article.create({
+  const a32 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zavrsen-1-ciklus-besplatnih-radionica-iz-elementarne-robotike',
@@ -4762,7 +4838,7 @@ async function main() {
   })
 
   // [33/69] drzavni-prvaci-15-robokupa
-  const a33 = await prisma.article.create({
+  const a33 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'drzavni-prvaci-15-robokupa',
@@ -4872,7 +4948,7 @@ async function main() {
   })
 
   // [34/69] festival-znanosti-2022
-  const a34 = await prisma.article.create({
+  const a34 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'festival-znanosti-2022',
@@ -4951,7 +5027,7 @@ async function main() {
   })
 
   // [35/69] osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022
-  const a35 = await prisma.article.create({
+  const a35 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'osvojeno-2-mjesto-na-zupanijskom-robokup-u-2022',
@@ -5042,7 +5118,7 @@ async function main() {
   })
 
   // [36/69] drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022
-  const a36 = await prisma.article.create({
+  const a36 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'drzavno-natjecanje-iz-lego-robotike-first-lego-league-2022',
@@ -5178,7 +5254,7 @@ async function main() {
   })
 
   // [37/69] proljetna-radionica-u-zvjezdanom-selu-mosor
-  const a37 = await prisma.article.create({
+  const a37 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'proljetna-radionica-u-zvjezdanom-selu-mosor',
@@ -5275,7 +5351,7 @@ async function main() {
   })
 
   // [38/69] proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda
-  const a38 = await prisma.article.create({
+  const a38 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'proljetne-radionice-robotike-2022-bilo-kuda-stem-svuda',
@@ -5349,7 +5425,7 @@ async function main() {
   })
 
   // [39/69] proljetne-radionice-robotike-2022
-  const a39 = await prisma.article.create({
+  const a39 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'proljetne-radionice-robotike-2022',
@@ -5409,7 +5485,7 @@ async function main() {
   })
 
   // [40/69] 3866-2
-  const a40 = await prisma.article.create({
+  const a40 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: '3866-2',
@@ -5440,7 +5516,7 @@ async function main() {
   })
 
   // [41/69] 3859-2
-  const a41 = await prisma.article.create({
+  const a41 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: '3859-2',
@@ -5473,7 +5549,7 @@ async function main() {
   })
 
   // [42/69] robokup-2022-zupanijska-razina
-  const a42 = await prisma.article.create({
+  const a42 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'robokup-2022-zupanijska-razina',
@@ -5502,7 +5578,7 @@ async function main() {
   })
 
   // [43/69] besplatni-tecajevi-elementarne-robotike
-  const a43 = await prisma.article.create({
+  const a43 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'besplatni-tecajevi-elementarne-robotike',
@@ -5649,7 +5725,7 @@ async function main() {
   })
 
   // [44/69] projekt-bilo-kuda-stem-svuda
-  const a44 = await prisma.article.create({
+  const a44 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'projekt-bilo-kuda-stem-svuda',
@@ -5681,7 +5757,7 @@ async function main() {
   })
 
   // [45/69] zimske-radionice-robotike-2022
-  const a45 = await prisma.article.create({
+  const a45 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zimske-radionice-robotike-2022',
@@ -5728,7 +5804,7 @@ async function main() {
   })
 
   // [46/69] zavrsetak-izvanskolske-aktivnosti-2020-2021
-  const a46 = await prisma.article.create({
+  const a46 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zavrsetak-izvanskolske-aktivnosti-2020-2021',
@@ -5768,7 +5844,7 @@ async function main() {
   })
 
   // [47/69] otvorili-smo-upise-u-nove-grupe-iz-robotike
-  const a47 = await prisma.article.create({
+  const a47 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'otvorili-smo-upise-u-nove-grupe-iz-robotike',
@@ -5922,7 +5998,7 @@ async function main() {
   })
 
   // [48/69] pocele-radionice-robotike-u-novoj-skolskoj-godini-2020-2021
-  const a48 = await prisma.article.create({
+  const a48 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'pocele-radionice-robotike-u-novoj-skolskoj-godini-2020-2021',
@@ -5997,7 +6073,7 @@ async function main() {
   })
 
   // [49/69] odrzan-cetvrti-ciklus-ljetnih-radionica-robotike-u-kolovozu-2020
-  const a49 = await prisma.article.create({
+  const a49 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzan-cetvrti-ciklus-ljetnih-radionica-robotike-u-kolovozu-2020',
@@ -6038,7 +6114,7 @@ async function main() {
   })
 
   // [50/69] odrzan-treci-ciklus-ljetnih-radionica-robotike-u-kolovozu-2020
-  const a50 = await prisma.article.create({
+  const a50 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzan-treci-ciklus-ljetnih-radionica-robotike-u-kolovozu-2020',
@@ -6168,7 +6244,7 @@ async function main() {
   })
 
   // [51/69] odrzan-drugi-ciklus-ljetnih-radionica-robotike-2020
-  const a51 = await prisma.article.create({
+  const a51 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzan-drugi-ciklus-ljetnih-radionica-robotike-2020',
@@ -6270,7 +6346,7 @@ async function main() {
   })
 
   // [52/69] ljetne-radionice-robotike-2020-2
-  const a52 = await prisma.article.create({
+  const a52 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'ljetne-radionice-robotike-2020-2',
@@ -6390,7 +6466,7 @@ async function main() {
   })
 
   // [53/69] ljetne-radionice-robotike-2020
-  const a53 = await prisma.article.create({
+  const a53 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'ljetne-radionice-robotike-2020',
@@ -6655,7 +6731,7 @@ Plan i program ljetnih radionica će biti osmišljen kroz izradu i sastavljanje 
   })
 
   // [54/69] rosil
-  const a54 = await prisma.article.create({
+  const a54 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'rosil',
@@ -6791,7 +6867,7 @@ Plan i program ljetnih radionica će biti osmišljen kroz izradu i sastavljanje 
   })
 
   // [55/69] online-edukcije-iz-robotike
-  const a55 = await prisma.article.create({
+  const a55 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'online-edukcije-iz-robotike',
@@ -6928,7 +7004,7 @@ Plan i program ljetnih radionica će biti osmišljen kroz izradu i sastavljanje 
   })
 
   // [56/69] zimske-radionice-lego-robotike-2020
-  const a56 = await prisma.article.create({
+  const a56 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zimske-radionice-lego-robotike-2020',
@@ -6973,7 +7049,7 @@ Nadahnuti zimskim praznicima pripremili smo projekte tematskog sadržaja poput; 
   })
 
   // [57/69] ljetne-radionice-robotike
-  const a57 = await prisma.article.create({
+  const a57 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'ljetne-radionice-robotike',
@@ -7057,7 +7133,7 @@ Veselimo se nadolazećim zimskim radionicama!`, styles: {} },
   })
 
   // [58/69] odrzan-prvi-ciklus-ljetnih-radionica-2019
-  const a58 = await prisma.article.create({
+  const a58 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'odrzan-prvi-ciklus-ljetnih-radionica-2019',
@@ -7088,7 +7164,7 @@ Učenici su uz vodstvo naših predavača slagali i programirali zanimljive Lego 
   })
 
   // [59/69] proljetne-radionice-lego-robotike-2019
-  const a59 = await prisma.article.create({
+  const a59 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'proljetne-radionice-lego-robotike-2019',
@@ -7173,7 +7249,7 @@ Učenici su uz vodstvo naših predavača slagali i programirali zanimljive Lego 
   })
 
   // [60/69] 1082
-  const a60 = await prisma.article.create({
+  const a60 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: '1082',
@@ -7223,7 +7299,7 @@ Mlađa dobna skupina je koristila `, styles: {} },
   })
 
   // [61/69] lego-mindstorms-radionice-robotike
-  const a61 = await prisma.article.create({
+  const a61 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'lego-mindstorms-radionice-robotike',
@@ -7295,7 +7371,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   })
 
   // [62/69] festival-znanosti-2018
-  const a62 = await prisma.article.create({
+  const a62 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'festival-znanosti-2018',
@@ -7359,7 +7435,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   })
 
   // [63/69] proljetne-radionice-lego-robotike-2018-2
-  const a63 = await prisma.article.create({
+  const a63 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'proljetne-radionice-lego-robotike-2018-2',
@@ -7415,7 +7491,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   })
 
   // [64/69] zimske-radionice-lego-robotike
-  const a64 = await prisma.article.create({
+  const a64 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zimske-radionice-lego-robotike',
@@ -7470,7 +7546,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   })
 
   // [65/69] radionice-robotike-za-djecu-zaposlenika-ht-a
-  const a65 = await prisma.article.create({
+  const a65 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'radionice-robotike-za-djecu-zaposlenika-ht-a',
@@ -7510,7 +7586,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   })
 
   // [66/69] proljetna-skola-lego-robotike
-  const a66 = await prisma.article.create({
+  const a66 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'proljetna-skola-lego-robotike',
@@ -7556,7 +7632,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   })
 
   // [67/69] druga-zimska-skola-lego-robotike
-  const a67 = await prisma.article.create({
+  const a67 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'druga-zimska-skola-lego-robotike',
@@ -7584,7 +7660,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   })
 
   // [68/69] kras-razveselio-nase-malisane-poklonima
-  const a68 = await prisma.article.create({
+  const a68 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'kras-razveselio-nase-malisane-poklonima',
@@ -7612,7 +7688,7 @@ Kamion za recikliranje otpada:`, styles: {'bold': true} },
   })
 
   // [69/69] zimska-skola-lego-robotike
-  const a69 = await prisma.article.create({
+  const a69 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zimska-skola-lego-robotike',
@@ -7654,7 +7730,7 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
   })
 
   // [70/72] ljetni-kampovi-lego-robotike-2026 — 2026-05-15
-  const a70 = await prisma.article.create({
+  const a70 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'ljetni-kampovi-lego-robotike-2026',
@@ -7963,7 +8039,7 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
   })
 
   // [71/72] wro-2026-drzavno-finale — 2026-07-08
-  const a71 = await prisma.article.create({
+  const a71 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'wro-2026-drzavno-finale',
@@ -8181,7 +8257,7 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
   })
 
   // [72/72] zavrsena-skolska-godina-radionica-robotike — 2026-07-10
-  const a72 = await prisma.article.create({
+  const a72 = await upsertArticleBySlug({
     data: {
       city: 'SPLIT',
       slug: 'zavrsena-skolska-godina-radionica-robotike',
@@ -8261,31 +8337,173 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
     ],
   })
 
-  void velebitska
-  void boskovica
-  void trokut
+  // [73/73] mladi-splitski-inovatori-osvajaju-znanstvenu-scenu — 2026-07-18
+  const a73 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'mladi-splitski-inovatori-osvajaju-znanstvenu-scenu',
+      title: `Mladi splitski inovatori osvajaju znanstvenu scenu: Upoznajte tim „Pametni kist”!`,
+      excerpt: `Nakon velikog uspjeha ekipe CroSpec, Udruga za robotiku „Inovatic” iz Splita predstavlja tim „Pametni kist” — Vito Tonšić i Jure Vukušić, pod vodstvom mentora Brune Bešlića — koji je osmislio revolucionarni uređaj što spaja modernu tehnologiju s očuvanjem kulturne baštine.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Nakon velikog uspjeha ekipe CroSpec, Udruga za robotiku „Inovatic” iz Splita predstavlja još jednu sjajnu ekipu mladih genijalaca. Članovi tima `, styles: {} },
+            { type: 'text', text: `„Pametni kist”`, styles: { bold: true } },
+            { type: 'text', text: ` – `, styles: {} },
+            { type: 'text', text: `Vito Tonšić`, styles: { bold: true } },
+            { type: 'text', text: ` i `, styles: {} },
+            { type: 'text', text: `Jure Vukušić`, styles: { bold: true } },
+            { type: 'text', text: `, pod vodstvom mentora `, styles: {} },
+            { type: 'text', text: `Brune Bešlića`, styles: { bold: true } },
+            { type: 'text', text: ` – osmislili su istoimeni revolucionarni uređaj koji spaja modernu tehnologiju s očuvanjem kulturne baštine.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Upoznajte članove tima`, styles: { bold: true } },
+            { type: 'text', text: `:`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Vito Tonšić`, styles: { bold: true } },
+            { type: 'text', text: `: Mladi inovator zadužen za „srce i mozak” projekta – dizajniranje elektroničkih shema i programiranje. Iza sebe ima godine rada u udruzi Inovatic i sudjelovanja na natjecanjima poput FLL-a, WRO-a, Robokupa i Robosima.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `„Ako imate ideju koja zvuči ludo, pokušajte je ostvariti. Kroz pokušaje i pogreške uči se najviše!” – poručuje Vito.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Jure Vukušić:`, styles: { bold: true } },
+            { type: 'text', text: ` Kreativna snaga tima zadužena za konstrukciju, ergonomiju i mehaniku kista. Koristeći CAD softvere i 3D print, pretvorio je ideju u funkcionalan, lagan i ergonomski ručni alat. Sudionik je brojnih robotičkih natjecanja i zaljubljenik u tehničko rješavanje problema.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `„Upornost i detaljna priprema ključ su svakog uspjeha. Robotika nam daje moć da stvaramo opipljive promjene u svijetu.” – ističe Jure.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Bruno Bešlić`, styles: { bold: true } },
+            { type: 'text', text: `, mag. edu. inf. et techn. (Mentor): Istaknuti učitelj informatike i tehničke kulture (OŠ Vjekoslava Paraća, Solin) te vanjski suradnik na splitskom PMF-u. S više od deset godina mentorskog staža, od čega osam u Inovaticu, Bruno uspješno usmjerava mlade talente prema vrhunskim rezultatima.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Projekt „Pametni kist” – Inovacija koja čuva povijest`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Pri čišćenju iznimno krhkih arheoloških nalaza, starih slika ili kostiju, i najmanji preveliki pritisak ruke može nepovratno uništiti povijesno blago. Projekt Pametni kist rješava taj problem.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Uređaj u sebi ima ugrađen mikrosenzor sile (FSR) koji u stvarnom vremenu mjeri pritisak. Ako korisnik pritisne previše jako, kist odmah reagira i upozorava ga svjetlom, zvukom i vibracijom.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Napredna tehnologija: Razvili su tri modela. Najnapredniji pokreće Arduino NANO ESP32, ima OLED zaslon, punjivu bateriju te mogućnost Bluetooth povezivanja.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Modularnost: Kist ima sustav brze izmjene glava kako bi se prilagodio različitim vrstama materijala na terenu.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Testiran na pravim ljudskim kostima i prepoznat od struke`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ova inovacija nije ostala samo u radionici. Tim je ostvario nevjerojatne suradnje koje dokazuju praktičnu vrijednost uređaja:`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Zavod za forenziku PMF-a u Splitu omogućio im je testiranje kista na pravim ljudskim kostima, što je prošlo s vrhunskim rezultatima.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Arheolozi iz Muzeja hrvatskih arheoloških spomenika (MHAS) i restauratorica Petra Perlain potvrdili su veliku korist alata u svakodnevnom radu.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Hrvatsko restauratorsko društvo (HRD), na čelu s Markom Buljanom, pozvalo je tim da svoj izum predstavi na Međunarodnoj konferenciji studija konzervacije-restauracije pred vodećim svjetskim tvrtkama, uz mogućnost financijske potpore za daljnji razvoj.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Uređaj ima puni potencijal da postane globalni startup proizvod, a mladi inovatori već su pripremili i patentnu prijavu kako bi u potpunosti zaštitili svoj izum. Pred splitskim timom „Pametni kist” bez sumnje je sjajna tehnološka budućnost!`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Podržite naše mlade inovatore na World Robot Olympiad (WRO) svjetskom natjecanju klikom `, styles: { bold: true } },
+            { type: 'link', href: `/donacije`, content: [{ type: 'text', text: `ovdje`, styles: {} }] },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2026-07-18'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455880/articles/covers/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu.jpg',
+    },
+  })
 
-  console.log('✅ Articles and tags seeded (72 articles)')
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a73.id, tagId: tagNatjecanja.id },
+      { articleId: a73.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  console.log('✅ Articles and tags seeded (73 articles)')
 
   // ── Article gallery images (Cloudinary) ──────────────────────────────────
   console.log('')
   console.log('📸 Seeding article gallery images...')
   await seedGalleryImages()
-  console.log('')
-  console.log('🎉 Seed complete!')
-  console.log('')
-  console.log('Demo accounts (all password: admin123):')
-  console.log('  Admin: jpucic00@gmail.com')
-  console.log('  Admin: jozo.pivac@udruga-inovatic.hr')
-  console.log('  Admin: bruno.beslic@udruga-inovatic.hr')
-  console.log('  Admin (Šibenik): slavica.jurcevic@udruga-inovatic.hr')
 }
 
-main()
-  .catch((e) => {
-    console.error(e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+// Only the destructive full seed auto-runs when this file is the entry point.
+// Importing it (e.g. from seed-articles.ts) must never wipe the database.
+if (process.argv[1] && path.basename(process.argv[1]) === 'seed.ts') {
+  main()
+    .catch((e) => {
+      console.error(e)
+      process.exit(1)
+    })
+    .finally(async () => {
+      await prisma.$disconnect()
+    })
+}
