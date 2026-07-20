@@ -10,6 +10,7 @@ import type {
 import type { RecommendationOption } from '@/lib/assessment-rubric'
 import { DeleteStudentDialog } from '@/components/admin/students/delete-student-dialog'
 import { EditStudentDialog } from '@/components/admin/students/edit-student-dialog'
+import { ResetPasswordButton } from '@/components/admin/students/reset-password-button'
 import { StudentYearSections } from '@/components/shared/student-year-sections'
 import { CopyButton } from './copy-button'
 import { formatDate, formatDateKey } from '@/lib/format'
@@ -147,7 +148,16 @@ export function StudentDetailView({
 
       {/* Credentials */}
       <div className="bg-white rounded-xl border p-6 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-2">Pristupni podaci</h2>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <h2 className="text-sm font-semibold text-gray-700">Pristupni podaci</h2>
+          {isAdmin && (
+            <ResetPasswordButton
+              studentId={student.id}
+              username={student.username}
+              hasPassword={Boolean(student.plainPassword)}
+            />
+          )}
+        </div>
         <dl>
           <DetailRow
             label="Korisničko ime"

@@ -5,6 +5,7 @@
  * the healed account immediately leaves the fuzzy pool.
  */
 import { describe, expect, it, vi, beforeAll } from 'vitest'
+import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
 import { mockSession } from './setup'
@@ -184,6 +185,35 @@ describe('createStudentFromInquiry — legacy reuse heals the DOB', () => {
       parentEmail,
     })
     expect(differentChild).toBeNull()
+  })
+
+  it('mints real credentials for the imported account instead of a blank password', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+
+    const course = await createCourse()
+    const group = await createGroup({ courseId: course.id, city: 'SPLIT' })
+    const { student, lastName, parentEmail } = await createLegacyStudent()
+
+    const inquiry = await createInquiry({
+      childFirstName: 'Legonja',
+      childLastName: lastName,
+      childDateOfBirth: '2016-09-09',
+      parentEmail,
+      city: 'SPLIT',
+      courseId: course.id,
+    })
+
+    const result = await createStudentFromInquiry(inquiry.id, group.id)
+    expect(result.success).toBe(true)
+    if (!result.success) throw new Error('unreachable')
+
+    // The reused row had no `plainPassword`; the parent's credentials email
+    // must not ship an empty Lozinka line, and the child must be able to log in.
+    expect(result.password).not.toBe('')
+    const healed = await db.user.findUnique({ where: { id: student.id } })
+    expect(healed?.plainPassword).toBe(result.password)
+    expect(await bcrypt.compare(result.password, healed!.passwordHash)).toBe(true)
   })
 
   it('applies identically to manual creation (Dodaj učenika, no inquiry)', async () => {

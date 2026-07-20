@@ -130,6 +130,12 @@ type CreateStudentResult =
     }
   | { success: false; error: string; code?: 'GROUP_FULL' }
 
+// No `emailSent` counterpart to the teacher result — a student password reset
+// is never mailed (see resetStudentPassword).
+type ResetStudentPasswordResult =
+  | { success: true; password: string }
+  | { success: false; error: string }
+
 const DIACRITICS_MAP: Record<string, string> = {
   'č': 'c', 'ć': 'c', 'š': 's', 'ž': 'z', 'đ': 'd',
   'Č': 'C', 'Ć': 'C', 'Š': 'S', 'Ž': 'Z', 'Đ': 'D',
@@ -235,6 +241,15 @@ async function findOrCreateStudent(
     if (!existingStudent.dateOfBirth && input.dateOfBirth) {
       backfill.dateOfBirth = input.dateOfBirth
     }
+    // A historically-imported account carries an unusable hash and no
+    // `plainPassword` (src/lib/import-history/apply.ts). Re-enrolling one has
+    // to mint real credentials here, or the parent's confirmation email ships
+    // a blank Lozinka line and the child still cannot log in.
+    const password = existingStudent.plainPassword ?? generateSimplePassword(6)
+    if (!existingStudent.plainPassword) {
+      backfill.plainPassword = password
+      backfill.passwordHash = await hashPassword(password)
+    }
     if (Object.keys(backfill).length > 0) {
       await tx.user.update({
         where: { id: existingStudent.id },
@@ -243,7 +258,7 @@ async function findOrCreateStudent(
     }
     return {
       user: { id: existingStudent.id, username: existingStudent.username },
-      password: existingStudent.plainPassword ?? '',
+      password,
       isExisting: true,
     }
   }
@@ -887,6 +902,51 @@ export async function getStudent(id: string) {
   const { city } = await requireAdminCtx()
   await assertUserInCity(id, city)
   return buildStudentDetailForAdmin(id, city)
+}
+
+/**
+ * Regenerates a student's login password and reveals it to the admin.
+ *
+ * Display-only by design — unlike the teacher reset, nothing is emailed: a
+ * child's `email` is the synthetic @student.inovatic.local address, and
+ * `sendStudentCredentialsEmail` is an enrollment email that hard-requires
+ * group/schedule/location. The admin hands the password over directly.
+ *
+ * This is also the only way to unlock a historically-imported account, which
+ * is created with an unusable hash and no `plainPassword` — see the promise
+ * made in src/lib/import-history/apply.ts.
+ */
+export async function resetStudentPassword(
+  studentId: string,
+): Promise<ResetStudentPasswordResult> {
+  const { city } = await requireAdminCtx()
+
+  if (!studentId) return { success: false, error: 'ID nije pronađen.' }
+
+  // Role-narrowed so a same-city TEACHER/ADMIN id can't be reset through the
+  // student path. Wrong-role and cross-city ids both read as missing, matching
+  // the city-guard notFound() convention used by deleteStudent.
+  const target = await db.user.findFirst({
+    where: { id: studentId, role: 'STUDENT' },
+    select: { city: true },
+  })
+  if (target?.city !== city) notFound()
+
+  try {
+    const password = generateSimplePassword(6)
+    const passwordHash = await hashPassword(password)
+
+    await db.user.update({
+      where: { id: studentId },
+      data: { passwordHash, plainPassword: password },
+    })
+
+    revalidatePath(`/admin/ucenici/${studentId}`)
+    return { success: true, password }
+  } catch (err) {
+    console.error('resetStudentPassword failed:', err)
+    return { success: false, error: 'Greška pri resetiranju lozinke.' }
+  }
 }
 
 export async function deleteEnrollment(enrollmentId: string): Promise<AdminActionResult> {
