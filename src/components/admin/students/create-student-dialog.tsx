@@ -90,7 +90,8 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
   const canSubmit =
     firstName.trim().length >= 2 &&
     lastName.trim().length >= 2 &&
-    dateOfBirth.trim().length > 0
+    dateOfBirth.trim().length > 0 &&
+    parentEmail.trim().length > 0
 
   const reset = () => {
     setFirstName('')
@@ -155,7 +156,11 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
 
   const handleSubmit = () => {
     if (!canSubmit) {
-      toast.error('Ime, prezime i datum rođenja djeteta su obavezni.')
+      toast.error('Ime, prezime i datum rođenja djeteta te e-mail roditelja su obavezni.')
+      return
+    }
+    if (!/^\S+@\S+\.\S+$/.test(parentEmail.trim())) {
+      toast.error('Unesite valjanu email adresu roditelja.')
       return
     }
     // Require at least one module for standard courses when a group is chosen
@@ -169,7 +174,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
         lastName: lastName.trim(),
         dateOfBirth: dateOfBirth.trim(),
         parentName: parentName.trim() || null,
-        parentEmail: parentEmail.trim() || null,
+        parentEmail: parentEmail.trim(),
         parentPhone: parentPhone.trim() || null,
         childSchool: childSchool.trim() || null,
         groupId: selectedGroupId || null,
@@ -297,7 +302,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
             {/* Parent fields */}
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                Roditelj (neobavezno)
+                Roditelj
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
@@ -320,11 +325,12 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
                     htmlFor="create-student-parent-email"
                     className="block text-xs font-medium text-gray-600 mb-1"
                   >
-                    E-mail
+                    E-mail *
                   </label>
                   <input
                     id="create-student-parent-email"
                     type="email"
+                    required
                     value={parentEmail}
                     onChange={(e) => setParentEmail(e.target.value)}
                     className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"

@@ -42,6 +42,9 @@ export default async function AdminDashboard() {
         childFirstName: true,
         childLastName: true,
         childDateOfBirth: true,
+        // flagReturningInquiries' legacy tier matches DOB-less imported
+        // accounts by child name + parent email.
+        parentEmail: true,
         studentId: true,
         status: true,
         createdAt: true,

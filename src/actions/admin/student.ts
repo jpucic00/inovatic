@@ -11,8 +11,10 @@ import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
 import {
   createStudentSchema,
   createStudentManuallySchema,
+  updateStudentSchema,
   addEnrollmentSchema,
   type CreateStudentManuallyInput,
+  type UpdateStudentInput,
   type AddEnrollmentInput,
 } from '@/lib/validators/admin/student'
 import { hashPassword, generateSimplePassword } from '@/lib/password'
@@ -23,7 +25,7 @@ import {
 } from '@/lib/group-capacity'
 import { sendStudentCredentialsEmail } from '@/lib/email'
 import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
-import { studentIdentityWhere } from '@/lib/student-match'
+import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
 import { formatGroupSchedule } from '@/lib/format'
 import { computeSchoolYear } from '@/lib/school-year'
 import {
@@ -207,13 +209,20 @@ async function findOrCreateStudent(
   tx: TxClient,
   input: CoreInput,
 ): Promise<{ user: { id: string; username: string | null }; password: string; isExisting: boolean }> {
-  const identityWhere = studentIdentityWhere(input)
-  const existingStudent = identityWhere
-    ? await tx.user.findFirst({
-        where: identityWhere,
-        select: { id: true, username: true, plainPassword: true, city: true },
-      })
-    : null
+  const matchSelect = {
+    id: true, username: true, plainPassword: true, city: true, dateOfBirth: true,
+  } as const
+  // Strict identity (name + DOB) wins; the legacy tier (name + parent email vs
+  // DOB-less imported accounts) is only consulted when strict finds nothing.
+  const strictWhere = studentIdentityWhere(input)
+  const legacyWhere = legacyIdentityWhere(input)
+  const existingStudent =
+    (strictWhere
+      ? await tx.user.findFirst({ where: strictWhere, select: matchSelect })
+      : null) ??
+    (legacyWhere
+      ? await tx.user.findFirst({ where: legacyWhere, select: matchSelect })
+      : null)
 
   if (existingStudent && existingStudent.city !== input.city) {
     throw new CrossCityStudentError()
@@ -221,6 +230,11 @@ async function findOrCreateStudent(
 
   if (existingStudent) {
     const backfill = buildParentBackfill(input)
+    // Legacy-tier reuse: heal the missing DOB so this account matches the
+    // strict rule from now on and stops being fuzzy-matchable.
+    if (!existingStudent.dateOfBirth && input.dateOfBirth) {
+      backfill.dateOfBirth = input.dateOfBirth
+    }
     if (Object.keys(backfill).length > 0) {
       await tx.user.update({
         where: { id: existingStudent.id },
@@ -584,7 +598,7 @@ export async function createStudentManually(
         lastName: data.lastName,
         dateOfBirth: data.dateOfBirth ?? null,
         parentName: data.parentName ?? null,
-        parentEmail: data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null,
+        parentEmail: data.parentEmail,
         parentPhone: data.parentPhone ?? null,
         childSchool: data.childSchool ?? null,
         gdprConsentAt: null,
@@ -603,13 +617,13 @@ export async function createStudentManually(
     return { success: false, error: 'Greška pri kreiranju učenika.' }
   }
 
-  // Send credentials email only when we have both a parent email AND initial
-  // group assignment. For new accounts only (skip deduped existing). The
-  // student row is already committed (the tx above), so a send failure is
-  // swallowed-and-flagged rather than surfaced as a creation failure.
+  // Send credentials email only when there is an initial group assignment.
+  // For new accounts only (skip deduped existing). The student row is already
+  // committed (the tx above), so a send failure is swallowed-and-flagged
+  // rather than surfaced as a creation failure.
   let emailFailed = false
-  const parentEmail = data.parentEmail && data.parentEmail !== '' ? data.parentEmail : null
-  if (!core.isExisting && parentEmail && core.group) {
+  const parentEmail = data.parentEmail
+  if (!core.isExisting && core.group) {
     try {
       const childName = `${data.firstName} ${data.lastName}`.trim()
       await dispatchStudentCredentials(parentEmail, data.parentName ?? '', childName, core)
@@ -635,6 +649,59 @@ export async function createStudentManually(
     isExisting: core.isExisting,
     studentId: core.user.id,
     ...(emailFailed ? { emailFailed: true } : {}),
+  }
+}
+
+/**
+ * Admin-only edit of an existing student's child + parent data from the profile
+ * page. City-scoped: a cross-city id resolves to notFound() (assertUserInCity),
+ * indistinguishable from a nonexistent one. Optional text fields are trimmed;
+ * empty → null so a cleared field wipes the stored value. Editing name/DOB can
+ * change returning-student matching, so inquiry pages are revalidated too.
+ */
+export async function updateStudent(
+  input: UpdateStudentInput,
+): Promise<AdminActionResult> {
+  const { city } = await requireAdminCtx()
+
+  const parsed = updateStudentSchema.safeParse(input)
+  if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
+
+  const { id, firstName, lastName, dateOfBirth, childSchool, parentName, parentEmail, parentPhone } =
+    parsed.data
+
+  // Outside the try — the notFound() throw must not be swallowed by the catch.
+  await assertUserInCity(id, city)
+
+  try {
+    const student = await db.user.findUnique({
+      where: { id, role: 'STUDENT' },
+      select: { id: true },
+    })
+    if (!student) return { success: false, error: 'Učenik nije pronađen.' }
+
+    await db.user.update({
+      where: { id },
+      data: {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        dateOfBirth,
+        childSchool: childSchool?.trim() || null,
+        parentName: parentName?.trim() || null,
+        parentEmail: parentEmail?.trim() || null,
+        parentPhone: parentPhone?.trim() || null,
+      },
+    })
+
+    revalidatePath('/admin/ucenici')
+    revalidatePath(`/admin/ucenici/${id}`)
+    // Name/DOB edits can flip which inquiries read as "Ponovni upis".
+    revalidatePath('/admin/upiti')
+    revalidatePath('/admin/upiti/[id]', 'page')
+    return { success: true }
+  } catch (err) {
+    console.error('updateStudent failed:', err)
+    return { success: false, error: 'Greška pri ažuriranju učenika.' }
   }
 }
 

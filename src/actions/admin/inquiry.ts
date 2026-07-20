@@ -17,7 +17,7 @@ import { computeGroupCapacity } from '@/lib/group-capacity'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { formatGroupSchedule } from '@/lib/format'
 import type { Grade } from '@/lib/inquiry-status'
-import { studentIdentityWhere } from '@/lib/student-match'
+import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
 
 type InquiryFilters = {
@@ -121,15 +121,20 @@ export async function getReturningStudentInfo(input: {
   firstName: string
   lastName: string
   dateOfBirth?: string | null
+  parentEmail?: string | null
   excludeStudentId?: string | null
 }): Promise<ReturningStudentInfo | null> {
   const { city } = await requireAdminCtx()
 
-  const where = studentIdentityWhere(input)
-  if (!where) return null
+  // Strict tier (name + DOB) plus the legacy tier for DOB-less imported
+  // accounts (name + parent email) — one query, strict preferred below.
+  const wheres = [studentIdentityWhere(input), legacyIdentityWhere(input)].filter(
+    (w): w is NonNullable<typeof w> => w !== null,
+  )
+  if (wheres.length === 0) return null
 
   const students = await db.user.findMany({
-    where,
+    where: { OR: wheres },
     select: {
       id: true,
       city: true,
@@ -155,8 +160,10 @@ export async function getReturningStudentInfo(input: {
   if (candidates.length === 0) return null
   // The same identity can exist in both cities — prefer the own-city record
   // (full behavior) and only fall back to the masked flag when every match
-  // lives in the other city.
-  const student = candidates.find((s) => s.city === city)
+  // lives in the other city. Among own-city records a strict (DOB-bearing)
+  // match outranks a legacy DOB-less one.
+  const ownCity = candidates.filter((s) => s.city === city)
+  const student = ownCity.find((s) => s.dateOfBirth !== null) ?? ownCity[0]
   if (!student) return MASKED_CROSS_CITY_STUDENT
 
   const byYear = new Map<string, ReturningStudentInfo['history'][number]['groups']>()

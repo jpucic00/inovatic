@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { identityKey, studentIdentityWhere } from '@/lib/student-match'
+import {
+  identityKey,
+  legacyIdentityKey,
+  legacyIdentityWhere,
+  studentIdentityWhere,
+} from '@/lib/student-match'
 
 describe('identityKey', () => {
   it('builds a normalized lower|lower|dob key', () => {
@@ -42,5 +47,61 @@ describe('studentIdentityWhere', () => {
     expect(
       studentIdentityWhere({ firstName: 'Luka', lastName: 'Horvat', dateOfBirth: null }),
     ).toBeNull()
+  })
+})
+
+describe('legacyIdentityWhere', () => {
+  it('targets only DOB-less students by name + parent email (insensitive)', () => {
+    expect(
+      legacyIdentityWhere({
+        firstName: 'Luka',
+        lastName: 'Horvat',
+        parentEmail: ' Mama@Example.com ',
+      }),
+    ).toEqual({
+      role: 'STUDENT',
+      dateOfBirth: null,
+      firstName: { equals: 'Luka', mode: 'insensitive' },
+      lastName: { equals: 'Horvat', mode: 'insensitive' },
+      parentEmail: { equals: 'Mama@Example.com', mode: 'insensitive' },
+    })
+  })
+
+  it('returns null without a parent email — email is what asserts the family', () => {
+    expect(legacyIdentityWhere({ firstName: 'Luka', lastName: 'Horvat' })).toBeNull()
+    expect(
+      legacyIdentityWhere({ firstName: 'Luka', lastName: 'Horvat', parentEmail: '' }),
+    ).toBeNull()
+  })
+
+  it('returns null for blank names so PARTY inquiries can never match by email alone', () => {
+    expect(
+      legacyIdentityWhere({ firstName: '', lastName: '', parentEmail: 'mama@example.com' }),
+    ).toBeNull()
+    expect(
+      legacyIdentityWhere({ firstName: 'Luka', lastName: ' ', parentEmail: 'mama@example.com' }),
+    ).toBeNull()
+  })
+})
+
+describe('legacyIdentityKey', () => {
+  it('normalizes names and email the way the DB comparison does', () => {
+    expect(legacyIdentityKey('  LUKA ', 'HORVAT', ' Mama@Example.COM ')).toBe(
+      'luka|horvat|mama@example.com',
+    )
+  })
+
+  it('returns null when email or a name part is missing', () => {
+    expect(legacyIdentityKey('Luka', 'Horvat', null)).toBeNull()
+    expect(legacyIdentityKey('Luka', 'Horvat', '')).toBeNull()
+    expect(legacyIdentityKey('', 'Horvat', 'mama@example.com')).toBeNull()
+  })
+
+  it('never collides with a strict identity key', () => {
+    // Same shape (a|b|c) but the third segment is an email, which always
+    // contains '@' — a DOB string never does.
+    expect(legacyIdentityKey('Luka', 'Horvat', 'mama@example.com')).not.toBe(
+      identityKey('Luka', 'Horvat', 'mama@example.com'.replace('@', '-')),
+    )
   })
 })

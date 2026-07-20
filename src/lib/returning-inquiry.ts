@@ -1,6 +1,11 @@
 import type { City } from '@prisma/client'
 import { db } from '@/lib/db'
-import { studentIdentityWhere, identityKey } from '@/lib/student-match'
+import {
+  identityKey,
+  legacyIdentityKey,
+  legacyIdentityWhere,
+  studentIdentityWhere,
+} from '@/lib/student-match'
 
 type ReturningFlaggable = {
   // Nullable since PARTY inquiries carry no child. Such rows have no DOB either,
@@ -8,6 +13,7 @@ type ReturningFlaggable = {
   childFirstName: string | null
   childLastName: string | null
   childDateOfBirth: string | null
+  parentEmail: string
   studentId: string | null
   city: City
 }
@@ -17,6 +23,11 @@ type ReturningFlaggable = {
  * existing students matching each row's child identity in a single query, then
  * marks a row returning when a match exists that is NOT the student this very
  * inquiry created (so ACCOUNT_CREATED inquiries don't all read as returning).
+ *
+ * Two tiers, mirroring `findOrCreateStudent`: the strict rule (name + DOB) and
+ * the legacy fallback (name + parent email against DOB-less imported accounts).
+ * A student is keyed under exactly one tier — by its DOB when present, by its
+ * parent email when not — so the tiers can never claim the same account.
  *
  * Identity matching is deliberately GLOBAL across cities (owner decision), but
  * the result is split by tenant: a match in the inquiry's own city sets
@@ -32,23 +43,34 @@ export async function flagReturningInquiries<T extends ReturningFlaggable>(
   rows: T[],
 ): Promise<(T & { isReturning: boolean; isReturningOtherCity: boolean })[]> {
   const orClauses = rows
-    .map((r) =>
-      studentIdentityWhere({
+    .flatMap((r) => {
+      const identity = {
         firstName: r.childFirstName ?? '',
         lastName: r.childLastName ?? '',
         dateOfBirth: r.childDateOfBirth,
-      }),
-    )
+        parentEmail: r.parentEmail,
+      }
+      return [studentIdentityWhere(identity), legacyIdentityWhere(identity)]
+    })
     .filter((w): w is NonNullable<typeof w> => w !== null)
 
   const matchesByKey = new Map<string, { id: string; city: City }[]>()
   if (orClauses.length > 0) {
     const students = await db.user.findMany({
       where: { OR: orClauses },
-      select: { id: true, firstName: true, lastName: true, dateOfBirth: true, city: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        dateOfBirth: true,
+        parentEmail: true,
+        city: true,
+      },
     })
     for (const s of students) {
-      const key = identityKey(s.firstName, s.lastName, s.dateOfBirth)
+      const key = s.dateOfBirth
+        ? identityKey(s.firstName, s.lastName, s.dateOfBirth)
+        : legacyIdentityKey(s.firstName, s.lastName, s.parentEmail)
       if (!key) continue
       const list = matchesByKey.get(key) ?? []
       list.push({ id: s.id, city: s.city })
@@ -57,10 +79,20 @@ export async function flagReturningInquiries<T extends ReturningFlaggable>(
   }
 
   return rows.map((r) => {
-    const key = identityKey(r.childFirstName ?? '', r.childLastName ?? '', r.childDateOfBirth)
-    const matches = (key ? (matchesByKey.get(key) ?? []) : []).filter(
-      (m) => m.id !== r.studentId,
+    const strictKey = identityKey(
+      r.childFirstName ?? '',
+      r.childLastName ?? '',
+      r.childDateOfBirth,
     )
+    const legacyKey = legacyIdentityKey(
+      r.childFirstName ?? '',
+      r.childLastName ?? '',
+      r.parentEmail,
+    )
+    const matches = [
+      ...(strictKey ? (matchesByKey.get(strictKey) ?? []) : []),
+      ...(legacyKey ? (matchesByKey.get(legacyKey) ?? []) : []),
+    ].filter((m) => m.id !== r.studentId)
     const isReturning = matches.some((m) => m.city === r.city)
     return {
       ...r,

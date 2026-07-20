@@ -23,9 +23,14 @@ describe('createStudentSchema', () => {
 })
 
 describe('createStudentManuallySchema', () => {
-  const minimal = { firstName: 'Luka', lastName: 'Horvat', dateOfBirth: '2015-06-15' }
+  const minimal = {
+    firstName: 'Luka',
+    lastName: 'Horvat',
+    dateOfBirth: '2015-06-15',
+    parentEmail: 'roditelj@example.com',
+  }
 
-  it('accepts minimal payload (firstName + lastName + dateOfBirth)', () => {
+  it('accepts minimal payload (names + dateOfBirth + parentEmail)', () => {
     const result = createStudentManuallySchema.parse(minimal)
     expect(result.firstName).toBe('Luka')
   })
@@ -34,6 +39,7 @@ describe('createStudentManuallySchema', () => {
     const result = createStudentManuallySchema.safeParse({
       firstName: 'Luka',
       lastName: 'Horvat',
+      parentEmail: 'roditelj@example.com',
     })
     expect(result.success).toBe(false)
   })
@@ -57,14 +63,28 @@ describe('createStudentManuallySchema', () => {
     expect(result.moduleScheduleIds).toEqual(['ms1', 'ms2'])
   })
 
-  it('accepts empty-string parentEmail', () => {
-    const result = createStudentManuallySchema.parse({ ...minimal, parentEmail: '' })
-    expect(result.parentEmail).toBe('')
+  it('rejects a missing parentEmail — required for credentials + legacy matching', () => {
+    const { parentEmail: _omitted, ...withoutEmail } = minimal
+    const result = createStudentManuallySchema.safeParse(withoutEmail)
+    expect(result.success).toBe(false)
   })
 
-  it('rejects invalid parentEmail when non-empty', () => {
+  it('rejects an empty-string parentEmail', () => {
+    const result = createStudentManuallySchema.safeParse({ ...minimal, parentEmail: '' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an invalid parentEmail', () => {
     const result = createStudentManuallySchema.safeParse({ ...minimal, parentEmail: 'not-email' })
     expect(result.success).toBe(false)
+  })
+
+  it('trims surrounding whitespace off parentEmail', () => {
+    const result = createStudentManuallySchema.parse({
+      ...minimal,
+      parentEmail: ' roditelj@example.com ',
+    })
+    expect(result.parentEmail).toBe('roditelj@example.com')
   })
 
   it('rejects firstName shorter than 2 chars', () => {

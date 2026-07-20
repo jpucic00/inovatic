@@ -314,11 +314,13 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   const allCourses = await getInquiryCourses()
 
   // Returning-student detection: a child (name + DOB) already in the system,
-  // other than the account this inquiry itself created.
+  // other than the account this inquiry itself created. Parent email feeds the
+  // legacy fallback for DOB-less imported accounts.
   const returningStudent = await getReturningStudentInfo({
     firstName: inquiry.childFirstName ?? '',
     lastName: inquiry.childLastName ?? '',
     dateOfBirth: inquiry.childDateOfBirth,
+    parentEmail: inquiry.parentEmail,
     excludeStudentId: inquiry.studentId,
   })
 
