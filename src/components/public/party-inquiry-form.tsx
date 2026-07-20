@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckCircle, Loader2 } from 'lucide-react'
 import { partyInquirySchema, type PartyInquiryFormData } from '@/lib/validators/inquiry'
 import { submitPartyInquiry } from '@/actions/inquiry'
+import { trackUmamiEvent } from '@/lib/umami'
 import { DateInput } from '@/components/ui/date-input'
 import { FieldError } from './inquiry/FieldError'
 
@@ -37,6 +38,7 @@ export function PartyInquiryForm() {
     startTransition(async () => {
       const result = await submitPartyInquiry(data)
       if (result.success) {
+        trackUmamiEvent('party-inquiry', { city: 'SPLIT' })
         setDone(true)
       } else {
         setServerError(result.error)

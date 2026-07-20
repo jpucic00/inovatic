@@ -40,6 +40,11 @@ Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + Postgr
 - **Returning-student matching is GLOBAL with a masked cross-city hint:** same-city identity match → full history; cross-city → neutral "postojeći polaznik (druga lokacija)" badge only, and `createStudentFromInquiry` blocks with an escalation error (`CrossCityStudentError`) — never auto-reuse a cross-city account.
 - **Per-city planner/holidays/windows:** uniques `(moduleId, schoolYear, city)`, `(schoolYear, city, date)`, `(courseId, schoolYear, city)` — each city plans the shared curriculum on its own dates (Šibenik launched mid-cycle). Holiday attendance-cascade deletes are city-filtered. `getActivePrograms(city)` gates groups on the composite open-window key; `/api/group-availability` 400s without a valid `?city=`.
 
+## Analytics (Umami, 2026-07-17)
+- **Public pages only.** `<UmamiAnalytics>` mounts in `(public)/layout.tsx`, env-gated: `NEXT_PUBLIC_UMAMI_SCRIPT_URL` + `NEXT_PUBLIC_UMAMI_WEBSITE_ID` (both required to render anything; unset = silent, e.g. local dev), optional `NEXT_PUBLIC_UMAMI_DOMAINS`. Dockerfile declares the ARGs — the vars must exist in Railway for builds to inline them.
+- The tracker script **survives SPA navigation out of the public layout**, so an inline `data-before-send` guard drops internal sections (`/admin`, `/nastavnik`, `/portal`, `/prijava`, `/api`) — pattern lives in `UMAMI_INTERNAL_PATH_PATTERN` (`src/lib/umami.ts`); add any new internal route prefix there. Requires Umami ≥ 2.18.
+- Conversion events fire on success branches only, via `trackUmamiEvent`: `course-inquiry` `{city}`, `party-inquiry` `{city}`; footer contact links use `data-umami-event` (`contact-email`/`contact-phone`). Never put personal data in event payloads.
+
 ## Common Commands
 ```bash
 npm run dev                    # Dev server on port 3000

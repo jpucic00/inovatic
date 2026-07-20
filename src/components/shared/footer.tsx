@@ -71,6 +71,7 @@ export function Footer() {
             <div className="space-y-3">
               <a
                 href="mailto:info@udruga-inovatic.hr"
+                data-umami-event="contact-email"
                 className="flex items-center gap-2.5 text-sm text-gray-400 hover:text-cyan-400 transition-colors"
               >
                 <Mail className="w-4 h-4 flex-shrink-0" />
@@ -78,6 +79,7 @@ export function Footer() {
               </a>
               <a
                 href="tel:+385993936993"
+                data-umami-event="contact-phone"
                 className="flex items-center gap-2.5 text-sm text-gray-400 hover:text-cyan-400 transition-colors"
               >
                 <Phone className="w-4 h-4 flex-shrink-0" />

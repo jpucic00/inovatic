@@ -7,6 +7,7 @@ import type { City } from '@prisma/client'
 import { CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
 import { submitInquiry } from '@/actions/inquiry'
+import { trackUmamiEvent } from '@/lib/umami'
 import type { ActiveProgram } from '@/actions/public/programs'
 import { InquiryStep1 } from './inquiry/InquiryStep1'
 import { InquiryStep2 } from './inquiry/InquiryStep2'
@@ -141,6 +142,7 @@ export function InquiryForm({
     startTransition(async () => {
       const result = await submitInquiry(data)
       if (result.success) {
+        trackUmamiEvent('course-inquiry', { city: data.city })
         setSubmittedCount((c) => c + 1)
         setDone(true)
       } else if ('code' in result && result.code === 'GROUP_FULL') {
