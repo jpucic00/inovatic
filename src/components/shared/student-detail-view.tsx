@@ -9,6 +9,7 @@ import type {
 } from '@/lib/student-assessment-view'
 import type { RecommendationOption } from '@/lib/assessment-rubric'
 import { DeleteStudentDialog } from '@/components/admin/students/delete-student-dialog'
+import { EditStudentDialog } from '@/components/admin/students/edit-student-dialog'
 import { StudentYearSections } from '@/components/shared/student-year-sections'
 import { CopyButton } from './copy-button'
 import { formatDate, formatDateKey } from '@/lib/format'
@@ -79,9 +80,50 @@ export function StudentDetailView({
 }: Readonly<Props>) {
   const isAdmin = viewerRole === 'ADMIN'
   const fullName = `${student.firstName} ${student.lastName}`
-  const hasParentInfo =
-    !!student.parentName || !!student.parentEmail || !!student.parentPhone
   const courseOptions = courses ?? []
+
+  // Child + parent rows. Each carries a rendered `node` or null when empty.
+  // Admins see the full set (empty → "—") so any field can be filled in via the
+  // edit dialog; teachers see only populated rows (read-only).
+  const infoRows: { label: string; node: React.ReactNode }[] = [
+    {
+      label: 'Datum rođenja',
+      node: student.dateOfBirth ? formatDateKey(student.dateOfBirth) : null,
+    },
+    { label: 'Škola', node: student.childSchool || null },
+    { label: 'Roditelj', node: student.parentName || null },
+    {
+      label: 'E-mail roditelja',
+      node: student.parentEmail ? (
+        <div className="flex items-center gap-2">
+          <a
+            href={`mailto:${student.parentEmail}`}
+            className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            {student.parentEmail}
+          </a>
+          <CopyButton value={student.parentEmail} label="e-mail" />
+        </div>
+      ) : null,
+    },
+    {
+      label: 'Telefon roditelja',
+      node: student.parentPhone ? (
+        <div className="flex items-center gap-2">
+          <a
+            href={`tel:${student.parentPhone}`}
+            className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
+          >
+            <Phone className="w-3.5 h-3.5" />
+            {student.parentPhone}
+          </a>
+          <CopyButton value={student.parentPhone} label="telefon" />
+        </div>
+      ) : null,
+    },
+  ]
+  const visibleInfoRows = infoRows.filter((r) => isAdmin || r.node !== null)
 
   return (
     <div className="max-w-3xl">
@@ -137,56 +179,33 @@ export function StudentDetailView({
       </div>
 
       {/* Child + parent info */}
-      {(hasParentInfo || student.dateOfBirth || student.childSchool) && (
+      {(isAdmin || visibleInfoRows.length > 0) && (
         <div className="bg-white rounded-xl border p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">Podaci</h2>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <h2 className="text-sm font-semibold text-gray-700">Podaci</h2>
+            {isAdmin && (
+              <EditStudentDialog
+                student={{
+                  id: student.id,
+                  firstName: student.firstName,
+                  lastName: student.lastName,
+                  dateOfBirth: student.dateOfBirth,
+                  childSchool: student.childSchool,
+                  parentName: student.parentName,
+                  parentEmail: student.parentEmail,
+                  parentPhone: student.parentPhone,
+                }}
+              />
+            )}
+          </div>
           <dl>
-            {student.dateOfBirth && (
+            {visibleInfoRows.map((row) => (
               <DetailRow
-                label="Datum rođenja"
-                value={formatDateKey(student.dateOfBirth ?? '')}
+                key={row.label}
+                label={row.label}
+                value={row.node ?? <span className="text-gray-400">—</span>}
               />
-            )}
-            {student.childSchool && (
-              <DetailRow label="Škola" value={student.childSchool} />
-            )}
-            {student.parentName && (
-              <DetailRow label="Roditelj" value={student.parentName} />
-            )}
-            {student.parentEmail && (
-              <DetailRow
-                label="E-mail roditelja"
-                value={
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={`mailto:${student.parentEmail}`}
-                      className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
-                    >
-                      <Mail className="w-3.5 h-3.5" />
-                      {student.parentEmail}
-                    </a>
-                    <CopyButton value={student.parentEmail} label="e-mail" />
-                  </div>
-                }
-              />
-            )}
-            {student.parentPhone && (
-              <DetailRow
-                label="Telefon roditelja"
-                value={
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={`tel:${student.parentPhone}`}
-                      className="inline-flex items-center gap-1.5 text-cyan-700 hover:underline"
-                    >
-                      <Phone className="w-3.5 h-3.5" />
-                      {student.parentPhone}
-                    </a>
-                    <CopyButton value={student.parentPhone} label="telefon" />
-                  </div>
-                }
-              />
-            )}
+            ))}
           </dl>
         </div>
       )}

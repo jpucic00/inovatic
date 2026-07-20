@@ -63,13 +63,34 @@ describe('updateTeacherSchema', () => {
       id: 't1',
       firstName: 'Iva',
       lastName: 'Marić',
+      email: 'iva@example.com',
     })
     expect(result.id).toBe('t1')
+    expect(result.email).toBe('iva@example.com')
   })
 
   it('rejects empty id', () => {
     expect(
-      updateTeacherSchema.safeParse({ id: '', firstName: 'Iva', lastName: 'Marić' }).success,
+      updateTeacherSchema.safeParse({
+        id: '',
+        firstName: 'Iva',
+        lastName: 'Marić',
+        email: 'iva@example.com',
+      }).success,
+    ).toBe(false)
+  })
+
+  it('requires a valid email', () => {
+    expect(
+      updateTeacherSchema.safeParse({ id: 't1', firstName: 'Iva', lastName: 'Marić' }).success,
+    ).toBe(false)
+    expect(
+      updateTeacherSchema.safeParse({
+        id: 't1',
+        firstName: 'Iva',
+        lastName: 'Marić',
+        email: 'not-email',
+      }).success,
     ).toBe(false)
   })
 })

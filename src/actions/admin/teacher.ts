@@ -245,6 +245,7 @@ export async function updateTeacher(
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
   const { id, firstName, lastName, phone } = parsed.data
+  const email = parsed.data.email.toLowerCase().trim()
 
   // Outside the try — the notFound() throw must not be swallowed by the catch.
   await assertUserInCity(id, city)
@@ -256,11 +257,23 @@ export async function updateTeacher(
     })
     if (!teacher) return { success: false, error: 'Nastavnik nije pronađen.' }
 
+    // Email is the login identity and is @unique across ALL users (any role or
+    // city, including soft-deleted). Block a change that would collide with a
+    // different account before the write (the DB constraint is the backstop).
+    const emailOwner = await db.user.findUnique({
+      where: { email },
+      select: { id: true },
+    })
+    if (emailOwner && emailOwner.id !== id) {
+      return { success: false, error: 'Korisnik s tim e-mailom već postoji.' }
+    }
+
     await db.user.update({
       where: { id },
       data: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        email,
         phone: phone?.trim() || null,
       },
     })

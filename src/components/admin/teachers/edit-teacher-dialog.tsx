@@ -20,20 +20,26 @@ interface Props {
     id: string
     firstName: string
     lastName: string
+    email: string
     phone: string | null
   }
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function EditTeacherDialog({ teacher }: Readonly<Props>) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [firstName, setFirstName] = useState(teacher.firstName)
   const [lastName, setLastName] = useState(teacher.lastName)
+  const [email, setEmail] = useState(teacher.email)
   const [phone, setPhone] = useState(teacher.phone ?? '')
   const [isPending, startTransition] = useTransition()
 
   const canSubmit =
-    firstName.trim().length >= 2 && lastName.trim().length >= 2
+    firstName.trim().length >= 2 &&
+    lastName.trim().length >= 2 &&
+    EMAIL_RE.test(email.trim())
 
   const handleSubmit = () => {
     if (!canSubmit) return
@@ -42,6 +48,7 @@ export function EditTeacherDialog({ teacher }: Readonly<Props>) {
         id: teacher.id,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        email: email.trim(),
         phone: phone.trim() || null,
       })
       if (res.success) {
@@ -66,8 +73,7 @@ export function EditTeacherDialog({ teacher }: Readonly<Props>) {
         <DialogHeader>
           <DialogTitle>Uredi nastavnika</DialogTitle>
           <DialogDescription>
-            E-mail se ne može mijenjati. Za promjenu e-maila obrišite račun i
-            kreirajte novi.
+            Promjena e-maila mijenja i podatke za prijavu nastavnika.
           </DialogDescription>
         </DialogHeader>
 
@@ -103,6 +109,21 @@ export function EditTeacherDialog({ teacher }: Readonly<Props>) {
                 className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
               />
             </div>
+          </div>
+          <div>
+            <label
+              htmlFor="edit-teacher-email"
+              className="block text-xs font-medium text-gray-600 mb-1"
+            >
+              E-mail *
+            </label>
+            <input
+              id="edit-teacher-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+            />
           </div>
           <div>
             <label

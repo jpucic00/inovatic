@@ -71,6 +71,7 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
             id: teacher.id,
             firstName: teacher.firstName,
             lastName: teacher.lastName,
+            email: teacher.email,
             phone: teacher.phone,
           }}
         />

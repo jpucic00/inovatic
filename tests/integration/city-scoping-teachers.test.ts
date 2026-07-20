@@ -155,7 +155,12 @@ describe('mutations by id — cross-city 404s, same-city works', () => {
     await sibenikAdminSession()
 
     await expect(
-      updateTeacher({ id: splitTeacher.id, firstName: 'Hak', lastName: 'Pokušaj' }),
+      updateTeacher({
+        id: splitTeacher.id,
+        firstName: 'Hak',
+        lastName: 'Pokušaj',
+        email: splitTeacher.email,
+      }),
     ).rejects.toThrow('NEXT_NOT_FOUND')
     const splitRow = await db.user.findUnique({
       where: { id: splitTeacher.id },
@@ -167,6 +172,7 @@ describe('mutations by id — cross-city 404s, same-city works', () => {
       id: sibTeacher.id,
       firstName: 'Nova',
       lastName: 'Osoba',
+      email: sibTeacher.email,
     })
     expect(res).toEqual({ success: true })
   })
