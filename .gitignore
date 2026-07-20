@@ -58,3 +58,6 @@ tests/fixtures/phase3-state.json
 
 # Design handoff bundles — transient reference material, not part of the codebase
 /design_handoff_*/
+
+# Historical import workbooks — contain personal data, must never be committed
+Evidencija_*
