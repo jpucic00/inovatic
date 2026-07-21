@@ -4,6 +4,7 @@ import {
   buildGroupName,
   courseSlugFromLabel,
   dayOfWeekFromLabel,
+  inferSchoolYearFromFilename,
   normalizeTimeToken,
   parseContactSheet,
   parseEvaluationSheet,
@@ -83,6 +84,20 @@ describe('buildGroupName', () => {
     expect(buildGroupName(parseGroupName('PON_SLR2_1830-20')!)).toBe('PON_SLR2_18:30-20:00')
     expect(buildGroupName(parseGroupName('ČET_SLR1_18:30-20:00')!)).toBe('ČET_SLR1_18:30-20:00')
     expect(buildGroupName(parseGroupName('SUB_SLR1_900-1030')!)).toBe('SUB_SLR1_9:00-10:30')
+  })
+})
+
+describe('inferSchoolYearFromFilename', () => {
+  it('extracts consecutive-year pairs from workbook filenames', () => {
+    expect(inferSchoolYearFromFilename('Evidencija_Anić_2024_2025.xlsx')).toBe('2024/2025')
+    expect(inferSchoolYearFromFilename('Kopija datoteke Evidencija_Anić_2024_2025.xlsx')).toBe('2024/2025')
+    expect(inferSchoolYearFromFilename('evidencija 2025-2026 final.xlsx')).toBe('2025/2026')
+  })
+
+  it('returns null for non-consecutive or absent year pairs', () => {
+    expect(inferSchoolYearFromFilename('Evidencija_2024_2026.xlsx')).toBeNull()
+    expect(inferSchoolYearFromFilename('polaznici.xlsx')).toBeNull()
+    expect(inferSchoolYearFromFilename('backup_1830_2000.xlsx')).toBeNull()
   })
 })
 
@@ -294,5 +309,27 @@ describe('parseContactSheet', () => {
     const warnings: ImportWarning[] = []
     parseContactSheet('PON_SLR2_1830-20', contactGrid(), warnings)
     expect(warnings.some((w) => w.level === 'warn' && w.message.includes('disagrees'))).toBe(true)
+  })
+
+  it('sanitizes Outlook-style MAIL cells down to the bare address', () => {
+    const grid: Grid = [
+      ['BR.', 'IME:', 'PREZIME:', 'RODITELJ:', 'MAIL:', 'MOBITEL:', 'PLAĆENO'],
+      [1, 'MARIJA', 'PERIĆ', 'MAMA PERIĆ', 'marija fredotović perić <Marija.FredotovicPeric@Outlook.com>', '0911111111', true],
+      [2, 'IVAN', 'PERIĆ', 'MAMA PERIĆ', 'mailto:mama.peric@example.com', '0911111111', false],
+      [3, 'ANA', 'PERIĆ', 'MAMA PERIĆ', 'Mama Perić <a@b.hr>; Tata Perić <c@d.hr>', '0911111111', false],
+      [4, 'LUKA', 'PERIĆ', 'MAMA PERIĆ', 'nije mail', '0911111111', false],
+    ]
+    const warnings: ImportWarning[] = []
+    const sheet = parseContactSheet('UTO_SLR1_1700-1830', grid, warnings)
+
+    expect(sheet!.rows[0].parentEmail).toBe('marija.fredotovicperic@outlook.com')
+    expect(sheet!.rows[1].parentEmail).toBe('mama.peric@example.com')
+    // Multiple pasted contacts: the first angled address wins.
+    expect(sheet!.rows[2].parentEmail).toBe('a@b.hr')
+    // Residual garbage is imported as-is but loudly flagged.
+    expect(sheet!.rows[3].parentEmail).toBe('nije mail')
+    expect(
+      warnings.filter((w) => w.level === 'warn' && w.message.includes("doesn't look like an email")),
+    ).toHaveLength(1)
   })
 })

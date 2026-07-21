@@ -60,4 +60,5 @@ tests/fixtures/phase3-state.json
 /design_handoff_*/
 
 # Historical import workbooks — contain personal data, must never be committed
-Evidencija_*
+# (any filename containing "Evidencija", e.g. "Kopija datoteke Evidencija_….numbers")
+*Evidencija*

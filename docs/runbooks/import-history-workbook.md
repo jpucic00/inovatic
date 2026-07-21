@@ -2,17 +2,23 @@
 
 Imports one school year's Excel workbook (evaluation sheet + one contact tab
 per group) into the app: students, groups, enrollments, full-year paid marks,
-teacher accounts/assignments, and report cards. Built for the 2025/2026 and
-2024/2025 archives; **2024/2025 has a different layout and needs a parser
-pass before use** — run 2025/2026 first.
+teacher accounts/assignments, and report cards. Works for any past year whose
+workbook follows the layout below (the original 2024/2025 archive had a
+different layout — import a copy reformatted to match, one year per run).
 
 ```bash
-npm run db:import-history -- <workbook.xlsx> [--year 2025/2026] [--apply]
+npm run db:import-history -- <workbook.xlsx> --year 2024/2025 [--apply]
 ```
 
 **Dry-run by default** — without `--apply` nothing is written, ever. The
 workbook file never leaves your machine; run it locally against whichever
 `DATABASE_URL` you point it at.
+
+**`--year` is mandatory** and must match the workbook: a wrong year silently
+matches the *other* year's groups (same days/courses/times), which on apply
+would attach enrollments and report cards to the wrong school year. As a
+safety net the script refuses to run when the filename contains a
+contradicting year (e.g. a `…2024_2025.xlsx` file with `--year 2025/2026`).
 
 ## What the workbook must look like
 
@@ -28,6 +34,13 @@ workbook file never leaves your machine; run it locally against whichever
   `IME`, `PREZIME`, `RODITELJ`, `MAIL`, `MOBITEL`, `PLAĆENO`. Ignored by
   design: `GODINE`, `RAZRED`, `ISKUSTVO`, `OGLEDNA`, `UGOVOR`, `PLAĆANJE`,
   `POPUST`, `PONUDA`, `RAČUN`, `ASISTENT`.
+- **MAIL cells are sanitized**: Outlook-style contact pastes
+  (`Marija Perić <marija@outlook.com>`, `mailto:` links, multi-contact
+  pastes) are reduced to the first bare lowercase address — the stored value
+  must equal what a parent later types into the inquiry form, or
+  returning-student matching breaks. Cells that still don't look like an
+  email after cleanup are imported as-is and flagged in the report. A re-run
+  also repairs previously imported `Name <address>` values.
 
 Any other sheet is reported as ignored — nothing fails on extra sheets.
 
@@ -66,7 +79,7 @@ evaluation blocks spread across several exported worksheets are merged.
 1. **Local dry-run** (uses `.env.local` → local Docker DB):
 
    ```bash
-   npm run db:import-history -- ~/Downloads/evidencija-2025-2026.xlsx
+   npm run db:import-history -- ~/Downloads/evidencija-2025-2026.xlsx --year 2025/2026
    ```
 
    Read the whole report. `✖ ERROR` items are rows/blocks the import will
@@ -79,16 +92,33 @@ evaluation blocks spread across several exported worksheets are merged.
    (parent contact, payments), and a report card. `npm run db:seed` later
    wipes this — it's only a rehearsal.
 
-3. **Prod dry-run** (Neon pooled URL, inline — same habit as migrations):
+3. **Prod dry-run** — two equivalent ways to point at the Neon prod DB; the
+   import always executes on your machine either way.
+
+   Via Railway CLI (injects the app service's `DATABASE_URL`; dotenv never
+   overrides an already-set variable, so `.env.local` loses as intended):
+
+   ```bash
+   brew install railway   # npm -g install breaks under global ignore-scripts (postinstall fetches the binary)
+   railway login
+   railway link           # pick the inovatic project → production environment → app service
+   railway status         # confirm what you linked
+   railway run npm run db:import-history -- ~/Downloads/evidencija-2025-2026.xlsx --year 2025/2026
+   ```
+
+   Or with the Neon pooled URL inline — same habit as migrations:
 
    ```bash
    DATABASE_URL="postgresql://<neon-pooled-url>" \
-   npm run db:import-history -- ~/Downloads/evidencija-2025-2026.xlsx
+   npm run db:import-history -- ~/Downloads/evidencija-2025-2026.xlsx --year 2025/2026
    ```
 
    The report now matches against real prod groups (`SRI_SLR1_18:30-20:00`…).
-   Expect every prod 2025/2026 group to show `=`; investigate any unexpected
-   `+` duplicates before applying.
+   **Fingerprint the target before applying**: the prod dry-run must list the
+   convention-named groups prod already has as `=` — a report showing "0
+   existing groups" when you expected matches means you're linked to the
+   wrong environment/database. Investigate any unexpected `+` duplicates
+   before applying.
 
 4. **Prod apply** — same command plus `--apply`. Re-run is safe.
 

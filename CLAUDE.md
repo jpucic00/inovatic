@@ -64,7 +64,7 @@ npm run test:integration:watch # Vitest integration watch (no reset — for inte
 npx playwright test tests/phase1 tests/phase2 tests/phase3  # Playwright E2E tier (requires dev server on port 3000; bare tests/ would also collect the vitest tiers and abort)
 npm run db:seed                # DESTRUCTIVE full dev reseed — wipes ALL tables then rebuilds (dev only)
 npm run db:seed:articles       # Articles ONLY — upserts news articles+tags+gallery by slug, idempotent, NON-destructive (safe against production)
-npm run db:import-history -- <workbook.xlsx> [--year 2025/2026] [--apply]  # Historical Excel import, DRY-RUN without --apply — see docs/runbooks/import-history-workbook.md
+npm run db:import-history -- <workbook.xlsx> --year 2024/2025 [--apply]  # Historical Excel import, DRY-RUN without --apply — see docs/runbooks/import-history-workbook.md
 ```
 Article content lives in `prisma/seed.ts` (`seedArticles()`, exported). `db:seed:articles` (`prisma/seed-articles.ts`) reuses it to refresh only articles without touching users/courses/enrollments — use this to publish articles to prod. `seed.ts`'s `main()` only auto-runs when invoked directly, so importing it never wipes the DB.
 

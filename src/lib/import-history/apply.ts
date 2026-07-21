@@ -135,7 +135,12 @@ export async function applyImportPlan(
       if (current) {
         const backfill: Record<string, string> = {}
         if (!current.parentName && s.parentName) backfill.parentName = s.parentName
-        if (!current.parentEmail && s.parentEmail) backfill.parentEmail = s.parentEmail
+        // Empty OR Outlook-residue ("Name <a@b>") emails get the sanitized
+        // value — earlier imports ran before MAIL cells were cleaned up.
+        const dirtyEmail = current.parentEmail?.includes('<') ?? false
+        if ((!current.parentEmail || dirtyEmail) && s.parentEmail) {
+          backfill.parentEmail = s.parentEmail
+        }
         if (!current.parentPhone && s.parentPhone) backfill.parentPhone = s.parentPhone
         if (Object.keys(backfill).length > 0) {
           await db.user.update({ where: { id: s.existingId! }, data: backfill })

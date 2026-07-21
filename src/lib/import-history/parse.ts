@@ -145,6 +145,20 @@ export function identityKey(id: {
   return `${id.courseSlug}|${id.dayOfWeek}|${id.startTime ?? ''}`
 }
 
+/**
+ * Sniffs a school year out of a workbook filename ("Evidencija_Anić_2024_2025"
+ * → "2024/2025"). Only two consecutive years count — anything else is null.
+ * Used as a guard against importing a workbook under the wrong --year.
+ */
+export function inferSchoolYearFromFilename(fileName: string): string | null {
+  const match = /(\d{4})[._/-](\d{4})/.exec(fileName)
+  if (!match) return null
+  const first = Number(match[1])
+  const second = Number(match[2])
+  if (second !== first + 1) return null
+  return `${first}/${second}`
+}
+
 export function parseGroupName(name: string): GroupIdentity | null {
   // Numbers → Excel export names split-out worksheets "PON_SLR2_1830-20 - Tablica 1";
   // real tab names never contain a spaced dash, so stripping the suffix is safe.
@@ -441,6 +455,21 @@ export function parseEvaluationSheet(grid: Grid, warnings: ImportWarning[]): Eva
 
 // ── Contact sheets (one tab per group) ───────────────────────────────────────
 
+/**
+ * Extracts a bare address from Outlook-style contact strings pasted into MAIL
+ * cells: `Marija Perić <marija@outlook.com>` → `marija@outlook.com`. Also
+ * strips a `mailto:` prefix and lowercases — the stored value must equal what
+ * a parent later types into the inquiry form, or legacy matching breaks.
+ */
+function sanitizeEmail(raw: string): string {
+  let email = raw.trim()
+  const angled = /<([^<>]+)>/.exec(email)
+  if (angled) email = angled[1].trim()
+  return email.replace(/^mailto:/i, '').trim().toLowerCase()
+}
+
+const PLAIN_EMAIL = /^\S+@\S+\.\S+$/
+
 export type ContactRow = {
   firstName: string
   lastName: string
@@ -497,11 +526,20 @@ function parseContactRow(
     paid = false
   }
 
+  const parentEmail = sanitizeEmail(cellText(col(row, map, 'mail'))) || null
+  if (parentEmail && !PLAIN_EMAIL.test(parentEmail)) {
+    warnings.push({
+      level: 'warn',
+      where,
+      message: `${firstName} ${lastName}: MAIL "${cellText(col(row, map, 'mail'))}" still doesn't look like an email after cleanup — imported as-is, fix the workbook and re-run`,
+    })
+  }
+
   return {
     firstName,
     lastName,
     parentName: titleCaseName(cellText(col(row, map, 'roditelj'))) || null,
-    parentEmail: cellText(col(row, map, 'mail')).toLowerCase() || null,
+    parentEmail,
     parentPhone: cellText(phoneRaw) || null,
     paid,
   }

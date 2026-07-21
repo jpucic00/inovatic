@@ -17,10 +17,12 @@ import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 dotenv.config({ path: '.env' })
 
+import { basename } from 'node:path'
+
 import { PrismaClient } from '@prisma/client'
 
 import { applyImportPlan } from '../src/lib/import-history/apply'
-import type { ImportWarning } from '../src/lib/import-history/parse'
+import { inferSchoolYearFromFilename, type ImportWarning } from '../src/lib/import-history/parse'
 import { buildImportPlan, type ImportPlan } from '../src/lib/import-history/plan'
 import { loadSnapshot } from '../src/lib/import-history/snapshot'
 import { parseWorkbookSheets } from '../src/lib/import-history/workbook'
@@ -30,7 +32,9 @@ const prisma = new PrismaClient()
 
 function parseArgs(argv: string[]): { file: string; schoolYear: string; apply: boolean } {
   const positional: string[] = []
-  let schoolYear = '2025/2026'
+  // Deliberately NO default: a wrong-year import silently matches the other
+  // year's groups (same days/courses/times), so the year must be explicit.
+  let schoolYear: string | null = null
   let apply = false
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
@@ -39,10 +43,10 @@ function parseArgs(argv: string[]): { file: string; schoolYear: string; apply: b
     else if (arg.startsWith('--')) fail(`Unknown flag: ${arg}`)
     else positional.push(arg)
   }
-  if (positional.length !== 1) {
-    fail('Usage: npm run db:import-history -- <workbook.xlsx> [--year 2025/2026] [--apply]')
+  if (positional.length !== 1 || !schoolYear) {
+    fail('Usage: npm run db:import-history -- <workbook.xlsx> --year 2024/2025 [--apply]')
   }
-  if (!/^\d{4}\/\d{4}$/.test(schoolYear)) fail(`--year must look like 2025/2026 (got "${schoolYear}")`)
+  if (!/^\d{4}\/\d{4}$/.test(schoolYear)) fail(`--year must look like 2024/2025 (got "${schoolYear}")`)
   return { file: positional[0], schoolYear, apply }
 }
 
@@ -95,6 +99,14 @@ function printPlan(plan: ImportPlan): void {
 
 async function main() {
   const { file, schoolYear, apply } = parseArgs(process.argv.slice(2))
+
+  const filenameYear = inferSchoolYearFromFilename(basename(file))
+  if (filenameYear && filenameYear !== schoolYear) {
+    fail(
+      `The filename suggests school year ${filenameYear} but --year is ${schoolYear}. ` +
+        'Re-run with the correct --year (or rename the file if the name is misleading).',
+    )
+  }
 
   console.log(`📖 Reading ${file}…`)
   const sheets = await readWorkbookGrids(file)
