@@ -2388,7 +2388,7 @@ export async function seedArticles(deps: {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Za sva pitanja stojimo na raspolaganju putem e-pošte: `, styles: {} },
-            { type: 'link', href: `mailto:prijave@udruga-inovatic.hr`, content: [{ type: 'text', text: `prijave@udruga-inovatic.hr`, styles: {} }] },
+            { type: 'link', href: `mailto:upisi@udruga-inovatic.hr`, content: [{ type: 'text', text: `upisi@udruga-inovatic.hr`, styles: {} }] },
             { type: 'text', text: ` ili kontakt telefona: 0993936993.`, styles: {} },
           ],
         },
@@ -2629,7 +2629,7 @@ export async function seedArticles(deps: {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Za sva dodatna pitanja pišite nam na mail adresu:`, styles: {} },
-            { type: 'text', text: ` prijave@udruga-inovatic.hr`, styles: {'bold': true} },
+            { type: 'text', text: ` upisi@udruga-inovatic.hr`, styles: {'bold': true} },
             { type: 'text', text: `  ili nas kontaktirajte na `, styles: {} },
             { type: 'text', text: `099 393 6993`, styles: {'bold': true} },
           ],
@@ -3526,7 +3526,7 @@ export async function seedArticles(deps: {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Za sva pitanja stojimo na raspolaganju putem e-pošte: `, styles: {} },
-            { type: 'link', href: `mailto:prijave@udruga-inovatic.hr`, content: [{ type: 'text', text: `prijave@udruga-inovatic.hr`, styles: {} }] },
+            { type: 'link', href: `mailto:upisi@udruga-inovatic.hr`, content: [{ type: 'text', text: `upisi@udruga-inovatic.hr`, styles: {} }] },
             { type: 'text', text: ` ili kontakt telefona: 0993936993.`, styles: {} },
           ],
         },
@@ -3903,7 +3903,7 @@ export async function seedArticles(deps: {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Za sva pitanja stojimo na raspolaganju putem e-pošte: `, styles: {} },
-            { type: 'link', href: `mailto:prijave@udruga-inovatic.hr`, content: [{ type: 'text', text: `prijave@udruga-inovatic.hr`, styles: {} }] },
+            { type: 'link', href: `mailto:upisi@udruga-inovatic.hr`, content: [{ type: 'text', text: `upisi@udruga-inovatic.hr`, styles: {} }] },
             { type: 'text', text: ` ili kontakt telefona: 0993936993.`, styles: {} },
           ],
         },
@@ -4434,7 +4434,7 @@ export async function seedArticles(deps: {
           type: 'paragraph',
           content: [
             { type: 'text', text: `Za sva pitanja stojimo na raspolaganju putem e-pošte: `, styles: {} },
-            { type: 'link', href: `mailto:prijave@udruga-inovatic.hr`, content: [{ type: 'text', text: `prijave@udruga-inovatic.hr`, styles: {} }] },
+            { type: 'link', href: `mailto:upisi@udruga-inovatic.hr`, content: [{ type: 'text', text: `upisi@udruga-inovatic.hr`, styles: {} }] },
             { type: 'text', text: ` ili kontakt telefona: 0993936993.`, styles: {} },
           ],
         },

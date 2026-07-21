@@ -112,8 +112,8 @@ export default async function WorkshopPage({ params }: Readonly<Props>) {
 
               <div className="bg-cyan-50 rounded-xl p-4 border border-cyan-100 text-sm text-gray-500 space-y-1">
                 <p className="font-medium text-gray-700">Imate pitanja?</p>
-                <a href="mailto:prijave@udruga-inovatic.hr" className="text-cyan-500 hover:underline block">
-                  prijave@udruga-inovatic.hr
+                <a href="mailto:upisi@udruga-inovatic.hr" className="text-cyan-500 hover:underline block">
+                  upisi@udruga-inovatic.hr
                 </a>
                 <a href="tel:+385993936993" className="text-cyan-500 hover:underline block">
                   +385 99 393 6993

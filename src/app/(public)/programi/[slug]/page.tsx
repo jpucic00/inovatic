@@ -175,7 +175,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
               Pošalji upit za upis
             </Link>
             <a
-              href="mailto:prijave@udruga-inovatic.hr"
+              href="mailto:upisi@udruga-inovatic.hr"
               className="rounded-xl border border-cyan-200 bg-white px-8 py-3.5 text-center text-sm font-semibold text-cyan-600 transition-colors hover:bg-cyan-50 md:text-[15px]"
             >
               Kontaktiraj nas emailom

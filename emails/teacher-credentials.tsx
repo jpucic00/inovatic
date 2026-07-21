@@ -52,8 +52,8 @@ function TeacherCredentialsEmail({
 
       <Text style={emailStyles.text}>
         Za sva pitanja slobodno nas kontaktirajte na{' '}
-        <Link href="mailto:prijave@udruga-inovatic.hr" style={emailStyles.link}>
-          prijave@udruga-inovatic.hr
+        <Link href="mailto:upisi@udruga-inovatic.hr" style={emailStyles.link}>
+          upisi@udruga-inovatic.hr
         </Link>
         .
       </Text>

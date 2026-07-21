@@ -33,6 +33,8 @@ interface CityContact {
   label: string
   /** Short hero line for the city contact page. */
   intro: string
+  /** Per-city enrollment inbox (Šibenik uses upisi.sibenik@). */
+  upisi: string
   venues: Venue[]
 }
 
@@ -42,9 +44,8 @@ export const CITIES: { slug: CitySlug; label: string }[] = [
   { slug: 'sibenik', label: 'Šibenik' },
 ]
 
-/** Shared inboxes shown on every city page (not city-specific). */
+/** Shared inbox shown on every city page. The enrollment inbox is per-city — see `upisi`. */
 export const SHARED_EMAILS = {
-  prijave: 'prijave@udruga-inovatic.hr',
   info: 'info@udruga-inovatic.hr',
 } as const
 
@@ -54,6 +55,7 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
     label: 'Split',
     intro:
       'Nastava u Splitu odvija se na dvije lokacije — redovni program u Velebitskoj i natjecateljski programi na Prirodoslovno-matematičkom fakultetu.',
+    upisi: 'upisi@udruga-inovatic.hr',
     venues: [
       {
         name: 'Velebitska 32',
@@ -97,6 +99,7 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
     label: 'Šibenik',
     intro:
       'Naša nova lokacija (2026.) — isti kurikulum Svijet LEGO Robotike.',
+    upisi: 'upisi.sibenik@udruga-inovatic.hr',
     venues: [
       {
         name: 'Trokut inkubator',

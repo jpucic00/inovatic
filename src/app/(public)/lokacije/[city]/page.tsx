@@ -79,7 +79,7 @@ export default async function CityLocationPage({ params }: PageProps) {
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Kontakt informacije</h2>
                 <div className="space-y-4">
                   <a
-                    href={`mailto:${SHARED_EMAILS.prijave}`}
+                    href={`mailto:${city.upisi}`}
                     className="flex items-center gap-3 text-sm text-gray-600 hover:text-cyan-600 transition-colors group"
                   >
                     <div className="w-9 h-9 bg-cyan-50 border border-cyan-200 rounded-xl flex items-center justify-center group-hover:bg-cyan-100 transition-colors flex-shrink-0">
@@ -87,7 +87,7 @@ export default async function CityLocationPage({ params }: PageProps) {
                     </div>
                     <div>
                       <div className="text-xs text-gray-400 font-medium">Email za prijave</div>
-                      <div className="font-medium text-gray-800">{SHARED_EMAILS.prijave}</div>
+                      <div className="font-medium text-gray-800">{city.upisi}</div>
                     </div>
                   </a>
                   <a

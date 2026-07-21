@@ -46,7 +46,7 @@ describe('email senders', () => {
     expect(send.mock.calls[0][0]).toMatchObject({
       to: 'roditelj@example.hr',
       from: 'Inovatic <noreply@udruga-inovatic.hr>',
-      replyTo: 'prijave@udruga-inovatic.hr',
+      replyTo: 'upisi@udruga-inovatic.hr',
       subject: 'Zaprimili smo vašu prijavu – Inovatic',
     })
   })
@@ -76,5 +76,14 @@ describe('email senders', () => {
     await sendTeacherCredentialsEmail({ ...base, variant: 'reset' })
     expect(send.mock.calls[0][0].subject).toBe('Pristupni podaci – Inovatic')
     expect(send.mock.calls[1][0].subject).toBe('Nova lozinka – Inovatic')
+  })
+
+  it('surfaces a Resend in-band error (e.g. unverified domain) as a throw', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    send.mockResolvedValue({
+      data: null,
+      error: { name: 'validation_error', message: 'The udruga-inovatic.hr domain is not verified.' },
+    })
+    await expect(sendInquiryConfirmationEmail(inquiryArgs)).rejects.toThrow(/not verified/)
   })
 })

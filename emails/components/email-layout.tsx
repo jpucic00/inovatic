@@ -95,8 +95,28 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
             <strong>Tim Inovatic</strong>
             <br />
             Udruga za robotiku &quot;Inovatic&quot;
+          </Text>
+          <Text style={emailStyles.footer}>
+            <strong>Kontakt Split</strong>
             <br />
-            prijave@udruga-inovatic.hr | +385 99 393 6993
+            <Link href="mailto:upisi@udruga-inovatic.hr" style={emailStyles.link}>
+              upisi@udruga-inovatic.hr
+            </Link>
+            {' · '}
+            <Link href="tel:+385993936993" style={emailStyles.link}>
+              +385 99 393 6993
+            </Link>
+            <br />
+            <br />
+            <strong>Kontakt Šibenik</strong>
+            <br />
+            <Link href="mailto:upisi.sibenik@udruga-inovatic.hr" style={emailStyles.link}>
+              upisi.sibenik@udruga-inovatic.hr
+            </Link>
+            {' · '}
+            <Link href="tel:+385921689987" style={emailStyles.link}>
+              +385 92 168 9987
+            </Link>
           </Text>
         </Container>
       </Body>

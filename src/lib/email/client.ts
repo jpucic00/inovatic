@@ -14,16 +14,19 @@ function getResend(): Resend {
  * (e.g. local dev / preview). Kept module-private — callers go through senders.
  */
 const FROM_EMAIL = process.env.EMAIL_FROM ?? 'Inovatic <noreply@udruga-inovatic.hr>'
-const REPLY_TO = 'prijave@udruga-inovatic.hr'
+const REPLY_TO = 'upisi@udruga-inovatic.hr'
 
 /**
  * Low-level transactional send shared by every function in ./senders.
  *
  * No-ops (returns `false`) when `RESEND_API_KEY` is unset — local dev, tests and
  * preview builds run without a key, and "no key" must never read as a failure.
- * On a real Resend rejection it THROWS, so each caller keeps its own policy
- * (swallow-and-flag for credentials emails, surface-as-failure for schedule
- * options, swallow-and-log for confirmations).
+ *
+ * The Resend SDK does NOT throw on API-level failures (unverified sender domain,
+ * invalid recipient, quota) — it returns them in-band as `{ error }`. We inspect
+ * that and THROW, so each caller keeps its own policy (swallow-and-flag for
+ * credentials emails, surface-as-failure for schedule options, swallow-and-log
+ * for confirmations) instead of a rejected send silently reading as "sent".
  */
 export async function sendTransactionalEmail(params: {
   to: string
@@ -31,12 +34,15 @@ export async function sendTransactionalEmail(params: {
   react: ReactElement
 }): Promise<boolean> {
   if (!process.env.RESEND_API_KEY) return false
-  await getResend().emails.send({
+  const result = await getResend().emails.send({
     from: FROM_EMAIL,
     replyTo: REPLY_TO,
     to: params.to,
     subject: params.subject,
     react: params.react,
   })
+  if (result?.error) {
+    throw new Error(`Resend: ${result.error.name} — ${result.error.message}`)
+  }
   return true
 }

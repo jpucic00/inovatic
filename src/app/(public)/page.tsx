@@ -179,8 +179,8 @@ export default async function HomePage() {
           </Link>
           <p className="mt-4 text-sm text-gray-400">
             ili nas kontaktirajte na{' '}
-            <a href="mailto:prijave@udruga-inovatic.hr" className="text-cyan-500 hover:underline">
-              prijave@udruga-inovatic.hr
+            <a href="mailto:upisi@udruga-inovatic.hr" className="text-cyan-500 hover:underline">
+              upisi@udruga-inovatic.hr
             </a>
           </p>
         </div>
