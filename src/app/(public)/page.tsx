@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
 import { Trophy, ArrowRight } from 'lucide-react'
+import { HeroBackgroundSlideshow } from '@/components/shared/hero-background-slideshow'
 import { RobotSvg } from '@/components/shared/robot-svg'
 import { RobotHeadSvg } from '@/components/shared/robot-head-svg'
 import { GearDecor } from '@/components/shared/decorations'
@@ -40,6 +40,34 @@ type LatestNewsArticle = {
   tags: { tag: { name: string } }[]
 }
 
+// Art-directed hero: portrait phone photos on mobile (tall box), landscape
+// shots on desktop (wide box). object-position focal points keep faces in
+// frame — mobile mainly matters on tablets/landscape phones, desktop always.
+const heroImagesMobile = [
+  { n: 1, pos: '50% 35%' }, // grupa s diplomama – lica u gornjoj sredini
+  { n: 2, pos: '50% 42%' }, // dva dječaka (pejzaž)
+  { n: 3, pos: '50% 27%' }, // učionica – lica visoko
+  { n: 4, pos: '50% 45%' }, // dječak naslonjen na ruke
+  { n: 5, pos: '50% 35%' }, // dva dječaka s naočalama
+  { n: 6, pos: '50% 70%' }, // lica nisko, strop zauzima vrh
+  { n: 7, pos: '50% 28%' }, // dva dječaka „palac gore” – lica visoko
+  { n: 8, pos: '50% 40%' }, // velika grupa ispred ulaza
+].map(({ n, pos }) => ({
+  src: `/images/hero/naslovna/${n}.jpeg`,
+  alt: `Djeca na radionici LEGO robotike – fotografija ${n}`,
+  objectPosition: pos,
+}))
+
+const heroImagesDesktop = [
+  { n: 1, pos: '50% 38%' }, // velika grupa s diplomama ispred ulaza
+  { n: 2, pos: '50% 35%' }, // dva dječaka s robotom-kockom
+  { n: 3, pos: '50% 42%' }, // voditelj s troje djece za stolom
+].map(({ n, pos }) => ({
+  src: `/images/hero/naslovna/desktop/${n}.jpeg`,
+  alt: `Djeca na radionici LEGO robotike – fotografija ${n}`,
+  objectPosition: pos,
+}))
+
 export default async function HomePage() {
   let latestNews: LatestNewsArticle[] = []
   try {
@@ -55,15 +83,18 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Hero — static photo, bottom-anchored content on mobile, centered on desktop */}
+      {/* Hero — art-directed carousel (portrait on mobile, landscape on desktop),
+          bottom-anchored content on mobile, centered on desktop */}
       <section className="relative flex min-h-[560px] items-end overflow-hidden lg:items-center">
-        <Image
-          src="https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656903/articles/covers/zavrsetak-cjelogodisnje-aktivnosti-2024-2025.jpg"
-          alt="Djeca na radionici LEGO robotike"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover"
+        <HeroBackgroundSlideshow
+          images={heroImagesMobile}
+          priority={false}
+          className="lg:hidden"
+        />
+        <HeroBackgroundSlideshow
+          images={heroImagesDesktop}
+          priority={false}
+          className="hidden lg:block"
         />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,35,42,0.15)_0%,rgba(8,35,42,0.45)_45%,rgba(8,35,42,0.88)_100%)] lg:bg-[linear-gradient(90deg,rgba(8,35,42,0.82)_0%,rgba(8,35,42,0.45)_52%,rgba(8,35,42,0.10)_100%)]" />
         <div className="relative w-full pt-24 pb-8 lg:py-16">

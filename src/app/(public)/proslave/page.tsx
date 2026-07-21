@@ -47,16 +47,40 @@ const steps = [
   { number: '3', title: 'Proslavite uz robotiku!', description: 'Nije potrebno predznanje – iskusni robo trener vodi kroz početne izazove robotike.' },
 ]
 
+// Art-directed hero: portrait phone photos on mobile (tall box), landscape
+// shots on desktop (wide box). object-position focal points keep faces in
+// frame — mobile mainly matters on tablets/landscape phones, desktop always.
+const heroImagesMobile = [
+  { n: 1, pos: '50% 33%' }, // dva dječaka grade – lica u gornjoj sredini
+  { n: 2, pos: '50% 55%' }, // lica niže, zidni mural na vrhu
+  { n: 3, pos: '50% 42%' }, // dječak u hoodieju drži robota
+  { n: 4, pos: '50% 35%' }, // dva dječaka za stolom
+  { n: 5, pos: '50% 48%' }, // dva dječaka u zagrljaju
+  { n: 6, pos: '50% 50%' }, // voditelj iza dvoje djece – kadar na djecu (lica u fokusu)
+  { n: 7, pos: '50% 50%' }, // voditelj i dvoje djece za laptopom
+].map(({ n, pos }) => ({
+  src: `/images/hero/proslave/${n}.jpeg`,
+  alt: `Robotička proslava rođendana u Inovaticu – fotografija ${n}`,
+  objectPosition: pos,
+}))
+
+const heroImagesDesktop = [
+  { n: 1, pos: '50% 32%' }, // dva dječaka u zagrljaju
+  { n: 2, pos: '50% 30%' }, // dva dječaka s vrtuljkom
+  { n: 3, pos: '50% 60%' }, // šestero djece u nizu – lica niže
+].map(({ n, pos }) => ({
+  src: `/images/hero/proslave/desktop/${n}.jpeg`,
+  alt: `Robotička proslava rođendana u Inovaticu – fotografija ${n}`,
+  objectPosition: pos,
+}))
+
 export default function CelebrationsPage() {
   return (
     <>
       {/* Hero */}
       <HeroCarousel
-        images={[
-          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656838/articles/covers/besplatne-proljetne-radionice-2023.jpg', alt: 'Djeca na robotičkoj proslavi' },
-          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656910/articles/covers/zimska-skola-2024.jpg', alt: 'Zimska škola robotike' },
-          { src: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1773656904/articles/covers/zavrsetak-cjelogodisnjih-radionica-2022-2023.jpg', alt: 'Završetak radionica' },
-        ]}
+        images={heroImagesMobile}
+        desktopImages={heroImagesDesktop}
         minHeightClassName="min-h-[34rem] lg:min-h-[43rem]"
       >
         <ConfettiDecor className="pointer-events-none absolute inset-0 h-full w-full" />
