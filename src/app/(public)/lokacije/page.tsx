@@ -67,7 +67,7 @@ export default function LocationsOverviewPage() {
                         <li key={v.name} className="flex items-start gap-2 text-sm text-gray-600">
                           <MapPin className="w-4 h-4 text-cyan-500 mt-0.5 flex-shrink-0" />
                           <span>
-                            <span className="font-medium text-gray-800">{v.name}</span>
+                            <span className="font-medium text-gray-800">{v.address}</span>
                             <span className="text-gray-400"> · {v.postal}</span>
                           </span>
                         </li>

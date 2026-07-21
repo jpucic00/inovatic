@@ -220,7 +220,7 @@ export default async function CityLocationPage({ params }: PageProps) {
                           rel="noopener noreferrer"
                           className="mt-3 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-cyan-600 font-medium"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" /> Više o prostoru: {venue.name}
+                          <ExternalLink className="w-3.5 h-3.5" /> Više o lokaciji: {venue.institution ?? venue.name}
                         </a>
                       )}
                     </div>
