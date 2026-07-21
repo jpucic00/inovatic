@@ -1290,6 +1290,38 @@ const GALLERY_IMAGES: Record<string, string[]> = {
     'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455896/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/08.jpg',
     'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784455898/articles/gallery/mladi-splitski-inovatori-osvajaju-znanstvenu-scenu/09.jpg',
   ],
+  'prvi-ciklus-ljetnog-kampa-robotike-2026': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/07.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/08.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/09.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/10.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/11.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/12.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/13.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/14.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/15.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/16.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/17.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/18.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/19.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/20.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/21.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/22.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/23.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/24.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/25.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/26.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/27.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/28.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/29.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/30.jpg',
+  ],
 }
 
 async function seedGalleryImages() {
@@ -8487,7 +8519,113 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
     ],
   })
 
-  console.log('✅ Articles and tags seeded (73 articles)')
+  // [74/74] prvi-ciklus-ljetnog-kampa-robotike-2026 — 2026-07-20
+  const a74 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'prvi-ciklus-ljetnog-kampa-robotike-2026',
+      title: `Uspješno završen prvi ciklus Ljetnog kampa LEGO robotike 2026.`,
+      excerpt: `Udruga za robotiku „Inovatic“ uspješno je završila prvi ciklus Ljetnog kampa LEGO robotike 2026., održan od 13. do 17. srpnja. Kroz pet dana 24 polaznika u dvije dobne skupine konstruirala su i programirala pet robotskih projekata te na kraju primila diplome i prigodne majice projekta Science Comes to Town.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Udruga za robotiku „Inovatic“ uspješno je završila `, styles: {} },
+            { type: 'text', text: `prvi ciklus Ljetnog kampa LEGO robotike 2026.`, styles: { bold: true } },
+            { type: 'text', text: `, koji se održavao od `, styles: {} },
+            { type: 'text', text: `13. do 17. srpnja 2026. godine`, styles: { bold: true } },
+            { type: 'text', text: `.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Tijekom pet dana kampa `, styles: {} },
+            { type: 'text', text: `24 polaznika`, styles: { bold: true } },
+            { type: 'text', text: `, raspoređena u dvije dobne skupine (`, styles: {} },
+            { type: 'text', text: `6 – 8 godina`, styles: { bold: true } },
+            { type: 'text', text: ` i `, styles: {} },
+            { type: 'text', text: `9 – 14 godina`, styles: { bold: true } },
+            { type: 'text', text: `), sudjelovala su u bogatom programu edukacijskih STEM radionica iz robotike i programiranja.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Kroz praktičan rad koristeći LEGO® Education robotske setove, polaznici su uspješno konstruirali i programirali svih `, styles: {} },
+            { type: 'text', text: `pet planiranih robotskih projekata`, styles: { bold: true } },
+            { type: 'text', text: `, razvijajući pritom kreativnost, logičko razmišljanje, vještine rješavanja problema i timski rad. Svaki je dan donio novi izazov i priliku za učenje kroz igru, istraživanje i eksperimentiranje, što je još jednom potvrdilo kako je robotika izvrstan način približavanja STEM područja djeci i mladima.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na završetku kampa svim su polaznicima uručene `, styles: {} },
+            { type: 'text', text: `diplome o uspješno završenom programu`, styles: { bold: true } },
+            { type: 'text', text: `, a zahvaljujući projektu `, styles: {} },
+            { type: 'text', text: `Science Comes to Town (SCTT)`, styles: { bold: true } },
+            { type: 'text', text: ` dobili su i prigodne majice kao uspomenu na sudjelovanje u kampu.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ljetni kamp LEGO robotike jedna je od aktivnosti koje Udruga za robotiku „Inovatic“ provodi u suradnji s `, styles: {} },
+            { type: 'text', text: `Gradom Splitom`, styles: { bold: true } },
+            { type: 'text', text: ` u okviru projekta `, styles: {} },
+            { type: 'text', text: `Science Comes to Town (SCTT)`, styles: { bold: true } },
+            { type: 'text', text: `. Cilj projekta je djeci i mladima približiti STEM područje kroz kvalitetne, besplatne i interaktivne edukativne sadržaje tijekom školskih praznika, potičući razvoj kreativnosti, inovativnosti i interesa za znanost i tehnologiju već od najranije dobi.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Zahvaljujemo `, styles: {} },
+            { type: 'text', text: `Gradu Splitu`, styles: { bold: true } },
+            { type: 'text', text: ` na partnerstvu i podršci u provedbi projekta `, styles: {} },
+            { type: 'text', text: `Science Comes to Town (SCTT)`, styles: { bold: true } },
+            { type: 'text', text: `, kojim zajednički stvaramo nove prilike za kvalitetno STEM obrazovanje djece i mladih.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Veliko hvala našem voditelju kampa `, styles: {} },
+            { type: 'text', text: `Brunu Bešliću`, styles: { bold: true } },
+            { type: 'text', text: ` te studentskom timu `, styles: {} },
+            { type: 'text', text: `Viti Drnjeviću, Ivanu Tabaku, Lani Krstulović i Danielu Baničeviću`, styles: { bold: true } },
+            { type: 'text', text: `, koji su svojim znanjem, stručnošću, strpljenjem i pozitivnom energijom doprinijeli uspješnoj provedbi prvog ciklusa Ljetnog kampa LEGO robotike 2026. Njihov predani rad omogućio je da svaki dan kampa bude ispunjen učenjem, kreativnošću, novim iskustvima i osmijesima naših polaznika.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Pozivamo sve zainteresirane roditelje da prijave svoju djecu na `, styles: {} },
+            { type: 'text', text: `preostala tri ciklusa Ljetnog kampa LEGO robotike 2026.`, styles: { bold: true } },
+            { type: 'text', text: ` Prijave su otvorene putem naše web stranice, gdje se mogu pronaći sve informacije o terminima i programu kampa.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Veselimo se novim druženjima, robotskim izazovima i još jednoj nezaboravnoj STEM avanturi!`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2026-07-20'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/covers/prvi-ciklus-ljetnog-kampa-robotike-2026.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a74.id, tagId: tagRadionice.id },
+    ],
+  })
+
+  console.log('✅ Articles and tags seeded (74 articles)')
 
   // ── Article gallery images (Cloudinary) ──────────────────────────────────
   console.log('')
