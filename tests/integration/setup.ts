@@ -4,9 +4,13 @@ import { afterAll, afterEach, vi } from 'vitest'
 
 // `auth()` from @/lib/auth is stubbed for the entire integration tier — every
 // test gets an unauthenticated session by default; call `mockSession(user)` in
-// a test to inject a logged-in role.
+// a test to inject a logged-in role. `signIn`/`signOut` resolve as no-ops so
+// server actions built on them (loginAction) stay callable — credential
+// checking itself is E2E territory.
 vi.mock('@/lib/auth', () => ({
   auth: vi.fn(() => Promise.resolve(null)),
+  signIn: vi.fn(() => Promise.resolve(undefined)),
+  signOut: vi.fn(() => Promise.resolve(undefined)),
 }))
 
 import { auth as authImport } from '@/lib/auth'

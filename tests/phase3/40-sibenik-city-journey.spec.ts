@@ -185,8 +185,29 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
     )
     await expect(page.getByText(GROUP_NAME).first()).toBeVisible({ timeout: 15000 })
 
+    // The reverse switcher: an admin inside the teacher panel gets a header
+    // link back to /admin (plain teachers never see it).
+    await expect(page.getByRole('link', { name: 'Administracija' })).toBeVisible()
+
     await page.goto(`${BASE}/nastavnik/grupa/${groupId}/materijali`)
     await addLinkMaterial(page, /Dodaj samo u ovu grupu/, MATERIAL_TITLE, 'https://example.com/sibenik-upute')
+  })
+
+  await test.step('post-login panel choice — dual-role admin picks the teacher panel', async () => {
+    // Now that Slavica teaches a group, logging in must offer the panel choice
+    // instead of auto-redirecting to /admin.
+    await page.context().clearCookies()
+    await page.goto(`${BASE}/prijava`)
+    await page.locator('#identifier').fill(SLAVICA_EMAIL)
+    await page.locator('input[type="password"]').fill(SLAVICA_PASSWORD)
+    const teacherChoice = page.getByRole('button', { name: 'Nastavnički panel' })
+    await clickUntilVisible(page.locator('button[type="submit"]'), teacherChoice)
+    await expect(page.getByRole('button', { name: 'Administracija' })).toBeVisible()
+    await submitUntilUrl(page, teacherChoice, /\/nastavnik/)
+    await expect(page.getByText(GROUP_NAME).first()).toBeVisible({ timeout: 15000 })
+
+    // The header link completes the roundtrip back to the admin panel.
+    await submitUntilUrl(page, page.getByRole('link', { name: 'Administracija' }), /\/admin/)
   })
 
   await test.step('public /upisi under Šibenik offers exactly the one Trokut group', async () => {

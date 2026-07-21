@@ -63,7 +63,27 @@ export async function loginWithEmail(page: Page, email: string, password: string
   await page.goto(`${BASE}/prijava`)
   await page.locator('#identifier').fill(email)
   await page.locator('input[type="password"]').fill(password)
-  await submitUntilUrl(page, page.locator('button[type="submit"]'), /\/(admin|nastavnik|portal)/)
+  // A dual-role admin (ADMIN with ≥1 TeacherAssignment) gets a panel-choice
+  // step instead of an auto-redirect; pick "Administracija" so specs land on
+  // /admin exactly as they did before the choice existed. Mirrors the retry
+  // shape of submitUntilUrl (hydration can swallow early clicks).
+  const urlPattern = /\/(admin|nastavnik|portal)/
+  const adminChoice = page.getByRole('button', { name: 'Administracija' })
+  const submit = page.locator('button[type="submit"]')
+  const deadline = Date.now() + 45000
+  while (Date.now() < deadline && !urlPattern.test(page.url())) {
+    if (await adminChoice.isVisible().catch(() => false)) {
+      await adminChoice.click({ timeout: 5000 }).catch(() => undefined)
+      await page.waitForURL(/\/admin/, { timeout: 20000 }).catch(() => undefined)
+      continue
+    }
+    await submit.click({ timeout: 5000 }).catch(() => undefined)
+    await Promise.race([
+      page.waitForURL(urlPattern, { timeout: 20000 }).catch(() => undefined),
+      adminChoice.waitFor({ state: 'visible', timeout: 20000 }).catch(() => undefined),
+    ])
+  }
+  await page.waitForURL(urlPattern, { timeout: 5000 })
   await page.waitForLoadState('domcontentloaded')
 }
 

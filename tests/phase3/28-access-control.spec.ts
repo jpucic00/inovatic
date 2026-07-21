@@ -69,5 +69,8 @@ test.describe('Phase 3 — Access-control DOM redirect flows', () => {
     await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
     await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
     expect(page.url()).toContain('/nastavnik')
+    // The admin-panel switcher in the teacher header is admin-only — a plain
+    // TEACHER must not see it.
+    await expect(page.getByRole('link', { name: 'Administracija' })).toHaveCount(0)
   })
 })

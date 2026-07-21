@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2 } from 'lucide-react'
+import { LayoutDashboard, Loader2, Presentation } from 'lucide-react'
 import { loginSchema, type LoginFormData } from '@/lib/validators/login'
 import { loginAction } from '@/actions/login'
 
@@ -16,6 +16,7 @@ const errorInputClass =
 export function LoginForm() {
   const router = useRouter()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [showPanelChoice, setShowPanelChoice] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const {
@@ -27,20 +28,50 @@ export function LoginForm() {
     mode: 'onTouched',
   })
 
+  function goTo(destination: string) {
+    router.push(destination)
+    router.refresh()
+  }
+
   function onSubmit(data: LoginFormData) {
     setServerError(null)
     startTransition(async () => {
       const result = await loginAction(data)
       if (result.success) {
+        // A dual-role admin (also assigned as teacher) picks a panel instead
+        // of being auto-redirected.
+        if (result.role === 'ADMIN' && result.showTeacherPanel) {
+          setShowPanelChoice(true)
+          return
+        }
         let destination = '/portal'
         if (result.role === 'ADMIN') destination = '/admin'
         else if (result.role === 'TEACHER') destination = '/nastavnik'
-        router.push(destination)
-        router.refresh()
+        goTo(destination)
       } else {
         setServerError(result.error)
       }
     })
+  }
+
+  if (showPanelChoice) {
+    const choiceClass =
+      'w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-cyan-500 hover:text-cyan-600 transition-colors'
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-gray-500 text-center">
+          Prijava uspješna. Odaberite panel:
+        </p>
+        <button type="button" onClick={() => goTo('/admin')} className={choiceClass}>
+          <LayoutDashboard className="w-4 h-4 text-cyan-500" />
+          Administracija
+        </button>
+        <button type="button" onClick={() => goTo('/nastavnik')} className={choiceClass}>
+          <Presentation className="w-4 h-4 text-cyan-500" />
+          Nastavnički panel
+        </button>
+      </div>
+    )
   }
 
   return (
