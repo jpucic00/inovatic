@@ -181,7 +181,7 @@ export default async function CityLocationPage({ params }: PageProps) {
                         )}
                       </div>
                       <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${venue.mapQuery}`}
+                        href={venue.mapUrl ?? `https://www.google.com/maps/search/?api=1&query=${venue.mapQuery}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="ml-auto text-xs text-cyan-500 hover:underline font-medium whitespace-nowrap"

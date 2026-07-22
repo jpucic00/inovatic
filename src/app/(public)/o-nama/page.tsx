@@ -7,7 +7,7 @@ import { GearDecor } from '@/components/shared/decorations'
 export const metadata: Metadata = {
   title: 'O nama',
   description:
-    'Udruga za robotiku "Inovatic" – osnovana 2014. u Splitu, od 2026. i u Šibeniku. Učimo djecu robotiku i programiranje kroz LEGO Spike Prime i WeDo 2.0.',
+    'Udruga za robotiku "Inovatic" – osnovana 2014. u Splitu, od 2026. i u Šibeniku. Učimo djecu robotiku i programiranje kroz LEGO programe u malim grupama.',
   openGraph: {
     title: 'O nama – Udruga Inovatic | Split i Šibenik',
     description: 'Udruga za robotiku osnovana 2014. Educiramo djecu od 6 do 14 godina kroz LEGO programe u Splitu i Šibeniku. Tim CroSpec – srebrna medalja WRO 2025.',
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://udruga-inovatic.hr/o-nama' },
 }
 
-const team: { name: string; role: string; description: string; accent: string; image?: string }[] = [
+const team: { name: string; role: string; description: string; accent: string; image?: string; imagePosition?: string }[] = [
   {
     name: 'Jozo Pivac',
     role: 'Predsjednik udruge',
@@ -32,6 +32,8 @@ const team: { name: string; role: string; description: string; accent: string; i
     description:
       'Diplomirana učiteljica s dugogodišnjim iskustvom rada s djecom. Koordinira svakodnevne aktivnosti i brigu o polaznicima.',
     accent: 'border-yellow-400',
+    image: '/images/predavaci/snjeza.jpeg',
+    imagePosition: '50% 20%',
   },
 ]
 
@@ -56,11 +58,16 @@ const competitions = [
     url: 'https://www.hztk.hr/',
   },
   {
-    name: 'RoboCup',
+    name: 'Robokup',
     description: 'Međunarodno natjecanje u autonomnoj robotici.',
     icon: Trophy,
     url: 'https://www.robocup.org/',
   },
+]
+
+const leaders: { name: string; role: string; image?: string }[] = [
+  { name: 'Bruno Bešlić', role: 'Voditelj lokacije Split', image: '/images/predavaci/bruno-beslic.jpeg' },
+  { name: 'Slavica Jurčević', role: 'Voditeljica lokacije Šibenik', image: '/images/predavaci/slavica-jurcevic.jpeg' },
 ]
 
 const trainers: { name: string; title: string; image?: string }[] = [
@@ -125,11 +132,11 @@ export default function AboutPage() {
                 </p>
                 <p>
                   Vjerujemo da su djeca prirodni inženjeri i istraživači. Naš zadatak je pružiti im
-                  prave alate – LEGO Spike Prime i WeDo 2.0 – i okruženje u kojemu mogu slobodno
-                  eksperimentirati, griješiti i učiti iz pogrešaka.
+                  prave alate i okruženje u kojemu mogu slobodno eksperimentirati, griješiti i učiti
+                  iz pogrešaka.
                 </p>
                 <p>
-                  S malim grupama (do 10 polaznika), stručnim robo trenerima i strukturiranim
+                  S malim grupama (do 12 polaznika), stručnim robo trenerima i strukturiranim
                   programom u 4 razine, pratimo svako dijete individualno i poticemo ga da razvije
                   vlastiti potencijal.
                 </p>
@@ -171,6 +178,7 @@ export default function AboutPage() {
                       fill
                       sizes="48px"
                       className="object-cover"
+                      style={member.imagePosition ? { objectPosition: member.imagePosition } : undefined}
                     />
                   </div>
                 ) : (
@@ -187,6 +195,33 @@ export default function AboutPage() {
           <p className="text-center text-xs text-gray-400 mt-2">
             Osobe ovlaštene za zastupanje
           </p>
+        </div>
+      </section>
+
+      {/* Leaders */}
+      <section className="py-14 px-4 bg-white border-t border-gray-100">
+        <div className="container mx-auto max-w-4xl">
+          <div className="text-center mb-8">
+            <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Voditelji</span>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">Voditelji lokacija</h2>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-6 max-w-xl mx-auto">
+            {leaders.map((leader) => (
+              <div key={leader.name} className="bg-cyan-50/60 border border-cyan-100 rounded-2xl p-6 text-center">
+                {leader.image ? (
+                  <div className="relative w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden ring-2 ring-cyan-200 shadow-sm">
+                    <Image src={leader.image} alt={leader.name} fill sizes="80px" className="object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center text-white font-extrabold text-2xl mx-auto mb-3">
+                    {leader.name.charAt(0)}
+                  </div>
+                )}
+                <h3 className="font-bold text-gray-900 text-sm mb-1">{leader.name}</h3>
+                <p className="text-xs text-cyan-600 font-semibold">{leader.role}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

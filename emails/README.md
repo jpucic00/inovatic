@@ -20,7 +20,7 @@ All outbound mail goes through **Resend** + **React Email**, in two layers.
   | `sendTeacherCredentialsEmail` | teacher account created / password reset (`variant: 'new' \| 'reset'`) | teacher |
 
 Sender identity is **`EMAIL_FROM`** (must be a verified Resend sender domain), falling back to
-`Inovatic <noreply@udruga-inovatic.hr>`. Reply-to is always `upisi@udruga-inovatic.hr`.
+`Inovatic <noreply@udruga-inovatic.hr>`. Reply-to is always `prijave@udruga-inovatic.hr`.
 
 Server actions call the senders and never touch Resend directly. The **error policy lives at
 the call site**, not in the service: confirmations swallow-and-log, credentials emails

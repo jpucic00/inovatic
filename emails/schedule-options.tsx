@@ -54,8 +54,8 @@ function ScheduleOptionsEmail({
       </Text>
       <Text style={emailStyles.text}>
         Za sva pitanja slobodno nas kontaktirajte na{' '}
-        <Link href="mailto:upisi@udruga-inovatic.hr" style={emailStyles.link}>
-          upisi@udruga-inovatic.hr
+        <Link href="mailto:prijave@udruga-inovatic.hr" style={emailStyles.link}>
+          prijave@udruga-inovatic.hr
         </Link>{' '}
         ili na <Link href="tel:+385993936993" style={emailStyles.link}>+385 99 393 6993</Link>.
       </Text>

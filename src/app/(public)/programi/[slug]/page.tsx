@@ -59,7 +59,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
     `Nastava jednom tjedno, ${course.sessionDuration} minuta`,
     `Korištenje opreme (${course.equipment} + laptop)`,
     `Alati: ${course.tools}`,
-    'Mala grupa (do 10 polaznika)',
+    'Mala grupa (do 12 polaznika)',
     'Stručni robo treneri',
     'Diploma o završetku',
     'Pristup materijalima',
@@ -158,7 +158,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
               </span>
               <div>
                 <div className="text-sm font-bold text-gray-900 md:text-[15px]">Godišnja pretplata</div>
-                <div className="text-xs text-gray-500 md:text-[13px]">Sva 4 modula · {course.hours} sati</div>
+                <div className="text-xs text-gray-500 md:text-[13px]">Sva 4 modula · {course.hours} {course.hoursUnit ?? 'sati'}</div>
               </div>
               <div className="text-right">
                 <div className="text-[22px] font-extrabold text-cyan-600 md:text-[28px]">{course.priceYear} EUR</div>
@@ -175,7 +175,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
               Pošalji upit za upis
             </Link>
             <a
-              href="mailto:upisi@udruga-inovatic.hr"
+              href="mailto:prijave@udruga-inovatic.hr"
               className="rounded-xl border border-cyan-200 bg-white px-8 py-3.5 text-center text-sm font-semibold text-cyan-600 transition-colors hover:bg-cyan-50 md:text-[15px]"
             >
               Kontaktiraj nas emailom

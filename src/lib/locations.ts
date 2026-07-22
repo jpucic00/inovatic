@@ -17,8 +17,10 @@ interface Venue {
   postal: string
   /** Institution or building name shown below the address in small blue text. */
   institution?: string
-  /** Pre-encoded Google Maps `query` param (used for both the embed and the "open in maps" link). */
+  /** Pre-encoded Google Maps `query` param (used for the embed and as fallback for the "open in maps" link). */
   mapQuery: string
+  /** Direct Google Maps URL — when set, overrides the constructed link on the "open in maps" button. */
+  mapUrl?: string
   image: string
   imageAlt: string
   description: string
@@ -33,7 +35,7 @@ interface CityContact {
   label: string
   /** Short hero line for the city contact page. */
   intro: string
-  /** Per-city enrollment inbox (Šibenik uses upisi.sibenik@). */
+  /** Per-city enrollment inbox (Šibenik uses prijave.sibenik@). */
   upisi: string
   venues: Venue[]
 }
@@ -55,18 +57,19 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
     label: 'Split',
     intro:
       'Nastava u Splitu odvija se na dvije lokacije — redovni program u Velebitskoj i natjecateljski programi na Prirodoslovno-matematičkom fakultetu.',
-    upisi: 'upisi@udruga-inovatic.hr',
+    upisi: 'prijave@udruga-inovatic.hr',
     venues: [
       {
         name: 'Velebitska 32',
         address: 'Velebitska 32',
         postal: '21000 Split',
-        institution: 'Anica zgrada',
+        institution: 'Anica zgrada – Plokite',
         mapQuery: 'Velebitska+32,+Split,+Croatia',
+        mapUrl: 'https://maps.app.goo.gl/TdiDRqVW1jKJdSsSA',
         image: '/images/locations/split-velebitska.jpg',
         imageAlt: 'Učionica Udruge Inovatic na lokaciji Velebitska 32 u Splitu',
         description:
-          'Dvije prostrane učionice namijenjene provedbi kurikuluma Svijet LEGO Robotike (redovni program, razine SLR 1–4).',
+          'Dvije prostrane učionice, dnevni boravak i kuhinja — namijenjene provedbi kurikuluma Svijet LEGO Robotike (redovni program, razine SLR 1–4).',
         coordinator: {
           name: 'Bruno Bešlić',
           role: 'Voditelj lokacije',
@@ -83,7 +86,7 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
         image: '/images/locations/split-pmf.jpg',
         imageAlt: 'Prostor na Prirodoslovno-matematičkom fakultetu, Ruđera Boškovića 33, Split',
         description:
-          'Dvorana B1-07 na Odjelu za politehniku Prirodoslovno-matematičkog fakulteta — lokacija namijenjena natjecateljskim programima.',
+          'Učionica B1-07 na Odjelu za politehniku Prirodoslovno-matematičkog fakulteta — lokacija namijenjena natjecateljskim programima.',
         website: 'https://www.pmfst.unist.hr',
         coordinator: {
           name: 'Jozo Pivac',
@@ -99,7 +102,7 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
     label: 'Šibenik',
     intro:
       'Naša nova lokacija (2026.) — isti kurikulum Svijet LEGO Robotike.',
-    upisi: 'upisi.sibenik@udruga-inovatic.hr',
+    upisi: 'prijave.sibenik@udruga-inovatic.hr',
     venues: [
       {
         name: 'Trokut inkubator',

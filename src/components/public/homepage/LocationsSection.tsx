@@ -4,7 +4,7 @@ import { MapPin, ArrowRight } from 'lucide-react'
 const locations = [
   {
     address: 'Velebitska 32, 21000 Split',
-    venue: 'Anića zgrada',
+    venue: 'Anića zgrada – Plokite',
     href: '/lokacije/split',
     badge: null,
     description: 'Dvije prostrane učionice namijenjene provedbi kurikuluma Svijet LEGO Robotike.',
@@ -32,7 +32,7 @@ export function LocationsSection() {
         <div className="text-center mb-12">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Lokacije</span>
           <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">Lokacije u Splitu i Šibeniku</h2>
-          <p className="text-gray-500 max-w-lg mx-auto">Nastava se odvija jednom tjedno, u malim grupama do 10 polaznika.</p>
+          <p className="text-gray-500 max-w-lg mx-auto">Nastava se odvija jednom tjedno, u malim grupama do 12 polaznika.</p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {locations.map((loc) => (

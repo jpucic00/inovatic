@@ -14,7 +14,7 @@ export const revalidate = 3600
 export const metadata: Metadata = {
   title: 'Natjecateljski programi',
   description:
-    'Naši najnadareniji polaznici sudjeluju na FIRST LEGO League (FLL) i World Robot Olympiad (WRO) natjecanjima. Tim CroSpec – srebrna medalja WRO 2025, Singapur.',
+    'Naši najmotiviraniji polaznici sudjeluju na FIRST LEGO League (FLL) i World Robot Olympiad (WRO) natjecanjima. Tim CroSpec – srebrna medalja WRO 2025, Singapur.',
   openGraph: {
     title: 'Natjecateljski programi | Inovatic',
     description: 'FIRST LEGO League i World Robot Olympiad – natjecanja u robotici za djecu. Tim CroSpec – srebrna medalja WRO 2025.',
@@ -106,7 +106,7 @@ export default async function NatjecanjaPage() {
                       {comp.title}
                     </h2>
                     <p className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">{comp.shortTitle}</p>
-                    <p className="text-gray-600 leading-relaxed text-justify mb-6 flex-1">{comp.description}</p>
+                    <p className="text-gray-600 leading-relaxed text-left mb-6 flex-1">{comp.description}</p>
                     {isWro && (
                       <span className="inline-block self-start mb-4 text-xs font-bold text-yellow-800 bg-yellow-200 px-2.5 py-0.5 rounded-full">
                         Srebrna medalja WRO 2025 – Singapur

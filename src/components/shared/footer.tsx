@@ -83,7 +83,15 @@ export function Footer() {
                 className="flex items-center gap-2.5 text-sm text-gray-400 hover:text-cyan-400 transition-colors"
               >
                 <Phone className="w-4 h-4 flex-shrink-0" />
-                +385 99 393 6993
+                +385 99 393 6993 <span className="text-gray-500">(Split)</span>
+              </a>
+              <a
+                href="tel:+385921689987"
+                data-umami-event="contact-phone"
+                className="flex items-center gap-2.5 text-sm text-gray-400 hover:text-cyan-400 transition-colors"
+              >
+                <Phone className="w-4 h-4 flex-shrink-0" />
+                +385 92 168 9987 <span className="text-gray-500">(Šibenik)</span>
               </a>
               <div className="flex items-start gap-2.5 text-sm text-gray-400">
                 <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     'Organizirajte nezaboravnu proslavu rođendana uz LEGO robotiku! Djeca grade i programiraju robote uz LEGO WeDo 2.0, SPIKE i Mindstorms EV3. Velebitska 32, Split.',
   openGraph: {
     title: 'Proslave uz LEGO Robotiku | Inovatic Split',
-    description: 'Nezaboravna proslava rođendana – djeca grade i programiraju LEGO robote. Do 8 sudionika, 120 min + pauza. 150 EUR.',
+    description: 'Nezaboravna proslava rođendana – djeca grade i programiraju LEGO robote. Do 12 sudionika, 120 min + pauza. 150 EUR.',
     url: 'https://udruga-inovatic.hr/proslave',
     images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
   },
@@ -36,7 +36,7 @@ const notIncluded = [
 
 const quickInfo = [
   { icon: Euro, iconColor: 'text-yellow-600', value: '150 EUR', label: 'Kotizacija' },
-  { icon: Users, iconColor: 'text-cyan-600', value: 'Do 8 uzvanika', label: 'sa slavljenikom' },
+  { icon: Users, iconColor: 'text-cyan-600', value: 'Do 12 uzvanika', label: 'sa slavljenikom' },
   { icon: Clock, iconColor: 'text-emerald-600', value: '120 + 30 min', label: 'Radionica + pauza' },
   { icon: Star, iconColor: 'text-purple-600', value: '6–14 godina', label: 'Preporučena dob' },
 ]

@@ -99,8 +99,8 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
           <Text style={emailStyles.footer}>
             <strong>Kontakt Split</strong>
             <br />
-            <Link href="mailto:upisi@udruga-inovatic.hr" style={emailStyles.link}>
-              upisi@udruga-inovatic.hr
+            <Link href="mailto:prijave@udruga-inovatic.hr" style={emailStyles.link}>
+              prijave@udruga-inovatic.hr
             </Link>
             {' · '}
             <Link href="tel:+385993936993" style={emailStyles.link}>
@@ -110,8 +110,8 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
             <br />
             <strong>Kontakt Šibenik</strong>
             <br />
-            <Link href="mailto:upisi.sibenik@udruga-inovatic.hr" style={emailStyles.link}>
-              upisi.sibenik@udruga-inovatic.hr
+            <Link href="mailto:prijave.sibenik@udruga-inovatic.hr" style={emailStyles.link}>
+              prijave.sibenik@udruga-inovatic.hr
             </Link>
             {' · '}
             <Link href="tel:+385921689987" style={emailStyles.link}>

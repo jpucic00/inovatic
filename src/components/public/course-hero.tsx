@@ -29,7 +29,7 @@ export function CourseHero({ course, level }: { readonly course: Course; readonl
   const age = `${course.ageMin}–${course.ageMax} godina`
   const duration = `${course.sessionDuration} min · 1× tjedno`
   const groupSize = `do ${course.groupSize} polaznika`
-  const hours = `${course.hours} sati godišnje`
+  const hours = `${course.hours} ${course.hoursUnit ?? 'sati'} godišnje`
 
   return (
     <section className="bg-gray-50 pb-8 pt-8">

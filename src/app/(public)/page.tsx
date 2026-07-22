@@ -152,7 +152,7 @@ export default async function HomePage() {
               Upoznajte naše natjecateljske programe
             </h2>
             <p className="text-cyan-100 text-lg mb-8 leading-relaxed max-w-2xl mx-auto">
-              Naši najnadareniji polaznici nastupaju na najprestižnijim robotičkim natjecanjima u Hrvatskoj i svijetu.
+              Naši najmotiviraniji polaznici nastupaju na najprestižnijim robotičkim natjecanjima u Hrvatskoj i svijetu.
               Tim CroSpec 2025. godine <strong className="text-white">osvojio srebrnu medalju na WRO finalima u Singapuru</strong>.
             </p>
             <div className="flex flex-wrap justify-center gap-3 mb-8">
@@ -160,7 +160,7 @@ export default async function HomePage() {
                 { name: 'FLL', url: 'https://www.firstlegoleague.org/' },
                 { name: 'WRO', url: 'https://wro-association.org/' },
                 { name: 'NMT', url: 'https://www.hztk.hr/' },
-                { name: 'RoboCup', url: 'https://www.robocup.org/' },
+                { name: 'Robokup', url: 'https://www.robocup.org/' },
               ].map((comp) => (
                 <a
                   key={comp.name}
@@ -210,8 +210,8 @@ export default async function HomePage() {
           </Link>
           <p className="mt-4 text-sm text-gray-400">
             ili nas kontaktirajte na{' '}
-            <a href="mailto:upisi@udruga-inovatic.hr" className="text-cyan-500 hover:underline">
-              upisi@udruga-inovatic.hr
+            <a href="mailto:prijave@udruga-inovatic.hr" className="text-cyan-500 hover:underline">
+              prijave@udruga-inovatic.hr
             </a>
           </p>
         </div>

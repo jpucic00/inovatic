@@ -81,7 +81,7 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
       {/* Content */}
       <section className="py-16 px-4 bg-white">
         <div className="container mx-auto max-w-3xl">
-          <div className="space-y-5 text-gray-600 leading-relaxed text-lg text-justify">
+          <div className="space-y-5 text-gray-600 leading-relaxed text-lg text-left">
             {comp.paragraphs.map((p) => (
               <p key={p.slice(0, 40)}>{p}</p>
             ))}
@@ -106,7 +106,7 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
                     </span>
                     <h3 className="font-bold text-gray-900">{cat.name}</h3>
                   </div>
-                  <p className="text-sm text-gray-600 leading-relaxed text-justify">{cat.description}</p>
+                  <p className="text-sm text-gray-600 leading-relaxed text-left">{cat.description}</p>
                 </div>
               ))}
             </div>

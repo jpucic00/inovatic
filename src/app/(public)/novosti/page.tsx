@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: 'Najnovije vijesti i obavijesti Udruge za robotiku Inovatic iz Splita i Šibenika – natjecanja, radionice, upisi i događaji.',
   openGraph: {
     title: 'Novosti | Inovatic',
-    description: 'Pratite naša natjecanja, radionice i sve što se događa u Inovatic zajednici.',
+    description: 'Pratite naša natjecanja, radionice, projekte i sve što se događa u Inovatic zajednici.',
     url: 'https://udruga-inovatic.hr/novosti',
     images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu i Šibeniku' }],
   },
@@ -118,7 +118,7 @@ export default async function NewsPage({ searchParams }: PageProps) {
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Novosti</span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Vijesti i događanja</h1>
           <p className="text-gray-600 text-lg">
-            Pratite naša natjecanja, radionice i sve što se događa u Inovatic zajednici.
+            Pratite naša natjecanja, radionice, projekte i sve što se događa u Inovatic zajednici.
           </p>
         </div>
       </section>

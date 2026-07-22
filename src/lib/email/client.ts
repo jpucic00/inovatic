@@ -14,7 +14,7 @@ function getResend(): Resend {
  * (e.g. local dev / preview). Kept module-private — callers go through senders.
  */
 const FROM_EMAIL = process.env.EMAIL_FROM ?? 'Inovatic <noreply@udruga-inovatic.hr>'
-const REPLY_TO = 'upisi@udruga-inovatic.hr'
+const REPLY_TO = 'prijave@udruga-inovatic.hr'
 
 /**
  * Low-level transactional send shared by every function in ./senders.

@@ -25,6 +25,7 @@ export interface Course {
   priceYear: number
   priceModule: number
   hours: number
+  hoursUnit?: string
   sessionDuration: number
   sessionFrequency: string
   season: string
@@ -62,7 +63,7 @@ export const courses: Course[] = [
     sessionDuration: 60,
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
-    groupSize: 10,
+    groupSize: 12,
     coverImage: '/images/courses/slr-1/cover.webp',
     heroBg: '/images/courses/slr-1/hero-bg.webp',
     heroRobot: { src: '/images/courses/slr-1/hero-robot.webp', width: 1100, height: 943 },
@@ -132,7 +133,7 @@ export const courses: Course[] = [
     sessionDuration: 60,
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
-    groupSize: 10,
+    groupSize: 12,
     coverImage: '/images/courses/slr-2/cover.webp',
     heroBg: '/images/courses/slr-2/hero-bg.webp',
     heroRobot: { src: '/images/courses/slr-2/hero-robot.webp', width: 1100, height: 827 },
@@ -195,13 +196,14 @@ export const courses: Course[] = [
     ageMax: 12,
     equipment: 'LEGO SPIKE Prime',
     tools: 'Scratch',
-    priceYear: 400,
-    priceModule: 110,
-    hours: 42,
+    priceYear: 470,
+    priceModule: 130,
+    hours: 56,
+    hoursUnit: 'školskih sati',
     sessionDuration: 90,
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
-    groupSize: 10,
+    groupSize: 12,
     coverImage: '/images/courses/slr-3/cover.webp',
     heroBg: '/images/courses/slr-3/hero-bg.webp',
     heroRobot: { src: '/images/courses/slr-3/hero-robot.webp', width: 1100, height: 1179 },
@@ -264,13 +266,14 @@ export const courses: Course[] = [
     ageMax: 14,
     equipment: 'LEGO SPIKE Prime',
     tools: 'Scratch',
-    priceYear: 400,
-    priceModule: 110,
-    hours: 42,
+    priceYear: 470,
+    priceModule: 130,
+    hours: 56,
+    hoursUnit: 'školskih sati',
     sessionDuration: 90,
     sessionFrequency: 'Jednom tjedno',
     season: 'Listopad – Svibanj',
-    groupSize: 10,
+    groupSize: 12,
     coverImage: '/images/courses/slr-4/cover.webp',
     heroBg: '/images/courses/slr-4/hero-bg.webp',
     heroRobot: { src: '/images/courses/slr-4/hero-robot.webp', width: 1100, height: 801 },

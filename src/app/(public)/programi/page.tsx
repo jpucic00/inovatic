@@ -35,7 +35,7 @@ const coursesJsonLd = {
 
 const quickFacts = [
   { value: '28 radionica', label: 'godišnje' },
-  { value: 'Do 10', label: 'polaznika po grupi' },
+  { value: 'Do 12', label: 'polaznika po grupi' },
   { value: 'Listopad – Svibanj', label: 'trajanje programa' },
   { value: '400 EUR/god.', label: 'ili 110 EUR/modul' },
 ]
