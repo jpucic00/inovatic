@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import type { ReactNode } from 'react'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import type { ActiveGroup, ActiveProgram } from '@/actions/public/programs'
+import { isTerminRequired } from '@/lib/inquiry-availability'
 import { InquiryStep3 } from '@/components/public/inquiry/InquiryStep3'
 
 vi.mock('next/link', () => ({
@@ -12,7 +13,7 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-function makeGroup(id: string, name: string): ActiveGroup {
+function makeGroup(id: string, name: string, isFull = false): ActiveGroup {
   return {
     id,
     name,
@@ -21,8 +22,8 @@ function makeGroup(id: string, name: string): ActiveGroup {
     dateEnd: null,
     startTime: '17:00',
     endTime: '18:00',
-    availableSpots: 5,
-    isFull: false,
+    availableSpots: isFull ? 0 : 5,
+    isFull,
   }
 }
 
@@ -58,6 +59,11 @@ const standardC = makeProgram('course-c', {
   level: 'SLR_1',
   group: makeGroup('group-c', 'Termin Gamma'),
 })
+const standardFull = makeProgram('course-full', {
+  isCustom: false,
+  level: 'SLR_1',
+  group: makeGroup('group-full', 'Termin Puno', true),
+})
 
 function Harness({
   programs,
@@ -67,20 +73,26 @@ function Harness({
     register,
     setValue,
     getValues,
+    clearErrors,
+    watch,
     formState: { errors },
   } = useForm<InquiryFormData>({
     defaultValues: preselectedCourseId
       ? { courseId: preselectedCourseId }
       : undefined,
   })
+  // Mirror the parent: the required state is derived from the same helper.
+  const terminRequired = isTerminRequired(programs, watch('grade'), preselectedCourseId)
   return (
     <InquiryStep3
       register={register}
       errors={errors}
       setValue={setValue}
       getValues={getValues}
+      clearErrors={clearErrors}
       programs={programs}
       preselectedCourseId={preselectedCourseId}
+      terminRequired={terminRequired}
     />
   )
 }
@@ -121,5 +133,34 @@ describe('InquiryStep3 — group dropdown scoping', () => {
     )
 
     expect(screen.getByLabelText(/Razred djeteta/)).toBeInTheDocument()
+  })
+})
+
+describe('InquiryStep3 — conditional termin requirement affordance', () => {
+  // The placeholder option is the only one carrying "(neobavezno)"; it is
+  // dropped the moment a termin becomes mandatory, so its presence is a clean
+  // proxy for the required/optional state.
+  const optionalPlaceholder = () => screen.queryByRole('option', { name: /neobavezno/ })
+
+  it('drops the "(neobavezno)" hint when the chosen grade has an open group', () => {
+    render(<Harness programs={[standardC]} />)
+    fireEvent.change(screen.getByLabelText(/Razred djeteta/), { target: { value: '1' } })
+
+    expect(optionalPlaceholder()).not.toBeInTheDocument()
+  })
+
+  it('keeps the termin optional when the grade\'s only group is full', () => {
+    render(<Harness programs={[standardFull]} />)
+    fireEvent.change(screen.getByLabelText(/Razred djeteta/), { target: { value: '1' } })
+
+    // A full group still renders (disabled) but must not force a choice.
+    expect(screen.getByRole('option', { name: /Termin Puno/ })).toBeDisabled()
+    expect(optionalPlaceholder()).toBeInTheDocument()
+  })
+
+  it('requires a termin on a radionica page with an open group (no grade needed)', () => {
+    render(<Harness programs={[radionicaA]} preselectedCourseId="course-a" />)
+
+    expect(optionalPlaceholder()).not.toBeInTheDocument()
   })
 })

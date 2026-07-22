@@ -32,11 +32,18 @@ function setSelectedYearCookie(value: string | undefined): void {
   })
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   // submitInquiry sends a confirmation email when RESEND_API_KEY is set; the
   // test environment must not talk to Resend.
   delete process.env.RESEND_API_KEY
   setSelectedYearCookie(undefined)
+  // getSelectedSchoolYear() honours a cookie year only when it exists in the
+  // SchoolYear registry, else it falls back to the computed current year — so
+  // register both years this suite switches the cookie between.
+  const currentYear = computeSchoolYear()
+  const futureYear = getNextSchoolYear(currentYear)
+  await db.schoolYear.upsert({ where: { label: currentYear }, create: { label: currentYear }, update: {} })
+  await db.schoolYear.upsert({ where: { label: futureYear }, create: { label: futureYear }, update: {} })
 })
 
 const { submitInquiry } = await import('@/actions/inquiry')

@@ -46,7 +46,7 @@ describe('email senders', () => {
     expect(send.mock.calls[0][0]).toMatchObject({
       to: 'roditelj@example.hr',
       from: 'Inovatic <noreply@udruga-inovatic.hr>',
-      replyTo: 'upisi@udruga-inovatic.hr',
+      replyTo: 'prijave@udruga-inovatic.hr',
       subject: 'Zaprimili smo vašu prijavu – Inovatic',
     })
   })

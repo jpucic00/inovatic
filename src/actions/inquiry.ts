@@ -10,6 +10,7 @@ import {
   type PartyInquiryFormData,
 } from '@/lib/validators/inquiry'
 import { getActivePrograms, type ActiveProgram } from '@/actions/public/programs'
+import { isTerminRequired } from '@/lib/inquiry-availability'
 import {
   GroupFullError,
   assertGroupHasAvailableSpot,
@@ -25,7 +26,7 @@ class GroupCityMismatchError extends Error {}
 type InquiryActionResult =
   | { success: true }
   | { success: false; error: string }
-  | { success: false; error: string; code: 'GROUP_FULL'; programs: ActiveProgram[] }
+  | { success: false; error: string; code: 'GROUP_FULL' | 'TERMIN_REQUIRED'; programs: ActiveProgram[] }
 
 export async function submitInquiry(data: InquiryFormData): Promise<InquiryActionResult> {
   const parsed = inquirySchema.safeParse(data)
@@ -48,6 +49,23 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     message,
     referralSource,
   } = parsed.data
+
+  // Server-side mirror of the client's conditional requirement: when no termin
+  // was sent but the grade/course still has an open, non-full group, reject with
+  // the fresh programs so a stale or tampered payload can't skip the choice. The
+  // client passes `courseId` only in the radionica/preselected flow, so it maps
+  // to the same "preselected course" argument the client uses.
+  if (!scheduledGroupId) {
+    const programs = await getActivePrograms(city)
+    if (isTerminRequired(programs, grade, courseId)) {
+      return {
+        success: false,
+        error: 'Za odabrani razred dostupni su termini – odaberite jedan.',
+        code: 'TERMIN_REQUIRED' as const,
+        programs,
+      }
+    }
+  }
 
   try {
     await runWithGroupCapacityGuard(async (tx) => {

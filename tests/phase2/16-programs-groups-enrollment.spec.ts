@@ -468,6 +468,22 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       // Form did not submit (success message absent)
       await expect(page.locator('text=Upit je poslan!')).not.toBeVisible()
     })
+
+    test('step 3 makes the termin mandatory when the grade has an open group', async ({ page }) => {
+      // The SLR 1 group still has both spots free here (section D fills it later),
+      // so a grade-1 selection has a bookable termin → the choice is required.
+      await reachStep3(page, PARENT_1)
+      await page.locator('#grade').selectOption('1') // grade 1 → SLR_1
+      await expect(page.locator('#scheduledGroupId')).toBeEnabled({ timeout: 5000 })
+      // Required affordance: the "(neobavezno)" hint is dropped from the label.
+      await expect(page.locator('label[for="scheduledGroupId"]')).not.toContainText('neobavezno')
+
+      // Consent, but deliberately skip the termin → submission is blocked inline.
+      await page.locator('input[name="consent"]').check()
+      await page.locator('button', { hasText: 'Pošalji upit' }).click()
+      await expect(page.locator('text=Upit je poslan!')).not.toBeVisible()
+      await expect(page.getByText('odaberite jedan')).toBeVisible()
+    })
   })
 
   // ── D: Fill up the standard group ───────────────────────────────────────────

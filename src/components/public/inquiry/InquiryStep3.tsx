@@ -2,10 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import type { UseFormRegister, FieldErrors, UseFormSetValue, UseFormGetValues } from 'react-hook-form'
+import type {
+  UseFormRegister,
+  FieldErrors,
+  UseFormSetValue,
+  UseFormGetValues,
+  UseFormClearErrors,
+} from 'react-hook-form'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import type { ActiveProgram } from '@/actions/public/programs'
 import { GRADE_VALUES, GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
+import { programsForSelection } from '@/lib/inquiry-availability'
 import { formatGroupSchedule } from '@/lib/format'
 import { FieldError } from './FieldError'
 
@@ -14,25 +21,16 @@ interface Props {
   errors: FieldErrors<InquiryFormData>
   setValue: UseFormSetValue<InquiryFormData>
   getValues: UseFormGetValues<InquiryFormData>
+  clearErrors: UseFormClearErrors<InquiryFormData>
   programs: ActiveProgram[]
   preselectedCourseId?: string
+  /** Whether the current grade/course selection forces a termin choice. */
+  terminRequired: boolean
 }
 
 const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition'
 const selectClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition'
 const selectDisabledClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed transition'
-
-const GRADE_TO_LEVEL: Record<Grade, string> = {
-  predskolci: 'SLR_1',
-  '1': 'SLR_1',
-  '2': 'SLR_1',
-  '3': 'SLR_2',
-  '4': 'SLR_2',
-  '5': 'SLR_3',
-  '6': 'SLR_3',
-  '7': 'SLR_4',
-  '8': 'SLR_4',
-}
 
 function formatGroupLabel(g: ActiveProgram['groups'][number], isCustom: boolean): string {
   const parts: string[] = []
@@ -54,7 +52,7 @@ function formatGroupLabel(g: ActiveProgram['groups'][number], isCustom: boolean)
   return parts.join(' · ')
 }
 
-export function InquiryStep3({ register, errors, setValue, getValues, programs, preselectedCourseId }: Readonly<Props>) {
+export function InquiryStep3({ register, errors, setValue, getValues, clearErrors, programs, preselectedCourseId, terminRequired }: Readonly<Props>) {
   const [selectedGroupKey, setSelectedGroupKey] = useState(() => {
     const courseId = getValues('courseId')
     const groupId = getValues('scheduledGroupId')
@@ -77,14 +75,10 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
   const gradeReg = register('grade')
   const gradeSelected = preselectedCourseId || !!selectedGrade
 
-  // Filter programs: workshop page shows only preselected; standard /upisi excludes radionice
-  const filteredPrograms = preselectedCourseId
-    ? programs.filter((p) => p.id === preselectedCourseId)
-    : programs.filter((p) => {
-        if (p.isCustom) return false  // radionice only via their own URL
-        if (!selectedGrade) return true
-        return p.level === GRADE_TO_LEVEL[selectedGrade]
-      })
+  // The open programs whose groups render in the dropdown — radionica page shows
+  // only its own course; standard /upisi excludes radionice and narrows to the
+  // selected grade's level (shared with the parent's terminRequired check).
+  const filteredPrograms = programsForSelection(programs, selectedGrade, preselectedCourseId)
 
   const hasAnyGroups = filteredPrograms.some((p) => p.groups.length > 0)
 
@@ -94,11 +88,14 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
     setSelectedGroupKey('')
     setValue('scheduledGroupId', undefined)
     setValue('courseId', preselectedCourseId || undefined)
+    // A stale "pick a termin" error from a prior grade no longer applies.
+    clearErrors('scheduledGroupId')
   }
 
   function handleGroupChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value
     setSelectedGroupKey(val)
+    clearErrors('scheduledGroupId')
     if (val) {
       const [courseId, groupId] = val.split('|')
       setValue('scheduledGroupId', groupId)
@@ -118,7 +115,9 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
           onChange={handleGroupChange}
           className={selectClass}
         >
-          <option value="">– Odaberite termin (neobavezno) –</option>
+          <option value="">
+            {terminRequired ? '– Odaberite termin –' : '– Odaberite termin (neobavezno) –'}
+          </option>
           {filteredPrograms.map((p) => {
             if (p.groups.length === 0) return null
             if (preselectedCourseId) {
@@ -161,7 +160,11 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
     <div className="space-y-5">
       <div>
         <h2 className="text-xl font-bold text-gray-900 mb-1">Dostupni termini</h2>
-        <p className="text-gray-500 text-sm">Svi unosi su neobavezni – pomažu nam u dodjeli odgovarajuće grupe.</p>
+        <p className="text-gray-500 text-sm">
+          {terminRequired
+            ? 'Za odabrani razred trenutačno su dostupni termini – odaberite željeni termin.'
+            : 'Svi unosi su neobavezni – pomažu nam u dodjeli odgovarajuće grupe.'}
+        </p>
       </div>
 
       <div>
@@ -187,9 +190,15 @@ export function InquiryStep3({ register, errors, setValue, getValues, programs, 
 
       <div>
         <label htmlFor="scheduledGroupId" className="block text-sm font-medium text-gray-700 mb-1.5">
-          Željeni termin <span className="text-gray-400 font-normal">(neobavezno)</span>
+          Željeni termin{' '}
+          {terminRequired ? (
+            <span className="text-red-500">*</span>
+          ) : (
+            <span className="text-gray-400 font-normal">(neobavezno)</span>
+          )}
         </label>
         {renderGroupSelect()}
+        <FieldError message={errors.scheduledGroupId?.message} />
       </div>
 
       <div>

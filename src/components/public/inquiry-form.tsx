@@ -8,6 +8,7 @@ import { CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
 import { submitInquiry } from '@/actions/inquiry'
 import { trackUmamiEvent } from '@/lib/umami'
+import { isTerminRequired } from '@/lib/inquiry-availability'
 import type { ActiveProgram } from '@/actions/public/programs'
 import { InquiryStep1 } from './inquiry/InquiryStep1'
 import { InquiryStep2 } from './inquiry/InquiryStep2'
@@ -64,6 +65,7 @@ export function InquiryForm({
     reset,
     getValues,
     clearErrors,
+    setError,
     formState: { errors },
   } = useForm<InquiryFormData>({
     resolver: zodResolver(inquirySchema),
@@ -79,6 +81,12 @@ export function InquiryForm({
   const activePrograms: ActiveProgram[] = selectedCity
     ? (liveByCity[selectedCity] ?? programsByCity[selectedCity] ?? [])
     : []
+
+  // Termin becomes mandatory once the chosen grade (or preselected radionica)
+  // still has a bookable, non-full group — kept in sync with Step 3's own view
+  // via the shared helper so the required affordance and this guard never drift.
+  const watchedGrade = watch('grade')
+  const terminRequired = isTerminRequired(activePrograms, watchedGrade, preselectedCourseId)
 
   // Poll availability for the selected city while on Step 3.
   useEffect(() => {
@@ -138,6 +146,16 @@ export function InquiryForm({
   }
 
   function onSubmit(data: InquiryFormData) {
+    // Termin is mandatory when the selection still has an open, non-full group.
+    // Zod keeps scheduledGroupId optional (the requirement is availability-driven,
+    // not static), so enforce it here once the schema has otherwise passed.
+    if (terminRequired && !data.scheduledGroupId) {
+      setError('scheduledGroupId', {
+        type: 'manual',
+        message: 'Za odabrani razred dostupni su termini – odaberite jedan.',
+      })
+      return
+    }
     setServerError(null)
     startTransition(async () => {
       const result = await submitInquiry(data)
@@ -145,8 +163,13 @@ export function InquiryForm({
         trackUmamiEvent('course-inquiry', { city: data.city })
         setSubmittedCount((c) => c + 1)
         setDone(true)
-      } else if ('code' in result && result.code === 'GROUP_FULL') {
+      } else if ('code' in result && (result.code === 'GROUP_FULL' || result.code === 'TERMIN_REQUIRED')) {
+        // Availability shifted since render (a slot opened / filled) — refresh
+        // the city's programs so Step 3 re-renders against the true state.
         setLiveByCity((m) => ({ ...m, [data.city]: result.programs }))
+        if (result.code === 'TERMIN_REQUIRED') {
+          setError('scheduledGroupId', { type: 'manual', message: result.error })
+        }
         setServerError(result.error)
       } else {
         setServerError(result.error)
@@ -219,7 +242,7 @@ export function InquiryForm({
         {step === 1 && <InquiryStep1 register={register} errors={errors} showCity={!preselectedCity} />}
         {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} getValues={getValues} />}
         {step === 3 && (
-          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} programs={activePrograms} preselectedCourseId={preselectedCourseId} />
+          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} clearErrors={clearErrors} programs={activePrograms} preselectedCourseId={preselectedCourseId} terminRequired={terminRequired} />
         )}
 
         {serverError && (
