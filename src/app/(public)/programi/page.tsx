@@ -37,7 +37,7 @@ const quickFacts = [
   { value: '28 radionica', label: 'godišnje' },
   { value: 'Do 12', label: 'polaznika po grupi' },
   { value: 'Listopad – Svibanj', label: 'trajanje programa' },
-  { value: '400 EUR/god.', label: 'ili 110 EUR/modul' },
+  { value: '400–470 EUR/god.', label: 'ili 110–130 EUR/modul' },
 ]
 
 // Abbreviations like "(3. i 4. razred)" contain ". " — a sentence only ends
@@ -153,26 +153,35 @@ export default function ProgramiPage() {
         <div className="mx-auto max-w-[860px]">
           <h2 className="mb-1.5 text-center text-2xl font-extrabold text-gray-900 md:text-[28px]">Cijene</h2>
           <p className="mb-6 text-center text-[14.5px] text-gray-500 md:mb-8 md:text-[15px]">
-            Sve razine programa imaju jednaku cijenu.
+            Cijena ovisi o razini programa.
           </p>
-          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-0">
-            <div className="rounded-[12px] border border-gray-200 bg-white p-7 md:rounded-r-none md:border-r-0 md:px-10 md:py-9">
-              <div className="text-[30px] font-extrabold text-gray-900 md:text-4xl">110 EUR</div>
-              <div className="mt-1 mb-2.5 text-sm font-semibold text-gray-500 md:mb-3">po modulu</div>
-              <p className="text-sm leading-[1.6] text-gray-500">
-                Idealno za isprobavanje. Jedan modul traje 7 sati (kroz 7 tjedana).
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
+            {/* Početne razine — SLR 1–2 */}
+            <div className="rounded-[12px] border border-gray-200 bg-white p-7 md:px-9 md:py-8">
+              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-cyan-600 md:text-[13px]">
+                Početne razine · SLR 1 – 2
+              </div>
+              <div className="flex items-baseline gap-2">
+                <div className="text-[30px] font-extrabold text-cyan-600 md:text-4xl">400 EUR</div>
+                <div className="text-sm font-semibold text-gray-500">godišnje</div>
+              </div>
+              <div className="mt-1.5 text-sm font-semibold text-gray-500">ili 110 EUR po modulu</div>
+              <p className="mt-3 text-sm leading-[1.6] text-gray-500">
+                Sva 4 modula kroz školsku godinu. Uštedite 40 EUR u usporedbi s plaćanjem modula zasebno.
               </p>
             </div>
-            <div className="relative rounded-[12px] border border-gray-200 bg-white p-7 md:rounded-l-none md:px-10 md:py-9">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[30px] font-extrabold text-cyan-600 md:text-4xl">400 EUR</div>
-                <span className="shrink-0 rounded-full bg-yellow-400 px-2.5 py-1 text-[11px] font-bold text-gray-900 md:absolute md:top-5 md:right-5">
-                  Najpovoljnije
-                </span>
+            {/* Napredne razine — SLR 3–4 */}
+            <div className="rounded-[12px] border border-gray-200 bg-white p-7 md:px-9 md:py-8">
+              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-teal-700 md:text-[13px]">
+                Napredne razine · SLR 3 – 4
               </div>
-              <div className="mt-1 mb-2.5 text-sm font-semibold text-gray-500 md:mb-3">godišnja pretplata</div>
-              <p className="text-sm leading-[1.6] text-gray-500">
-                Sva 4 modula kroz školsku godinu. Uštedite 40 EUR u usporedbi s plaćanjem modula zasebno.
+              <div className="flex items-baseline gap-2">
+                <div className="text-[30px] font-extrabold text-teal-700 md:text-4xl">470 EUR</div>
+                <div className="text-sm font-semibold text-gray-500">godišnje</div>
+              </div>
+              <div className="mt-1.5 text-sm font-semibold text-gray-500">ili 130 EUR po modulu</div>
+              <p className="mt-3 text-sm leading-[1.6] text-gray-500">
+                Sva 4 modula kroz školsku godinu. Uštedite 50 EUR u usporedbi s plaćanjem modula zasebno.
               </p>
             </div>
           </div>
