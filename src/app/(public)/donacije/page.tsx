@@ -115,7 +115,7 @@ const galleryImages = Array.from({ length: 21 }, (_, i) => {
   }
 })
 
-const pametniKistImages = Array.from({ length: 9 }, (_, i) => {
+const pametniKistImages = Array.from({ length: 19 }, (_, i) => {
   const n = String(i + 1).padStart(2, '0')
   return {
     src: `/images/donacije/pametni-kist/${n}.webp`,
@@ -401,6 +401,24 @@ export default function DonacijePage() {
               pripremili i patentnu prijavu kako bi u potpunosti zaštitili svoj izum. Pred splitskim timom
               „Pametni kist” bez sumnje je sjajna tehnološka budućnost!
             </p>
+          </div>
+
+          {/* Project video – Pametni kist in action */}
+          <div className="max-w-3xl mx-auto mt-14 pt-10 border-t border-gray-100 text-center">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Pogledajte „Pametni kist” u akciji</h3>
+            <p className="text-gray-600 leading-relaxed mb-6">
+              Kratka snimka prikazuje uređaj pri nježnom čišćenju krhkih stranica stare knjige.
+            </p>
+            <video
+              controls
+              preload="metadata"
+              playsInline
+              poster="/images/donacije/pametni-kist/video-poster.webp"
+              className="mx-auto w-full max-w-[340px] rounded-2xl shadow-sm border border-gray-100 bg-black aspect-[464/832]"
+            >
+              <source src="/images/donacije/pametni-kist/video.mp4" type="video/mp4" />
+              Vaš preglednik ne podržava reprodukciju videa.
+            </video>
           </div>
         </div>
       </section>
