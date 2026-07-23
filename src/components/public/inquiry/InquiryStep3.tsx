@@ -116,7 +116,7 @@ export function InquiryStep3({ register, errors, setValue, getValues, clearError
           className={selectClass}
         >
           <option value="">
-            {terminRequired ? '– Odaberite termin –' : '– Odaberite termin (neobavezno) –'}
+            {'– Odaberite termin –'}
           </option>
           {filteredPrograms.map((p) => {
             if (p.groups.length === 0) return null
@@ -190,12 +190,7 @@ export function InquiryStep3({ register, errors, setValue, getValues, clearError
 
       <div>
         <label htmlFor="scheduledGroupId" className="block text-sm font-medium text-gray-700 mb-1.5">
-          Željeni termin{' '}
-          {terminRequired ? (
-            <span className="text-red-500">*</span>
-          ) : (
-            <span className="text-gray-400 font-normal">(neobavezno)</span>
-          )}
+          Željeni termin{terminRequired && <>{' '}<span className="text-red-500">*</span></>}
         </label>
         {renderGroupSelect()}
         <FieldError message={errors.scheduledGroupId?.message} />
