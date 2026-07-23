@@ -80,7 +80,7 @@ const localBusinessJsonLd = {
         postalCode: '21000',
         addressCountry: 'HR',
       },
-      geo: { '@type': 'GeoCoordinates', latitude: 43.5111, longitude: 16.4497 },
+      geo: { '@type': 'GeoCoordinates', latitude: 43.5163792, longitude: 16.4560215 },
     },
     {
       '@type': 'Place',

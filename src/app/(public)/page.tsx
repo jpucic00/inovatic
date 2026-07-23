@@ -160,7 +160,7 @@ export default async function HomePage() {
                 { name: 'FLL', url: 'https://www.firstlegoleague.org/' },
                 { name: 'WRO', url: 'https://wro-association.org/' },
                 { name: 'NMT', url: 'https://www.hztk.hr/' },
-                { name: 'Robokup', url: 'https://www.robocup.org/' },
+                { name: 'Robokup', url: 'https://www.hztk.hr/robokup.aspx' },
               ].map((comp) => (
                 <a
                   key={comp.name}

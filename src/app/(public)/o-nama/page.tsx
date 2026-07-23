@@ -61,7 +61,7 @@ const competitions = [
     name: 'Robokup',
     description: 'Međunarodno natjecanje u autonomnoj robotici.',
     icon: Trophy,
-    url: 'https://www.robocup.org/',
+    url: 'https://www.hztk.hr/robokup.aspx',
   },
 ]
 
@@ -78,13 +78,13 @@ const trainers: { name: string; title: string; image?: string }[] = [
   { name: 'Josip Stepinac', title: 'student Prirodoslovno-matematičkog fakulteta, usmjerenje informatika i tehnika', image: '/images/predavaci/josip-stepinac.jpeg' },
   { name: 'Ivan Stepinac', title: 'student FESB-a, smjer računarstvo', image: '/images/predavaci/ivan-stepinac.jpeg' },
   { name: 'Vito Drnjević', title: 'student FESB-a, smjer računarstvo', image: '/images/predavaci/vito-drnjevic.jpeg' },
-  { name: 'Ivano Tabak', title: 'maturant, Elektrotehnička škola', image: '/images/predavaci/ivano-tabak.jpeg' },
+  { name: 'Ivano Tabak', title: 'student FER-a, smjer računarstvo', image: '/images/predavaci/ivano-tabak.jpeg' },
 ]
 
 const memberships = [
   { name: 'ZTK Split', full: 'Zajednica tehničke kulture Splita', url: 'http://www.ztk-split.hr/' },
   { name: 'HZTK', full: 'Hrvatska zajednica tehničke kulture', url: 'https://www.hztk.hr/' },
-  { name: 'HROBOS', full: 'Hrvatska robotička zajednica', url: 'https://hrobos.hr/' },
+  { name: 'HROBOS', full: 'Hrvatski robotički savez', url: 'https://hrobos.hr/' },
 ]
 
 const statCards = [

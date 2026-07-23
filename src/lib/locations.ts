@@ -63,9 +63,11 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
         name: 'Velebitska 32',
         address: 'Velebitska 32',
         postal: '21000 Split',
-        institution: 'Anica zgrada – Plokite',
-        mapQuery: 'Velebitska+32,+Split,+Croatia',
-        mapUrl: 'https://maps.app.goo.gl/TdiDRqVW1jKJdSsSA',
+        institution: 'Anića zgrada – Plokite',
+        // Search the association's Google POI, not the bare street address — a plain
+        // "Velebitska 32" lookup resolves to the wrong end of the street.
+        mapQuery: 'Udruga+za+robotiku+%22Inovatic%22+-+Lokacija+2+(Ani%C4%87a+zgrada),+Velebitska+32,+Split',
+        mapUrl: 'https://maps.app.goo.gl/MdfsWt1tqfEeZAX18',
         image: '/images/locations/split-velebitska.jpg',
         imageAlt: 'Učionica Udruge Inovatic na lokaciji Velebitska 32 u Splitu',
         description:

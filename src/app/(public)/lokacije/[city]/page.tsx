@@ -228,7 +228,7 @@ export default async function CityLocationPage({ params }: PageProps) {
                     {/* Map */}
                     <div className="h-56 rounded-xl overflow-hidden border border-gray-100">
                       <iframe
-                        src={`https://maps.google.com/maps?q=${venue.mapQuery}&output=embed&iwloc=`}
+                        src={`https://maps.google.com/maps?q=${venue.mapQuery}&z=16&output=embed&iwloc=`}
                         className="w-full h-full border-0"
                         loading="lazy"
                         title={`Karta – ${venue.address}`}
