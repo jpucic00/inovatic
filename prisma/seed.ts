@@ -1322,6 +1322,202 @@ const GALLERY_IMAGES: Record<string, string[]> = {
     'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/29.jpg',
     'https://res.cloudinary.com/dgc2tp4f8/image/upload/articles/gallery/prvi-ciklus-ljetnog-kampa-robotike-2026/30.jpg',
   ],
+  '59-natjecanje-mladih-tehnicara-zupanijska-razina': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819129/articles/gallery/59-natjecanje-mladih-tehnicara-zupanijska-razina/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819129/articles/gallery/59-natjecanje-mladih-tehnicara-zupanijska-razina/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819129/articles/gallery/59-natjecanje-mladih-tehnicara-zupanijska-razina/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819130/articles/gallery/59-natjecanje-mladih-tehnicara-zupanijska-razina/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819130/articles/gallery/59-natjecanje-mladih-tehnicara-zupanijska-razina/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819130/articles/gallery/59-natjecanje-mladih-tehnicara-zupanijska-razina/06.jpg',
+  ],
+  '59-natjecanje-mladih-tehnicara-drzavna-razina': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819127/articles/gallery/59-natjecanje-mladih-tehnicara-drzavna-razina/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819128/articles/gallery/59-natjecanje-mladih-tehnicara-drzavna-razina/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819128/articles/gallery/59-natjecanje-mladih-tehnicara-drzavna-razina/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819128/articles/gallery/59-natjecanje-mladih-tehnicara-drzavna-razina/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819128/articles/gallery/59-natjecanje-mladih-tehnicara-drzavna-razina/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819128/articles/gallery/59-natjecanje-mladih-tehnicara-drzavna-razina/06.jpg',
+  ],
+  'cm-liga-2016-17': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819140/articles/gallery/cm-liga-2016-17/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819140/articles/gallery/cm-liga-2016-17/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819140/articles/gallery/cm-liga-2016-17/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819140/articles/gallery/cm-liga-2016-17/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819141/articles/gallery/cm-liga-2016-17/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819142/articles/gallery/cm-liga-2016-17/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819141/articles/gallery/cm-liga-2016-17/07.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819141/articles/gallery/cm-liga-2016-17/08.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819141/articles/gallery/cm-liga-2016-17/09.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819142/articles/gallery/cm-liga-2016-17/10.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819142/articles/gallery/cm-liga-2016-17/11.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819142/articles/gallery/cm-liga-2016-17/12.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819142/articles/gallery/cm-liga-2016-17/13.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819143/articles/gallery/cm-liga-2016-17/14.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819143/articles/gallery/cm-liga-2016-17/15.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819144/articles/gallery/cm-liga-2016-17/16.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819144/articles/gallery/cm-liga-2016-17/17.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819144/articles/gallery/cm-liga-2016-17/18.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819144/articles/gallery/cm-liga-2016-17/19.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819145/articles/gallery/cm-liga-2016-17/20.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819145/articles/gallery/cm-liga-2016-17/21.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819145/articles/gallery/cm-liga-2016-17/22.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819145/articles/gallery/cm-liga-2016-17/23.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819145/articles/gallery/cm-liga-2016-17/24.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819145/articles/gallery/cm-liga-2016-17/25.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819146/articles/gallery/cm-liga-2016-17/26.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819146/articles/gallery/cm-liga-2016-17/27.jpg',
+  ],
+  'wer-croatian-open': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819235/articles/gallery/wer-croatian-open/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819236/articles/gallery/wer-croatian-open/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819239/articles/gallery/wer-croatian-open/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819238/articles/gallery/wer-croatian-open/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819238/articles/gallery/wer-croatian-open/05.jpg',
+  ],
+  '60-natjecanje-mladih-tehnicara-zupanijska-razina': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819131/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819131/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819131/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819131/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819132/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819132/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819132/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/07.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819132/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/08.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819133/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/09.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819133/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/10.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819133/articles/gallery/60-natjecanje-mladih-tehnicara-zupanijska-razina/11.jpg',
+  ],
+  '60-natjecanje-mladih-tehnicara-drzavna-razina': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819130/articles/gallery/60-natjecanje-mladih-tehnicara-drzavna-razina/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819131/articles/gallery/60-natjecanje-mladih-tehnicara-drzavna-razina/02.jpg',
+  ],
+  'cm-liga-2017-18-pmf-split': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819146/articles/gallery/cm-liga-2017-18-pmf-split/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819147/articles/gallery/cm-liga-2017-18-pmf-split/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819147/articles/gallery/cm-liga-2017-18-pmf-split/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819147/articles/gallery/cm-liga-2017-18-pmf-split/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819147/articles/gallery/cm-liga-2017-18-pmf-split/05.jpg',
+  ],
+  'wer-croatian-open-2018': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819239/articles/gallery/wer-croatian-open-2018/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819240/articles/gallery/wer-croatian-open-2018/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819241/articles/gallery/wer-croatian-open-2018/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819241/articles/gallery/wer-croatian-open-2018/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819241/articles/gallery/wer-croatian-open-2018/05.jpg',
+  ],
+  'robokup-zupanijsko-2019': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819221/articles/gallery/robokup-zupanijsko-2019/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819224/articles/gallery/robokup-zupanijsko-2019/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819227/articles/gallery/robokup-zupanijsko-2019/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819228/articles/gallery/robokup-zupanijsko-2019/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819229/articles/gallery/robokup-zupanijsko-2019/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819230/articles/gallery/robokup-zupanijsko-2019/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819230/articles/gallery/robokup-zupanijsko-2019/07.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819231/articles/gallery/robokup-zupanijsko-2019/08.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819231/articles/gallery/robokup-zupanijsko-2019/09.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819232/articles/gallery/robokup-zupanijsko-2019/10.jpg',
+  ],
+  'first-lego-league-2019': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819152/articles/gallery/first-lego-league-2019/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819152/articles/gallery/first-lego-league-2019/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819155/articles/gallery/first-lego-league-2019/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819153/articles/gallery/first-lego-league-2019/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819156/articles/gallery/first-lego-league-2019/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819153/articles/gallery/first-lego-league-2019/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819154/articles/gallery/first-lego-league-2019/07.jpg',
+  ],
+  'robokup-drzavno-2019': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819210/articles/gallery/robokup-drzavno-2019/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819212/articles/gallery/robokup-drzavno-2019/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819214/articles/gallery/robokup-drzavno-2019/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819216/articles/gallery/robokup-drzavno-2019/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819217/articles/gallery/robokup-drzavno-2019/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819218/articles/gallery/robokup-drzavno-2019/06.jpg',
+  ],
+  '61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819134/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819134/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819134/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819135/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819136/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819139/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina/06.jpg',
+  ],
+  '61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819133/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819133/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819134/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819134/articles/gallery/61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina/04.jpg',
+  ],
+  'cm-liga-2018-19-pmf-split': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819147/articles/gallery/cm-liga-2018-19-pmf-split/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819148/articles/gallery/cm-liga-2018-19-pmf-split/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819148/articles/gallery/cm-liga-2018-19-pmf-split/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819148/articles/gallery/cm-liga-2018-19-pmf-split/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819148/articles/gallery/cm-liga-2018-19-pmf-split/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819149/articles/gallery/cm-liga-2018-19-pmf-split/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819149/articles/gallery/cm-liga-2018-19-pmf-split/07.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819149/articles/gallery/cm-liga-2018-19-pmf-split/08.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819149/articles/gallery/cm-liga-2018-19-pmf-split/09.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819149/articles/gallery/cm-liga-2018-19-pmf-split/10.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819150/articles/gallery/cm-liga-2018-19-pmf-split/11.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819150/articles/gallery/cm-liga-2018-19-pmf-split/12.jpg',
+  ],
+  'wro-2019': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819242/articles/gallery/wro-2019/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819243/articles/gallery/wro-2019/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819242/articles/gallery/wro-2019/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819243/articles/gallery/wro-2019/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819244/articles/gallery/wro-2019/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819245/articles/gallery/wro-2019/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819245/articles/gallery/wro-2019/07.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819245/articles/gallery/wro-2019/08.jpg',
+  ],
+  'robokup-zupanijsko-natjecanje-2020': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819232/articles/gallery/robokup-zupanijsko-natjecanje-2020/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819232/articles/gallery/robokup-zupanijsko-natjecanje-2020/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819233/articles/gallery/robokup-zupanijsko-natjecanje-2020/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819233/articles/gallery/robokup-zupanijsko-natjecanje-2020/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819237/articles/gallery/robokup-zupanijsko-natjecanje-2020/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819237/articles/gallery/robokup-zupanijsko-natjecanje-2020/06.jpg',
+  ],
+  'first-lego-league-2020': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819154/articles/gallery/first-lego-league-2020/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819157/articles/gallery/first-lego-league-2020/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819155/articles/gallery/first-lego-league-2020/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819155/articles/gallery/first-lego-league-2020/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819156/articles/gallery/first-lego-league-2020/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819156/articles/gallery/first-lego-league-2020/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819157/articles/gallery/first-lego-league-2020/07.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819157/articles/gallery/first-lego-league-2020/08.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819157/articles/gallery/first-lego-league-2020/09.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819157/articles/gallery/first-lego-league-2020/10.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819158/articles/gallery/first-lego-league-2020/11.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819158/articles/gallery/first-lego-league-2020/12.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819158/articles/gallery/first-lego-league-2020/13.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819158/articles/gallery/first-lego-league-2020/14.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819159/articles/gallery/first-lego-league-2020/15.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819159/articles/gallery/first-lego-league-2020/16.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819161/articles/gallery/first-lego-league-2020/17.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819159/articles/gallery/first-lego-league-2020/18.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819160/articles/gallery/first-lego-league-2020/19.jpg',
+  ],
+  '62-natjecanje-mladih-tehnicara-zupanijska-razina': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819138/articles/gallery/62-natjecanje-mladih-tehnicara-zupanijska-razina/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819136/articles/gallery/62-natjecanje-mladih-tehnicara-zupanijska-razina/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819140/articles/gallery/62-natjecanje-mladih-tehnicara-zupanijska-razina/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819139/articles/gallery/62-natjecanje-mladih-tehnicara-zupanijska-razina/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819139/articles/gallery/62-natjecanje-mladih-tehnicara-zupanijska-razina/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819139/articles/gallery/62-natjecanje-mladih-tehnicara-zupanijska-razina/06.jpg',
+  ],
+  'cm-liga-2019-2020-pmf-split': [
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819150/articles/gallery/cm-liga-2019-2020-pmf-split/01.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819150/articles/gallery/cm-liga-2019-2020-pmf-split/02.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819153/articles/gallery/cm-liga-2019-2020-pmf-split/03.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819151/articles/gallery/cm-liga-2019-2020-pmf-split/04.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819151/articles/gallery/cm-liga-2019-2020-pmf-split/05.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819151/articles/gallery/cm-liga-2019-2020-pmf-split/06.jpg',
+    'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819152/articles/gallery/cm-liga-2019-2020-pmf-split/07.jpg',
+  ],
 }
 
 async function seedGalleryImages() {
@@ -8625,7 +8821,1096 @@ Radionica će se održati u prostoru Udruge INOVATIC na splitskom PMF-u  u peri
     ],
   })
 
-  console.log('✅ Articles and tags seeded (74 articles)')
+  // [1/20] 59-natjecanje-mladih-tehnicara-zupanijska-razina — WP page migrated 2026-07-23
+  const a75 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: '59-natjecanje-mladih-tehnicara-zupanijska-razina',
+      title: `59. natjecanje mladih tehničara – županijska razina`,
+      excerpt: `59. županijsko natjecanje mladih tehničara je održano u ožujku 2017. u OŠ Kman-Kocunar.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `59. županijsko natjecanje mladih tehničara je održano u ožujku  2017. u OŠ Kman-Kocunar.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na natjecanju našu udrugu su predstavljali  učenici; `, styles: {} },
+            { type: 'text', text: `Marin Čikotić`, styles: { bold: true } },
+            { type: 'text', text: ` (6.r), `, styles: {} },
+            { type: 'text', text: `Josip Stepinac`, styles: { bold: true } },
+            { type: 'text', text: ` (6.r) i `, styles: {} },
+            { type: 'text', text: `Ivan Janković `, styles: { bold: true } },
+            { type: 'text', text: `(6.r) te mentor `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Učenici su se natjecali u P-kategoriji predmeta tehničke kulture pod nazivom “`, styles: {} },
+            { type: 'text', text: `Robotsko spašavanje žrtve`, styles: { bold: true } },
+            { type: 'text', text: `”`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Naš učenik `, styles: {} },
+            { type: 'text', text: `Marin Čikotić `, styles: { bold: true } },
+            { type: 'text', text: `je ostvario `, styles: {} },
+            { type: 'text', text: `1. mjesto`, styles: { bold: true } },
+            { type: 'text', text: ` u splitsko-dalmatinskoj županiji te je pozvan za državnu razinu natjecanje mladih tehničara.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2017-03-01'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819082/articles/covers/59-natjecanje-mladih-tehnicara-zupanijska-razina.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a75.id, tagId: tagNatjecanja.id },
+      { articleId: a75.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [2/20] 59-natjecanje-mladih-tehnicara-drzavna-razina — WP page migrated 2026-07-23
+  const a76 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: '59-natjecanje-mladih-tehnicara-drzavna-razina',
+      title: `59. natjecanje mladih tehničara – državna razina`,
+      excerpt: `59. državno natjecanje mladih tehničara je održano je u travnju 2017. u Hotelu Zora, Primošten .`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `59. državno natjecanje mladih tehničara je održano je u travnju 2017. u Hotelu Zora, Primošten .`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na državnom natjecanju našu udrugu je predstavljao učenik i naš član `, styles: {} },
+            { type: 'text', text: `Marin Čikotić`, styles: { bold: true } },
+            { type: 'text', text: ` (6.r) i mentor `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Natjecali smo se u P-kategoriji predmeta tehničke kulture pod nazivom `, styles: {} },
+            { type: 'text', text: `“Robotsko spašavanje žrtve” `, styles: { bold: true } },
+            { type: 'text', text: `te ostvarili 8.mjesto na državnoj razini.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2017-04-01'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819081/articles/covers/59-natjecanje-mladih-tehnicara-drzavna-razina.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a76.id, tagId: tagNatjecanja.id },
+      { articleId: a76.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [3/20] cm-liga-2016-17 — WP page migrated 2026-07-23
+  const a77 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'cm-liga-2016-17',
+      title: `CM liga 2016./17. PMF-Split`,
+      excerpt: `Galerija fotografija s kola Croatian Makers lige održanih u školskoj godini 2016./2017. na splitskom Prirodoslovno-matematičkom fakultetu.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Galerija fotografija s kola Croatian Makers lige održanih u školskoj godini 2016./2017. na splitskom Prirodoslovno-matematičkom fakultetu.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2017-06-01'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819092/articles/covers/cm-liga-2016-17.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a77.id, tagId: tagNatjecanja.id },
+    ],
+  })
+
+  // [4/20] wer-croatian-open — WP page migrated 2026-07-23
+  const a78 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'wer-croatian-open',
+      title: `WER Croatian Open 2017.`,
+      excerpt: `U subotu, 23. rujna u OŠ Kajzerica u Zagrebu održan je WER – otvoreni kup Hrvatske: međunarodno natjecanje iz edukacijske robotike koje je dio World Education Robotics (WER).`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `U subotu, `, styles: {} },
+            { type: 'text', text: `23. rujna u OŠ Kajzerica u Zagrebu održan je WER – otvoreni kup Hrvatske`, styles: { bold: true } },
+            { type: 'text', text: `: međunarodno natjecanje iz edukacijske robotike koje je dio `, styles: {} },
+            { type: 'link', href: `http://en.wercontest.org/`, content: [{ type: 'text', text: `World Education Robotics (WER)`, styles: {} }] },
+            { type: 'text', text: `.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na natjecanju je sudjelovalo skoro`, styles: {} },
+            { type: 'text', text: ` 300 učenica i učenika te mentora iz Hrvatske, Bosne i Hercegovine te Srbije.`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Natjecali su se u `, styles: {} },
+            { type: 'text', text: `tri dobne skupne`, styles: { bold: true } },
+            { type: 'text', text: ` (1.-4. razred OŠ, 5.-8. razred OŠ i srednjoškolski uzrast) `, styles: {} },
+            { type: 'text', text: `za najbolji rezultat i osvajanje ulaznica`, styles: { bold: true } },
+            { type: 'text', text: ` na svjetsko natjecanje u Šangaju.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Video s natjecanja: `, styles: { bold: true } },
+            { type: 'link', href: `https://www.youtube.com/watch?v=jZ7SfOGCKdw`, content: [{ type: 'text', text: `https://www.youtube.com/watch?v=jZ7SfOGCKdw`, styles: {} }] },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Natjecatelji su  riješavali `, styles: {} },
+            { type: 'text', text: `zahtjevne zadatke kao premještanja predmeta, okretanja kotačića, prenošenja tereta i drugih.`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Udrugu za robotiku “Inovatic”`, styles: { bold: true } },
+            { type: 'text', text: ` su predstavljali na natjecanju učenici: `, styles: {} },
+            { type: 'text', text: `Marko Štrba`, styles: { bold: true } },
+            { type: 'text', text: `c (5. r.), `, styles: {} },
+            { type: 'text', text: `Toni Brkić`, styles: { bold: true } },
+            { type: 'text', text: ` (5.r.) i `, styles: {} },
+            { type: 'text', text: `Bartol Babić`, styles: { bold: true } },
+            { type: 'text', text: ` (6.r.) i mentor `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2017-09-23'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819125/articles/covers/wer-croatian-open.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a78.id, tagId: tagNatjecanja.id },
+    ],
+  })
+
+  // [5/20] 60-natjecanje-mladih-tehnicara-zupanijska-razina — WP page migrated 2026-07-23
+  const a79 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: '60-natjecanje-mladih-tehnicara-zupanijska-razina',
+      title: `60. natjecanje mladih tehničara – županijska razina`,
+      excerpt: `60. županijsko natjecanje mladih tehničara je održano 2.ožujka 2018. u OŠ Kman-Kocunar.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `60. županijsko natjecanje mladih tehničara je održano 2.ožujka 2018. u OŠ Kman-Kocunar.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na natjecanju našu udrugu su predstavljali  učenici; `, styles: {} },
+            { type: 'text', text: `Marin Čikotić`, styles: { bold: true } },
+            { type: 'text', text: ` (7.r), `, styles: {} },
+            { type: 'text', text: `Josip Stepinac`, styles: { bold: true } },
+            { type: 'text', text: ` (8.r) i `, styles: {} },
+            { type: 'text', text: `Bartol Babić`, styles: { bold: true } },
+            { type: 'text', text: ` (6.r) te mentor `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Učenici su se natjecali u P-kategoriji predmeta tehničke kulture pod nazivom “`, styles: {} },
+            { type: 'text', text: `Robotsko spašavanje žrtve`, styles: { bold: true } },
+            { type: 'text', text: `“.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Naš učenik `, styles: {} },
+            { type: 'text', text: `Josip Stepinac`, styles: { bold: true } },
+            { type: 'text', text: ` je ostvario `, styles: {} },
+            { type: 'text', text: `1. mjesto`, styles: { bold: true } },
+            { type: 'text', text: ` u splitsko-dalmatinskoj županiji te je pozvan za državnu razinu natjecanje mladih tehničara.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2018-03-02'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819084/articles/covers/60-natjecanje-mladih-tehnicara-zupanijska-razina.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a79.id, tagId: tagNatjecanja.id },
+      { articleId: a79.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [6/20] 60-natjecanje-mladih-tehnicara-drzavna-razina — WP page migrated 2026-07-23
+  const a80 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: '60-natjecanje-mladih-tehnicara-drzavna-razina',
+      title: `60. natjecanje mladih tehničara – državna razina`,
+      excerpt: `60. državno natjecanje mladih tehničara je održano je u 10.4. 2018. u Hotelu Zora, Primošten .`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `60. državno natjecanje mladih tehničara je održano je u 10.4. 2018. u Hotelu Zora, Primošten .`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na državnom natjecanju našu udrugu je predstavljao učenik i naš član `, styles: {} },
+            { type: 'text', text: `Josip Stepinac`, styles: { bold: true } },
+            { type: 'text', text: ` (8.r) i mentor `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Natjecali smo se u P-kategoriji predmeta tehničke kulture pod nazivom `, styles: {} },
+            { type: 'text', text: `“Robotsko spašavanje žrtve” `, styles: { bold: true } },
+            { type: 'text', text: `te ostvarili 8. mjesto na državnoj razini.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2018-04-10'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819083/articles/covers/60-natjecanje-mladih-tehnicara-drzavna-razina.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a80.id, tagId: tagNatjecanja.id },
+      { articleId: a80.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [7/20] cm-liga-2017-18-pmf-split — WP page migrated 2026-07-23
+  const a81 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'cm-liga-2017-18-pmf-split',
+      title: `CM liga 2017./18. PMF-Split`,
+      excerpt: `Galerija fotografija s kola Croatian Makers lige održanih u školskoj godini 2017./2018. na splitskom Prirodoslovno-matematičkom fakultetu.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Galerija fotografija s kola Croatian Makers lige održanih u školskoj godini 2017./2018. na splitskom Prirodoslovno-matematičkom fakultetu.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2018-06-01'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819094/articles/covers/cm-liga-2017-18-pmf-split.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a81.id, tagId: tagNatjecanja.id },
+    ],
+  })
+
+  // [8/20] wer-croatian-open-2018 — WP page migrated 2026-07-23
+  const a82 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'wer-croatian-open-2018',
+      title: `WER Croatian Open 2018.`,
+      excerpt: `Natjecanje se održalo 6. listopada u prostorima Tehnološkog parka Zagreb i sudjelovalo je više od 150 natjecatelja i mentora.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Natjecanje se održalo 6. listopada u prostorima Tehnološkog parka Zagreb i sudjelovalo je više od 150 natjecatelja i mentora.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ovogodišnja je tema bila „`, styles: {} },
+            { type: 'text', text: `Informacijsko doba“`, styles: { bold: true } },
+            { type: 'text', text: ` te su natjecatelji `, styles: {} },
+            { type: 'text', text: `programirali robote da se koriste telekomunikacijskim tehnologijama, recikliraju e-otpad i šalju informacijske pakete preko interneta.`, styles: { bold: true } },
+            { type: 'text', text: ` Simulirajući ove radnje natjecatelji su u timovima rješavali zadatke s ciljem da vožnja robota bude što brža i točnija.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Više o samom natjecanju, rezultatima i pobjednicima možete vidjeti `, styles: {} },
+            { type: 'link', href: `https://croatianmakers.hr/hr/project/wer-croatian-open-2018-odrzano-natjecanje-iz-edukacijske-robotike/`, content: [{ type: 'text', text: `OVDJE`, styles: {} }] },
+            { type: 'text', text: `.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Udrugu za robotiku “Inovatic”`, styles: { bold: true } },
+            { type: 'text', text: ` su predstavljali na natjecanju učenici: `, styles: {} },
+            { type: 'text', text: `Marko Štrba`, styles: { bold: true } },
+            { type: 'text', text: `c (6. r.) i `, styles: {} },
+            { type: 'text', text: `Bartol Babić`, styles: { bold: true } },
+            { type: 'text', text: ` (6.r.) i mentor `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2018-10-06'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819123/articles/covers/wer-croatian-open-2018.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a82.id, tagId: tagNatjecanja.id },
+    ],
+  })
+
+  // [9/20] robokup-zupanijsko-2019 — WP page migrated 2026-07-23
+  const a83 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'robokup-zupanijsko-2019',
+      title: `Robokup županijsko natjecanje 2019.`,
+      excerpt: `Dana 14. siječnja sa početkom u 12:00 h na Prirodoslovno – matematičkom fakultetu Split je održano županijsko natjecanje iz elementarne robotike pod nazivom Robokup. Organizator natjecanja je Hrvatska zajednica tehničke kulture, a domaćini i suorganizatori natjecanja su bili Udruga za robotiku...`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Dana 14. siječnja sa početkom u 12:00 h na `, styles: {} },
+            { type: 'text', text: `Prirodoslovno – matematičkom fakultetu Split`, styles: { bold: true } },
+            { type: 'text', text: ` je održano županijsko natjecanje iz elementarne robotike pod nazivom `, styles: {} },
+            { type: 'text', text: `Robokup`, styles: { bold: true } },
+            { type: 'text', text: `. Organizator natjecanja je `, styles: {} },
+            { type: 'text', text: `Hrvatska zajednica tehničke kulture`, styles: { bold: true } },
+            { type: 'text', text: `, a domaćini i suorganizatori natjecanja su bili `, styles: {} },
+            { type: 'text', text: `Udruga za robotiku “Inovatic”, Zajednica tehničke kulture Split i Udruga “Mladi robotičari”`, styles: { bold: true } },
+            { type: 'text', text: `. Natjecanje je namjenjeno učenicima viših razreda osnovne škole koji se bave robotikom kao izvannastavnom aktivnošću unutar škola, klubova mladih tehničara ili udruga za robotiku i tehničku kulturu. Cilj ovakvog natjecanja je razvijati interes među mladima za robotiku i tehničku kulturu općenito. Od ove godine po prvi put se provodi i županijska razina Robokup natjecanja gdje najbolje plasirane ekipe iz županija odlaze dva dana na završnicu državnog natjecanja koje će okupiti najbolje ekipe u Stubičkim toplicama 25. i 26. siječnja ove godine.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Natjecanje se provodi ekipno gdje svaku ekipu čine ukupno tri učenika uzrasta 5-8 razreda osnovne škole. Zadaci natjecanja su podijeljeni u dvije skupine. Prva skupina zadataka su zadaci elektroničkog tipa gdje učenici koristeći eksperimentalne pločice i određene elektroničke elemente poput dioda i prekidača izrađuju razne elektroničke sklopove poput modela semafora i drugih svjetlosnih i rasvjetnih uređaja. Druga skupina zadataka je iz elementarne robotike gdje učenici trebaju izraditi odgovarajuću konstrukciju robotskog vozila te ga programirati da obavlja zadatke poput praćenja crne linije te prepoznavanje i zaobilaženje određenih prepreka. Ograničenja u izboru alata i izradi robota nema te svaka ekipa može koristiti proizvoljan oblik robota sa odgovarajućim senzorima i motorima potrebnim da robot bude funkcionalan i operativan u obavljanju zadataka.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na natjecanju je sudjelovalo ukupno `, styles: {} },
+            { type: 'text', text: `36 učenika`, styles: { bold: true } },
+            { type: 'text', text: ` podijeljenih u `, styles: {} },
+            { type: 'text', text: `12 ekipa`, styles: { bold: true } },
+            { type: 'text', text: `, a prva tri mjesta osvojile su  ekipe te su stekle pravo sudjelovanja na državnoj razini natjecanja Robokup koje se održava u Stubičkim toplicama 25. – 27. 01. 2019.:`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `1. mjesto; Zajednica tehničke kulture Split, mentor Toni Jagnjić`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `2. mjesto; Udruga za robotiku “INOVATIC”, mentor Jozo Pivac`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `3. mjesto; OŠ Kman – Kocunar, mentorica Ivana Ora`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Našu udrugu su predstavljali učenici: `, styles: {} },
+            { type: 'text', text: `Marko Čikotić, Ivor Krstulović i Luka Arnerić`, styles: { bold: true } },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2019-01-14'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819115/articles/covers/robokup-zupanijsko-2019.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a83.id, tagId: tagNatjecanja.id },
+      { articleId: a83.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [10/20] first-lego-league-2019 — WP page migrated 2026-07-23
+  const a84 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'first-lego-league-2019',
+      title: `First Lego League 2019.`,
+      excerpt: `U subotu, 19.1.2019. je na Fakultetu elektrotehnike i računarstva održano državno robotičko natjecanje FIRST LEGO League u organizaciju Hrvatskog robotičkog saveza. Hrvatska je jedna od 98 država svijeta u kojoj se održava ovo natjecanje, a ukupno u svijetu sudjeluju preko 320 000 natjecatelja.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `U subotu, 19.1.2019. je na Fakultetu elektrotehnike i računarstva održano državno robotičko natjecanje FIRST LEGO League u organizaciju Hrvatskog robotičkog saveza. Hrvatska je jedna od 98 država svijeta u kojoj se održava ovo natjecanje, a ukupno u svijetu sudjeluju preko 320 000 natjecatelja.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ovogodišnja tema je bila “U orbitu”, a nastupilo je 16 ekipa s 3-10 članova starih od 9 do 16 godina. Svaka ekipa nastupila je u četiri kategorije: projekt, temeljne vrijednosti, tehnički intervju i robotska igra. Dodijeljene su nagrada najuspješnijima u svakoj od kategorija, te za ukupni poredak.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Udruga za robotiku “Inovatic” je sudjelovala na završnici natjecanja u Zagrebu u sastavu učenika: `, styles: {} },
+            { type: 'text', text: `Josip Stepinac, Ivan Stepinac, Luka Šimić, Roko Kljaković-Gašpić, Marko Štrbac`, styles: { bold: true } },
+            { type: 'text', text: ` pod vodstvom mentora:`, styles: {} },
+            { type: 'text', text: ` Jozo Pivac i Marko Janjiš.`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `U četiri mjeseca priprema naši učenici su proučavali razne uvjete u svemiru, detektirali određene probleme i nudili svoja inovativna rješenja. Na susretu uživo u Zagrebu smo demonstrirali naše istraživačko-inovativne radove. Osim toga, radili smo dosta i na dizajnu i programiranju robota LEGO Mindstorms EV3, koji je bio spreman za obavljanje raznih zadatak prolazeći kroz misije na robo stazi. I sve to timskim radom, pomažući čak i protivničkoj ekipi.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Više o samom natjecanju, pobjednicima i ostalim ekipama možete pogledati `, styles: {} },
+            { type: 'link', href: `http://hrobos.hr/19-natjecanja/376-zavrseno-first-lego-league-natjecanje-u-zagrebu.html`, content: [{ type: 'text', text: `OVDJE`, styles: {} }] },
+            { type: 'text', text: `.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2019-01-19'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819101/articles/covers/first-lego-league-2019.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a84.id, tagId: tagNatjecanja.id },
+    ],
+  })
+
+  // [11/20] robokup-drzavno-2019 — WP page migrated 2026-07-23
+  const a85 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'robokup-drzavno-2019',
+      title: `Robokup državno natjecanje 2019.`,
+      excerpt: `Hrvatska zajednica tehničke kulture organizirala je Robokup, ekipno natjecanje viših razreda osnovnih škola iz elementarne robotike, koje se održava već dvanaest godina u neprekidnom nizu. Državna razina Robokupa održana je od 25. do 27. siječnja 2019. u hotelu Matija Gubec u Stubičkim...`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Hrvatska zajednica tehničke kulture organizirala je Robokup, ekipno natjecanje viših razreda osnovnih škola iz elementarne robotike, koje se održava već dvanaest godina u neprekidnom nizu. Državna razina Robokupa održana je od 25. do 27. siječnja 2019. u hotelu Matija Gubec u Stubičkim Toplicama, a ostvarena je u suradnji s Hrvatskim robotičkim savezom i pod pokroviteljstvom Ministarstva znanosti i obrazovanja. Osnovna škola Vladimir Bosnar bila je domaćin ovogodišnjeg Robokupa.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na državnoj razini Robokupa sudjelovalo je 60 natjecatelja raspoređenih u 20 tročlanih natjecateljskih ekipa od kojih je bilo 18 iz Republike Hrvatske i 2 iz Bosne i Hercegovine. Natjecateljske ekipe pratilo je 17 mentora. U sklopu Robokupa organizirane su i popratne aktivnosti: radionica za mentore, a za polaznike dječjih vrtića Zvončić iz Zagreba i Zvirek iz Stubičkih Toplica te učenike nižih razreda iz OŠ Vladimir Bosnar pripremljeno je natjecanje u paralelnoj vožnji robotskih kolica.`, styles: {} },
+          ],
+        },
+        {
+          type: 'image',
+          props: {
+            url: `https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819252/articles/inline/robokup-drzavno-2019/Paralelnavoznja.jpg`,
+            caption: '',
+            previewWidth: 512,
+          },
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Natjecatelji su odmjerili znanje rješavajući dva zadatka. U prvom zadatku potrebno je bilo izraditi nekoliko različitih strujnih krugova, a u drugom zadatku trebalo je sastaviti robotičku konstrukciju i napisati programski kod. Na izrađenog robota natjecatelji su smjestili raznobojne loptice. Robot je morao samostalno prepoznati boju loptice i smjestiti je u kutiju odgovarajuće boje.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Našu udrugu na završnici državnog natjecanja su predstavljali učenici: `, styles: {} },
+            { type: 'text', text: `Marko Čikotić, Ivor Krstulović i Luka Arnerić `, styles: { bold: true } },
+            { type: 'text', text: `i njihov`, styles: {} },
+            { type: 'text', text: ` `, styles: { bold: true } },
+            { type: 'text', text: `mentor`, styles: {} },
+            { type: 'text', text: ` Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Više o samoj završnici državnog natjecanja, ekipama i pobjednicima možete vidjeti `, styles: {} },
+            { type: 'link', href: `http://www.hztk.hr/novosti/u-stubickim-toplicama-odrzan-robokup/`, content: [{ type: 'text', text: `OVDJE`, styles: {} }] },
+            { type: 'text', text: `.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2019-01-27'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819114/articles/covers/robokup-drzavno-2019.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a85.id, tagId: tagNatjecanja.id },
+    ],
+  })
+
+  // [12/20] 61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina — WP page migrated 2026-07-23
+  const a86 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: '61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina',
+      title: `61. natjecanje mladih tehničara (2018./2019.) – županijska razina`,
+      excerpt: `61. županijsko natjecanje mladih tehničara je održano 1.ožujka 2019. u OŠ Kman-Kocunar.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `61. županijsko natjecanje mladih tehničara je održano 1.ožujka 2019. u OŠ Kman-Kocunar.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na natjecanju našu udrugu su predstavljali  učenici; `, styles: {} },
+            { type: 'text', text: `Marin Čikotić`, styles: { bold: true } },
+            { type: 'text', text: ` (8.r), `, styles: {} },
+            { type: 'text', text: `Ivan Stepinac`, styles: { bold: true } },
+            { type: 'text', text: ` (7.r), `, styles: {} },
+            { type: 'text', text: `Luka Šimić`, styles: { bold: true } },
+            { type: 'text', text: ` (6.r). i `, styles: {} },
+            { type: 'text', text: `Marko Čikotić`, styles: { bold: true } },
+            { type: 'text', text: ` (6.r) te mentor `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Učenici su se natjecali u P-kategoriji predmeta tehničke kulture pod nazivom “`, styles: {} },
+            { type: 'text', text: `Robotsko spašavanje žrtve`, styles: { bold: true } },
+            { type: 'text', text: `” i u H-kategoriji “`, styles: {} },
+            { type: 'text', text: `Robotika`, styles: { bold: true } },
+            { type: 'text', text: `”`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Naš učenik `, styles: {} },
+            { type: 'text', text: `Ivan Stepinac`, styles: { bold: true } },
+            { type: 'text', text: ` je ostvario `, styles: {} },
+            { type: 'text', text: `1. mjesto`, styles: { bold: true } },
+            { type: 'text', text: ` u splitsko-dalmatinskoj županiji te je pozvan za državnu razinu natjecanje mladih tehničara.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2019-03-01'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819089/articles/covers/61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a86.id, tagId: tagNatjecanja.id },
+      { articleId: a86.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [13/20] 61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina — WP page migrated 2026-07-23
+  const a87 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: '61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina',
+      title: `61. natjecanje mladih tehničara (2018./2019.) – državna razina`,
+      excerpt: `61. državno natjecanje mladih tehničara je održano 27. ožujka 2019. u hotelu Pical, Poreč.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `61. državno natjecanje mladih tehničara je održano 27. ožujka 2019. u hotelu Pical, Poreč.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na državnom natjecanju našu udrugu je predstavljao učenik i naš član `, styles: {} },
+            { type: 'text', text: `Ivan Stepinac`, styles: { bold: true } },
+            { type: 'text', text: ` (7.r) i mentor `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Natjecali smo se u P-kategoriji predmeta tehničke kulture pod nazivom `, styles: {} },
+            { type: 'text', text: `“Robotsko spašavanje žrtve” `, styles: { bold: true } },
+            { type: 'text', text: `te ostvarili 12.mjesto na državnoj razini.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2019-03-27'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819088/articles/covers/61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a87.id, tagId: tagNatjecanja.id },
+      { articleId: a87.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [14/20] cm-liga-2018-19-pmf-split — WP page migrated 2026-07-23
+  const a88 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'cm-liga-2018-19-pmf-split',
+      title: `CM liga 2018./19. PMF-Split`,
+      excerpt: `Galerija fotografija s kola Croatian Makers lige održanih u školskoj godini 2018./2019. na splitskom Prirodoslovno-matematičkom fakultetu.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Galerija fotografija s kola Croatian Makers lige održanih u školskoj godini 2018./2019. na splitskom Prirodoslovno-matematičkom fakultetu.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2019-06-01'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819096/articles/covers/cm-liga-2018-19-pmf-split.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a88.id, tagId: tagNatjecanja.id },
+    ],
+  })
+
+  // [15/20] wro-2019 — WP page migrated 2026-07-23
+  const a89 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'wro-2019',
+      title: `WRO 2019.`,
+      excerpt: `U Zagrebu je 20.10.2019. u prostorijama Algebra LAB-a održan World Robot Olympiad (WRO) po prvi puta našoj zemlji.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `U Zagrebu je 20.10.2019. u prostorijama Algebra LAB-a održan World Robot Olympiad (WRO) po prvi puta  našoj zemlji.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na natjecanju su sudjelovali učenici naše udruge: Josip Stepinac i Ivan Stepinac pod vodstvom mentora Marka Janjiša i Joze Pivca.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `U kategoriji junior (13-15 god.) osvojili smo 2.mjesto.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Više o samom natjecanju pogledajte `, styles: {} },
+            { type: 'link', href: `https://hrobos.hr/2019/10/22/world-robot-olympiad-2019-u-algebra-lab-u/`, content: [{ type: 'text', text: `OVDJE`, styles: {} }] },
+            { type: 'text', text: `.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2019-10-20'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819126/articles/covers/wro-2019.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a89.id, tagId: tagNatjecanja.id },
+      { articleId: a89.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [16/20] robokup-zupanijsko-natjecanje-2020 — WP page migrated 2026-07-23
+  const a90 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'robokup-zupanijsko-natjecanje-2020',
+      title: `Robokup županijsko natjecanje 2020.`,
+      excerpt: `Udruga Inovatic u suradnji sa ZTK Split je bili domaćini Robokup 2020. županijskog natjecanja iz robotike koje se održalo na splitskom PMF-u , dana 14.01.2020.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Udruga Inovatic`, styles: { bold: true } },
+            { type: 'text', text: ` u suradnji sa `, styles: {} },
+            { type: 'text', text: `ZTK Split`, styles: { bold: true } },
+            { type: 'text', text: ` je bili domaćini Robokup 2020. županijskog natjecanja iz robotike koje se održalo na splitskom PMF-u , dana 14.01.2020.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na natjecanju je sudjelovalo dvadeset najboljih učenika iz naše županije, a prvo mjesto dijele Udruga Inovatic i ZTK Split čime smo osigurali plasman na državnu razinu Robokup natjecanja.
+
+Učenici koji su predstavljali našu udrugu na natjecanju te osvojili `, styles: {} },
+            { type: 'text', text: `1.mjesto`, styles: { bold: true } },
+            { type: 'text', text: ` su:`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Mislav Barčot`, styles: { bold: true } },
+            { type: 'text', text: ` (5.r), `, styles: {} },
+            { type: 'text', text: `Feđa Đikić`, styles: { bold: true } },
+            { type: 'text', text: ` (5.r) i `, styles: {} },
+            { type: 'text', text: `Jan Modun`, styles: { bold: true } },
+            { type: 'text', text: ` (7.r), zajedno sa mentorom: `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2020-01-14'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819120/articles/covers/robokup-zupanijsko-natjecanje-2020.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a90.id, tagId: tagNatjecanja.id },
+      { articleId: a90.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [17/20] first-lego-league-2020 — WP page migrated 2026-07-23
+  const a91 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'first-lego-league-2020',
+      title: `First Lego League 2020.`,
+      excerpt: `U subotu, 18.1.2020. je na Fakultetu elektrotehnike i računarstva održano državno robotičko natjecanje FIRST LEGO League u organizaciju Hrvatskog robotičkog saveza.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `U subotu, 18.1.2020. je na Fakultetu elektrotehnike i računarstva održano državno robotičko natjecanje FIRST LEGO League u organizaciju Hrvatskog robotičkog saveza.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Ove godine se provodi u 100 država svijeta, a jedna od tih država je i Hrvatska (`, styles: {} },
+            { type: 'link', href: `http://www.firstlegoleague.org/`, content: [{ type: 'text', text: `http://www.firstlegoleague.org/`, styles: {} }] },
+            { type: 'text', text: `). Na natjecanje je prijavljeno 20 ekipa iz cijele Hrvatske, sa 3-10 članova, ukupno oko 170 djece. Tema natjecanja ove godine je „Grad budućnosti“. Kroz 5 mjeseci priprema, djeca su proučavala kako se grade kuće sigurne od potresa, kako dizajnirati dječje igralište koje je dostupno svima, uključujući i osobe s invaliditetom, kako poboljšati samoodrživost gradova, kako riješiti prometnu gužvu i kako spasiti divlje životinje koje zalutaju u grad. Na susretu u živo demonstrirat će svoje istraživačko-inovativne radove. Osim toga, radili su i na dizajnu i programiranju LEGO Mindstorms robota koji će upravljati nadzornim dronom, pomicati kran, postaviti kućicu na drvo i slično. I sve to timskim radom, pomažući čak i protivničkoj ekipi. Hrvatski pobjednici sudjelovat će na natjecanju Adria regije u Sloveniji, te imaju mogućnost sudjelovanja na svjetskim natjecanjima u Grčkoj i SAD.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Našu udrugu je predstavljao tim pod nazivom: `, styles: {} },
+            { type: 'text', text: `PMFST Inovatic Team`, styles: { bold: true } },
+            { type: 'text', text: `, a sačinjavali su ga učenici: `, styles: {} },
+            { type: 'text', text: `Josip Stepinac, Ivan Stepinac, Mijo Ljubičić, Nino Gizdić, Roko Kljaković Gašpić, Luka Šimić i Nikola Jurišić `, styles: { bold: true } },
+            { type: 'text', text: `te mentori`, styles: {} },
+            { type: 'text', text: ` Marko Janjiš i Jozo Pivac.`, styles: { bold: true } },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Naš tim je osvojio nagradu za `, styles: {} },
+            { type: 'text', text: `temeljne vrijednosti`, styles: { bold: true } },
+            { type: 'text', text: ` kao ekipa koja je najbolje prenijela svoj timski duh, koja je pokazala blagotvorni profesionalizam i natjecateljsku suradnju.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Također smo se plasirali među četiri najuspješnije ekipe za regionalno natjecanje u ožujku 2020. u Sloveniji, međutim zbog nepovoljne epidemiološke situacije uzrokovanje COVID-19 virusom isto se natjecanje nije održalo.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2020-01-18'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819106/articles/covers/first-lego-league-2020.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a91.id, tagId: tagNatjecanja.id },
+      { articleId: a91.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [18/20] robokup-2020-drzavna-razina — WP page migrated 2026-07-23
+  const a92 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'robokup-2020-drzavna-razina',
+      title: `Robokup 2020 – državna razina`,
+      excerpt: `Treća po redu godina državnog natjecanja Robokup je održana u periodu 24. – 26. siječnja 2020. u Stubičkim Toplicama.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Treća po redu godina državnog natjecanja Robokup je održana u periodu 24. – 26. siječnja 2020. u Stubičkim Toplicama.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Opis zadataka na državnoj razini Robokupa:`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `1. dio natjecanja: Izrada strujnih krugova na eksperimentalnoj pločici.
+
+2. dio natjecanja: Programiranje mikroupravljačkog sučelja.
+
+3. dio natjecanja: Programiranje i ugađanje unaprijed izrađene robotske konstrukcije.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Više o samom natjecanju pogledajte `, styles: {} },
+            { type: 'link', href: `https://www.hztk.hr/robokup-2020.aspx`, content: [{ type: 'text', text: `OVDJE`, styles: {} }] },
+            { type: 'text', text: `.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Naš tim na državnoj razini Robokup natjecanja su predstavljali učenici `, styles: {} },
+            { type: 'text', text: `Feđa Đikić`, styles: { bold: true } },
+            { type: 'text', text: ` (5.r) i `, styles: {} },
+            { type: 'text', text: `Mislav Barčot`, styles: { bold: true } },
+            { type: 'text', text: ` (5.r) zajedno sa mentorom `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na državnoj razini natjecanja je sudjelovalo ukupno 21 ekipe iz Hrvatske te susjedne Bosne i Hercegovine te je naša ekipa izborila 13.mjesto u ukupnom plasmanu natjecanja.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Sve ekipe i rezultate možete pogledati `, styles: {} },
+            { type: 'link', href: `https://www.hztk.hr/media/Robokup_2020_rezultati.pdf`, content: [{ type: 'text', text: `OVDJE`, styles: {} }] },
+            { type: 'text', text: `.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2020-01-26'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819113/articles/covers/robokup-2020-drzavna-razina.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a92.id, tagId: tagNatjecanja.id },
+      { articleId: a92.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [19/20] 62-natjecanje-mladih-tehnicara-zupanijska-razina — WP page migrated 2026-07-23
+  const a93 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: '62-natjecanje-mladih-tehnicara-zupanijska-razina',
+      title: `62. natjecanje mladih tehničara (2019./2020.) – županijska razina`,
+      excerpt: `62. županijsko natjecanje mladih tehničara je održano 6.ožujka 2020. u OŠ Kman-Kocunar.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `62. županijsko natjecanje mladih tehničara je održano 6.ožujka 2020. u OŠ Kman-Kocunar.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Na natjecanju našu udrugu su predstavljali učenici; `, styles: {} },
+            { type: 'text', text: `Mislav Barčot `, styles: { bold: true } },
+            { type: 'text', text: `(5.r), `, styles: {} },
+            { type: 'text', text: `Feđa Đikić`, styles: { bold: true } },
+            { type: 'text', text: ` (5.r), `, styles: {} },
+            { type: 'text', text: `Marko Čikotić`, styles: { bold: true } },
+            { type: 'text', text: ` (7.r), `, styles: {} },
+            { type: 'text', text: `Ivan Stepinac`, styles: { bold: true } },
+            { type: 'text', text: ` (8.r),  te mentor `, styles: {} },
+            { type: 'text', text: `Jozo Pivac`, styles: { bold: true } },
+            { type: 'text', text: `, prof.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Učenici su se natjecali u P-kategoriji predmeta tehničke kulture pod nazivom “`, styles: {} },
+            { type: 'text', text: `Robotsko spašavanje žrtve`, styles: { bold: true } },
+            { type: 'text', text: `” i u H-kategoriji “`, styles: {} },
+            { type: 'text', text: `Robotika`, styles: { bold: true } },
+            { type: 'text', text: `”.`, styles: {} },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Naš učenik `, styles: {} },
+            { type: 'text', text: `Mislav Barčot `, styles: { bold: true } },
+            { type: 'text', text: `(5.r) je ostvario `, styles: {} },
+            { type: 'text', text: `1. mjesto`, styles: { bold: true } },
+            { type: 'text', text: ` u kategoriji “Robotika” u Splitsko-dalmatinskoj županiji te je pozvan za državnu razinu natjecanje mladih tehničara.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2020-03-06'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819090/articles/covers/62-natjecanje-mladih-tehnicara-zupanijska-razina.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a93.id, tagId: tagNatjecanja.id },
+      { articleId: a93.id, tagId: tagRezultati.id },
+    ],
+  })
+
+  // [20/20] cm-liga-2019-2020-pmf-split — WP page migrated 2026-07-23
+  const a94 = await upsertArticleBySlug({
+    data: {
+      city: 'SPLIT',
+      slug: 'cm-liga-2019-2020-pmf-split',
+      title: `CM liga 2019./2020. PMF Split`,
+      excerpt: `Galerija fotografija s kola Croatian Makers lige održanih u školskoj godini 2019./2020. na splitskom Prirodoslovno-matematičkom fakultetu.`,
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: `Galerija fotografija s kola Croatian Makers lige održanih u školskoj godini 2019./2020. na splitskom Prirodoslovno-matematičkom fakultetu.`, styles: {} },
+          ],
+        },
+      ],
+      authorId: admin.id,
+      isPublished: true,
+      publishedAt: new Date('2020-06-01'),
+      coverImage: 'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1784819100/articles/covers/cm-liga-2019-2020-pmf-split.jpg',
+    },
+  })
+
+  await prisma.articleTag.createMany({
+    data: [
+      { articleId: a94.id, tagId: tagNatjecanja.id },
+    ],
+  })
+  console.log('✅ Articles and tags seeded (94 articles)')
 
   // ── Article gallery images (Cloudinary) ──────────────────────────────────
   console.log('')

@@ -1,9 +1,38 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, ExternalLink, Trophy, Award, ListChecks } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ExternalLink, Trophy, ListChecks, Info } from 'lucide-react'
 import { GearDecor } from '@/components/shared/decorations'
-import { competitions, getCompetitionBySlug } from '@/lib/competitions-data'
+import {
+  competitions,
+  getCompetitionBySlug,
+  getNextCompetition,
+  COMPETITION_ICONS,
+  COMPETITION_TONES,
+  type Competition,
+} from '@/lib/competitions-data'
+
+/** Teaser for the next competition in the list, styled in that program's tone. */
+function NextCompetitionBanner({ comp }: Readonly<{ comp: Competition }>) {
+  const tone = COMPETITION_TONES[comp.tone]
+  return (
+    <section className={`py-14 px-4 relative overflow-hidden ${tone.banner}`}>
+      <GearDecor size={80} className={`absolute -bottom-4 right-8 opacity-10 ${tone.bannerTitle}`} />
+      <div className="container mx-auto text-center max-w-xl relative">
+        <p className={`text-sm font-semibold mb-2 ${tone.bannerLead}`}>
+          Pogledaj i drugi natjecateljski program
+        </p>
+        <h2 className={`text-2xl font-extrabold mb-4 ${tone.bannerTitle}`}>{comp.title}</h2>
+        <Link
+          href={`/natjecanja/${comp.slug}`}
+          className={`inline-flex items-center gap-2 px-7 py-3.5 font-semibold rounded-xl transition-colors shadow-sm ${tone.bannerButton}`}
+        >
+          {comp.title} <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
+    </section>
+  )
+}
 
 export function generateStaticParams() {
   return competitions.map((c) => ({ slug: c.slug }))
@@ -33,24 +62,17 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
   const comp = getCompetitionBySlug(slug)
   if (!comp) notFound()
 
-  const isWro = slug === 'world-robot-olympiad'
-  const otherComp = competitions.find((c) => c.slug !== slug)
+  const tone = COMPETITION_TONES[comp.tone]
+  const Icon = COMPETITION_ICONS[slug] || Trophy
+  const nextComp = getNextCompetition(slug)
 
   return (
     <>
       {/* Hero */}
-      <section className={`py-16 px-4 overflow-hidden relative ${
-        isWro
-          ? 'bg-gradient-to-br from-yellow-50 via-white to-orange-50'
-          : 'bg-gradient-to-br from-cyan-50 via-white to-blue-50'
-      }`}>
-        <div aria-hidden="true" className={`absolute -top-16 -left-16 w-64 h-64 rounded-full blur-3xl opacity-40 pointer-events-none ${
-          isWro ? 'bg-yellow-300' : 'bg-cyan-300'
-        }`} />
-        <div aria-hidden="true" className={`absolute -bottom-12 -right-12 w-56 h-56 rounded-full blur-3xl opacity-40 pointer-events-none ${
-          isWro ? 'bg-orange-200' : 'bg-yellow-200'
-        }`} />
-        <GearDecor size={48} className={`absolute top-8 right-10 opacity-60 rotate-12 ${isWro ? 'text-yellow-200' : 'text-cyan-200'}`} />
+      <section className={`py-16 px-4 overflow-hidden relative ${tone.heroBg}`}>
+        <div aria-hidden="true" className={`absolute -top-16 -left-16 w-64 h-64 rounded-full blur-3xl opacity-40 pointer-events-none ${tone.heroBlobA}`} />
+        <div aria-hidden="true" className={`absolute -bottom-12 -right-12 w-56 h-56 rounded-full blur-3xl opacity-40 pointer-events-none ${tone.heroBlobB}`} />
+        <GearDecor size={48} className={`absolute top-8 right-10 opacity-60 rotate-12 ${tone.heroGear}`} />
 
         <div className="container mx-auto max-w-3xl relative">
           <Link
@@ -60,18 +82,16 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
             <ArrowLeft className="w-4 h-4" /> Sva natjecanja
           </Link>
           <div className="text-center">
-            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 ${
-              isWro ? 'bg-yellow-400' : 'bg-cyan-500'
-            }`}>
-              {isWro ? <Award className="w-8 h-8 text-gray-900" /> : <Trophy className="w-8 h-8 text-white" />}
+            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 ${tone.iconTile}`}>
+              <Icon className={`w-8 h-8 ${tone.iconGlyph}`} />
             </div>
             <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-2 leading-tight">
               {comp.title}
             </h1>
             <p className="text-gray-400 text-sm font-semibold uppercase tracking-wide mb-4">{comp.subtitle}</p>
-            {isWro && (
-              <span className="inline-block text-xs font-bold text-yellow-800 bg-yellow-200 px-3 py-1 rounded-full">
-                Srebrna medalja WRO 2025 – Singapur
+            {comp.highlight && (
+              <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full ${tone.pill}`}>
+                {comp.highlight}
               </span>
             )}
           </div>
@@ -81,6 +101,19 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
       {/* Content */}
       <section className="py-16 px-4 bg-white">
         <div className="container mx-auto max-w-3xl">
+          {comp.programDetails && (
+            <dl className="grid sm:grid-cols-3 gap-4 mb-10">
+              {comp.programDetails.map((detail) => (
+                <div key={detail.label} className="rounded-xl bg-gray-50 border border-gray-100 p-5">
+                  <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-cyan-600 mb-2">
+                    <Info className="w-3.5 h-3.5" />
+                    {detail.label}
+                  </dt>
+                  <dd className="text-sm text-gray-700 leading-relaxed">{detail.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           <div className="space-y-5 text-gray-600 leading-relaxed text-lg text-left">
             {comp.paragraphs.map((p) => (
               <p key={p.slice(0, 40)}>{p}</p>
@@ -95,18 +128,20 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
           <div className="container mx-auto max-w-3xl">
             <div className="flex items-center gap-3 mb-8">
               <ListChecks className="w-6 h-6 text-cyan-500" />
-              <h2 className="text-2xl font-extrabold text-gray-900">Kategorije natjecanja</h2>
+              <h2 className="text-2xl font-extrabold text-gray-900">{comp.categoriesTitle ?? 'Kategorije natjecanja'}</h2>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               {comp.categories.map((cat, i) => (
                 <div key={cat.name} className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 font-extrabold text-sm">
+                  <div className={`flex items-center gap-3 ${cat.description ? 'mb-3' : ''}`}>
+                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 font-extrabold text-sm flex-shrink-0">
                       {i + 1}
                     </span>
                     <h3 className="font-bold text-gray-900">{cat.name}</h3>
                   </div>
-                  <p className="text-sm text-gray-600 leading-relaxed text-left">{cat.description}</p>
+                  {cat.description && (
+                    <p className="text-sm text-gray-600 leading-relaxed text-left">{cat.description}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -163,33 +198,9 @@ export default async function CompetitionDetailPage({ params }: PageProps) {
         </section>
       )}
 
-      {/* Navigate to other competition */}
-      {otherComp && (
-        <section className={`py-14 px-4 relative overflow-hidden ${
-          isWro
-            ? 'bg-gradient-to-r from-cyan-500 to-cyan-600'
-            : 'bg-gradient-to-r from-yellow-400 to-orange-500'
-        }`}>
-          <GearDecor size={80} className={`absolute -bottom-4 right-8 opacity-10 ${isWro ? 'text-white' : 'text-gray-900'}`} />
-          <div className="container mx-auto text-center max-w-xl relative">
-            <p className={`text-sm font-semibold mb-2 ${isWro ? 'text-cyan-100' : 'text-yellow-900/60'}`}>
-              Pogledaj i drugi natjecateljski program
-            </p>
-            <h2 className={`text-2xl font-extrabold mb-4 ${isWro ? 'text-white' : 'text-gray-900'}`}>
-              {otherComp.title}
-            </h2>
-            <Link
-              href={`/natjecanja/${otherComp.slug}`}
-              className={`inline-flex items-center gap-2 px-7 py-3.5 font-semibold rounded-xl transition-colors shadow-sm ${
-                isWro
-                  ? 'bg-yellow-400 text-gray-900 hover:bg-yellow-300'
-                  : 'bg-cyan-500 text-white hover:bg-cyan-600'
-              }`}
-            >
-              {otherComp.title} <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </section>
+      {/* Navigate to the next competition */}
+      {nextComp && (
+        <NextCompetitionBanner comp={nextComp} />
       )}
     </>
   )

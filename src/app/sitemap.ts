@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { db } from '@/lib/db'
 import { courses } from '@/lib/courses-data'
+import { competitions } from '@/lib/competitions-data'
 
 const siteUrl = 'https://udruga-inovatic.hr'
 
@@ -23,6 +24,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${siteUrl}/novosti`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${siteUrl}/natjecanja`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
       priority: 0.8,
     },
     {
@@ -77,6 +84,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.85,
   }))
 
+  // Competition detail pages (static data)
+  const competitionRoutes: MetadataRoute.Sitemap = competitions.map((competition) => ({
+    url: `${siteUrl}/natjecanja/${competition.slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'monthly' as const,
+    priority: 0.7,
+  }))
+
   // Published articles (dynamic)
   let articleRoutes: MetadataRoute.Sitemap = []
   try {
@@ -95,5 +110,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // DB unavailable during build – skip article routes
   }
 
-  return [...staticRoutes, ...courseRoutes, ...articleRoutes]
+  return [...staticRoutes, ...courseRoutes, ...competitionRoutes, ...articleRoutes]
 }

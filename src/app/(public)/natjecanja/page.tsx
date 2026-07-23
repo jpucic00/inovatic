@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight, Calendar, Trophy, Award, Newspaper } from 'lucide-react'
+import { ArrowRight, Calendar, Trophy, Newspaper } from 'lucide-react'
 import { GearDecor } from '@/components/shared/decorations'
-import { competitions } from '@/lib/competitions-data'
+import { competitions, COMPETITION_ICONS, COMPETITION_TONES } from '@/lib/competitions-data'
 import { db } from '@/lib/db'
 import { formatDate } from '@/lib/format'
 import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
@@ -14,17 +14,15 @@ export const revalidate = 3600
 export const metadata: Metadata = {
   title: 'Natjecateljski programi',
   description:
-    'Naši najmotiviraniji polaznici sudjeluju na FIRST LEGO League (FLL) i World Robot Olympiad (WRO) natjecanjima. Tim CroSpec – srebrna medalja WRO 2025, Singapur.',
+    'Naši polaznici nastupaju na FIRST LEGO League (FLL), World Robot Olympiad (WRO), Natjecanju mladih tehničara i Robokupu. Tim CroSpec – srebrna medalja WRO 2025, Singapur.',
   openGraph: {
     title: 'Natjecateljski programi | Inovatic',
-    description: 'FIRST LEGO League i World Robot Olympiad – natjecanja u robotici za djecu. Tim CroSpec – srebrna medalja WRO 2025.',
+    description: 'FIRST LEGO League, World Robot Olympiad, Natjecanje mladih tehničara i Robokup – natjecanja u robotici za djecu.',
     url: 'https://udruga-inovatic.hr/natjecanja',
     images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – Natjecanja u robotici' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/natjecanja' },
 }
-
-const icons = { 'first-lego-league': Trophy, 'world-robot-olympiad': Award } as const
 
 async function getCompetitionArticles() {
   try {
@@ -84,32 +82,26 @@ export default async function NatjecanjaPage() {
         <div className="container mx-auto max-w-4xl">
           <div className="grid md:grid-cols-2 gap-8">
             {competitions.map((comp) => {
-              const Icon = icons[comp.slug as keyof typeof icons] || Trophy
-              const isWro = comp.slug === 'world-robot-olympiad'
+              const Icon = COMPETITION_ICONS[comp.slug] || Trophy
+              const tone = COMPETITION_TONES[comp.tone]
               return (
                 <Link
                   key={comp.slug}
                   href={`/natjecanja/${comp.slug}`}
-                  className={`group relative flex flex-col rounded-2xl overflow-hidden border transition-all hover:shadow-lg ${
-                    isWro
-                      ? 'bg-yellow-50 border-yellow-200 hover:border-yellow-400 hover:shadow-yellow-100'
-                      : 'bg-cyan-50 border-cyan-200 hover:border-cyan-400 hover:shadow-cyan-100'
-                  }`}
+                  className={`group relative flex flex-col rounded-2xl overflow-hidden border transition-all hover:shadow-lg ${tone.card}`}
                 >
-                  <div className={`p-8 flex flex-col flex-1`}>
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 ${
-                      isWro ? 'bg-yellow-400' : 'bg-cyan-500'
-                    }`}>
-                      <Icon className={`w-7 h-7 ${isWro ? 'text-gray-900' : 'text-white'}`} />
+                  <div className="p-8 flex flex-col flex-1">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 ${tone.iconTile}`}>
+                      <Icon className={`w-7 h-7 ${tone.iconGlyph}`} />
                     </div>
                     <h2 className="text-2xl font-extrabold text-gray-900 mb-1 group-hover:text-cyan-600 transition-colors">
                       {comp.title}
                     </h2>
                     <p className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">{comp.shortTitle}</p>
                     <p className="text-gray-600 leading-relaxed text-left mb-6 flex-1">{comp.description}</p>
-                    {isWro && (
-                      <span className="inline-block self-start mb-4 text-xs font-bold text-yellow-800 bg-yellow-200 px-2.5 py-0.5 rounded-full">
-                        Srebrna medalja WRO 2025 – Singapur
+                    {comp.highlight && (
+                      <span className={`inline-block self-start mb-4 text-xs font-bold px-2.5 py-0.5 rounded-full ${tone.pill}`}>
+                        {comp.highlight}
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-600 group-hover:underline">

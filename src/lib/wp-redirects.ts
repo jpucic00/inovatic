@@ -53,31 +53,20 @@ export const WP_REDIRECTS: Readonly<Record<string, string>> = {
   // ── Competitions with a live detail page (identical slug) ────────────────
   'first-lego-league': '/natjecanja/first-lego-league',
   'world-robot-olympiad': '/natjecanja/world-robot-olympiad',
+  'natjecanje-mladih-tehnicara': '/natjecanja/natjecanje-mladih-tehnicara',
+  robokup: '/natjecanja/robokup',
+
+  // ── Per-year competition reports ─────────────────────────────────────────
+  // 19 of these WP pages were migrated as articles on 2026-07-23 keeping their
+  // slugs 1:1, so they are DELIBERATELY absent here — the map is consulted
+  // BEFORE the DB lookup, and an entry would shadow the article it points past.
+  // Only the one auto-slug that had to be renamed keeps an alias:
+  '2069-2': '/novosti/62-natjecanje-mladih-tehnicara-zupanijska-razina',
 
   // ── Competition family → hub ──────────────────────────────────────────────
-  'natjecanje-mladih-tehnicara': '/natjecanja',
-  '59-natjecanje-mladih-tehnicara-drzavna-razina': '/natjecanja',
-  '59-natjecanje-mladih-tehnicara-zupanijska-razina': '/natjecanja',
-  '60-natjecanje-mladih-tehnicara-drzavna-razina': '/natjecanja',
-  '60-natjecanje-mladih-tehnicara-zupanijska-razina': '/natjecanja',
-  '61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina': '/natjecanja',
-  '61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina': '/natjecanja',
-  robokup: '/natjecanja',
-  'robokup-2020-drzavna-razina': '/natjecanja',
-  'robokup-drzavno-2019': '/natjecanja',
-  'robokup-zupanijsko-2019': '/natjecanja',
-  'robokup-zupanijsko-natjecanje-2020': '/natjecanja',
-  'cm-liga-2016-17': '/natjecanja',
-  'cm-liga-2017-18-pmf-split': '/natjecanja',
-  'cm-liga-2018-19-pmf-split': '/natjecanja',
-  'cm-liga-2019-2020-pmf-split': '/natjecanja',
+  // Program descriptions, not event reports — deliberately not migrated.
   'croatian-makers-liga': '/natjecanja',
-  'first-lego-league-2019': '/natjecanja',
-  'first-lego-league-2020': '/natjecanja',
-  'wer-croatian-open': '/natjecanja',
   'wer-croatian-open-2': '/natjecanja',
-  'wer-croatian-open-2018': '/natjecanja',
-  'wro-2019': '/natjecanja',
 
   // ── Retired course/hardware & workshop-offer pages → programs ────────────
   'ciklusi-elementarne-robotike': '/programi',
@@ -108,7 +97,6 @@ export const WP_REDIRECTS: Readonly<Record<string, string>> = {
   'ljetne-radionice-1-ciklus-16-7-20-7-2021': '/programi',
   '2-ciklus-ljetnih-radionica-2021': '/programi',
   '3-ciklus-ljetnih-radionica-2021': '/programi',
-  '2069-2': '/programi',
 
   // ── STEM project showcases → about ────────────────────────────────────────
   'microbit-projekti': '/o-nama',
