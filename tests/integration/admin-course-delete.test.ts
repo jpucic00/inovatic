@@ -2,7 +2,18 @@ import { describe, expect, it, vi } from 'vitest'
 import { MaterialScope } from '@prisma/client'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
-import { createAdmin, createCourse, createModule, createMaterial } from './helpers/factory'
+import {
+  createAdmin,
+  createCourse,
+  createEnrollment,
+  createEnrollmentWindow,
+  createGroup,
+  createMaterial,
+  createModule,
+  createStudent,
+  createTeacher,
+  createTeacherAssignment,
+} from './helpers/factory'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
@@ -65,5 +76,56 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
 
     expect(res.success).toBe(true)
     expect(await db.course.count({ where: { id: course.id } })).toBe(0)
+  })
+})
+
+// The confirm dialog promises "Bit će obrisane i sve pridružene grupe." —
+// deleteCourse must take empty groups with the radionica (ScheduledGroup.course
+// has no onDelete cascade) yet refuse, with a message naming the blocker, when
+// a group still carries anything deleteGroup would refuse to drop.
+describe('deleteCourse — pridružene grupe', () => {
+  it('deletes a radionica together with its empty group', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const course = await createCourse({ isCustom: true, schoolYear: '2026/2027' })
+    const group = await createGroup({ courseId: course.id, dateStart: '2027-02-01', dateEnd: '2027-02-05' })
+    const teacher = await createTeacher()
+    await createTeacherAssignment(teacher.id, group.id)
+    await createEnrollmentWindow(course.id)
+
+    const res = await deleteCourse(course.id)
+
+    expect(res.success).toBe(true)
+    expect(await db.course.count({ where: { id: course.id } })).toBe(0)
+    expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(0)
+    // Group-level teacher assignments and course-level enrollment windows
+    // cascade — nothing orphaned, teacher account untouched.
+    expect(await db.teacherAssignment.count({ where: { scheduledGroupId: group.id } })).toBe(0)
+    expect(await db.courseEnrollmentWindow.count({ where: { courseId: course.id } })).toBe(0)
+    expect(await db.user.count({ where: { id: teacher.id } })).toBe(1)
+  })
+
+  it('blocks deleting a radionica whose group has enrolled students', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const course = await createCourse({ isCustom: true, schoolYear: '2026/2027' })
+    const group = await createGroup({ courseId: course.id, name: 'Termin A' })
+    const student = await createStudent()
+    await createEnrollment(student.id, group.id)
+
+    const res = await deleteCourse(course.id)
+
+    expect(res.success).toBe(false)
+    if (!res.success) {
+      // The app guard fired — a friendly message naming group + blocker, not
+      // the P2003 fallback "Greška pri brisanju programa."
+      expect(res.error).toContain('Termin A')
+      expect(res.error).toMatch(/polaznike/)
+    }
+    expect(await db.course.count({ where: { id: course.id } })).toBe(1)
+    expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(1)
+    expect(await db.enrollment.count({ where: { scheduledGroupId: group.id } })).toBe(1)
   })
 })

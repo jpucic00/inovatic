@@ -116,6 +116,33 @@ export async function createCourse(data: CreateCourseInput): Promise<AdminAction
   return { success: true }
 }
 
+// Same blockers deleteGroup enforces — a group carrying any of these must be
+// emptied by hand before its radionica can go.
+const GROUP_DELETE_BLOCKERS = [
+  ['enrollments', 'upisane polaznike'],
+  ['assignedInquiries', 'povezane upite'],
+  ['preferredInquiries', 'povezane upite'],
+  ['materials', 'materijale'],
+  ['studentComments', 'komentare'],
+  ['studentAssessments', 'ocjene'],
+  ['galleryImages', 'slike u galeriji'],
+] as const
+
+type GroupDeleteCounts = { name: string | null } & {
+  _count: Record<(typeof GROUP_DELETE_BLOCKERS)[number][0], number>
+}
+
+function blockedGroupError(groups: GroupDeleteCounts[]): AdminActionResult | null {
+  for (const group of groups) {
+    const blocker = GROUP_DELETE_BLOCKERS.find(([relation]) => group._count[relation] > 0)
+    if (blocker) {
+      const label = group.name ? `Grupa "${group.name}"` : 'Grupa'
+      return { success: false, error: `${label} ima ${blocker[1]} pa se radionica ne može obrisati.` }
+    }
+  }
+  return null
+}
+
 export async function deleteCourse(id: string): Promise<AdminActionResult> {
   const { city } = await requireAdminCtx()
 
@@ -129,6 +156,22 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
         city: true,
         _count: { select: { materials: true } },
         modules: { select: { _count: { select: { materials: true } } } },
+        scheduledGroups: {
+          select: {
+            name: true,
+            _count: {
+              select: {
+                enrollments: true,
+                assignedInquiries: true,
+                preferredInquiries: true,
+                materials: true,
+                studentComments: true,
+                studentAssessments: true,
+                galleryImages: true,
+              },
+            },
+          },
+        },
       },
     })
     // Cross-city radionice read as nonexistent — same message as a missing id.
@@ -142,7 +185,17 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
       return { success: false, error: 'Program ima materijale koji se moraju obrisati prije brisanja programa.' }
     }
 
-    await db.course.delete({ where: { id } })
+    const blocked = blockedGroupError(course.scheduledGroups)
+    if (blocked) return blocked
+
+    // The confirm dialog promises the groups go with the radionica, and
+    // ScheduledGroup.course has no onDelete cascade — delete them in the same
+    // transaction. Teacher assignments and material hides cascade off the
+    // groups; modules and enrollment windows cascade off the course.
+    await db.$transaction([
+      db.scheduledGroup.deleteMany({ where: { courseId: id } }),
+      db.course.delete({ where: { id } }),
+    ])
   } catch (err) {
     console.error('deleteCourse failed:', err)
     return { success: false, error: 'Greška pri brisanju programa.' }
