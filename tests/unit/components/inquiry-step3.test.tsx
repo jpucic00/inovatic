@@ -137,16 +137,19 @@ describe('InquiryStep3 — group dropdown scoping', () => {
 })
 
 describe('InquiryStep3 — conditional termin requirement affordance', () => {
-  // The placeholder option is the only one carrying "(neobavezno)"; it is
-  // dropped the moment a termin becomes mandatory, so its presence is a clean
-  // proxy for the required/optional state.
-  const optionalPlaceholder = () => screen.queryByRole('option', { name: /neobavezno/ })
+  // The red asterisk on the label is the only remaining required/optional
+  // affordance (the "(neobavezno)" hint was removed), so the select's
+  // accessible name ends with "*" exactly when a termin is mandatory.
+  const terminSelect = (required: boolean) =>
+    screen.queryByRole('combobox', {
+      name: required ? 'Željeni termin *' : 'Željeni termin',
+    })
 
-  it('drops the "(neobavezno)" hint when the chosen grade has an open group', () => {
+  it('marks the termin required when the chosen grade has an open group', () => {
     render(<Harness programs={[standardC]} />)
     fireEvent.change(screen.getByLabelText(/Razred djeteta/), { target: { value: '1' } })
 
-    expect(optionalPlaceholder()).not.toBeInTheDocument()
+    expect(terminSelect(true)).toBeInTheDocument()
   })
 
   it('keeps the termin optional when the grade\'s only group is full', () => {
@@ -155,12 +158,12 @@ describe('InquiryStep3 — conditional termin requirement affordance', () => {
 
     // A full group still renders (disabled) but must not force a choice.
     expect(screen.getByRole('option', { name: /Termin Puno/ })).toBeDisabled()
-    expect(optionalPlaceholder()).toBeInTheDocument()
+    expect(terminSelect(false)).toBeInTheDocument()
   })
 
   it('requires a termin on a radionica page with an open group (no grade needed)', () => {
     render(<Harness programs={[radionicaA]} preselectedCourseId="course-a" />)
 
-    expect(optionalPlaceholder()).not.toBeInTheDocument()
+    expect(terminSelect(true)).toBeInTheDocument()
   })
 })
