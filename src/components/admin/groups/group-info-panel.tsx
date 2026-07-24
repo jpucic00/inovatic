@@ -301,12 +301,12 @@ function GroupInfoEdit({
           <>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="info-dateStart" className="block text-sm font-medium text-gray-700 mb-1">Početak *</label>
+                <label htmlFor="info-dateStart" className="block text-sm font-medium text-gray-700 mb-1">Početak radionice *</label>
                 <Controller name="dateStart" control={control} render={({ field }) => <DateInput id="info-dateStart" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
                 {errors.dateStart && <p className="text-xs text-red-600 mt-1">{errors.dateStart.message}</p>}
               </div>
               <div>
-                <label htmlFor="info-dateEnd" className="block text-sm font-medium text-gray-700 mb-1">Kraj *</label>
+                <label htmlFor="info-dateEnd" className="block text-sm font-medium text-gray-700 mb-1">Kraj radionice *</label>
                 <Controller name="dateEnd" control={control} render={({ field }) => <DateInput id="info-dateEnd" value={field.value ?? ''} onChange={field.onChange} className={adminInputClass} />} />
                 {errors.dateEnd && <p className="text-xs text-red-600 mt-1">{errors.dateEnd.message}</p>}
               </div>

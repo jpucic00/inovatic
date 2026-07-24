@@ -3,7 +3,7 @@
 import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Wrench, Copy, Check, Trash2, Users, Search, ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react'
+import { Wrench, Copy, Check, Trash2, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -123,12 +123,18 @@ function CourseCard({ course, editable }: Readonly<{ course: Course; editable: b
   const groupCount = course._count.scheduledGroups
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5 mb-4">
+    <div className="relative bg-white border border-gray-200 rounded-lg p-5 mb-4 hover:border-cyan-400 hover:shadow-sm transition">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Wrench className="w-5 h-5 text-orange-500 shrink-0" />
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">{course.title}</h3>
+            <h3 className="text-sm font-semibold text-gray-900">
+              {/* Stretched link: makes the whole card open the program page while
+                  the action buttons below stay clickable via relative z-10. */}
+              <Link href={`/admin/programi/${course.id}`} className="after:absolute after:inset-0">
+                {course.title}
+              </Link>
+            </h3>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-gray-400">{course.ageMin}–{course.ageMax} god.</span>
               {course.price != null && (
@@ -140,15 +146,7 @@ function CourseCard({ course, editable }: Readonly<{ course: Course; editable: b
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-          <Link
-            href={`/admin/programi/${course.id}`}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
-            title="Materijali i detalji"
-          >
-            <FolderOpen className="w-3.5 h-3.5" />
-            Materijali
-          </Link>
+        <div className="relative z-10 flex items-center gap-2 flex-wrap justify-end shrink-0">
           <CopyUrlButton slug={course.slug} />
           {groupCount > 0 && (
             <Link
