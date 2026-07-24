@@ -86,6 +86,22 @@ test.describe('Legacy WordPress URLs — permanent redirects', () => {
     expect(locationPath(resp.headers()['location'])).toContain(`/novosti/${slug}`)
   })
 
+  // WordPress permalinks always end in a slash, so this — not the bare slug —
+  // is the shape every old Facebook share actually carries. Next strips the
+  // slash first, making it a two-hop chain; both hops must survive.
+  test('WordPress trailing-slash links reach the article', async ({ page }) => {
+    const cases = [
+      { from: `/${wpPostSlugs[0]}/`, to: `/novosti/${wpPostSlugs[0]}` },
+      { from: '/robokup-drzavno-2019/', to: '/novosti/robokup-drzavno-2019' },
+      { from: '/2069-2/?fbclid=IwZXh0bgNhZW0', to: '/novosti/62-natjecanje-mladih-tehnicara-zupanijska-razina' },
+    ]
+    for (const { from, to } of cases) {
+      const resp = await page.request.get(`${BASE}${from}`)
+      expect.soft(resp.status(), `${from} should end at 200`).toBe(200)
+      expect.soft(new URL(resp.url()).pathname, `${from} final URL`).toBe(to)
+    }
+  })
+
   test('unknown root slugs still return 404', async ({ page }) => {
     const resp = await page.request.get(`${BASE}/ovaj-slug-nikad-nije-postojao-123`, {
       maxRedirects: 0,
