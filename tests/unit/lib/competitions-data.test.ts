@@ -7,30 +7,8 @@ import {
   COMPETITION_TONES,
 } from '@/lib/competitions-data'
 import { WP_REDIRECTS } from '@/lib/wp-redirects'
-
-/** WP *pages* migrated to articles on 2026-07-23, slugs kept 1:1. */
-const MIGRATED_REPORT_SLUGS = [
-  '59-natjecanje-mladih-tehnicara-zupanijska-razina',
-  '59-natjecanje-mladih-tehnicara-drzavna-razina',
-  '60-natjecanje-mladih-tehnicara-zupanijska-razina',
-  '60-natjecanje-mladih-tehnicara-drzavna-razina',
-  '61-natjecanje-mladih-tehnicara-2018-2019-zupanijska-razina',
-  '61-natjecanje-mladih-tehnicara-2018-2019-drzavna-razina',
-  '62-natjecanje-mladih-tehnicara-zupanijska-razina',
-  'robokup-zupanijsko-2019',
-  'robokup-drzavno-2019',
-  'robokup-zupanijsko-natjecanje-2020',
-  'robokup-2020-drzavna-razina',
-  'cm-liga-2016-17',
-  'cm-liga-2017-18-pmf-split',
-  'cm-liga-2018-19-pmf-split',
-  'cm-liga-2019-2020-pmf-split',
-  'first-lego-league-2019',
-  'first-lego-league-2020',
-  'wer-croatian-open',
-  'wer-croatian-open-2018',
-  'wro-2019',
-]
+// Same fixture the E2E redirect spec walks — one list, two levels of coverage.
+import wpCompetitionPages from '../../fixtures/wp-competition-pages.json'
 
 describe('competitions data', () => {
   it('carries the four competition programs on unique slugs', () => {
@@ -115,15 +93,16 @@ describe('legacy WordPress competition redirects', () => {
   })
 
   // The root [slug] route reads WP_REDIRECTS *before* the article lookup, so a
-  // leftover entry for a migrated page would permanently shadow its article.
-  it('leaves every migrated report page out of the map', () => {
-    for (const slug of MIGRATED_REPORT_SLUGS) {
-      expect(WP_REDIRECTS[slug], `${slug} must fall through to the article lookup`).toBeUndefined()
+  // leftover entry for a slug-identical page would permanently shadow its
+  // article. Only a page whose slug had to change may carry an entry.
+  it('routes every migrated competition page to its article', () => {
+    for (const { wp, article } of wpCompetitionPages) {
+      if (wp === article) {
+        expect(WP_REDIRECTS[wp], `/${wp} must fall through to the article lookup`).toBeUndefined()
+      } else {
+        expect(WP_REDIRECTS[wp], `/${wp} was renamed and needs an alias`).toBe(`/novosti/${article}`)
+      }
     }
-  })
-
-  it('aliases the one renamed auto-slug straight to its article', () => {
-    expect(WP_REDIRECTS['2069-2']).toBe('/novosti/62-natjecanje-mladih-tehnicara-zupanijska-razina')
   })
 
   it('keeps the two un-migrated program descriptions pointing at the hub', () => {
@@ -144,10 +123,10 @@ describe('competition archive links', () => {
 
   it('links every migrated report from its program page', () => {
     const linked = new Set(competitions.flatMap((c) => c.archive.map((e) => e.slug)))
-    for (const slug of MIGRATED_REPORT_SLUGS) {
-      // CM-liga galleries have no program page of their own — they live in /novosti only
-      if (slug.startsWith('cm-liga') || slug.startsWith('wer-')) continue
-      expect(linked.has(slug), `${slug} is not linked from any competition archive`).toBe(true)
+    for (const { article } of wpCompetitionPages) {
+      // CM-liga and WER have no program page of their own — they live in /novosti only
+      if (article.startsWith('cm-liga') || article.startsWith('wer-')) continue
+      expect(linked.has(article), `${article} is not linked from any competition archive`).toBe(true)
     }
   })
 })

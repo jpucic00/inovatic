@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { BASE } from './shared'
 import { WP_REDIRECTS } from '../../src/lib/wp-redirects'
 import wpPostSlugs from '../fixtures/wp-post-slugs.json'
+import wpCompetitionPages from '../fixtures/wp-competition-pages.json'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // LEGACY WORDPRESS URL REDIRECTS
@@ -40,6 +41,21 @@ test.describe('Legacy WordPress URLs — permanent redirects', () => {
       expect
         .soft(locationPath(resp.headers()['location']), `/${slug} target`)
         .toBe(target)
+    }
+  })
+
+  // These 20 were WP *pages*, so they are absent from the posts fixture, and
+  // 19 of them are deliberately absent from WP_REDIRECTS too (an entry would
+  // shadow the article, since the map is consulted before the DB lookup) —
+  // which leaves the two tests above blind to them. Cover them explicitly.
+  test('all 20 migrated WP competition pages redirect to their article', async ({ page }) => {
+    test.setTimeout(120000)
+    for (const { wp, article } of wpCompetitionPages) {
+      const resp = await page.request.get(`${BASE}/${wp}`, { maxRedirects: 0 })
+      expect.soft(resp.status(), `/${wp} should 308`).toBe(308)
+      expect
+        .soft(locationPath(resp.headers()['location']), `/${wp} target`)
+        .toBe(`/novosti/${article}`)
     }
   })
 
