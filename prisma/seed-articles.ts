@@ -9,10 +9,9 @@
  *
  *   npm run db:seed:articles
  *
- * Prisma reads .env (not .env.local); for local dev pass the DB URLs inline:
- *   DATABASE_URL="postgresql://inovatic:...@localhost:5432/inovatic" \
- *   DIRECT_URL="postgresql://inovatic:...@localhost:5432/inovatic" \
- *   npm run db:seed:articles
+ * DB URLs come from .env.local / .env (loaded by ./seed); to target another
+ * database (e.g. production), pass DATABASE_URL/DIRECT_URL inline — explicitly
+ * set env vars win over dotenv.
  */
 import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'

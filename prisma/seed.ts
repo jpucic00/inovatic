@@ -1,3 +1,8 @@
+import * as dotenv from 'dotenv'
+
+dotenv.config({ path: '.env.local' })
+dotenv.config({ path: '.env' })
+
 import { PrismaClient, CourseLevel, UserRole, Prisma, type City } from '@prisma/client'
 // courses-data.ts is the source of truth for standard SLR program content.
 import { courses as coursesData } from '../src/lib/courses-data'
