@@ -9,6 +9,11 @@ export function getNextSchoolYear(current: string): string {
   return `${startYear + 1}/${startYear + 2}`
 }
 
+export function getPreviousSchoolYear(current: string): string {
+  const [startYear] = current.split('/').map(Number)
+  return `${startYear - 1}/${startYear}`
+}
+
 // Archived = strictly before the current year. The current year and any
 // future year (set up ahead of time) are editable.
 export function isArchivedYear(year: string, now: Date = new Date()): boolean {

@@ -4,4 +4,6 @@ export {
   sendScheduleOptionsEmail,
   sendStudentCredentialsEmail,
   sendTeacherCredentialsEmail,
+  sendBulkMessageEmail,
+  renderBulkMessageHtml,
 } from './senders'

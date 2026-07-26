@@ -43,6 +43,8 @@ async function createUser(
     phone: string
     deletedAt: Date | null
     city: City
+    parentName: string | null
+    parentEmail: string | null
   }> = {},
 ): Promise<User & { plainPassword: string }> {
   const id = uniq()
@@ -60,6 +62,8 @@ async function createUser(
       phone: overrides.phone,
       deletedAt: overrides.deletedAt ?? null,
       city: overrides.city ?? 'SPLIT',
+      parentName: overrides.parentName ?? null,
+      parentEmail: overrides.parentEmail ?? null,
     },
   })
   return { ...user, plainPassword: password }

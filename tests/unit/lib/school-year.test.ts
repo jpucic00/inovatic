@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   computeSchoolYear,
   getNextSchoolYear,
+  getPreviousSchoolYear,
   isArchivedYear,
   schoolYearNeedsPlanning,
 } from '@/lib/school-year'
@@ -48,6 +49,21 @@ describe('getNextSchoolYear', () => {
 
   it('handles century boundary', () => {
     expect(getNextSchoolYear('2099/2100')).toBe('2100/2101')
+  })
+})
+
+describe('getPreviousSchoolYear', () => {
+  it('steps back one sequential year pair', () => {
+    expect(getPreviousSchoolYear('2026/2027')).toBe('2025/2026')
+    expect(getPreviousSchoolYear('2025/2026')).toBe('2024/2025')
+  })
+
+  it('handles century boundary', () => {
+    expect(getPreviousSchoolYear('2100/2101')).toBe('2099/2100')
+  })
+
+  it('round-trips with getNextSchoolYear', () => {
+    expect(getPreviousSchoolYear(getNextSchoolYear('2026/2027'))).toBe('2026/2027')
   })
 })
 

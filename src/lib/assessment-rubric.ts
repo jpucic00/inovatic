@@ -111,6 +111,18 @@ export const RECOMMENDATION_SPECIALS: readonly {
   { kind: 'COMPETITION_PROGRAM', label: 'Natjecateljski program' },
 ]
 
+/**
+ * Display label for a stored preporuka: the recommended course's title for
+ * COURSE, the canonical special-track label otherwise.
+ */
+export function formatRecommendationLabel(
+  kind: RecommendationKind,
+  recommendedCourseTitle: string | null,
+): string {
+  if (kind === 'COURSE') return recommendedCourseTitle ?? 'Preporučen program'
+  return RECOMMENDATION_SPECIALS.find((s) => s.kind === kind)?.label ?? kind
+}
+
 /** A single PREPORUKA dropdown option: encoded value + Croatian label. */
 export type RecommendationOption = { value: string; label: string }
 

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, CalendarDays, TriangleAlert, Presentation } from 'lucide-react'
+import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, CalendarDays, TriangleAlert, Presentation, Send } from 'lucide-react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/shared/logo'
@@ -28,6 +28,7 @@ const navGroups = [
       { href: '/admin/nastavnici', label: 'Nastavnici', icon: Users },
       { href: '/admin/lokacije', label: 'Lokacije', icon: MapPin },
       { href: '/admin/novosti', label: 'Novosti', icon: Newspaper },
+      { href: '/admin/email', label: 'E-mail', icon: Send },
     ],
   },
 ]

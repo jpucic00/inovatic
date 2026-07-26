@@ -69,6 +69,16 @@ enum MaterialScope {
   GROUP
 }
 
+enum EmailCampaignKind {
+  CUSTOM
+  REENROLLMENT
+}
+
+enum EmailRecipientStatus {
+  SENT
+  FAILED
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
@@ -104,6 +114,7 @@ model User {
   authoredAssessments  StudentAssessment[] @relation("AssessmentAuthor")
   recordedAttendances  Attendance[]        @relation("AttendanceRecorder")
   createdHolidays      SchoolYearHoliday[] @relation("HolidayCreator")
+  sentEmailCampaigns   EmailCampaign[]     @relation("EmailCampaignSender")
 
   @@index([role, city])
 }
@@ -137,6 +148,7 @@ model Course {
   enrollmentWindows CourseEnrollmentWindow[]
 
   recommendedInAssessments StudentAssessment[]
+  emailCampaignsAsTarget   EmailCampaign[]     @relation("EmailCampaignTarget")
 }
 
 // Per-school-year public signup window for a program. Keyed by
@@ -545,4 +557,57 @@ model StudentAssessment {
 
   @@unique([studentId, groupId])
   @@index([groupId])
+}
+
+// One row per admin bulk-email send from /admin/email. Recipient rows double as
+// the REENROLLMENT idempotency ledger: a parent with a SENT row for the same
+// (city, kind, targetCourseId, targetSchoolYear) is skipped on re-runs, so a
+// double-click or a browser close mid-loop never double-mails an invitation.
+// CUSTOM campaigns are deliberately repeatable (no skip).
+model EmailCampaign {
+  id               String            @id @default(cuid())
+  city             City
+  kind             EmailCampaignKind
+  sourceSchoolYear String
+  // Audit-only snapshot of the selected cohort groups (no FK — groups may be
+  // deleted later; the send resolved recipients at send time anyway). Empty
+  // when the cohort was selected by preporuka instead.
+  sourceGroupIds   String[]
+  // Preporuka-mode cohort: display labels of the selected preporuka filters
+  // (per-course titles + special tracks; year-wide, group-independent).
+  // Labels rather than ids so history stays readable after course deletion.
+  // Empty in group mode.
+  sourceRecommendations String[] @default([])
+  targetSchoolYear String?
+  targetCourseId   String?
+  subject          String
+  bodyText         String            @db.Text
+  sentById         String
+  // Denormalized at loop end for cheap history display; recipient rows are
+  // the ground truth (counts can be stale if the send aborted mid-loop).
+  sentCount        Int               @default(0)
+  failedCount      Int               @default(0)
+  skippedCount     Int               @default(0)
+  excludedCount    Int               @default(0)
+  createdAt        DateTime          @default(now())
+
+  targetCourse Course? @relation("EmailCampaignTarget", fields: [targetCourseId], references: [id], onDelete: SetNull)
+  sentBy       User    @relation("EmailCampaignSender", fields: [sentById], references: [id])
+
+  recipients EmailCampaignRecipient[]
+
+  @@index([city, createdAt])
+  @@index([city, kind, targetCourseId, targetSchoolYear])
+}
+
+model EmailCampaignRecipient {
+  id          String               @id @default(cuid())
+  campaignId  String
+  parentEmail String
+  status      EmailRecipientStatus
+  sentAt      DateTime             @default(now())
+
+  campaign EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
 }

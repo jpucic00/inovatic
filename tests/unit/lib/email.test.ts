@@ -10,6 +10,7 @@ vi.mock('resend', () => ({
 }))
 
 import {
+  sendBulkMessageEmail,
   sendInquiryConfirmationEmail,
   sendScheduleOptionsEmail,
   sendTeacherCredentialsEmail,
@@ -76,6 +77,31 @@ describe('email senders', () => {
     await sendTeacherCredentialsEmail({ ...base, variant: 'reset' })
     expect(send.mock.calls[0][0].subject).toBe('Pristupni podaci – Inovatic')
     expect(send.mock.calls[1][0].subject).toBe('Nova lozinka – Inovatic')
+  })
+
+  it('passes the admin-authored bulk-message subject through verbatim', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendBulkMessageEmail({
+      to: 'roditelj@example.hr',
+      subject: 'Upisi u školsku godinu 2026/2027 – Inovatic',
+      bodyText: 'Pozivamo vas na upis.',
+    })
+    expect(send.mock.calls[0][0]).toMatchObject({
+      to: 'roditelj@example.hr',
+      subject: 'Upisi u školsku godinu 2026/2027 – Inovatic',
+      replyTo: 'prijave@udruga-inovatic.hr',
+    })
+  })
+
+  it('bulk-message no-ops without a key like every other sender', async () => {
+    vi.stubEnv('RESEND_API_KEY', '')
+    const sent = await sendBulkMessageEmail({
+      to: 'roditelj@example.hr',
+      subject: 'Obavijest – Inovatic',
+      bodyText: 'Kratka obavijest.',
+    })
+    expect(sent).toBe(false)
+    expect(send).not.toHaveBeenCalled()
   })
 
   it('surfaces a Resend in-band error (e.g. unverified domain) as a throw', async () => {

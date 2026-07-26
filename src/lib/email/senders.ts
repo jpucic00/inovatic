@@ -1,10 +1,20 @@
 import { createElement } from 'react'
+import { render } from '@react-email/components'
 import { sendTransactionalEmail } from './client'
 import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
 import PartyInquiryConfirmationEmail from '../../../emails/party-inquiry-confirmation'
 import ScheduleOptionsEmail, { type GroupOption } from '../../../emails/schedule-options'
 import AccountCredentialsEmail from '../../../emails/account-credentials'
 import TeacherCredentialsEmail from '../../../emails/teacher-credentials'
+import BulkMessageEmail from '../../../emails/bulk-message'
+
+function publicBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXTAUTH_URL ??
+    'https://udruga-inovatic.hr'
+  )
+}
 
 /**
  * Typed senders — one per transactional email. Each owns its subject and maps
@@ -115,10 +125,7 @@ export function sendTeacherCredentialsEmail(params: {
   password: string
   variant: keyof typeof TEACHER_SUBJECTS
 }): Promise<boolean> {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.NEXTAUTH_URL ??
-    'https://udruga-inovatic.hr'
+  const baseUrl = publicBaseUrl()
   return sendTransactionalEmail({
     to: params.to,
     subject: TEACHER_SUBJECTS[params.variant],
@@ -130,4 +137,43 @@ export function sendTeacherCredentialsEmail(params: {
       loginUrl: `${baseUrl}/prijava`,
     }),
   })
+}
+
+type BulkMessageParams = {
+  to: string
+  /** Admin-authored in the /admin/email composer — a deliberate exception to
+   * the sender-owns-subject rule above. The body ships exactly as written
+   * (no auto greeting — parent names are missing on many imported students). */
+  subject: string
+  bodyText: string
+  options?: GroupOption[]
+  /** REENROLLMENT invitations link to the public signup form. */
+  includeSignupCta?: boolean
+}
+
+function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to'>) {
+  return createElement(BulkMessageEmail, {
+    subject: params.subject,
+    bodyText: params.bodyText,
+    options: params.options,
+    signupUrl: params.includeSignupCta ? `${publicBaseUrl()}/upisi` : undefined,
+  })
+}
+
+/** Admin bulk campaign (/admin/email) → one parent per call. */
+export function sendBulkMessageEmail(params: BulkMessageParams): Promise<boolean> {
+  const { to, ...rest } = params
+  return sendTransactionalEmail({
+    to,
+    subject: params.subject,
+    react: buildBulkMessageElement(rest),
+  })
+}
+
+/**
+ * The composer's preview iframe renders through the same element builder as
+ * the send path, so what the admin previews is exactly what parents receive.
+ */
+export function renderBulkMessageHtml(params: Omit<BulkMessageParams, 'to'>): Promise<string> {
+  return render(buildBulkMessageElement(params))
 }

@@ -5,6 +5,7 @@ import {
   SKILL_LEVELS,
   decodeRecommendation,
   encodeRecommendation,
+  formatRecommendationLabel,
 } from '@/lib/assessment-rubric'
 
 describe('encode/decodeRecommendation', () => {
@@ -46,6 +47,23 @@ describe('encode/decodeRecommendation', () => {
       recommendationKind: null,
       recommendedCourseId: null,
     })
+  })
+})
+
+describe('formatRecommendationLabel', () => {
+  it('uses the recommended course title for COURSE', () => {
+    expect(formatRecommendationLabel('COURSE', 'Svijet LEGO Robotike 3')).toBe(
+      'Svijet LEGO Robotike 3',
+    )
+  })
+
+  it('falls back to a generic label when the COURSE title is missing', () => {
+    expect(formatRecommendationLabel('COURSE', null)).toBe('Preporučen program')
+  })
+
+  it('maps the special tracks to their canonical Croatian labels', () => {
+    expect(formatRecommendationLabel('COMPETITION_PREP', null)).toBe('Priprema za natjecanja')
+    expect(formatRecommendationLabel('COMPETITION_PROGRAM', null)).toBe('Natjecateljski program')
   })
 })
 
