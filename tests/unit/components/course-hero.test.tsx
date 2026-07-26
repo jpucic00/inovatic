@@ -76,7 +76,7 @@ describe('CourseHero', () => {
     render(<CourseHero course={course} level={1} />)
 
     expect(screen.getByRole('link', { name: /Svi programi/ }).getAttribute('href')).toBe('/programi')
-    expect(screen.getByRole('link', { name: 'Pošalji upit za upis' }).getAttribute('href')).toBe('/upisi')
+    expect(screen.getByRole('link', { name: 'Pošalji prijavu za upis' }).getAttribute('href')).toBe('/upisi')
     expect(screen.getByRole('link', { name: /Pogledaj cijene/ }).getAttribute('href')).toBe('#cijene')
   })
 })
