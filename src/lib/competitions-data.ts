@@ -73,6 +73,11 @@ export const competitions: Competition[] = [
         description: 'Potiču fair play, timsku suradnju, kreativnost i uzajamno poštovanje.',
       },
     ],
+    programDetails: [
+      { label: 'Trajanje programa', value: 'rujan – lipanj' },
+      { label: 'Dinamika', value: 'jednom tjedno 90 min' },
+      { label: 'Pravo upisa', value: 'Završen SLR4 uz preporuku mentora' },
+    ],
     externalLinks: [
       { label: 'FIRST LEGO League Croatia', url: 'https://fllcroatia.org/' },
       { label: 'FIRST LEGO League Home', url: 'https://www.firstlegoleague.org' },
@@ -100,6 +105,11 @@ export const competitions: Competition[] = [
       'Sudjelovanje u WRO timu naše udruge ostvaruje se po preporuci predavača nakon završetka programa Svijet LEGO robotike 4, kako bi polaznici koji pokazuju motivaciju i sposobnosti imali priliku okušati se na međunarodnoj pozornici. Program pruža jedinstvenu priliku za primjenu znanja u stvarnom svijetu, razvoj samopouzdanja, timskog duha i suradničkih vještina, dok se polaznici povezuju s globalnom zajednicom mladih inovatora. Ovakvo natjecanje potiče analitičko razmišljanje, kreativnost, preciznost i strateško planiranje te donosi nova iskustva i izazove koji nadilazi standardnu edukaciju robotike.',
     ],
     categories: [],
+    programDetails: [
+      { label: 'Trajanje programa', value: 'rujan – lipanj' },
+      { label: 'Dinamika', value: 'jednom tjedno 90 min' },
+      { label: 'Pravo upisa', value: 'Završen SLR4 uz preporuku mentora' },
+    ],
     externalLinks: [
       { label: 'WRO Hrvatska', url: 'https://wro.hr' },
       { label: 'WRO International', url: 'https://wro-association.org' },
@@ -118,9 +128,9 @@ export const competitions: Competition[] = [
       'Natjecanje mladih tehničara (NMT) nacionalno je natjecanje iz tehničke kulture u organizaciji Hrvatske zajednice tehničke kulture. Naša udruga aktivno priprema svoje članove za kategorije robotskog spašavanja žrtve, robotike i automatike.',
     tone: 'cyan',
     programDetails: [
-      { label: 'Trajanje programa', value: '60 školskih sati (listopad – svibanj)' },
-      { label: 'Dinamika održavanja', value: 'Jednom tjedno u trajanju od 90 minuta' },
-      { label: 'Pravo upisa', value: 'Prošlogodišnji polaznici 5. – 8. razreda na preporuku predavača/mentora' },
+      { label: 'Trajanje programa', value: 'rujan – lipanj' },
+      { label: 'Dinamika', value: 'jednom tjedno 90 min' },
+      { label: 'Pravo upisa', value: 'Završen SLR4 uz preporuku mentora' },
     ],
     paragraphs: [
       'Natjecanje mladih tehničara (NMT) organiziraju i provode Ministarstvo znanosti, obrazovanja i sporta, Agencija za odgoj i obrazovanje, Hrvatska zajednica tehničke kulture, županijski i gradski uredi za prosvjetu, kulturu, informiranje, sport i tehničku kulturu, županijske i gradske zajednice tehničke kulture te udruge tehničke kulture.',
@@ -158,9 +168,9 @@ export const competitions: Competition[] = [
     tone: 'yellow',
     highlight: 'Državni prvaci 15. Robokupa',
     programDetails: [
-      { label: 'Trajanje programa', value: '60 školskih sati (listopad – svibanj)' },
-      { label: 'Dinamika održavanja', value: 'Jednom tjedno u trajanju od 90 minuta' },
-      { label: 'Pravo upisa', value: 'Prošlogodišnji polaznici 5. – 8. razreda na preporuku predavača/mentora' },
+      { label: 'Trajanje programa', value: 'rujan – lipanj' },
+      { label: 'Dinamika', value: 'jednom tjedno 90 min' },
+      { label: 'Pravo upisa', value: 'Završen SLR4 uz preporuku mentora' },
     ],
     paragraphs: [
       'Robokup je ekipno natjecanje učenika osnovnih škola iz cijele Hrvatske u robotici, a od 2008. godine se održava. Natjecateljsku ekipu čine najviše tri natjecatelja.',

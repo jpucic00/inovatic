@@ -105,13 +105,13 @@ export function Navbar() {
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:text-cyan-600 hover:bg-gray-50 rounded-md transition-colors"
             >
               <LogIn className="w-4 h-4" />
-              Prijava
+              Polaznički portal
             </Link>
             <Link
               href="/upisi"
               className="hidden sm:inline-flex items-center px-4 py-2 bg-cyan-500 text-white text-sm font-semibold rounded-lg hover:bg-cyan-600 transition-colors shadow-sm"
             >
-              Upiši se
+              Prijavi se
             </Link>
             <button
               className="md:hidden p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
@@ -178,14 +178,14 @@ export function Navbar() {
                 onClick={() => setIsOpen(false)}
               >
                 <LogIn className="w-4 h-4" />
-                Prijava
+                Polaznički portal
               </Link>
               <Link
                 href="/upisi"
                 className="block py-2.5 text-center bg-cyan-500 text-white text-sm font-semibold rounded-lg hover:bg-cyan-600 transition-colors"
                 onClick={() => setIsOpen(false)}
               >
-                Upiši se
+                Prijavi se
               </Link>
             </div>
           </div>

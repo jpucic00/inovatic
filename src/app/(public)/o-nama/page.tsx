@@ -338,7 +338,7 @@ export default function AboutPage() {
             href="/upisi"
             className="inline-flex items-center gap-2 px-7 py-3.5 bg-yellow-400 text-gray-900 font-semibold rounded-xl hover:bg-yellow-300 transition-colors shadow-sm"
           >
-            Upiši dijete <ArrowRight className="w-4 h-4" />
+            Prijavi dijete <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>

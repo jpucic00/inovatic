@@ -11,7 +11,7 @@ const quickLinks = [
   { href: '/o-nama', label: 'O nama' },
   { href: '/donacije', label: 'Donacije' },
   { href: '/lokacije', label: 'Lokacije' },
-  { href: '/upisi', label: 'Upiši se' },
+  { href: '/upisi', label: 'Prijavi se' },
 ]
 
 export function Footer() {

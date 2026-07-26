@@ -87,6 +87,7 @@ const techFeatures = [
 const recognitions = [
   'Zavod za forenziku Prirodoslovno-matematičkog fakulteta u Splitu omogućio im je testiranje kista na pravim ljudskim kostima, što je prošlo s vrhunskim rezultatima.',
   'Arheolozi iz Muzeja hrvatskih arheoloških spomenika (MHAS) i restauratorica Petra Perlain potvrdili su veliku korist alata u svakodnevnom radu.',
+  'Suradnja s Filozofskim fakultetom u Splitu: Posebno zahvaljujemo doc. dr. sc. Ivanu Matijeviću koji nas je povezao s restauratoricom Petrom Perlain, podijelio s nama važna iskustva te nam ustupio potrebne knjige i promotivne materijale (notes, kemijske, torba za laptop). U sklopu suradnje dogovoreno je i predavanje na kojem ćemo studentima prezentirati naš projekt.',
   'Hrvatsko restauratorsko društvo (HRD), na čelu s Markom Buljanom, pozvalo je tim da svoj izum predstavi na Međunarodnoj konferenciji studija konzervacije-restauracije pred vodećim svjetskim tvrtkama, uz mogućnost financijske potpore za daljnji razvoj.',
 ]
 

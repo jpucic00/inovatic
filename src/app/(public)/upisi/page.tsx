@@ -20,10 +20,10 @@ export const metadata: Metadata = {
 }
 
 const perks = [
-  'Bez obveza – samo šaljete upit',
+  'Ispunjavanje prijavnog obrasca ne obvezuje na upis',
+  'Prijavom ostvarujete pravo na probni sat',
   'Kontaktiramo vas u roku 48h',
   'Preporučujemo program prema dobi',
-  'Objašnjavamo sve detalje',
 ]
 
 const perkIconColors = [
@@ -54,8 +54,8 @@ export default async function InquiryPage() {
         <div className="absolute -top-10 -right-10 w-72 h-72 bg-cyan-400 rounded-full blur-3xl opacity-40 pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-yellow-300 rounded-full blur-3xl opacity-40 pointer-events-none" />
         <div className="container mx-auto max-w-3xl text-center relative">
-          <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">Upisi</span>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Upiši dijete</h1>
+          <span className="inline-block text-xs font-bold uppercase tracking-widest text-cyan-500 mb-3">PRIJAVA</span>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">Prijavi dijete</h1>
           <p className="text-gray-600 text-lg max-w-xl mx-auto">
             Ispunite kratki obrazac ispod i naš tim će vas kontaktirati u najkraćem mogućem roku.
           </p>
@@ -71,7 +71,7 @@ export default async function InquiryPage() {
                 <h2 className="font-bold text-gray-900 mb-4">Kako funkcionira?</h2>
                 <div className="space-y-3">
                   {[
-                    { n: '1', text: 'Ispunite prijavu i odaberite željenu grupu.' },
+                    { n: '1', text: 'Ispunite prijavni obrazac i odaberite željenu grupu.' },
                     { n: '2', text: 'Provjeravamo dostupnost i kontaktiramo vas.' },
                     { n: '3', text: 'Dogovaramo termin probnog sata.' },
                     { n: '4', text: 'Nakon probnog sata upisujemo dijete.' },

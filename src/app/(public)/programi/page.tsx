@@ -205,7 +205,7 @@ export default function ProgramiPage() {
           href="/upisi"
           className="inline-flex w-full max-w-[280px] items-center justify-center gap-2 rounded-[12px] bg-yellow-400 px-8 py-3.5 text-[15px] font-bold text-gray-900 transition-colors hover:bg-yellow-500 md:w-auto md:max-w-none md:text-base"
         >
-          Pošalji upit <ArrowRight className="h-4 w-4" />
+          Pošalji prijavu <ArrowRight className="h-4 w-4" />
         </Link>
       </section>
     </>

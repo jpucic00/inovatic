@@ -108,7 +108,7 @@ export function CourseHero({ course, level }: { readonly course: Course; readonl
             href="/upisi"
             className="hidden rounded-xl bg-cyan-500 px-6 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-cyan-600 min-[480px]:block"
           >
-            Pošalji upit za upis
+            Pošalji prijavu za upis
           </Link>
           <SmoothScrollLink
             targetId="cijene"
