@@ -1563,6 +1563,8 @@ async function main() {
   await prisma.courseModule.deleteMany()
   await prisma.course.deleteMany()
   await prisma.location.deleteMany()
+  // Recipients cascade from campaigns; campaigns block user deletion (sentById).
+  await prisma.emailCampaign.deleteMany()
   await prisma.user.deleteMany()
 
   console.log('🗑️  Cleared existing data')
