@@ -21,6 +21,14 @@ export const SKILL_LEVEL_DESCRIPTIONS: Record<SkillLevel, string> = {
   OSTVARENO: 'Opsežno zamijećenih primjera.',
 }
 
+// Filled-chip classes for one level — shared by the staff three-segment control
+// and the read-only portal card so both read the same at a glance.
+export const SKILL_LEVEL_BADGE_CLASS: Record<SkillLevel, string> = {
+  POCETNO: 'bg-amber-500 text-white',
+  U_RAZVOJU: 'bg-sky-500 text-white',
+  OSTVARENO: 'bg-emerald-500 text-white',
+}
+
 // ── Skills, grouped into the two rubric categories ───────────────────────────
 
 export type SkillKey =

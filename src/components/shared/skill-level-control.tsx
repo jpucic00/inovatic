@@ -1,13 +1,11 @@
 'use client'
 
 import type { SkillLevel } from '@prisma/client'
-import { SKILL_LEVELS, SKILL_LEVEL_LABELS } from '@/lib/assessment-rubric'
-
-const ACTIVE_CLASS: Record<SkillLevel, string> = {
-  POCETNO: 'bg-amber-500 text-white',
-  U_RAZVOJU: 'bg-sky-500 text-white',
-  OSTVARENO: 'bg-emerald-500 text-white',
-}
+import {
+  SKILL_LEVELS,
+  SKILL_LEVEL_BADGE_CLASS,
+  SKILL_LEVEL_LABELS,
+} from '@/lib/assessment-rubric'
 
 interface Props {
   /** Skill name announced to assistive tech (the visible label sits outside). */
@@ -43,7 +41,7 @@ export function SkillLevelControl({
               'px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50',
               i > 0 ? 'border-l border-gray-200' : '',
               isActive
-                ? ACTIVE_CLASS[level]
+                ? SKILL_LEVEL_BADGE_CLASS[level]
                 : 'bg-white text-gray-600 hover:bg-gray-50',
             ].join(' ')}
           >

@@ -1,7 +1,15 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowRight, CheckCircle, Sparkles } from 'lucide-react'
+import {
+  ArrowRight,
+  CheckCircle,
+  ClipboardCheck,
+  FileText,
+  Images,
+  LogIn,
+  Sparkles,
+} from 'lucide-react'
 import { courses, getCourseBySlug } from '@/lib/courses-data'
 import { CourseModuleAccordion } from '@/components/public/course-module-accordion'
 import { CourseStickyCta } from '@/components/public/course-sticky-cta'
@@ -47,6 +55,65 @@ function ProbniSatCallout({ className = '' }: { readonly className?: string }) {
   )
 }
 
+const PLATFORM_FEATURES = [
+  {
+    icon: FileText,
+    title: 'Materijali',
+    description:
+      'Upute za slaganje, prezentacije i video zapisi za svaki modul programa. Dostupni su cijelu godinu, pa dijete može ponoviti projekt i kod kuće.',
+  },
+  {
+    icon: Images,
+    title: 'Galerija fotografija',
+    description:
+      'Fotografije s radionica vaše grupe, razvrstane po modulima. Možete ih pregledati i preuzeti.',
+  },
+  {
+    icon: ClipboardCheck,
+    title: 'Evaluacija polaznika',
+    description:
+      'Ocjena mentora po šest vještina — slaganje, programiranje, inovacije, suradnja, komunikacija i zabava — uz opisnu ocjenu i preporuku za sljedeću razinu.',
+  },
+] as const
+
+function OnlinePlatformSection() {
+  return (
+    <>
+      <h2 className="mb-2.5 mt-8 text-lg font-bold text-gray-900 md:mb-4 md:mt-11 md:text-[22px]">
+        Online platforma za roditelje i polaznike
+      </h2>
+      <p className="mb-4 text-sm leading-[1.65] text-gray-600 md:mb-5 md:text-[15.5px] md:leading-[1.7]">
+        Nakon upisa svaki polaznik dobiva svoje pristupne podatke. Roditelji se
+        prijavljuju istim podacima i u svakom trenutku mogu pratiti što dijete
+        radi na radionicama.
+      </p>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {PLATFORM_FEATURES.map((feature) => (
+          <div
+            key={feature.title}
+            className="rounded-xl border border-gray-100 bg-gray-50 p-5"
+          >
+            <div className="mb-2.5 flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500 text-white">
+              <feature.icon className="h-[18px] w-[18px]" />
+            </div>
+            <h3 className="mb-1.5 text-sm font-bold text-gray-900">{feature.title}</h3>
+            <p className="text-[13px] leading-[1.6] text-gray-600">{feature.description}</p>
+          </div>
+        ))}
+      </div>
+
+      <Link
+        href="/prijava"
+        className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-600 transition-colors hover:text-cyan-700"
+      >
+        <LogIn className="h-4 w-4" />
+        Polaznički portal
+      </Link>
+    </>
+  )
+}
+
 export default async function CourseDetailPage({ params }: PageProps) {
   const { slug } = await params
   const course = getCourseBySlug(slug)
@@ -62,7 +129,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
     'Mala grupa (do 12 polaznika)',
     'Stručni robo treneri',
     'Diploma o završetku',
-    'Pristup materijalima',
+    'Pristup online platformi',
     'Probni sat bez obveze',
   ]
 
@@ -126,6 +193,8 @@ export default async function CourseDetailPage({ params }: PageProps) {
             </div>
           ))}
         </div>
+
+        <OnlinePlatformSection />
       </div>
 
       {/* Pricing band — full-width, in flow */}

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, ClipboardCheck, Image as ImageIcon } from 'lucide-react'
 import type { GroupMaterialsView } from '@/lib/group-materials-view'
 import { formatGroupSchedule } from '@/lib/format'
 import { GroupHeader } from '@/components/shared/group-header'
@@ -40,7 +40,7 @@ export function GroupMaterialsScreen({ view, backHref, backLabel }: Readonly<Pro
           teacherNames={group.teacherNames}
         />
       </div>
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap gap-2">
         <Link
           href={`/portal/grupa/${group.id}/galerija`}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded-md transition-colors"
@@ -48,6 +48,16 @@ export function GroupMaterialsScreen({ view, backHref, backLabel }: Readonly<Pro
           <ImageIcon className="w-4 h-4" />
           Galerija
         </Link>
+        {/* Radionice are never graded — no evaluation page to link to. */}
+        {!group.course.isCustom && (
+          <Link
+            href={`/portal/grupa/${group.id}/evaluacija`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded-md transition-colors"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            Evaluacija
+          </Link>
+        )}
       </div>
       <MaterialList view={view} />
     </div>
