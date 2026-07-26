@@ -10,6 +10,10 @@ const PX_PER_MIN = 0.9
 const HEADER_HEIGHT = 26
 const DEFAULT_DURATION = 90
 const BODY_PAD = 10
+// Stretches of the day with no group on any weekday (typically the gap between the
+// morning and afternoon blocks) shrink to a short band instead of dead scroll space.
+const COLLAPSE_FROM_HOURS = 2
+const COLLAPSED_BAND_HEIGHT = 30
 
 type FilterKey = 'all' | 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
 
@@ -57,6 +61,44 @@ function matchesFilter(g: { course: { level: string | null } }, filter: FilterKe
   return g.course.level === filter
 }
 
+type TimeBand = { start: number; end: number; collapsed: boolean; top: number; height: number }
+
+/** Splits [minTime, maxTime) into hour runs, collapsing the long empty ones. */
+function buildTimeBands(
+  bounds: { start: number; end: number }[],
+  minTime: number,
+  maxTime: number,
+): TimeBand[] {
+  const runs: { start: number; end: number; busy: boolean }[] = []
+  for (let t = minTime; t < maxTime; t += 60) {
+    const busy = bounds.some((b) => b.start < t + 60 && b.end > t)
+    const last = runs[runs.length - 1]
+    if (last && last.busy === busy) last.end = t + 60
+    else runs.push({ start: t, end: t + 60, busy })
+  }
+
+  let top = BODY_PAD
+  return runs.map((run) => {
+    const collapsed = !run.busy && run.end - run.start >= COLLAPSE_FROM_HOURS * 60
+    const height = collapsed ? COLLAPSED_BAND_HEIGHT : (run.end - run.start) * PX_PER_MIN
+    const band: TimeBand = { start: run.start, end: run.end, collapsed, top, height }
+    top += height
+    return band
+  })
+}
+
+/** Piecewise minutes → pixel offset; linear inside a band, compressed across collapsed ones. */
+function timeToY(bands: TimeBand[], minutes: number): number {
+  for (const band of bands) {
+    if (minutes <= band.end) {
+      const ratio = (minutes - band.start) / (band.end - band.start)
+      return band.top + band.height * Math.min(Math.max(ratio, 0), 1)
+    }
+  }
+  const last = bands[bands.length - 1]
+  return last.top + last.height
+}
+
 type Group = {
   id: string
   name: string | null
@@ -97,19 +139,28 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
 
   const scheduled = allScheduled.filter((g) => matchesFilter(g, activeFilter))
 
-  // Time range always based on all groups so the grid doesn't jump when filtering
-  const allStarts = allScheduled.map((g) => parseTime(g.startTime!))
-  const allEnds = allScheduled.map((g) =>
-    g.endTime ? parseTime(g.endTime) : parseTime(g.startTime!) + DEFAULT_DURATION,
-  )
-  const minTime = Math.floor(Math.min(...allStarts) / 60) * 60
-  const maxTime = Math.ceil(Math.max(...allEnds) / 60) * 60
-  const totalMinutes = maxTime - minTime
+  // Time range and band layout always based on all groups so the grid doesn't jump when filtering
+  const allBounds = allScheduled.map((g) => {
+    const start = parseTime(g.startTime!)
+    return { start, end: g.endTime ? parseTime(g.endTime) : start + DEFAULT_DURATION }
+  })
+  const minTime = Math.floor(Math.min(...allBounds.map((b) => b.start)) / 60) * 60
+  const maxTime = Math.ceil(Math.max(...allBounds.map((b) => b.end)) / 60) * 60
 
+  const bands = buildTimeBands(allBounds, minTime, maxTime)
+  const yOf = (minutes: number) => timeToY(bands, minutes)
+
+  // Hour ticks only inside the bands that are drawn to scale
   const slots: number[] = []
-  for (let t = minTime; t <= maxTime; t += 60) slots.push(t)
+  for (const band of bands) {
+    if (band.collapsed) continue
+    for (let t = band.start; t <= band.end; t += 60) {
+      if (!slots.includes(t)) slots.push(t)
+    }
+  }
 
-  const gridHeight = totalMinutes * PX_PER_MIN + BODY_PAD * 2
+  const lastBand = bands[bands.length - 1]
+  const gridHeight = lastBand.top + lastBand.height + BODY_PAD
 
   return (
     <div>
@@ -183,21 +234,45 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
                   <div
                     key={t}
                     className="absolute right-1 text-[10px] text-gray-600 -translate-y-1/2"
-                    style={{ top: (t - minTime) * PX_PER_MIN + BODY_PAD }}
+                    style={{ top: yOf(t) }}
                   >
                     {formatTime(t)}
                   </div>
                 ))}
+                {bands
+                  .filter((b) => b.collapsed)
+                  .map((b) => (
+                    <div
+                      key={b.start}
+                      className="absolute right-1 text-[10px] leading-none text-gray-400 -translate-y-1/2"
+                      style={{ top: b.top + b.height / 2 }}
+                    >
+                      ⋯
+                    </div>
+                  ))}
               </div>
 
               {/* Day columns */}
               <div className="flex-1 relative">
                 <div className="absolute inset-0 pointer-events-none">
+                  {bands
+                    .filter((b) => b.collapsed)
+                    .map((b) => (
+                      <div
+                        key={b.start}
+                        className="absolute left-0 right-0 bg-gray-100 flex items-center justify-center"
+                        style={{ top: b.top, height: b.height }}
+                      >
+                        <span className="text-[9px] text-gray-400">
+                          {formatTime(b.start)}–{formatTime(b.end)}
+                        </span>
+                      </div>
+                    ))}
                   {slots.map((t) => (
                     <div
                       key={t}
                       className="absolute left-0 right-0 border-t border-gray-300"
-                      style={{ top: (t - minTime) * PX_PER_MIN + BODY_PAD }}
+                      style={{ top: yOf(t) }}
                     />
                   ))}
                 </div>
@@ -225,8 +300,8 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
                     return (
                       <div key={day} className={`relative ${hasAny ? '' : 'bg-gray-50/50'}`}>
                         {dayGroupsWithBounds.map(({ group: g, start, end }, idx) => {
-                          const top = (start - minTime) * PX_PER_MIN + BODY_PAD
-                          const height = Math.max((end - start) * PX_PER_MIN - 2, 16)
+                          const top = yOf(start)
+                          const height = Math.max(yOf(end) - top - 2, 16)
                           const { laneIndex, laneCount } = layouts[idx]
                           const widthPct = 100 / laneCount
                           const leftPct = laneIndex * widthPct
