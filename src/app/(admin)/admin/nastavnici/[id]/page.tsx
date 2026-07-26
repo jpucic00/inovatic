@@ -7,10 +7,12 @@ import {
   getTeacher,
   getAssignableGroupsForTeacher,
 } from '@/actions/admin/teacher'
+import { getTeacherWorkReport } from '@/actions/admin/teacher-work'
 import { EditTeacherDialog } from '@/components/admin/teachers/edit-teacher-dialog'
 import { ResetPasswordButton } from '@/components/admin/teachers/reset-password-button'
 import { DeleteTeacherDialog } from '@/components/admin/teachers/delete-teacher-dialog'
 import { TeacherAssignmentPanel } from '@/components/admin/teachers/teacher-assignment-panel'
+import { TeacherWorkReportCard } from '@/components/admin/teachers/teacher-work-report-card'
 import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/format'
 
@@ -36,17 +38,22 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
   await requireAdmin()
 
   const { id } = await params
-  const [teacher, assignableGroups] = await Promise.all([
+  const [teacher, assignableGroups, workReport] = await Promise.all([
     getTeacher(id),
     getAssignableGroupsForTeacher(id),
+    getTeacherWorkReport(id),
   ])
 
   if (!teacher) notFound()
 
   const fullName = `${teacher.firstName} ${teacher.lastName}`
+  // Slavica's case: a city ADMIN who also teaches. Her account is managed as an
+  // admin, so the TEACHER-only actions (edit, credentials, delete) stay hidden —
+  // they are role-scoped server-side and would be dead controls here.
+  const isAdminAccount = teacher.role === 'ADMIN'
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       <div className="flex items-center gap-3 mb-6">
         <Link
           href="/admin/nastavnici"
@@ -60,21 +67,30 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
       {/* Header */}
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
+            {isAdminAccount && (
+              <span className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
+                Administrator
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 text-sm mt-1">
             Račun kreiran{' '}
             {formatDate(teacher.createdAt)}
           </p>
         </div>
-        <EditTeacherDialog
-          teacher={{
-            id: teacher.id,
-            firstName: teacher.firstName,
-            lastName: teacher.lastName,
-            email: teacher.email,
-            phone: teacher.phone,
-          }}
-        />
+        {!isAdminAccount && (
+          <EditTeacherDialog
+            teacher={{
+              id: teacher.id,
+              firstName: teacher.firstName,
+              lastName: teacher.lastName,
+              email: teacher.email,
+              phone: teacher.phone,
+            }}
+          />
+        )}
       </div>
 
       {/* Contact info */}
@@ -117,38 +133,40 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
       </div>
 
       {/* Credentials */}
-      <div className="bg-white rounded-xl border p-6 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-gray-700">Pristupni podaci</h2>
-          <ResetPasswordButton teacherId={teacher.id} teacherEmail={teacher.email} />
-        </div>
-        <dl>
-          <DetailRow
-            label="E-mail za prijavu"
-            value={
-              <div className="flex items-center gap-2">
-                <span className="font-mono">{teacher.email}</span>
-                <CopyButton value={teacher.email} label="e-mail za prijavu" />
-              </div>
-            }
-          />
-          <DetailRow
-            label="Trenutna lozinka"
-            value={
-              teacher.plainPassword ? (
+      {!isAdminAccount && (
+        <div className="bg-white rounded-xl border p-6 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-gray-700">Pristupni podaci</h2>
+            <ResetPasswordButton teacherId={teacher.id} teacherEmail={teacher.email} />
+          </div>
+          <dl>
+            <DetailRow
+              label="E-mail za prijavu"
+              value={
                 <div className="flex items-center gap-2">
-                  <span className="font-mono">{teacher.plainPassword}</span>
-                  <CopyButton value={teacher.plainPassword} label="lozinku" />
+                  <span className="font-mono">{teacher.email}</span>
+                  <CopyButton value={teacher.email} label="e-mail za prijavu" />
                 </div>
-              ) : (
-                <span className="text-gray-400 italic">
-                  Nije dostupna (nastavnik ju je promijenio)
-                </span>
-              )
-            }
-          />
-        </dl>
-      </div>
+              }
+            />
+            <DetailRow
+              label="Trenutna lozinka"
+              value={
+                teacher.plainPassword ? (
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono">{teacher.plainPassword}</span>
+                    <CopyButton value={teacher.plainPassword} label="lozinku" />
+                  </div>
+                ) : (
+                  <span className="text-gray-400 italic">
+                    Nije dostupna (nastavnik ju je promijenio)
+                  </span>
+                )
+              }
+            />
+          </dl>
+        </div>
+      )}
 
       {/* Assignments */}
       <div className="bg-white rounded-xl border p-6 mb-6">
@@ -159,19 +177,26 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
         />
       </div>
 
-      {/* Danger zone */}
-      <div className="border border-red-200 rounded-xl p-6">
-        <h2 className="text-sm font-semibold text-red-700 mb-2">Opasna zona</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Trajno brisanje računa nastavnika i svih njegovih dodjela grupama. Ova
-          radnja se ne može poništiti.
-        </p>
-        <DeleteTeacherDialog
-          teacherId={teacher.id}
-          teacherName={fullName}
-          assignmentCount={teacher.teacherAssignments.length}
-        />
+      {/* Work report */}
+      <div className="bg-white rounded-xl border p-6 mb-6">
+        <TeacherWorkReportCard report={workReport} />
       </div>
+
+      {/* Danger zone */}
+      {!isAdminAccount && (
+        <div className="border border-red-200 rounded-xl p-6">
+          <h2 className="text-sm font-semibold text-red-700 mb-2">Opasna zona</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Trajno brisanje računa nastavnika i svih njegovih dodjela grupama. Ova
+            radnja se ne može poništiti.
+          </p>
+          <DeleteTeacherDialog
+            teacherId={teacher.id}
+            teacherName={fullName}
+            assignmentCount={teacher.teacherAssignments.length}
+          />
+        </div>
+      )}
     </div>
   )
 }

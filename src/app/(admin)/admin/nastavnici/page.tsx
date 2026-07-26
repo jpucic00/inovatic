@@ -80,6 +80,11 @@ export default async function TeachersPage({ searchParams }: Readonly<PageProps>
                     >
                       {t.firstName} {t.lastName}
                     </Link>
+                    {t.role === 'ADMIN' && (
+                      <span className="ml-2 rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+                        Administrator
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     <div className="flex items-center gap-1.5">

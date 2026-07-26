@@ -113,6 +113,8 @@ model User {
   studentAssessments   StudentAssessment[] @relation("AssessmentStudent")
   authoredAssessments  StudentAssessment[] @relation("AssessmentAuthor")
   recordedAttendances  Attendance[]        @relation("AttendanceRecorder")
+  teacherAttendances   TeacherAttendance[] @relation("TeacherAttendanceTeacher")
+  recordedTeacherAttendances TeacherAttendance[] @relation("TeacherAttendanceRecorder")
   createdHolidays      SchoolYearHoliday[] @relation("HolidayCreator")
   sentEmailCampaigns   EmailCampaign[]     @relation("EmailCampaignSender")
 
@@ -275,6 +277,7 @@ model ScheduledGroup {
   course             Course              @relation(fields: [courseId], references: [id])
   location           Location            @relation(fields: [locationId, city], references: [id, city])
   teacherAssignments TeacherAssignment[]
+  teacherAttendances TeacherAttendance[]
   enrollments        Enrollment[]
   materials          Material[]
   materialHides      MaterialGroupHide[]
@@ -460,6 +463,29 @@ model Attendance {
 
   @@unique([enrollmentId, sessionDate])
   @@index([sessionDate])
+}
+
+/// Teaching hours, marked alongside student attendance. Deliberately keyed on
+/// (user, group, date) and NOT on TeacherAssignment: unassigning a teacher — or
+/// a stand-in covering one session — must never rewrite who worked which hour.
+/// The admin payout report reads these rows and nothing else.
+model TeacherAttendance {
+  id               String   @id @default(cuid())
+  userId           String
+  scheduledGroupId String
+  sessionDate      DateTime @db.Date
+  present          Boolean
+  recordedById     String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user           User           @relation("TeacherAttendanceTeacher", fields: [userId], references: [id], onDelete: Cascade)
+  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id], onDelete: Cascade)
+  recordedBy     User           @relation("TeacherAttendanceRecorder", fields: [recordedById], references: [id])
+
+  @@unique([userId, scheduledGroupId, sessionDate])
+  @@index([userId, sessionDate])
+  @@index([scheduledGroupId, sessionDate])
 }
 
 model Article {

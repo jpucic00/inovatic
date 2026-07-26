@@ -1,5 +1,6 @@
 'use server'
 
+import type { UserRole } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertGroupInCity, assertUserInCity } from '@/lib/city-guard'
@@ -23,6 +24,7 @@ type TeacherRow = {
   firstName: string
   lastName: string
   phone: string | null
+  role: UserRole
   createdAt: Date
   teacherAssignments: {
     id: string
@@ -76,15 +78,26 @@ export async function getTeachers(
   const { search, page = 1, pageSize = 20 } = filters
 
   const where = {
-    role: 'TEACHER' as const,
     deletedAt: null,
     city,
+    // A city ADMIN who also teaches (Šibenik) belongs in staff management so her
+    // groups and work report are reachable; a non-teaching admin never appears.
+    // Past hours count as teaching too — her report outlives the assignment.
+    OR: [
+      { role: 'TEACHER' as const },
+      { role: 'ADMIN' as const, teacherAssignments: { some: {} } },
+      { role: 'ADMIN' as const, teacherAttendances: { some: {} } },
+    ],
     ...(search
       ? {
-          OR: [
-            { firstName: { contains: search, mode: 'insensitive' as const } },
-            { lastName: { contains: search, mode: 'insensitive' as const } },
-            { email: { contains: search, mode: 'insensitive' as const } },
+          AND: [
+            {
+              OR: [
+                { firstName: { contains: search, mode: 'insensitive' as const } },
+                { lastName: { contains: search, mode: 'insensitive' as const } },
+                { email: { contains: search, mode: 'insensitive' as const } },
+              ],
+            },
           ],
         }
       : {}),
@@ -99,6 +112,7 @@ export async function getTeachers(
         firstName: true,
         lastName: true,
         phone: true,
+        role: true,
         createdAt: true,
         teacherAssignments: {
           select: {
@@ -132,9 +146,10 @@ export async function getTeachers(
 
 export async function getTeacher(id: string) {
   const { city } = await requireAdminCtx()
-  return db.user.findUnique({
-    where: { id, role: 'TEACHER', deletedAt: null, city },
+  const user = await db.user.findUnique({
+    where: { id, role: { in: ['TEACHER', 'ADMIN'] }, deletedAt: null, city },
     include: {
+      _count: { select: { teacherAttendances: true } },
       teacherAssignments: {
         include: {
           scheduledGroup: {
@@ -147,6 +162,16 @@ export async function getTeacher(id: string) {
       },
     },
   })
+  // An ADMIN is a staff-management row only if she actually teaches — currently
+  // assigned, or with hours already booked. A pure admin account stays out.
+  if (
+    user?.role === 'ADMIN' &&
+    user.teacherAssignments.length === 0 &&
+    user._count.teacherAttendances === 0
+  ) {
+    return null
+  }
+  return user
 }
 
 /** Used by the "Assign" combobox on the teacher detail page. */
@@ -424,6 +449,8 @@ export async function unassignTeacherFromGroup(
     const blocked = archivedYearError(assignment.scheduledGroup.schoolYear)
     if (blocked) return blocked
 
+    // Safe to remove: the teacher's TeacherAttendance rows for this group stay
+    // put, so hours already worked keep counting on the payout report.
     await db.teacherAssignment.delete({ where: { id: assignmentId } })
 
     revalidatePath(`/admin/nastavnici/${assignment.userId}`)

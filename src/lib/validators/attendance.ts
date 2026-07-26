@@ -21,6 +21,16 @@ export const bulkMarkSessionSchema = z.object({
       }),
     )
     .min(1, 'Unesite barem jedan zapis.'),
+  // Teaching hours. Omitted by a group with a single teacher — the server fills
+  // that one in automatically; with 2+ teachers the marker sends them all.
+  teacherEntries: z
+    .array(
+      z.object({
+        userId: z.string().min(1),
+        present: z.boolean(),
+      }),
+    )
+    .optional(),
 })
 
 export type BulkMarkSessionInput = z.infer<typeof bulkMarkSessionSchema>

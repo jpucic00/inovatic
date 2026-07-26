@@ -12,6 +12,8 @@ import type {
   AttendanceRecord,
   AttendanceRosterRow,
   GroupAttendance,
+  TeacherAttendanceRecord,
+  TeacherAttendanceRow,
 } from '@/actions/teacher/attendance'
 import { assignAdhocDateToSection } from '@/lib/attendance-sections'
 import { formatDate } from '@/lib/format'
@@ -90,6 +92,124 @@ function makeDraftHandlers(setDraft: Dispatch<SetStateAction<Draft>>): {
       }))
     },
   }
+}
+
+type TeacherDraft = Record<string, boolean>
+
+function indexTeacherRecords(
+  records: TeacherAttendanceRecord[],
+): Map<string, Map<string, boolean>> {
+  const map = new Map<string, Map<string, boolean>>()
+  for (const r of records) {
+    let byUser = map.get(r.sessionDate)
+    if (!byUser) {
+      byUser = new Map()
+      map.set(r.sessionDate, byUser)
+    }
+    byUser.set(r.userId, r.present)
+  }
+  return map
+}
+
+/** Assigned teachers default to present — the common case is "we both taught". */
+function initTeacherDraft(
+  teachers: TeacherAttendanceRow[],
+  existing: Map<string, boolean> | undefined,
+): TeacherDraft {
+  const draft: TeacherDraft = {}
+  for (const t of teachers) {
+    if (!t.assigned) continue
+    draft[t.userId] = existing?.get(t.userId) ?? true
+  }
+  return draft
+}
+
+function makeTeacherToggle(
+  setDraft: Dispatch<SetStateAction<TeacherDraft>>,
+): (userId: string) => void {
+  return (userId) => {
+    setDraft((prev) => ({ ...prev, [userId]: !(prev[userId] ?? true) }))
+  }
+}
+
+/** Only assigned teachers are bookable; the server enforces the same rule. */
+function toTeacherEntries(
+  teachers: TeacherAttendanceRow[],
+  draft: TeacherDraft,
+): { userId: string; present: boolean }[] {
+  return teachers
+    .filter((t) => t.assigned)
+    .map((t) => ({ userId: t.userId, present: draft[t.userId] ?? true }))
+}
+
+interface TeacherSectionProps {
+  teachers: TeacherAttendanceRow[]
+  draft: TeacherDraft
+  existing: Map<string, boolean> | undefined
+  onToggle: (userId: string) => void
+}
+
+/**
+ * Teaching hours for the selected session. Only shown when the group has more
+ * than one teacher — a single teacher is booked automatically on save.
+ */
+function TeacherSection({
+  teachers,
+  draft,
+  existing,
+  onToggle,
+}: Readonly<TeacherSectionProps>) {
+  const assigned = teachers.filter((t) => t.assigned)
+  const historic = teachers.filter((t) => !t.assigned && existing?.has(t.userId))
+  if (assigned.length < 2 && historic.length === 0) return null
+
+  return (
+    <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+        Nastavnici na terminu
+      </h4>
+      <p className="text-[11px] text-gray-500 mb-2.5">
+        Označite tko je stvarno održao ovaj termin — po tome se broje sati.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {assigned.map((t) => {
+          const present = draft[t.userId] ?? true
+          return (
+            <button
+              key={t.userId}
+              type="button"
+              onClick={() => onToggle(t.userId)}
+              aria-pressed={present}
+              className={[
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                present
+                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                  : 'bg-red-100 text-red-700 hover:bg-red-200',
+              ].join(' ')}
+            >
+              {present ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+              {t.name}
+            </button>
+          )
+        })}
+        {historic.map((t) => (
+          <span
+            key={t.userId}
+            title="Više nije dodijeljen ovoj grupi — evidentirani sati ostaju."
+            className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500"
+          >
+            {existing?.get(t.userId) ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <X className="w-3.5 h-3.5" />
+            )}
+            {t.name}
+            <span className="text-[9px] uppercase tracking-wide">bivši</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function scheduleHint(
@@ -323,10 +443,16 @@ function RadionicaAttendanceMarker({
   extraSessions,
   roster,
   records,
+  teachers,
+  teacherRecords,
 }: Readonly<RadionicaProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const recordIndex = useMemo(() => indexRecords(records), [records])
+  const teacherIndex = useMemo(
+    () => indexTeacherRecords(teacherRecords),
+    [teacherRecords],
+  )
   const [adhocDates, setAdhocDates] = useState<string[]>([])
   const allDates = useMemo(() => {
     const merged = [
@@ -342,11 +468,15 @@ function RadionicaAttendanceMarker({
   const [draft, setDraft] = useState<Draft>(() =>
     initDraft(roster, recordIndex.get(selected)),
   )
+  const [teacherDraft, setTeacherDraft] = useState<TeacherDraft>(() =>
+    initTeacherDraft(teachers, teacherIndex.get(selected)),
+  )
   const [newDateInput, setNewDateInput] = useState('')
 
   const handlePickDate = (key: string) => {
     setSelected(key)
     setDraft(initDraft(roster, recordIndex.get(key)))
+    setTeacherDraft(initTeacherDraft(teachers, teacherIndex.get(key)))
   }
 
   const handleAddAdhoc = () => {
@@ -359,12 +489,12 @@ function RadionicaAttendanceMarker({
     if (!adhocDates.includes(key) && !allDates.includes(key)) {
       setAdhocDates((prev) => [...prev, key])
     }
-    setSelected(key)
-    setDraft(initDraft(roster, recordIndex.get(key)))
+    handlePickDate(key)
     setNewDateInput('')
   }
 
   const { togglePresent, setNote } = makeDraftHandlers(setDraft)
+  const toggleTeacher = makeTeacherToggle(setTeacherDraft)
 
   const handleSave = () => {
     const entries = roster.map((r) => ({
@@ -377,6 +507,7 @@ function RadionicaAttendanceMarker({
         groupId,
         sessionDate: selected,
         entries,
+        teacherEntries: toTeacherEntries(teachers, teacherDraft),
       })
       if (res.success) {
         toast.success('Evidencija spremljena.')
@@ -445,6 +576,13 @@ function RadionicaAttendanceMarker({
           <SaveButton isPending={isPending} onClick={handleSave} />
         </header>
 
+        <TeacherSection
+          teachers={teachers}
+          draft={teacherDraft}
+          existing={teacherIndex.get(selected)}
+          onToggle={toggleTeacher}
+        />
+
         <RosterTable
           visibleRoster={roster}
           draft={draft}
@@ -511,10 +649,16 @@ function StandardAttendanceMarker({
   defaultSelectedDate,
   roster,
   records,
+  teachers,
+  teacherRecords,
 }: Readonly<StandardProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const recordIndex = useMemo(() => indexRecords(records), [records])
+  const teacherIndex = useMemo(
+    () => indexTeacherRecords(teacherRecords),
+    [teacherRecords],
+  )
 
   const [selected, setSelected] = useState<string>(defaultSelectedDate)
   const [adhocDates, setAdhocDates] = useState<string[]>([])
@@ -568,10 +712,14 @@ function StandardAttendanceMarker({
   const [draft, setDraft] = useState<Draft>(() =>
     initDraft(roster, recordIndex.get(defaultSelectedDate)),
   )
+  const [teacherDraft, setTeacherDraft] = useState<TeacherDraft>(() =>
+    initTeacherDraft(teachers, teacherIndex.get(defaultSelectedDate)),
+  )
 
   const handlePickDate = (key: string) => {
     setSelected(key)
     setDraft(initDraft(roster, recordIndex.get(key)))
+    setTeacherDraft(initTeacherDraft(teachers, teacherIndex.get(key)))
   }
 
   const handleAddAdhoc = () => {
@@ -588,12 +736,12 @@ function StandardAttendanceMarker({
       ) ||
       otherDates.includes(key)
     if (!alreadyKnown) setAdhocDates((prev) => [...prev, key])
-    setSelected(key)
-    setDraft(initDraft(roster, recordIndex.get(key)))
+    handlePickDate(key)
     setNewDateInput('')
   }
 
   const { togglePresent, setNote } = makeDraftHandlers(setDraft)
+  const toggleTeacher = makeTeacherToggle(setTeacherDraft)
 
   const handleSave = () => {
     const entries = visibleRoster.map((r) => ({
@@ -610,6 +758,7 @@ function StandardAttendanceMarker({
         groupId,
         sessionDate: selected,
         entries,
+        teacherEntries: toTeacherEntries(teachers, teacherDraft),
       })
       if (res.success) {
         toast.success('Evidencija spremljena.')
@@ -748,6 +897,13 @@ function StandardAttendanceMarker({
           </div>
           <SaveButton isPending={isPending} onClick={handleSave} />
         </header>
+
+        <TeacherSection
+          teachers={teachers}
+          draft={teacherDraft}
+          existing={teacherIndex.get(selected)}
+          onToggle={toggleTeacher}
+        />
 
         <RosterTable
           visibleRoster={visibleRoster}

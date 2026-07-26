@@ -55,6 +55,19 @@ export type AttendanceModuleSection = {
   lastSession: string | null
 }
 
+export type TeacherAttendanceRow = {
+  userId: string
+  name: string
+  /** False for a teacher who worked here in the past but is no longer assigned. */
+  assigned: boolean
+}
+
+export type TeacherAttendanceRecord = {
+  userId: string
+  sessionDate: string // YYYY-MM-DD
+  present: boolean
+}
+
 type GroupAttendanceBase = {
   groupId: string
   schoolYear: string
@@ -65,6 +78,9 @@ type GroupAttendanceBase = {
   endTime: string | null
   roster: AttendanceRosterRow[]
   records: AttendanceRecord[]
+  /** Assigned teachers first, then anyone with historic hours on this group. */
+  teachers: TeacherAttendanceRow[]
+  teacherRecords: TeacherAttendanceRecord[]
 }
 
 export type GroupAttendance =
@@ -149,6 +165,60 @@ type AttendanceEnrollment = Awaited<
 >[number]
 
 type HolidayDateKeys = Awaited<ReturnType<typeof loadHolidayDateKeys>>
+
+/**
+ * Teaching-hours roster for the marker: everyone currently assigned, plus any
+ * teacher who already has hours here (kept visible read-only, because those
+ * rows survive an unassignment).
+ */
+async function loadTeacherAttendance(groupId: string): Promise<{
+  teachers: TeacherAttendanceRow[]
+  teacherRecords: TeacherAttendanceRecord[]
+}> {
+  const [assignments, rows] = await Promise.all([
+    db.teacherAssignment.findMany({
+      where: { scheduledGroupId: groupId },
+      select: { user: { select: { id: true, firstName: true, lastName: true } } },
+    }),
+    db.teacherAttendance.findMany({
+      where: { scheduledGroupId: groupId },
+      select: {
+        userId: true,
+        sessionDate: true,
+        present: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+    }),
+  ])
+
+  const teachers = new Map<string, TeacherAttendanceRow>()
+  for (const a of assignments) {
+    teachers.set(a.user.id, {
+      userId: a.user.id,
+      name: `${a.user.firstName} ${a.user.lastName}`,
+      assigned: true,
+    })
+  }
+  for (const r of rows) {
+    if (teachers.has(r.userId)) continue
+    teachers.set(r.userId, {
+      userId: r.userId,
+      name: `${r.user.firstName} ${r.user.lastName}`,
+      assigned: false,
+    })
+  }
+
+  return {
+    teachers: Array.from(teachers.values()).sort(
+      (a, b) => Number(b.assigned) - Number(a.assigned) || a.name.localeCompare(b.name, 'hr'),
+    ),
+    teacherRecords: rows.map((r) => ({
+      userId: r.userId,
+      sessionDate: toDateKey(r.sessionDate),
+      present: r.present,
+    })),
+  }
+}
 
 /** Flatten each enrollment's Attendance rows into the flat record list the UI consumes. */
 function flattenAttendanceRecords(
@@ -298,7 +368,10 @@ export async function getGroupAttendance(
   const isCustom = group.course.isCustom
   const holidayDates = await loadHolidayDateKeys(schoolYear, group.city)
 
-  const enrollments = await loadAttendanceEnrollments(groupId, schoolYear)
+  const [enrollments, teacherData] = await Promise.all([
+    loadAttendanceEnrollments(groupId, schoolYear),
+    loadTeacherAttendance(groupId),
+  ])
 
   const roster: AttendanceRosterRow[] = enrollments.map((e) => ({
     enrollmentId: e.id,
@@ -319,6 +392,8 @@ export async function getGroupAttendance(
     endTime: group.endTime,
     roster,
     records,
+    teachers: teacherData.teachers,
+    teacherRecords: teacherData.teacherRecords,
   }
 
   return isCustom
@@ -369,9 +444,32 @@ function pickDefaultSelectedDate(
 }
 
 /**
+ * Resolve the teaching hours to write for this session.
+ *
+ * Explicit entries win (the marker sends one per assigned teacher whenever the
+ * group has more than one). A group with a single teacher needs no interaction:
+ * marking the students books that teacher's hour. Nothing is ever booked for
+ * someone who isn't assigned to the group — a stand-in must be assigned first.
+ */
+function resolveTeacherEntries(
+  provided: { userId: string; present: boolean }[] | undefined,
+  assignedUserIds: string[],
+): { userId: string; present: boolean }[] {
+  const assigned = new Set(assignedUserIds)
+  const entries = (provided ?? []).filter((e) => assigned.has(e.userId))
+  const covered = new Set(entries.map((e) => e.userId))
+
+  if (assignedUserIds.length === 1 && !covered.has(assignedUserIds[0])) {
+    entries.push({ userId: assignedUserIds[0], present: true })
+  }
+  return entries
+}
+
+/**
  * Mark a whole class session in one round-trip: validates that every
  * supplied enrollment belongs to this group + school year, then upserts each
- * row with the caller's id in `recordedById`.
+ * row with the caller's id in `recordedById`. Teaching hours are written in the
+ * same transaction — see `resolveTeacherEntries`.
  */
 export async function bulkMarkSession(
   input: BulkMarkSessionInput,
@@ -433,6 +531,34 @@ export async function bulkMarkSession(
               note: e.note || null,
               recordedById: recorderId,
             },
+          })
+        }
+
+        const assignments = await tx.teacherAssignment.findMany({
+          where: { scheduledGroupId: data.groupId },
+          select: { userId: true },
+        })
+        const teacherEntries = resolveTeacherEntries(
+          data.teacherEntries,
+          assignments.map((a) => a.userId),
+        )
+        for (const t of teacherEntries) {
+          await tx.teacherAttendance.upsert({
+            where: {
+              userId_scheduledGroupId_sessionDate: {
+                userId: t.userId,
+                scheduledGroupId: data.groupId,
+                sessionDate,
+              },
+            },
+            create: {
+              userId: t.userId,
+              scheduledGroupId: data.groupId,
+              sessionDate,
+              present: t.present,
+              recordedById: recorderId,
+            },
+            update: { present: t.present, recordedById: recorderId },
           })
         }
       },

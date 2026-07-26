@@ -268,6 +268,8 @@ async function syncTeacherAssignments(
   const toAdd = [...nextIds].filter((uid) => !currentIds.has(uid))
 
   if (toRemove.length > 0) {
+    // TeacherAttendance is keyed on (user, group, date), never on the
+    // assignment — hours already worked survive this.
     await tx.teacherAssignment.deleteMany({
       where: { scheduledGroupId: groupId, userId: { in: toRemove } },
     })

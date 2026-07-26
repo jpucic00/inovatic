@@ -5,6 +5,8 @@ import {
   formatDate,
   formatDateKey,
   formatGroupSchedule,
+  formatHours,
+  formatMonthYear,
 } from '@/lib/format'
 
 const utc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d, 12))
@@ -130,6 +132,22 @@ describe('formatGroupSchedule', () => {
 
   it('emits an empty string when no parts are supplied', () => {
     expect(formatGroupSchedule({})).toBe('')
+  })
+})
+
+describe('formatHours', () => {
+  it('renders minutes as Croatian hours with a decimal comma', () => {
+    expect(formatHours(90)).toBe('1,5 h')
+    expect(formatHours(60)).toBe('1 h')
+    expect(formatHours(750)).toBe('12,5 h')
+    expect(formatHours(0)).toBe('0 h')
+  })
+})
+
+describe('formatMonthYear', () => {
+  it('capitalizes the Croatian month name', () => {
+    expect(formatMonthYear(2026, 7)).toBe('Srpanj 2026.')
+    expect(formatMonthYear(2026, 1)).toBe('Siječanj 2026.')
   })
 })
 

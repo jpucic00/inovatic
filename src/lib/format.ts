@@ -53,6 +53,24 @@ export function formatModuleDateRange(start: Date, end: Date): string {
   return ` (${dd(start)}.${mm(start)}. – ${dd(end)}.${mm(end)}.${end.getFullYear()}.)`
 }
 
+/** Minutes as Croatian hours, e.g. 90 → "1,5 h". */
+export function formatHours(minutes: number): string {
+  const value = new Intl.NumberFormat('hr-HR', { maximumFractionDigits: 2 }).format(
+    minutes / 60,
+  )
+  return `${value} h`
+}
+
+/** Month heading, e.g. (2026, 7) → "Srpanj 2026.". `month` is 1-12. */
+export function formatMonthYear(year: number, month: number): string {
+  const label = new Intl.DateTimeFormat('hr-HR', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, 1)))
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
 type GroupScheduleParts = {
   isCustom?: boolean
   dayOfWeek?: string | null
