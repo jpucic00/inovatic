@@ -68,9 +68,14 @@ export const emailStyles = {
 interface EmailLayoutProps {
   preview: string
   children: ReactNode
+  /**
+   * Sign-off + contact block. Off for internal notifications (an email TO the
+   * association should not close with the association's own contact card).
+   */
+  showSignature?: boolean
 }
 
-export function EmailLayout({ preview, children }: EmailLayoutProps) {
+export function EmailLayout({ preview, children, showSignature = true }: EmailLayoutProps) {
   return (
     <Html>
       <Head />
@@ -88,36 +93,40 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
             </Link>
           </Section>
           {children}
-          <Hr style={emailStyles.hr} />
-          <Text style={emailStyles.footer}>
-            S poštovanjem,
-            <br />
-            <strong>Tim Inovatic</strong>
-            <br />
-            Udruga za robotiku &quot;Inovatic&quot;
-          </Text>
-          <Text style={emailStyles.footer}>
-            <strong>Kontakt Split</strong>
-            <br />
-            <Link href="mailto:prijave@udruga-inovatic.hr" style={emailStyles.link}>
-              prijave@udruga-inovatic.hr
-            </Link>
-            {' · '}
-            <Link href="tel:+385993936993" style={emailStyles.link}>
-              +385 99 393 6993
-            </Link>
-            <br />
-            <br />
-            <strong>Kontakt Šibenik</strong>
-            <br />
-            <Link href="mailto:prijave.sibenik@udruga-inovatic.hr" style={emailStyles.link}>
-              prijave.sibenik@udruga-inovatic.hr
-            </Link>
-            {' · '}
-            <Link href="tel:+385921689987" style={emailStyles.link}>
-              +385 92 168 9987
-            </Link>
-          </Text>
+          {showSignature && (
+            <>
+              <Hr style={emailStyles.hr} />
+              <Text style={emailStyles.footer}>
+                S poštovanjem,
+                <br />
+                <strong>Tim Inovatic</strong>
+                <br />
+                Udruga za robotiku &quot;Inovatic&quot;
+              </Text>
+              <Text style={emailStyles.footer}>
+                <strong>Kontakt Split</strong>
+                <br />
+                <Link href="mailto:prijave@udruga-inovatic.hr" style={emailStyles.link}>
+                  prijave@udruga-inovatic.hr
+                </Link>
+                {' · '}
+                <Link href="tel:+385993936993" style={emailStyles.link}>
+                  +385 99 393 6993
+                </Link>
+                <br />
+                <br />
+                <strong>Kontakt Šibenik</strong>
+                <br />
+                <Link href="mailto:prijave.sibenik@udruga-inovatic.hr" style={emailStyles.link}>
+                  prijave.sibenik@udruga-inovatic.hr
+                </Link>
+                {' · '}
+                <Link href="tel:+385921689987" style={emailStyles.link}>
+                  +385 92 168 9987
+                </Link>
+              </Text>
+            </>
+          )}
         </Container>
       </Body>
     </Html>

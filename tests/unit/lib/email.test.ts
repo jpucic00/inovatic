@@ -13,6 +13,8 @@ import {
   sendBulkMessageEmail,
   sendInquiryConfirmationEmail,
   sendScheduleOptionsEmail,
+  sendStemEducationConfirmationEmail,
+  sendStemEducationInquiryEmail,
   sendTeacherCredentialsEmail,
 } from '@/lib/email'
 
@@ -102,6 +104,38 @@ describe('email senders', () => {
     })
     expect(sent).toBe(false)
     expect(send).not.toHaveBeenCalled()
+  })
+
+  it('routes the STEM-education inquiry to the association inbox, reply-to the submitter', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendStemEducationInquiryEmail({
+      contactName: 'Ivana Ivić',
+      institutionName: 'OŠ Meje',
+      institutionType: 'Osnovna škola',
+      email: 'ivana.ivic@skole.hr',
+      services: ['Osnovna edukacija mentora'],
+      message: 'Trebamo edukaciju za tri učiteljice.',
+    })
+    expect(send.mock.calls[0][0]).toMatchObject({
+      to: 'prijave@udruga-inovatic.hr',
+      replyTo: 'ivana.ivic@skole.hr',
+      subject: 'Upit za STEM edukaciju – OŠ Meje',
+    })
+  })
+
+  it('sends the STEM-education confirmation to the submitter with the default reply-to', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendStemEducationConfirmationEmail({
+      to: 'ivana.ivic@skole.hr',
+      contactName: 'Ivana Ivić',
+      institutionName: 'OŠ Meje',
+      services: ['Osnovna edukacija mentora'],
+    })
+    expect(send.mock.calls[0][0]).toMatchObject({
+      to: 'ivana.ivic@skole.hr',
+      replyTo: 'prijave@udruga-inovatic.hr',
+      subject: 'Zaprimili smo vaš upit za STEM edukaciju – Inovatic',
+    })
   })
 
   it('surfaces a Resend in-band error (e.g. unverified domain) as a throw', async () => {

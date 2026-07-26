@@ -8,6 +8,7 @@ import { GearDecor } from '@/components/shared/decorations'
 import { db } from '@/lib/db'
 import { StatsSection } from '@/components/public/homepage/StatsSection'
 import { CoursesPreview } from '@/components/public/homepage/CoursesPreview'
+import { StemEducationSection } from '@/components/public/homepage/StemEducationSection'
 import { LocationsSection } from '@/components/public/homepage/LocationsSection'
 import { TestimonialsSection } from '@/components/public/homepage/TestimonialsSection'
 import { NewsSection } from '@/components/public/homepage/NewsSection'
@@ -183,6 +184,7 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <StemEducationSection />
       <LocationsSection />
       <TestimonialsSection />
       <NewsSection articles={latestNews} />

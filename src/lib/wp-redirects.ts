@@ -41,7 +41,10 @@ export const WP_REDIRECTS: Readonly<Record<string, string>> = {
   'o-projektu': '/o-nama',
   'o-partnerima': '/o-nama',
   'bilo-kuda-stem-svuda-projektne-aktivnosti': '/o-nama',
-  'stem-edukacija-za-ucitelje': '/o-nama',
+
+  // ── Mentor / teacher education (WP service pages → the live equivalent) ───
+  'stem-edukacija-za-ucitelje': '/stem-edukacija',
+  'stem-edukacija-za-mentore': '/stem-edukacija',
 
   // ── Standard SLR course pages ─────────────────────────────────────────────
   'svijet-lego-robotike-1': '/programi/slr-1',

@@ -1,8 +1,10 @@
 import { createElement } from 'react'
 import { render } from '@react-email/components'
-import { sendTransactionalEmail } from './client'
+import { ASSOCIATION_EMAIL, sendTransactionalEmail } from './client'
 import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
 import PartyInquiryConfirmationEmail from '../../../emails/party-inquiry-confirmation'
+import StemEducationInquiryEmail from '../../../emails/stem-education-inquiry'
+import StemEducationConfirmationEmail from '../../../emails/stem-education-confirmation'
 import ScheduleOptionsEmail, { type GroupOption } from '../../../emails/schedule-options'
 import AccountCredentialsEmail from '../../../emails/account-credentials'
 import TeacherCredentialsEmail from '../../../emails/teacher-credentials'
@@ -59,6 +61,52 @@ export function sendPartyInquiryConfirmationEmail(params: {
     react: createElement(PartyInquiryConfirmationEmail, {
       parentName: params.parentName,
       proposedDate: params.proposedDate,
+    }),
+  })
+}
+
+type StemEducationInquiryParams = {
+  contactName: string
+  institutionName: string
+  institutionType: string
+  email: string
+  phone?: string
+  /** Croatian service labels, already resolved from the submitted enum keys. */
+  services: string[]
+  trainingPlace?: string
+  message: string
+}
+
+/**
+ * Public /stem-edukacija submission → the association inbox. These inquiries
+ * are deliberately not persisted, so this email is the only record; reply-to is
+ * the submitter so staff answer them straight from the inbox.
+ */
+export function sendStemEducationInquiryEmail(
+  params: StemEducationInquiryParams,
+): Promise<boolean> {
+  return sendTransactionalEmail({
+    to: ASSOCIATION_EMAIL,
+    replyTo: params.email,
+    subject: `Upit za STEM edukaciju – ${params.institutionName}`,
+    react: createElement(StemEducationInquiryEmail, params),
+  })
+}
+
+/** Public /stem-edukacija confirmation → the person who submitted the form. */
+export function sendStemEducationConfirmationEmail(params: {
+  to: string
+  contactName: string
+  institutionName: string
+  services: string[]
+}): Promise<boolean> {
+  return sendTransactionalEmail({
+    to: params.to,
+    subject: 'Zaprimili smo vaš upit za STEM edukaciju – Inovatic',
+    react: createElement(StemEducationConfirmationEmail, {
+      contactName: params.contactName,
+      institutionName: params.institutionName,
+      services: params.services,
     }),
   })
 }
