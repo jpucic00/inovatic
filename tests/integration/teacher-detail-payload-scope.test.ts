@@ -55,6 +55,37 @@ describe('getTeacher — RSC payload scope', () => {
     expect(row.createdAt).toBeInstanceOf(Date)
   })
 
+  /**
+   * Pins the WHOLE key set, not just the absence of `passwordHash`. This value
+   * is serialized into the RSC payload verbatim, so the test is the standing
+   * proof of what reaches the browser — and it catches the actual failure mode,
+   * which is someone widening the query later and shipping a new column without
+   * noticing. Add a key here only together with a reason the page needs it.
+   */
+  it('ships exactly the fields the page renders and nothing else', async () => {
+    const admin = await createAdmin()
+    const teacher = await createTeacher()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const row = await getTeacher(teacher.id)
+    expect(row).not.toBeNull()
+    if (!row) return
+
+    expect(Object.keys(row).sort()).toEqual([
+      '_count',
+      'createdAt',
+      'deletedAt',
+      'email',
+      'firstName',
+      'id',
+      'lastName',
+      'phone',
+      'plainPassword',
+      'role',
+      'teacherAssignments',
+    ].sort())
+  })
+
   it('omits plainPassword for a teaching ADMIN, matching the hidden credentials block', async () => {
     const viewer = await createAdmin()
     const teachingAdmin = await createAdmin()
