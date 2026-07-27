@@ -79,7 +79,8 @@ function MonthBlock({ month }: Readonly<{ month: WorkReportMonth }>) {
 
 /**
  * Read-only payout basis: hours credited to this teacher in the current and
- * previous calendar month, derived from who last recorded each class session.
+ * previous calendar month, derived from this teacher's present TeacherAttendance
+ * rows and the group's session length — never from who recorded the students.
  */
 export function TeacherWorkReportCard({
   report,

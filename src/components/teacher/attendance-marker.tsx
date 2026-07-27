@@ -3,7 +3,8 @@
 import { useMemo, useState, useTransition } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Loader2, Plus, Save, X } from 'lucide-react'
+import { Check, Loader2, Lock, Plus, Save, X } from 'lucide-react'
+import type { MarkingWindow } from '@/lib/attendance-window'
 import { DateInput } from '@/components/ui/date-input'
 import { toast } from 'sonner'
 import { bulkMarkSession } from '@/actions/teacher/attendance'
@@ -132,6 +133,23 @@ function makeTeacherToggle(
   }
 }
 
+/** Picking a date resets both drafts to whatever is already recorded for it. */
+function makePickDate(ctx: {
+  setSelected: Dispatch<SetStateAction<string>>
+  setDraft: Dispatch<SetStateAction<Draft>>
+  setTeacherDraft: Dispatch<SetStateAction<TeacherDraft>>
+  roster: AttendanceRosterRow[]
+  recordIndex: Map<string, Map<string, AttendanceRecord>>
+  teachers: TeacherAttendanceRow[]
+  teacherIndex: Map<string, Map<string, boolean>>
+}): (key: string) => void {
+  return (key) => {
+    ctx.setSelected(key)
+    ctx.setDraft(initDraft(ctx.roster, ctx.recordIndex.get(key)))
+    ctx.setTeacherDraft(initTeacherDraft(ctx.teachers, ctx.teacherIndex.get(key)))
+  }
+}
+
 /** Only assigned teachers are bookable; the server enforces the same rule. */
 function toTeacherEntries(
   teachers: TeacherAttendanceRow[],
@@ -147,6 +165,7 @@ interface TeacherSectionProps {
   draft: TeacherDraft
   existing: Map<string, boolean> | undefined
   onToggle: (userId: string) => void
+  readOnly: boolean
 }
 
 /**
@@ -158,6 +177,7 @@ function TeacherSection({
   draft,
   existing,
   onToggle,
+  readOnly,
 }: Readonly<TeacherSectionProps>) {
   const assigned = teachers.filter((t) => t.assigned)
   const historic = teachers.filter((t) => !t.assigned && existing?.has(t.userId))
@@ -179,9 +199,12 @@ function TeacherSection({
               key={t.userId}
               type="button"
               onClick={() => onToggle(t.userId)}
+              disabled={readOnly}
               aria-pressed={present}
+              aria-label={`${t.name} — ${present ? 'prisutan' : 'odsutan'}`}
               className={[
                 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                'disabled:cursor-not-allowed disabled:opacity-60',
                 present
                   ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                   : 'bg-red-100 text-red-700 hover:bg-red-200',
@@ -308,6 +331,19 @@ function AdhocInputBox({ value, onChange, onAdd }: Readonly<AdhocInputProps>) {
   )
 }
 
+/**
+ * Why the selected session can no longer be written, or null when it can.
+ * Teachers get a window; admins get `null` and are never locked.
+ */
+function lockReason(window: MarkingWindow | null, dateKey: string): string | null {
+  if (!window) return null
+  if (dateKey > window.today) return 'Termin još nije održan.'
+  if (dateKey < window.firstOfMonth) {
+    return 'Prošli mjesec — za izmjenu se javite administratoru.'
+  }
+  return null
+}
+
 interface RosterTableProps {
   visibleRoster: AttendanceRosterRow[]
   draft: Draft
@@ -315,6 +351,7 @@ interface RosterTableProps {
   recordIndex: Map<string, Map<string, AttendanceRecord>>
   onToggle: (enrollmentId: string) => void
   onNote: (enrollmentId: string, note: string) => void
+  readOnly: boolean
 }
 
 function RosterTable({
@@ -324,6 +361,7 @@ function RosterTable({
   recordIndex,
   onToggle,
   onNote,
+  readOnly,
 }: Readonly<RosterTableProps>) {
   if (visibleRoster.length === 0) {
     return (
@@ -369,10 +407,12 @@ function RosterTable({
                     <button
                       type="button"
                       onClick={() => onToggle(r.enrollmentId)}
+                      disabled={readOnly}
                       aria-pressed={d.present}
                       aria-label={d.present ? 'Prisutan' : 'Odsutan'}
                       className={[
                         'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                        'disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-inherit',
                         d.present
                           ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                           : 'bg-red-100 text-red-700 hover:bg-red-200',
@@ -395,9 +435,10 @@ function RosterTable({
                     type="text"
                     value={d.note}
                     onChange={(e) => onNote(r.enrollmentId, e.target.value)}
-                    placeholder="npr. opravdano, zakasnio"
+                    readOnly={readOnly}
+                    placeholder={readOnly ? '' : 'npr. opravdano, zakasnio'}
                     aria-label={`Bilješka — ${r.lastName} ${r.firstName}`}
-                    className="w-full px-2 py-1 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="w-full px-2 py-1 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 read-only:bg-gray-50 read-only:text-gray-500"
                   />
                 </td>
               </tr>
@@ -445,6 +486,7 @@ function RadionicaAttendanceMarker({
   records,
   teachers,
   teacherRecords,
+  markingWindow,
 }: Readonly<RadionicaProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -473,11 +515,15 @@ function RadionicaAttendanceMarker({
   )
   const [newDateInput, setNewDateInput] = useState('')
 
-  const handlePickDate = (key: string) => {
-    setSelected(key)
-    setDraft(initDraft(roster, recordIndex.get(key)))
-    setTeacherDraft(initTeacherDraft(teachers, teacherIndex.get(key)))
-  }
+  const handlePickDate = makePickDate({
+    setSelected,
+    setDraft,
+    setTeacherDraft,
+    roster,
+    recordIndex,
+    teachers,
+    teacherIndex,
+  })
 
   const handleAddAdhoc = () => {
     if (!newDateInput) return
@@ -495,6 +541,7 @@ function RadionicaAttendanceMarker({
 
   const { togglePresent, setNote } = makeDraftHandlers(setDraft)
   const toggleTeacher = makeTeacherToggle(setTeacherDraft)
+  const locked = lockReason(markingWindow, selected)
 
   const handleSave = () => {
     const entries = roster.map((r) => ({
@@ -570,10 +617,12 @@ function RadionicaAttendanceMarker({
               {sessionLabel(selected)}
             </h3>
             <p className="text-xs text-gray-500">
-              Označite prisutnost za svakog polaznika i spremite.
+              {locked
+                ? 'Evidencija je samo za pregled.'
+                : 'Označite prisutnost za svakog polaznika i spremite.'}
             </p>
           </div>
-          <SaveButton isPending={isPending} onClick={handleSave} />
+          <SaveButton isPending={isPending} onClick={handleSave} locked={locked} />
         </header>
 
         <TeacherSection
@@ -581,6 +630,7 @@ function RadionicaAttendanceMarker({
           draft={teacherDraft}
           existing={teacherIndex.get(selected)}
           onToggle={toggleTeacher}
+          readOnly={locked !== null}
         />
 
         <RosterTable
@@ -590,6 +640,7 @@ function RadionicaAttendanceMarker({
           recordIndex={recordIndex}
           onToggle={togglePresent}
           onNote={setNote}
+          readOnly={locked !== null}
         />
       </section>
     </div>
@@ -599,7 +650,18 @@ function RadionicaAttendanceMarker({
 function SaveButton({
   isPending,
   onClick,
-}: Readonly<{ isPending: boolean; onClick: () => void }>) {
+  locked,
+}: Readonly<{ isPending: boolean; onClick: () => void; locked: string | null }>) {
+  // Outside the marking window there is nothing to save, so show the reason
+  // instead of a button that would only fail server-side.
+  if (locked) {
+    return (
+      <p className="flex items-center gap-1.5 shrink-0 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+        <Lock className="w-3.5 h-3.5 shrink-0" />
+        {locked}
+      </p>
+    )
+  }
   return (
     <button
       type="button"
@@ -651,6 +713,7 @@ function StandardAttendanceMarker({
   records,
   teachers,
   teacherRecords,
+  markingWindow,
 }: Readonly<StandardProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -716,11 +779,15 @@ function StandardAttendanceMarker({
     initTeacherDraft(teachers, teacherIndex.get(defaultSelectedDate)),
   )
 
-  const handlePickDate = (key: string) => {
-    setSelected(key)
-    setDraft(initDraft(roster, recordIndex.get(key)))
-    setTeacherDraft(initTeacherDraft(teachers, teacherIndex.get(key)))
-  }
+  const handlePickDate = makePickDate({
+    setSelected,
+    setDraft,
+    setTeacherDraft,
+    roster,
+    recordIndex,
+    teachers,
+    teacherIndex,
+  })
 
   const handleAddAdhoc = () => {
     if (!newDateInput) return
@@ -742,6 +809,7 @@ function StandardAttendanceMarker({
 
   const { togglePresent, setNote } = makeDraftHandlers(setDraft)
   const toggleTeacher = makeTeacherToggle(setTeacherDraft)
+  const locked = lockReason(markingWindow, selected)
 
   const handleSave = () => {
     const entries = visibleRoster.map((r) => ({
@@ -892,10 +960,12 @@ function StandardAttendanceMarker({
               ) : null}
             </h3>
             <p className="text-xs text-gray-500">
-              Označite prisutnost za svakog polaznika i spremite.
+              {locked
+                ? 'Evidencija je samo za pregled.'
+                : 'Označite prisutnost za svakog polaznika i spremite.'}
             </p>
           </div>
-          <SaveButton isPending={isPending} onClick={handleSave} />
+          <SaveButton isPending={isPending} onClick={handleSave} locked={locked} />
         </header>
 
         <TeacherSection
@@ -903,6 +973,7 @@ function StandardAttendanceMarker({
           draft={teacherDraft}
           existing={teacherIndex.get(selected)}
           onToggle={toggleTeacher}
+          readOnly={locked !== null}
         />
 
         <RosterTable
@@ -912,6 +983,7 @@ function StandardAttendanceMarker({
           recordIndex={recordIndex}
           onToggle={togglePresent}
           onNote={setNote}
+          readOnly={locked !== null}
         />
       </section>
     </div>

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
+import { zagrebDateKey } from '@/lib/attendance-window'
 import { mockSession } from '../setup'
 import {
   createAdmin,
@@ -37,6 +38,10 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 const { bulkMarkSession, getGroupAttendance } = await import('@/actions/teacher/attendance')
 const { getStudentAttendance } = await import('@/actions/admin/attendance')
+
+// Teachers may only mark the current month up to today, so these fixtures use
+// today rather than a hardcoded date that would age out of the window.
+const MARK_DATE = zagrebDateKey(new Date())
 
 // Roster scoping — migrated from the C5 case ("attendance roster only includes
 // own-group students") removed from tests/phase3/25-attendance.spec.ts.
@@ -111,7 +116,7 @@ describe('bulkMarkSession — session marking', () => {
     mockSession({ id: teacher.id, role: 'TEACHER' })
     const result = await bulkMarkSession({
       groupId: group.id,
-      sessionDate: '2026-03-02',
+      sessionDate: MARK_DATE,
       entries: [
         { enrollmentId: enrollmentA.id, present: true },
         { enrollmentId: enrollmentB.id, present: false, note: 'Bolestan' },
@@ -137,14 +142,14 @@ describe('bulkMarkSession — session marking', () => {
     mockSession({ id: teacher.id, role: 'TEACHER' })
     const first = await bulkMarkSession({
       groupId: group.id,
-      sessionDate: '2026-03-09',
+      sessionDate: MARK_DATE,
       entries: [{ enrollmentId: enrollment.id, present: true }],
     })
     expect(first.success).toBe(true)
 
     const second = await bulkMarkSession({
       groupId: group.id,
-      sessionDate: '2026-03-09',
+      sessionDate: MARK_DATE,
       entries: [{ enrollmentId: enrollment.id, present: false, note: 'Stigao kasno' }],
     })
     expect(second.success).toBe(true)
@@ -168,7 +173,7 @@ describe('bulkMarkSession — session marking', () => {
     mockSession({ id: teacher.id, role: 'TEACHER' })
     const result = await bulkMarkSession({
       groupId: ownGroup.id,
-      sessionDate: '2026-03-02',
+      sessionDate: MARK_DATE,
       entries: [{ enrollmentId: foreignEnrollment.id, present: true }],
     })
 
@@ -192,7 +197,7 @@ describe('bulkMarkSession — session marking', () => {
     await expect(
       bulkMarkSession({
         groupId: group.id,
-        sessionDate: '2026-03-02',
+        sessionDate: MARK_DATE,
         entries: [{ enrollmentId: enrollment.id, present: true }],
       }),
     ).rejects.toThrow(/NEXT_NOT_FOUND/)

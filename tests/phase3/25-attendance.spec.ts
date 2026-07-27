@@ -5,6 +5,8 @@ import {
   loginWithEmail,
   collectGroupIds,
   markSession,
+  markableToday,
+  croatianDateRegex,
   expectNotFoundPage,
   type TeacherData,
   type StudentData,
@@ -49,7 +51,9 @@ const OTHER_STUDENT: StudentData = {
   parentPhone: '0911117778',
 }
 
-const SESSION_DATE = '2026-03-17'
+// Teachers may only record the current month up to today, so this must be
+// derived rather than hardcoded — a fixed date ages out of the window.
+const SESSION_DATE = markableToday()
 const RE_MARK_NOTE = 'Opravdano – bolest'
 
 type Seeded = {
@@ -95,7 +99,7 @@ test.describe('Phase 3 Step 14 — Attendance', () => {
     if (!seeded) throw new Error('not seeded')
     test.setTimeout(180000)
 
-    await test.step('Teacher marks 17.03.2026 session', async () => {
+    await test.step('Teacher marks the session', async () => {
       await loginWithEmail(page, seeded!.teacher.email, seeded!.teacher.password)
       await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
       await markSession(page, seeded!.groupId, SESSION_DATE)
@@ -108,14 +112,14 @@ test.describe('Phase 3 Step 14 — Attendance', () => {
         page.getByRole('heading', { name: 'Evidencija dolaska' }),
         'admin attendance panel heading is visible',
       ).toBeVisible()
-      const croDateRegex = /17\.\s?03\.\s?2026\./
+      const croDateRegex = croatianDateRegex(SESSION_DATE)
       const attendanceSection = page
         .locator('div')
         .filter({ has: page.getByRole('heading', { name: 'Evidencija dolaska' }) })
         .first()
       await expect(
         attendanceSection.getByText(croDateRegex).first(),
-        'session date "17.03.2026." is rendered',
+        'the marked session date is rendered',
       ).toBeVisible()
       await expect(
         attendanceSection.getByText('Prisutan').first(),
@@ -128,7 +132,7 @@ test.describe('Phase 3 Step 14 — Attendance', () => {
       await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
       await page.goto(`${BASE}/nastavnik/grupa/${seeded!.groupId}/dolazak`)
 
-      const dateButton = page.getByRole('button', { name: /17\.\s?03\.\s?2026\./ })
+      const dateButton = page.getByRole('button', { name: croatianDateRegex(SESSION_DATE) })
       await dateButton.first().click()
 
       const studentFullName = `${STUDENT.lastName} ${STUDENT.firstName}`
@@ -150,7 +154,7 @@ test.describe('Phase 3 Step 14 — Attendance', () => {
     await test.step('Admin sees updated row: no duplicate, status=Odsutan, note persisted', async () => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/ucenici/${seeded!.studentId}`)
-      const croDateRegex = /17\.\s?03\.\s?2026\./
+      const croDateRegex = croatianDateRegex(SESSION_DATE)
       const dateCells = page.locator('td').filter({ hasText: croDateRegex })
       await expect(
         dateCells,

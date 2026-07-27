@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
 import { monthWindows } from '@/lib/teacher-work-report'
+import { zagrebDateKey } from '@/lib/attendance-window'
 import { mockSession } from './setup'
 import {
   createAdmin,
@@ -45,6 +46,18 @@ function dateKeyOf(window: { year: number; month: number }, day: number): string
 
 /** A date safely outside both report windows. */
 const LONG_AGO = new Date(WINDOWS.previous.start.getTime() - 40 * DAY_MS)
+
+/**
+ * A date a TEACHER is still allowed to mark: this month, never in the future.
+ * Fixed days-of-month would fail whenever the suite runs early in a month.
+ * Distinctness degrades near the 1st, which is harmless — the uniqueness key is
+ * (teacher, group, date) and each test builds its own group.
+ */
+function markableDateKey(daysAgo = 0): string {
+  const today = zagrebDateKey(new Date())
+  const day = Math.max(1, Number(today.slice(8, 10)) - daysAgo)
+  return `${today.slice(0, 8)}${String(day).padStart(2, '0')}`
+}
 
 beforeAll(async () => {
   await db.schoolYear.upsert({ where: { label: SY }, create: { label: SY }, update: {} })
@@ -147,7 +160,7 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
     const res = await bulkMarkSession({
       groupId: group.id,
-      sessionDate: dateKeyOf(WINDOWS.current, 7),
+      sessionDate: markableDateKey(0),
       entries: [{ enrollmentId: enrollment.id, present: true, note: null }],
     })
     expect(res).toEqual({ success: true })
@@ -168,7 +181,7 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     mockSession({ id: present.id, role: 'TEACHER', city: 'SPLIT' })
     await bulkMarkSession({
       groupId: group.id,
-      sessionDate: dateKeyOf(WINDOWS.current, 14),
+      sessionDate: markableDateKey(1),
       entries: [{ enrollmentId: enrollment.id, present: true, note: null }],
       teacherEntries: [
         { userId: present.id, present: true },
@@ -191,7 +204,7 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     mockSession({ id: first.id, role: 'TEACHER', city: 'SPLIT' })
     await bulkMarkSession({
       groupId: group.id,
-      sessionDate: dateKeyOf(WINDOWS.current, 15),
+      sessionDate: markableDateKey(2),
       entries: [{ enrollmentId: enrollment.id, present: true, note: null }],
     })
 
@@ -210,7 +223,7 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
     await bulkMarkSession({
       groupId: group.id,
-      sessionDate: dateKeyOf(WINDOWS.current, 16),
+      sessionDate: markableDateKey(3),
       entries: [{ enrollmentId: enrollment.id, present: true, note: null }],
       teacherEntries: [{ userId: outsider.id, present: true }],
     })
@@ -228,7 +241,7 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
     await bulkMarkSession({
       groupId: group.id,
-      sessionDate: dateKeyOf(WINDOWS.current, 17),
+      sessionDate: markableDateKey(4),
       entries: [{ enrollmentId: enrollment.id, present: true, note: null }],
     })
 
@@ -241,7 +254,7 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     const teacher = await createTeacher()
     const { group, enrollment } = await groupWithStudent()
     await createTeacherAssignment(teacher.id, group.id)
-    const sessionDate = dateKeyOf(WINDOWS.current, 18)
+    const sessionDate = markableDateKey(5)
 
     mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
     for (const present of [true, false, true]) {
@@ -257,6 +270,94 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
   })
 })
 
+// Teaching hours are the payout basis, so a teacher may only record the current
+// month up to today — no marking classes that haven't happened, and no filling
+// in a whole month after the fact. Admins keep the unrestricted correction path.
+describe('bulkMarkSession — the teacher marking window', () => {
+  async function teacherOnGroup() {
+    const teacher = await createTeacher()
+    const { group, enrollment } = await groupWithStudent()
+    await createTeacherAssignment(teacher.id, group.id)
+    mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
+    return { teacher, group, enrollment }
+  }
+
+  function mark(groupId: string, enrollmentId: string, sessionDate: string) {
+    return bulkMarkSession({
+      groupId,
+      sessionDate,
+      entries: [{ enrollmentId, present: true, note: null }],
+    })
+  }
+
+  /** `daysAhead` days after today, in the same Zagreb-anchored key format. */
+  function futureDateKey(daysAhead: number): string {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() + daysAhead)
+    return zagrebDateKey(d)
+  }
+
+  it('rejects a future session and writes nothing', async () => {
+    const { teacher, group, enrollment } = await teacherOnGroup()
+
+    const res = await mark(group.id, enrollment.id, futureDateKey(3))
+
+    expect(res.success).toBe(false)
+    expect(res.success === false && res.error).toMatch(/budući termin/)
+    // Neither the student roster nor the teacher's hours may be touched.
+    expect(await db.attendance.count({ where: { enrollmentId: enrollment.id } })).toBe(0)
+    await adminSession()
+    expect((await getTeacherWorkReport(teacher.id)).current.sessionCount).toBe(0)
+  })
+
+  it('rejects a session in the previous month', async () => {
+    const { teacher, group, enrollment } = await teacherOnGroup()
+
+    const res = await mark(group.id, enrollment.id, dateKeyOf(WINDOWS.previous, 15))
+
+    expect(res.success).toBe(false)
+    expect(res.success === false && res.error).toMatch(/tekućeg mjeseca/)
+    await adminSession()
+    expect((await getTeacherWorkReport(teacher.id)).previous.sessionCount).toBe(0)
+  })
+
+  it('accepts today', async () => {
+    const { teacher, group, enrollment } = await teacherOnGroup()
+
+    expect(await mark(group.id, enrollment.id, markableDateKey(0))).toEqual({ success: true })
+
+    await adminSession()
+    expect((await getTeacherWorkReport(teacher.id)).current.sessionCount).toBe(1)
+  })
+
+  it('accepts the 1st of the current month', async () => {
+    const { group, enrollment } = await teacherOnGroup()
+    const firstOfMonth = `${zagrebDateKey(new Date()).slice(0, 8)}01`
+
+    expect(await mark(group.id, enrollment.id, firstOfMonth)).toEqual({ success: true })
+  })
+
+  it('lets an ADMIN record a previous-month session the teacher cannot', async () => {
+    const teacher = await createTeacher()
+    const { group, enrollment } = await groupWithStudent()
+    await createTeacherAssignment(teacher.id, group.id)
+    const pastDate = dateKeyOf(WINDOWS.previous, 12)
+
+    mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
+    expect((await mark(group.id, enrollment.id, pastDate)).success).toBe(false)
+
+    const admin = await adminSession()
+    expect(await mark(group.id, enrollment.id, pastDate)).toEqual({ success: true })
+    expect(
+      await db.attendance.count({
+        where: { enrollmentId: enrollment.id, sessionDate: new Date(`${pastDate}T00:00:00.000Z`) },
+      }),
+    ).toBe(1)
+    // The admin is not assigned to the group, so no hours are booked for them.
+    expect((await getTeacherWorkReport(admin.id)).previous.sessionCount).toBe(0)
+  })
+})
+
 describe('hours survive the assignment', () => {
   it('keeps the teacher’s hours after they are removed from the group', async () => {
     const teacher = await createTeacher()
@@ -266,7 +367,7 @@ describe('hours survive the assignment', () => {
     mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
     await bulkMarkSession({
       groupId: group.id,
-      sessionDate: dateKeyOf(WINDOWS.current, 20),
+      sessionDate: markableDateKey(6),
       entries: [{ enrollmentId: enrollment.id, present: true, note: null }],
     })
 

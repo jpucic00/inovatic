@@ -218,6 +218,15 @@ export async function createStudentInGroup(
       .waitFor({ state: 'attached', timeout: 3000 })
       .catch(() => null)
     if ((await radio.count()) > 0) {
+      // A full group renders a disabled radio; checking it retries for minutes
+      // and then reports as whatever test happened to own this beforeAll. Fail
+      // fast with the real reason instead.
+      if (await radio.first().isDisabled()) {
+        throw new Error(
+          `group ${groupId} is at capacity — its radio is disabled. Clear the fixture group's ` +
+            `enrolments (see .claude/validate.md) or re-run 20-bootstrap.spec.ts.`,
+        )
+      }
       await radio.check()
       found = true
       break
@@ -409,6 +418,15 @@ export async function markSession(page: Page, groupId: string, date: string) {
   ).toBeVisible({ timeout: 5000 })
   await page.getByRole('button', { name: 'Spremi' }).click()
   await expect(page.getByText('Evidencija spremljena.')).toBeVisible({ timeout: 15000 })
+}
+
+/**
+ * Today's Europe/Zagreb date as `YYYY-MM-DD`. Teachers may only record the
+ * current month up to today, so any spec that marks a session through the
+ * teacher UI must use this rather than a hardcoded date that ages out.
+ */
+export function markableToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Zagreb' })
 }
 
 /** Match Croatian `dd.MM.yyyy.` / `dd. MM. yyyy.` rendering of an ISO date. */

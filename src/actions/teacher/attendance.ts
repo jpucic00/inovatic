@@ -15,6 +15,11 @@ import {
   type GroupModuleArcEntry,
 } from '@/lib/group-module-arc'
 import { assignAdhocDateToSection } from '@/lib/attendance-sections'
+import {
+  teacherMarkingError,
+  teacherMarkingWindow,
+  type MarkingWindow,
+} from '@/lib/attendance-window'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import {
   bulkMarkSessionSchema,
@@ -81,6 +86,8 @@ type GroupAttendanceBase = {
   /** Assigned teachers first, then anyone with historic hours on this group. */
   teachers: TeacherAttendanceRow[]
   teacherRecords: TeacherAttendanceRecord[]
+  /** The dates this viewer may still write. Null for an admin — no limit. */
+  markingWindow: MarkingWindow | null
 }
 
 export type GroupAttendance =
@@ -361,7 +368,7 @@ function buildStandardAttendance(
 export async function getGroupAttendance(
   groupId: string,
 ): Promise<GroupAttendance> {
-  await assertTeacherOwnsGroup(groupId)
+  const { session } = await assertTeacherOwnsGroup(groupId)
 
   const group = await loadAttendanceGroup(groupId)
   const schoolYear = group.schoolYear
@@ -394,6 +401,9 @@ export async function getGroupAttendance(
     records,
     teachers: teacherData.teachers,
     teacherRecords: teacherData.teacherRecords,
+    // Admins keep the unrestricted correction path; teachers see past sessions
+    // read-only so the arc stays visible without offering a dead Save button.
+    markingWindow: session.user.role === 'TEACHER' ? teacherMarkingWindow(new Date()) : null,
   }
 
   return isCustom
@@ -481,6 +491,14 @@ export async function bulkMarkSession(
   const data = parsed.data
 
   const { session } = await assertTeacherOwnsGroup(data.groupId)
+
+  // Teaching hours are payout basis, so a TEACHER may only record the current
+  // month up to today. Admins keep the unrestricted path in
+  // `src/actions/admin/attendance.ts` for genuinely missed sessions.
+  if (session.user.role === 'TEACHER') {
+    const windowError = teacherMarkingError(data.sessionDate, new Date())
+    if (windowError) return { success: false, error: windowError }
+  }
 
   const enrollmentIds = data.entries.map((e) => e.enrollmentId)
   const sessionDate = fromDateKey(data.sessionDate)

@@ -11,6 +11,7 @@
  */
 
 import { toDateKey } from './session-dates'
+import { zagrebDateKey } from './attendance-window'
 
 export type WorkReportGroup = {
   id: string
@@ -105,12 +106,7 @@ function monthWindow(year: number, month: number): MonthWindow {
  * compare exactly.
  */
 export function monthWindows(now: Date): { current: MonthWindow; previous: MonthWindow } {
-  const key = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Zagreb',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now)
+  const key = zagrebDateKey(now)
   const year = Number(key.slice(0, 4))
   const month = Number(key.slice(5, 7))
   return {
