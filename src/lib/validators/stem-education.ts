@@ -60,7 +60,14 @@ export const stemEducationInquirySchema = z.object({
     .string()
     .trim()
     .min(2, 'Unesite naziv ustanove (najmanje 2 znaka)')
-    .max(200, 'Naziv ustanove može imati najviše 200 znakova'),
+    .max(200, 'Naziv ustanove može imati najviše 200 znakova')
+    // This is the one place raw visitor text reaches a mail header
+    // (`Upit za STEM edukaciju – ${institutionName}`). `.trim()` strips only the
+    // ends, so interior CR/LF survives — verified: the schema accepted
+    // 'OS Meje\r\nBcc: x@y.com'. Resend's JSON API almost certainly encodes it,
+    // so this is defence in depth rather than a live exploit.
+    // eslint-disable-next-line no-control-regex
+    .transform((s) => s.replace(/[\u0000-\u001f]+/g, ' ').trim()),
   email: z
     .string()
     .trim()

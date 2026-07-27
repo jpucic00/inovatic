@@ -61,12 +61,20 @@ describe('sessionMinutes', () => {
 describe('monthWindows', () => {
   it('spans the current month and the one before it', () => {
     const w = monthWindows(new Date('2026-07-15T10:00:00.000Z'))
-    expect(w.current).toMatchObject({ year: 2026, month: 7 })
-    expect(w.current.start.toISOString()).toBe('2026-07-01T00:00:00.000Z')
-    expect(w.current.end.toISOString()).toBe('2026-07-31T00:00:00.000Z')
-    expect(w.previous).toMatchObject({ year: 2026, month: 6 })
-    expect(w.previous.start.toISOString()).toBe('2026-06-01T00:00:00.000Z')
-    expect(w.previous.end.toISOString()).toBe('2026-06-30T00:00:00.000Z')
+    // Date keys, not Dates: these cross a 'use server' boundary via
+    // getTeacherWorkReport, which returns serializable values only.
+    expect(w.current).toEqual({
+      year: 2026,
+      month: 7,
+      startKey: '2026-07-01',
+      endKey: '2026-07-31',
+    })
+    expect(w.previous).toEqual({
+      year: 2026,
+      month: 6,
+      startKey: '2026-06-01',
+      endKey: '2026-06-30',
+    })
   })
 
   it('rolls the previous month across the new year', () => {

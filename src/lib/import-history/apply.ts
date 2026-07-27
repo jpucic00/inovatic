@@ -52,10 +52,10 @@ export async function applyImportPlan(
   const teacherIds = new Map<string, string>()
   for (const t of plan.teachers) {
     if (t.action === 'match') {
-      teacherIds.set(t.key, t.existingId!)
+      teacherIds.set(t.key, t.existingId)
       continue
     }
-    const existing = await db.user.findUnique({ where: { email: t.email! } })
+    const existing = await db.user.findUnique({ where: { email: t.email } })
     if (existing) {
       teacherIds.set(t.key, existing.id)
       continue
@@ -64,7 +64,7 @@ export async function applyImportPlan(
       data: {
         city: 'SPLIT',
         role: 'TEACHER',
-        email: t.email!,
+        email: t.email,
         firstName: t.firstName,
         lastName: t.lastName,
         passwordHash: await unusablePasswordHash(),
@@ -127,9 +127,9 @@ export async function applyImportPlan(
   const studentIds = new Map<string, string>()
   for (const s of plan.students) {
     if (s.action === 'match') {
-      studentIds.set(s.key, s.existingId!)
+      studentIds.set(s.key, s.existingId)
       const current = await db.user.findUnique({
-        where: { id: s.existingId! },
+        where: { id: s.existingId },
         select: { parentName: true, parentEmail: true, parentPhone: true },
       })
       if (current) {
@@ -143,14 +143,14 @@ export async function applyImportPlan(
         }
         if (!current.parentPhone && s.parentPhone) backfill.parentPhone = s.parentPhone
         if (Object.keys(backfill).length > 0) {
-          await db.user.update({ where: { id: s.existingId! }, data: backfill })
+          await db.user.update({ where: { id: s.existingId }, data: backfill })
           result.studentsBackfilled++
         }
       }
       continue
     }
 
-    const existing = await db.user.findUnique({ where: { email: s.email! }, select: { id: true } })
+    const existing = await db.user.findUnique({ where: { email: s.email }, select: { id: true } })
     if (existing) {
       studentIds.set(s.key, existing.id)
       continue
@@ -159,8 +159,8 @@ export async function applyImportPlan(
       data: {
         city: 'SPLIT',
         role: 'STUDENT',
-        email: s.email!,
-        username: s.username!,
+        email: s.email,
+        username: s.username,
         firstName: s.firstName,
         lastName: s.lastName,
         parentName: s.parentName,

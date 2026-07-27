@@ -12,7 +12,7 @@ const base: StudentAssessmentReadonly = {
   zabava: 'OSTVARENO',
   opisnaOcjena: 'Vrlo motiviran polaznik.',
   recommendationLabel: 'Svijet LEGO robotike 2',
-  updatedAt: new Date('2027-06-15T10:00:00Z'),
+  updatedAtLabel: '15.06.2027.',
   authorName: 'Ana Anić',
 }
 

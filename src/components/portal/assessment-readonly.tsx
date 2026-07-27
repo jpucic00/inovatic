@@ -8,7 +8,6 @@ import {
   SKILL_LEVEL_LABELS,
   type SkillKey,
 } from '@/lib/assessment-rubric'
-import { formatDate } from '@/lib/format'
 import type { StudentAssessmentReadonly } from '@/actions/student/assessment'
 
 /**
@@ -131,7 +130,7 @@ export function AssessmentReadonly({
 
         <p className="border-t border-gray-100 pt-3 text-xs text-gray-400">
           Ocijenio: {assessment.authorName} ·{' '}
-          {formatDate(new Date(assessment.updatedAt))}
+          {assessment.updatedAtLabel}
         </p>
       </div>
     </div>

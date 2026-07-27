@@ -16,6 +16,20 @@
  * politika-privatnosti) need no entry — their static routes win before the
  * dynamic [slug] segment. /kontakt is redirected in next.config.ts.
  */
+/**
+ * Shape gate for the root `[slug]` catcher, applied AFTER the map above and
+ * BEFORE the article lookup. Every migrated slug is lowercase alphanumeric with
+ * hyphens (verified against all 96 rows; longest is 84 chars), so anything else
+ * cannot match — and bot traffic against `/<random>`, `/.env`, `/wp-admin.php`
+ * then 404s without costing a Neon pooled-connection round trip.
+ */
+const WP_SLUG_PATTERN = /^[a-z0-9-]+$/
+const MAX_SLUG_LENGTH = 120
+
+export function couldBeArticleSlug(slug: string): boolean {
+  return slug.length > 0 && slug.length <= MAX_SLUG_LENGTH && WP_SLUG_PATTERN.test(slug)
+}
+
 export const WP_REDIRECTS: Readonly<Record<string, string>> = {
   // ── Articles renamed during migration (WP slug → new slug) ───────────────
   'inovatic-ostvario-povijesni-uspjeh-na-drzavnom-finalu-world-robot-olympiad-pet-trofeja-europski-i-svjetski-plasman':

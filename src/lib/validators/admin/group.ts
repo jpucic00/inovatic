@@ -1,6 +1,66 @@
 import { z } from 'zod'
 import { DAYS_HR } from '@/lib/format'
 
+/**
+ * The time regex allows one or two hour digits — '9:00' and '09:00' both occur
+ * in real input — so string comparison is wrong ('9:00' > '18:00'). Compare
+ * minutes since midnight instead.
+ */
+function toMinutes(hhmm: string): number {
+  const [hours, minutes] = hhmm.split(':')
+  return Number(hours) * 60 + Number(minutes)
+}
+
+/**
+ * Shared by create and update: the date pair must be complete and ordered, and
+ * the session must have positive length.
+ *
+ * An equal or inverted time range used to save happily and then crash
+ * `/admin/grupe` outright — `buildTimeBands` produced no bands and the grid
+ * indexed past the end of the list. That crash is now guarded defensively in
+ * `weekly-schedule.tsx`; this is the other half, keeping the bad row out of the
+ * database in the first place.
+ */
+function refineGroupWindow(
+  data: Readonly<{
+    dateStart?: string
+    dateEnd?: string
+    startTime?: string
+    endTime?: string
+  }>,
+  ctx: z.RefinementCtx,
+): void {
+  const hasStart = !!data.dateStart
+  const hasEnd = !!data.dateEnd
+  if (hasStart !== hasEnd) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [hasStart ? 'dateEnd' : 'dateStart'],
+      message: 'Unesite oba datuma (početak i kraj).',
+    })
+  } else if (hasStart && hasEnd && data.dateEnd! < data.dateStart!) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['dateEnd'],
+      message: 'Kraj ne smije biti prije početka.',
+    })
+  }
+
+  // Runs regardless of the date branch above — a broken date pair and a broken
+  // time range are independent problems, and the admin should see both at once.
+  if (
+    data.startTime &&
+    data.endTime &&
+    toMinutes(data.endTime) <= toMinutes(data.startTime)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['endTime'],
+      message: 'Kraj termina mora biti nakon početka.',
+    })
+  }
+}
+
 export const createGroupSchema = z
   .object({
     courseId: z.string().min(1, 'Odaberite program'),
@@ -18,25 +78,7 @@ export const createGroupSchema = z
     maxStudents: z.coerce.number().int().min(1).max(50),
     teacherIds: z.array(z.string().min(1)).optional(),
   })
-  .superRefine((data, ctx) => {
-    const hasStart = !!data.dateStart
-    const hasEnd = !!data.dateEnd
-    if (hasStart !== hasEnd) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [hasStart ? 'dateEnd' : 'dateStart'],
-        message: 'Unesite oba datuma (početak i kraj).',
-      })
-      return
-    }
-    if (hasStart && hasEnd && data.dateEnd! < data.dateStart!) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['dateEnd'],
-        message: 'Kraj ne smije biti prije početka.',
-      })
-    }
-  })
+  .superRefine(refineGroupWindow)
 
 export const updateGroupSchema = z
   .object({
@@ -52,25 +94,7 @@ export const updateGroupSchema = z
     maxStudents: z.coerce.number().int().min(1).max(50).optional(),
     teacherIds: z.array(z.string().min(1)).optional(),
   })
-  .superRefine((data, ctx) => {
-    const hasStart = !!data.dateStart
-    const hasEnd = !!data.dateEnd
-    if (hasStart !== hasEnd) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [hasStart ? 'dateEnd' : 'dateStart'],
-        message: 'Unesite oba datuma (početak i kraj).',
-      })
-      return
-    }
-    if (hasStart && hasEnd && data.dateEnd! < data.dateStart!) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['dateEnd'],
-        message: 'Kraj ne smije biti prije početka.',
-      })
-    }
-  })
+  .superRefine(refineGroupWindow)
 
 export type CreateGroupInput = z.infer<typeof createGroupSchema>
 export type UpdateGroupInput = z.infer<typeof updateGroupSchema>

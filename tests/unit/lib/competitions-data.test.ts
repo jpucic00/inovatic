@@ -6,7 +6,7 @@ import {
   COMPETITION_ICONS,
   COMPETITION_TONES,
 } from '@/lib/competitions-data'
-import { WP_REDIRECTS } from '@/lib/wp-redirects'
+import { couldBeArticleSlug, WP_REDIRECTS } from '@/lib/wp-redirects'
 // Same fixture the E2E redirect spec walks — one list, two levels of coverage.
 import wpCompetitionPages from '../../fixtures/wp-competition-pages.json'
 
@@ -127,6 +127,33 @@ describe('competition archive links', () => {
       // CM-liga and WER have no program page of their own — they live in /novosti only
       if (article.startsWith('cm-liga') || article.startsWith('wer-')) continue
       expect(linked.has(article), `${article} is not linked from any competition archive`).toBe(true)
+    }
+  })
+})
+
+/**
+ * Shape gate in front of the root `[slug]` catcher's only DB query. Verified
+ * against all 96 migrated articles at the time of writing: every slug is
+ * lowercase alphanumeric with hyphens, longest 84 chars.
+ */
+describe('couldBeArticleSlug', () => {
+  it('accepts the slug shape every migrated article uses', () => {
+    for (const slug of ['robokup', 'natjecanje-mladih-tehnicara', 'slr1-2026', 'a']) {
+      expect(couldBeArticleSlug(slug)).toBe(true)
+    }
+  })
+
+  it('rejects the scanner traffic that used to reach the database', () => {
+    for (const slug of ['.env', 'wp-admin.php', 'Robokup', 'a b', 'foo/bar', '', 'x'.repeat(121)]) {
+      expect(couldBeArticleSlug(slug)).toBe(false)
+    }
+  })
+
+  // The map is consulted BEFORE the shape check, but a key that could never
+  // pass it would still be a sign the two have drifted apart.
+  it('every WP_REDIRECTS key is itself a plausible slug', () => {
+    for (const key of Object.keys(WP_REDIRECTS)) {
+      expect(couldBeArticleSlug(key)).toBe(true)
     }
   })
 })

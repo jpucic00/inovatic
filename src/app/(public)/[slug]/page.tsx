@@ -1,6 +1,6 @@
 import { notFound, permanentRedirect } from 'next/navigation'
 import { db } from '@/lib/db'
-import { WP_REDIRECTS } from '@/lib/wp-redirects'
+import { couldBeArticleSlug, WP_REDIRECTS } from '@/lib/wp-redirects'
 
 type PageProps = Readonly<{ params: Promise<{ slug: string }> }>
 
@@ -17,6 +17,9 @@ export default async function LegacyWpRedirect({ params }: PageProps) {
 
   const mapped = WP_REDIRECTS[slug]
   if (mapped) permanentRedirect(mapped)
+
+  // Cheap shape check before the only DB hit on this route.
+  if (!couldBeArticleSlug(slug)) notFound()
 
   const article = await db.article.findUnique({
     where: { slug, isPublished: true },

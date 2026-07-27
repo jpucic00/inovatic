@@ -3,6 +3,7 @@
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertUserInCity } from '@/lib/city-guard'
+import { fromDateKey } from '@/lib/session-dates'
 import {
   buildTeacherWorkReport,
   monthWindows,
@@ -27,7 +28,13 @@ export async function getTeacherWorkReport(
     where: {
       userId,
       present: true,
-      sessionDate: { gte: windows.previous.start, lte: windows.current.end },
+      // The window bounds are date keys (nothing but serializable values crosses
+      // this action's boundary); `sessionDate` is @db.Date at UTC midnight, so
+      // the parsed keys compare exactly.
+      sessionDate: {
+        gte: fromDateKey(windows.previous.startKey),
+        lte: fromDateKey(windows.current.endKey),
+      },
       scheduledGroup: { city },
     },
     select: {

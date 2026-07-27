@@ -30,10 +30,10 @@ export type MonthWindow = {
   year: number
   /** 1-12. */
   month: number
-  /** UTC midnight of the 1st. */
-  start: Date
-  /** UTC midnight of the last day, inclusive. */
-  end: Date
+  /** YYYY-MM-DD of the 1st. */
+  startKey: string
+  /** YYYY-MM-DD of the last day, inclusive. */
+  endKey: string
 }
 
 export type WorkReportGroupSummary = {
@@ -93,9 +93,9 @@ function monthWindow(year: number, month: number): MonthWindow {
   return {
     year,
     month,
-    start: new Date(Date.UTC(year, month - 1, 1)),
+    startKey: toDateKey(new Date(Date.UTC(year, month - 1, 1))),
     // Day 0 of the next month = last day of this one.
-    end: new Date(Date.UTC(year, month, 0)),
+    endKey: toDateKey(new Date(Date.UTC(year, month, 0))),
   }
 }
 
@@ -116,7 +116,7 @@ export function monthWindows(now: Date): { current: MonthWindow; previous: Month
 }
 
 function inWindow(date: string, window: MonthWindow): boolean {
-  return date >= toDateKey(window.start) && date <= toDateKey(window.end)
+  return date >= window.startKey && date <= window.endKey
 }
 
 function finalizeMonth(

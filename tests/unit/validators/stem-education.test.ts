@@ -69,6 +69,18 @@ describe('stemEducationInquirySchema', () => {
     expect(parsed.institutionName).toBe('OŠ Meje')
   })
 
+  // institutionName is interpolated into the mail subject, so it is the one
+  // place raw visitor text reaches a header. `.trim()` only strips the ends —
+  // interior CR/LF used to survive intact.
+  it('strips control characters out of the name that becomes the mail subject', () => {
+    const parsed = stemEducationInquirySchema.parse({
+      ...valid,
+      institutionName: 'OS Meje\r\nBcc: napadac@example.com',
+    })
+    expect(parsed.institutionName).toBe('OS Meje Bcc: napadac@example.com')
+    expect(parsed.institutionName).not.toMatch(/[\r\n]/)
+  })
+
   // Only 7 service values exist, but the array was unbounded: a crafted payload
   // (well within Next's 1 MB action-body limit) reached the email body as a
   // giant join, and gave the confirmation template duplicate React keys.

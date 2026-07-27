@@ -168,7 +168,9 @@ describe('buildImportPlan — students + enrollments', () => {
     ]
     const plan = buildImportPlan(sheets, [], snapshot({ usernames: ['anamariaivic'] }), warnings)
     expect(plan.students).toHaveLength(2)
-    const usernames = plan.students.map((s) => s.username)
+    // Only a `create` row mints a username — the union makes that explicit
+    // instead of yielding `undefined` for a matched student.
+    const usernames = plan.students.flatMap((s) => (s.action === 'create' ? [s.username] : []))
     expect(usernames).toContain('anamariaivic2')
     expect(usernames).toContain('anamariaivic3')
   })

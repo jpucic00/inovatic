@@ -33,14 +33,19 @@ export type DbSnapshot = {
 
 // ── Plan model ───────────────────────────────────────────────────────────────
 
+/**
+ * Discriminated on `action` so the invariant is enforced by tsc rather than by
+ * convention: a matched row HAS an existing id, a created row HAS the fields
+ * needed to insert it. As plain optionals, a planner change that forgot to set
+ * `username` on a `create` row compiled cleanly and wrote `undefined` into a
+ * required Prisma column at runtime — `applyImportPlan` needed nine `!`s to
+ * paper over it.
+ */
 export type PlannedTeacher = {
   key: string
   firstName: string
   lastName: string
-  action: 'match' | 'create'
-  existingId?: string
-  email?: string
-}
+} & ({ action: 'match'; existingId: string } | { action: 'create'; email: string })
 
 export type PlannedGroup = {
   key: string
@@ -60,11 +65,10 @@ export type PlannedStudent = {
   parentName: string | null
   parentEmail: string | null
   parentPhone: string | null
-  action: 'match' | 'create'
-  existingId?: string
-  username?: string
-  email?: string
-}
+} & (
+  | { action: 'match'; existingId: string }
+  | { action: 'create'; username: string; email: string }
+)
 
 export type PlannedEnrollment = { studentKey: string; groupKey: string; paid: boolean }
 

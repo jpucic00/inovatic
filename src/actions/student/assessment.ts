@@ -5,6 +5,7 @@ import type { SkillLevel } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireStudent } from '@/lib/auth-guard'
 import { formatRecommendationLabel } from '@/lib/assessment-rubric'
+import { formatDate } from '@/lib/format'
 
 /**
  * The report card as the parent/polaznik sees it. Ids are resolved to display
@@ -20,7 +21,9 @@ export type StudentAssessmentReadonly = {
   zabava: SkillLevel | null
   opisnaOcjena: string | null
   recommendationLabel: string | null
-  updatedAt: Date
+  /** Formatted here, not shipped as a Date: server actions return serializable
+   * values only, and the consumer was already re-wrapping it in `new Date()`. */
+  updatedAtLabel: string
   authorName: string
 }
 
@@ -119,7 +122,7 @@ export async function getMyAssessmentForGroup(
             row.recommendedCourse?.title ?? null,
           )
         : null,
-      updatedAt: row.updatedAt,
+      updatedAtLabel: formatDate(row.updatedAt),
       authorName: `${row.author.firstName} ${row.author.lastName}`.trim(),
     },
   }

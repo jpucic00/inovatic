@@ -107,3 +107,60 @@ describe('updateGroupSchema', () => {
     expect(updateGroupSchema.safeParse({ id: '' }).success).toBe(false)
   })
 })
+
+/**
+ * A group saved with `endTime <= startTime` used to crash `/admin/grupe`:
+ * `buildTimeBands` returned no bands and the grid indexed past the end of the
+ * list. That crash is guarded defensively in the component now; this is the
+ * other half — keeping the row out of the database.
+ */
+describe('group time range', () => {
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ['18:00', '18:00'], // zero-length
+    ['18:30', '08:00'], // inverted
+    ['9:00', '9:00'], // one-digit hour, zero-length
+    ['18:00', '9:00'], // inverted, and '9:00' > '18:00' as a STRING
+  ]
+
+  it.each(cases)('rejects %s → %s on create', (startTime, endTime) => {
+    const res = createGroupSchema.safeParse({ ...validGroup, startTime, endTime })
+    expect(res.success).toBe(false)
+    expect(res.error?.issues.some((i) => i.path[0] === 'endTime')).toBe(true)
+  })
+
+  it.each(cases)('rejects %s → %s on update', (startTime, endTime) => {
+    expect(
+      updateGroupSchema.safeParse({ id: 'g1', startTime, endTime }).success,
+    ).toBe(false)
+  })
+
+  // The regex allows one or two hour digits, so the comparison must be on
+  // parsed minutes — '9:00' → '10:30' is valid but fails a string compare.
+  it.each([
+    ['9:00', '10:30'],
+    ['09:00', '10:30'],
+    ['17:00', '18:30'],
+    ['08:00', '20:00'],
+  ] as const)('accepts %s → %s', (startTime, endTime) => {
+    expect(createGroupSchema.safeParse({ ...validGroup, startTime, endTime }).success).toBe(true)
+  })
+
+  it('leaves a partial update without times alone', () => {
+    expect(updateGroupSchema.safeParse({ id: 'g1', maxStudents: 20 }).success).toBe(true)
+    expect(updateGroupSchema.safeParse({ id: 'g1', startTime: '18:00' }).success).toBe(true)
+  })
+
+  // Two independent problems, both worth surfacing in one pass.
+  it('reports a broken date pair and a broken time range together', () => {
+    const res = createGroupSchema.safeParse({
+      ...validGroup,
+      dateStart: '2026-03-01',
+      startTime: '18:00',
+      endTime: '17:00',
+    })
+    expect(res.success).toBe(false)
+    const paths = res.error?.issues.map((i) => i.path[0]) ?? []
+    expect(paths).toContain('dateEnd')
+    expect(paths).toContain('endTime')
+  })
+})

@@ -45,7 +45,7 @@ function dateKeyOf(window: { year: number; month: number }, day: number): string
 }
 
 /** A date safely outside both report windows. */
-const LONG_AGO = new Date(WINDOWS.previous.start.getTime() - 40 * DAY_MS)
+const LONG_AGO = new Date(dayOf(WINDOWS.previous, 1).getTime() - 40 * DAY_MS)
 
 /**
  * A date a TEACHER is still allowed to mark: this month, never in the future.
