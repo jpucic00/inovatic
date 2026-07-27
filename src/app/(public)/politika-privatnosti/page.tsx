@@ -1,13 +1,15 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 
 export const metadata: Metadata = {
   title: 'Politika privatnosti',
   description: 'Politika privatnosti Udruge za robotiku "Inovatic" – zaštita osobnih podataka u skladu s GDPR-om.',
   openGraph: {
+    ...OG_DEFAULTS,
     title: 'Politika privatnosti – Udruga Inovatic',
     description: 'Politika privatnosti Udruge za robotiku "Inovatic" – zaštita osobnih podataka u skladu s GDPR-om.',
     url: 'https://udruga-inovatic.hr/politika-privatnosti',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/politika-privatnosti' },
 }

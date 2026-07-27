@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import { CheckCircle } from 'lucide-react'
 import { db } from '@/lib/db'
 import { getActivePrograms } from '@/actions/public/programs'
@@ -39,6 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: workshop.title,
     description: workshop.description,
     openGraph: {
+      ...OG_DEFAULTS,
       title: `${workshop.title} | ${brand}`,
       description: workshop.description,
       images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: `${workshop.title} – ${brand}` }],

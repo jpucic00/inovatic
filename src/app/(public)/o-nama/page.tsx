@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, ArrowUpRight, Trophy, Award } from 'lucide-react'
@@ -9,10 +10,11 @@ export const metadata: Metadata = {
   description:
     'Udruga za robotiku "Inovatic" – osnovana 2014. u Splitu, od 2026. i u Šibeniku. Učimo djecu robotiku i programiranje kroz LEGO programe u malim grupama.',
   openGraph: {
-    title: 'O nama – Udruga Inovatic | Split i Šibenik',
+    ...OG_DEFAULTS,
+    title: 'O nama – Udruga Inovatic',
     description: 'Udruga za robotiku osnovana 2014. Educiramo djecu od 6 do 14 godina kroz LEGO programe u Splitu i Šibeniku. Tim CroSpec – srebrna medalja WRO 2025.',
     url: 'https://udruga-inovatic.hr/o-nama',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu i Šibeniku' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/o-nama' },
 }

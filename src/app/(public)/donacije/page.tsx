@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import Image from 'next/image'
 import {
   ArrowUpRight,
@@ -28,6 +29,7 @@ export const metadata: Metadata = {
   description:
     'Podržite naše timove na putu na europsko (Zagreb, listopad 2026.) i svjetsko (Portoriko, prosinac 2026.) natjecanje World Robot Olympiad. Donirajte skeniranjem barkoda ili uplatom na IBAN.',
   openGraph: {
+    ...OG_DEFAULTS,
     title: 'Donacije – Podržite naše timove na World Robot Olympiad',
     description:
       'Svaka donacija, bez obzira na iznos, pomaže našim mladim inovatorima da predstavljaju Hrvatsku na WRO europskom i svjetskom natjecanju.',

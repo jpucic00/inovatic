@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, ArrowRight } from 'lucide-react'
@@ -9,10 +10,11 @@ export const metadata: Metadata = {
   description:
     'Lokacije Udruge Inovatic: Split (Velebitska 32 i Ruđera Boškovića 33 / PMF) i Šibenik (Trokut inkubator). Odaberite grad za kontakt, adresu i kartu.',
   openGraph: {
+    ...OG_DEFAULTS,
     title: 'Lokacije – Udruga Inovatic',
     description: 'LEGO robotika za djecu u Splitu i Šibeniku. Odaberite lokaciju za kontakt i kartu.',
     url: 'https://udruga-inovatic.hr/lokacije',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – lokacije u Splitu i Šibeniku' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/lokacije' },
 }

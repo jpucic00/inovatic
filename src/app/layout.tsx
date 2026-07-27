@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
   },
   title: {
-    default: 'Inovatic – LEGO Robotika za djecu u Splitu',
+    default: 'Inovatic – LEGO Robotika za djecu',
     template: '%s | Inovatic',
   },
   description:
@@ -24,8 +24,8 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'hr_HR',
     url: siteUrl,
-    siteName: 'Inovatic – Udruga za robotiku Split i Šibenik',
-    title: 'Inovatic – LEGO Robotika za djecu u Splitu',
+    siteName: 'Inovatic – Udruga za robotiku',
+    title: 'Inovatic – LEGO Robotika za djecu',
     description:
       'Učimo djecu od 6 do 14 godina STEM vještine kroz LEGO robotiku u Splitu i Šibeniku.',
     images: [
@@ -33,13 +33,13 @@ export const metadata: Metadata = {
         url: '/opengraph-image',
         width: 1200,
         height: 630,
-        alt: 'Inovatic – Udruga za robotiku Split i Šibenik',
+        alt: 'Inovatic – LEGO Robotika za djecu',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Inovatic – LEGO Robotika za djecu u Splitu',
+    title: 'Inovatic – LEGO Robotika za djecu',
     description: 'Učimo djecu od 6 do 14 godina STEM vještine kroz LEGO robotiku u Splitu i Šibeniku.',
   },
   robots: {
@@ -60,6 +60,10 @@ const localBusinessJsonLd = {
   telephone: '+385993936993',
   email: 'info@udruga-inovatic.hr',
   foundingDate: '2014',
+  areaServed: [
+    { '@type': 'City', name: 'Split' },
+    { '@type': 'City', name: 'Šibenik' },
+  ],
   description:
     'Udruga za robotiku koja educira djecu od 6 do 14 godina kroz LEGO WeDo 2.0 i Spike Prime programe u Splitu i Šibeniku.',
   address: {

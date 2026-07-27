@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import Link from 'next/link'
 import { ArrowRight, Users, Clock, Star, Phone, Euro, Check, MapPin } from 'lucide-react'
 import { PartyRobotSvg } from '@/components/shared/party-robot-svg'
@@ -12,10 +13,11 @@ export const metadata: Metadata = {
   description:
     'Organizirajte nezaboravnu proslavu rođendana uz LEGO robotiku! Djeca grade i programiraju robote uz LEGO WeDo 2.0, SPIKE i Mindstorms EV3. Velebitska 32, Split.',
   openGraph: {
-    title: 'Proslave uz LEGO Robotiku | Inovatic Split',
+    ...OG_DEFAULTS,
+    title: 'Proslave uz LEGO Robotiku | Inovatic',
     description: 'Nezaboravna proslava rođendana – djeca grade i programiraju LEGO robote. Do 12 sudionika, 120 min + pauza. 150 EUR.',
     url: 'https://udruga-inovatic.hr/proslave',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/proslave' },
 }

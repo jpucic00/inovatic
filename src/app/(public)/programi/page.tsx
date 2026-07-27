@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
@@ -9,10 +10,11 @@ export const metadata: Metadata = {
   description:
     'Sva 4 razine tečajeva LEGO robotike – Svijet LEGO Robotike 1–4. Programi za djecu od 6 do 14 godina u Splitu i Šibeniku.',
   openGraph: {
+    ...OG_DEFAULTS,
     title: 'Programi – Svijet LEGO Robotike | Inovatic',
     description: 'Sva 4 razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu i Šibeniku.',
     url: 'https://udruga-inovatic.hr/programi',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu i Šibeniku' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/programi' },
 }

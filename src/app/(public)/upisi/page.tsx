@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import type { City } from '@prisma/client'
 import { CheckCircle } from 'lucide-react'
 import { InquiryForm } from '@/components/public/inquiry-form'
@@ -11,10 +12,11 @@ export const metadata: Metadata = {
   title: 'Upisi',
   description: 'Upiši dijete na tečaj LEGO robotike u Splitu i Šibeniku. Ispuni upit i kontaktirat ćemo te s dostupnim terminima. Bez obveza.',
   openGraph: {
+    ...OG_DEFAULTS,
     title: 'Upiši dijete – LEGO Robotika | Inovatic',
-    description: 'Ispuni kratki upit i kontaktirat ćemo te s dostupnim grupama i terminima. Bez obveza.',
+    description: 'Ispuni kratki upit i kontaktirat ćemo te s dostupnim grupama i terminima u Splitu i Šibeniku. Bez obveza.',
     url: 'https://udruga-inovatic.hr/upisi',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu i Šibeniku' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/upisi' },
 }

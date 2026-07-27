@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -17,13 +18,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const city = getCity(slug)
   if (!city) return { title: 'Lokacija nije pronađena' }
 
-  const addresses = city.venues.map((v) => `${v.address}, ${v.postal}`).join(' · ')
-  const desc = `Kontakt i lokacije Udruge Inovatic u ${city.label === 'Split' ? 'Splitu' : 'Šibeniku'}: ${addresses}. Pošaljite upit za upis u programe LEGO robotike.`
+  // These two pages carry the local-search intent for the whole site ("robotika
+  // za djecu split", "radionice za djecu šibenik"), so the title leads with the
+  // query wording rather than with "Lokacije".
+  const locative = city.label === 'Split' ? 'Splitu' : 'Šibeniku'
+  const desc = `Radionice robotike i programiranja za djecu od 6 do 14 godina u ${locative}. LEGO Spike, male grupe. Kontakt, adrese i upis u programe Udruge Inovatic.`
   return {
-    title: `Lokacije – ${city.label}`,
+    title: `Robotika za djecu ${city.label} – radionice i programiranje`,
     description: desc,
     openGraph: {
-      title: `Lokacije ${city.label} – Udruga Inovatic`,
+      ...OG_DEFAULTS,
+      title: `Robotika za djecu ${city.label} – Udruga Inovatic`,
       description: desc,
       url: `https://udruga-inovatic.hr/lokacije/${city.slug}`,
       images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: `Inovatic ${city.label}` }],

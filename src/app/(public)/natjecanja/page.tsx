@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, Calendar, Trophy, Newspaper } from 'lucide-react'
@@ -14,8 +15,9 @@ export const revalidate = 3600
 export const metadata: Metadata = {
   title: 'Natjecateljski programi',
   description:
-    'Naši polaznici nastupaju na FIRST LEGO League (FLL), World Robot Olympiad (WRO), Natjecanju mladih tehničara i Robokupu. Tim CroSpec – srebrna medalja WRO 2025, Singapur.',
+    'Natjecateljski programi robotike za djecu u Splitu i Šibeniku – FIRST LEGO League (FLL), World Robot Olympiad (WRO), Natjecanje mladih tehničara i Robokup. Tim CroSpec – srebro WRO 2025.',
   openGraph: {
+    ...OG_DEFAULTS,
     title: 'Natjecateljski programi | Inovatic',
     description: 'FIRST LEGO League, World Robot Olympiad, Natjecanje mladih tehničara i Robokup – natjecanja u robotici za djecu.',
     url: 'https://udruga-inovatic.hr/natjecanja',

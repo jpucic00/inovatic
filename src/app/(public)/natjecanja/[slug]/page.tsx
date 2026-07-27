@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, ExternalLink, Trophy, ListChecks, Info } from 'lucide-react'
@@ -48,6 +49,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: `${comp.title} | Natjecanja`,
     description: comp.description,
     openGraph: {
+      ...OG_DEFAULTS,
       title: `${comp.title} | Inovatic`,
       description: comp.description,
       url: `https://udruga-inovatic.hr/natjecanja/${slug}`,

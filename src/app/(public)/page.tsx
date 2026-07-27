@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import Link from 'next/link'
 import { Trophy, ArrowRight } from 'lucide-react'
 import { HeroBackgroundSlideshow } from '@/components/shared/hero-background-slideshow'
@@ -18,15 +19,16 @@ export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: {
-    absolute: 'Inovatic – LEGO Robotika za djecu u Splitu',
+    absolute: 'Inovatic – LEGO Robotika za djecu',
   },
   description:
-    'Udruga Inovatic uči djecu od 6 do 14 godina programiranje i robotiku kroz LEGO Spike programe u Splitu. Upišite dijete danas!',
+    'Udruga Inovatic uči djecu od 6 do 14 godina programiranje i robotiku kroz LEGO Spike programe u Splitu i Šibeniku. Upišite dijete danas!',
   openGraph: {
-    title: 'Inovatic – LEGO Robotika za djecu u Splitu',
-    description: 'Udruga Inovatic uči djecu od 6 do 14 godina programiranje i robotiku u Splitu. Upišite dijete danas!',
+    ...OG_DEFAULTS,
+    title: 'Inovatic – LEGO Robotika za djecu',
+    description: 'Udruga Inovatic uči djecu od 6 do 14 godina programiranje i robotiku u Splitu i Šibeniku. Upišite dijete danas!',
     url: 'https://udruga-inovatic.hr',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr' },
 }
@@ -114,7 +116,7 @@ export default async function HomePage() {
                 Učimo djecu od 6 do 14 godina STEM vještine kroz igru, kreativnost i
                 programiranje.{' '}
                 <span className="hidden sm:inline">
-                  Splitska udruga za robotiku s tradicijom od 2014. godine.
+                  Udruga za robotiku iz Splita i Šibenika, s tradicijom od 2014. godine.
                 </span>
               </p>
               <div className="flex w-full flex-col sm:w-auto sm:flex-row gap-4 lg:mt-2">

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -30,6 +31,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: course.title,
     description: desc,
     openGraph: {
+      ...OG_DEFAULTS,
       title: `${course.title} | Inovatic`,
       description: desc,
       url: `https://udruga-inovatic.hr/programi/${slug}`,

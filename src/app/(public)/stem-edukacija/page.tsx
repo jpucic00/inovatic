@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -18,8 +19,9 @@ import { StemEducationForm } from '@/components/public/stem-education-form'
 export const metadata: Metadata = {
   title: 'STEM edukacija za učitelje, nastavnike i mentore',
   description:
-    'Osnovne i napredne edukacije za mentore, savjetovanje pri odabiru STEM opreme te izrada radionica i kurikuluma za škole, udruge i ustanove. Edukacija kod vas ili u našim prostorima.',
+    'Osnovne i napredne edukacije za mentore, savjetovanje pri odabiru STEM opreme te izrada radionica i kurikuluma za škole, udruge i ustanove. Edukacija kod vas ili u našim prostorima u Splitu i Šibeniku.',
   openGraph: {
+    ...OG_DEFAULTS,
     title: 'STEM edukacija za učitelje, nastavnike i mentore | Inovatic',
     description:
       'Od odabira opreme do samostalne provedbe kvalitetnih STEM radionica – edukacija mentora, savjetovanje i izrada kurikuluma.',

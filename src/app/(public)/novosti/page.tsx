@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { OG_DEFAULTS } from '@/lib/seo'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, Calendar, Newspaper } from 'lucide-react'
@@ -13,10 +14,11 @@ export const metadata: Metadata = {
   title: 'Novosti',
   description: 'Najnovije vijesti i obavijesti Udruge za robotiku Inovatic iz Splita i Šibenika – natjecanja, radionice, upisi i događaji.',
   openGraph: {
+    ...OG_DEFAULTS,
     title: 'Novosti | Inovatic',
-    description: 'Pratite naša natjecanja, radionice, projekte i sve što se događa u Inovatic zajednici.',
+    description: 'Pratite natjecanja, radionice i projekte Udruge Inovatic u Splitu i Šibeniku.',
     url: 'https://udruga-inovatic.hr/novosti',
-    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu u Splitu i Šibeniku' }],
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
   alternates: { canonical: 'https://udruga-inovatic.hr/novosti' },
 }
