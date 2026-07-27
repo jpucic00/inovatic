@@ -78,6 +78,19 @@ export function StemEducationForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+      {/* Honeypot — off-screen rather than display:none so naive bots still see
+          it, hidden from assistive tech and skipped by keyboard navigation. */}
+      <div aria-hidden="true" className="absolute left-[-9999px] w-px h-px overflow-hidden">
+        <label htmlFor="website">Ne popunjavajte ovo polje</label>
+        <input
+          id="website"
+          {...register('website')}
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+        />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 mb-1.5">

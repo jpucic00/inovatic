@@ -78,6 +78,10 @@ export const stemEducationInquirySchema = z.object({
   consent: z.literal(true, {
     errorMap: () => ({ message: 'Morate pristati na obradu osobnih podataka.' }),
   }),
+  // Honeypot: hidden in the form, so a human never fills it. Bots that submit
+  // every field give themselves away. Accepted by the schema and handled in the
+  // action, which reports success without sending anything.
+  website: z.string().optional(),
 })
 
 export type StemEducationInquiryFormData = z.infer<typeof stemEducationInquirySchema>
