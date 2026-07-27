@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { formatDate } from '@/lib/format'
 import type { getEmailCampaigns } from '@/actions/admin/email-campaign'
 
@@ -32,9 +33,10 @@ export function CampaignHistory({ campaigns }: Readonly<{ campaigns: Campaigns }
               {campaigns.map((c) => {
                 const badge = KIND_BADGE[c.kind]
                 const groupCount = c.sourceGroupIds.length
+                const groupNoun = groupCount === 1 ? 'grupa' : 'grupe'
                 const cohort =
                   groupCount > 0
-                    ? `${groupCount} ${groupCount === 1 ? 'grupa' : 'grupe'}`
+                    ? `${groupCount} ${groupNoun}`
                     : `preporuka: ${c.sourceRecommendations.join(', ')}`
                 return (
                   <tr key={c.id} className="border-b border-gray-100 last:border-0">
@@ -48,8 +50,18 @@ export function CampaignHistory({ campaigns }: Readonly<{ campaigns: Campaigns }
                         {badge.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 max-w-[18rem] truncate text-gray-800" title={c.subject}>
-                      {c.subject}
+                    <td className="px-4 py-3 max-w-[18rem] truncate" title={c.subject}>
+                      <Link
+                        href={`/admin/email/${c.id}`}
+                        className="text-cyan-700 hover:text-cyan-800 hover:underline"
+                      >
+                        {c.subject}
+                      </Link>
+                      {c.finishedAt === null && (
+                        <span className="ml-2 rounded-full bg-cyan-100 text-cyan-700 px-1.5 py-0.5 text-[10px] font-medium">
+                          slanje u tijeku
+                        </span>
+                      )}
                     </td>
                     <td
                       className="px-4 py-3 whitespace-nowrap max-w-[16rem] truncate text-gray-600"

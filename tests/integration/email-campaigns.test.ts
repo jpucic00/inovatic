@@ -47,7 +47,42 @@ const {
   previewEmailHtml,
   previewEmailRecipients,
   sendEmailCampaign,
+  getCampaignDetail,
+  getCampaignProgress,
+  resumeEmailCampaign,
 } = await import('@/actions/admin/email-campaign')
+
+/**
+ * The send now runs detached from the request so the admin can close the tab,
+ * which means a test has to wait for the campaign to finish before asserting on
+ * what actually went out. With no RESEND_API_KEY there is no throttle, so this
+ * settles almost immediately.
+ */
+async function settle(campaignId: string) {
+  for (let i = 0; i < 400; i++) {
+    const c = await db.emailCampaign.findUnique({
+      where: { id: campaignId },
+      select: { sentCount: true, failedCount: true, finishedAt: true },
+    })
+    if (c?.finishedAt) {
+      const failedRows = await db.emailCampaignRecipient.findMany({
+        where: { campaignId, status: 'FAILED' },
+        select: { parentEmail: true },
+      })
+      return { sent: c.sentCount, failed: failedRows.map((r) => r.parentEmail) }
+    }
+    await new Promise((r) => setTimeout(r, 5))
+  }
+  throw new Error(`campaign ${campaignId} never finished`)
+}
+
+/** Start a send and wait for it, flattened into the old synchronous shape. */
+async function sendAndSettle(input: Parameters<typeof sendEmailCampaign>[0]) {
+  const res = await sendEmailCampaign(input)
+  if (!res.success) return res
+  const done = await settle(res.campaignId)
+  return { ...res, ...done }
+}
 
 let seq = 0
 const uniqEmail = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(++seq).toString(36)}@test.hr`
@@ -120,12 +155,16 @@ async function loginAdmin(city: City = 'SPLIT') {
 beforeAll(async () => {
   // Reach the (mocked) send path — without a key the senders no-op.
   process.env.RESEND_API_KEY = 'test_resend_key'
+  // ...but skip the 2 req/s throttle: the SDK is mocked, so it is dead time
+  // that would also leave background jobs running into the next test file.
+  process.env.EMAIL_SEND_THROTTLE_MS = '0'
   await db.schoolYear.upsert({ where: { label: TARGET_YEAR }, update: {}, create: { label: TARGET_YEAR } })
   await db.schoolYear.upsert({ where: { label: ARCHIVED_YEAR }, update: {}, create: { label: ARCHIVED_YEAR } })
 })
 
 afterAll(() => {
   delete process.env.RESEND_API_KEY
+  delete process.env.EMAIL_SEND_THROTTLE_MS
 })
 
 beforeEach(() => {
@@ -144,7 +183,7 @@ describe('sendEmailCampaign — CUSTOM', () => {
     await enrollStudent(a.group.id, { parentEmail: parentA })
     await enrollStudent(b.group.id, { parentEmail: parentB })
 
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'CUSTOM',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [a.group.id, b.group.id],
@@ -178,8 +217,8 @@ describe('sendEmailCampaign — CUSTOM', () => {
       ...CONTENT,
     }
 
-    const first = await sendEmailCampaign(input)
-    const second = await sendEmailCampaign(input)
+    const first = await sendAndSettle(input)
+    const second = await sendAndSettle(input)
 
     expect(first).toMatchObject({ success: true, sent: 1 })
     expect(second).toMatchObject({ success: true, sent: 1, alreadySent: 0 })
@@ -194,7 +233,7 @@ describe('sendEmailCampaign — CUSTOM', () => {
     const { group } = await makeSourceGroup({ isCustom: true })
     await enrollStudent(group.id, { parentEmail: uniqEmail('radionica') })
 
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'CUSTOM',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [group.id],
@@ -221,7 +260,7 @@ describe('sendEmailCampaign — CUSTOM', () => {
       expect(preview.recipients[0].children).toHaveLength(2)
     }
 
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'CUSTOM',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [group.id],
@@ -250,7 +289,7 @@ describe('sendEmailCampaign — CUSTOM', () => {
       ])
     }
 
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'CUSTOM',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [group.id],
@@ -268,7 +307,7 @@ describe('sendEmailCampaign — CUSTOM', () => {
     await enrollStudent(group.id, { parentEmail: keep })
     await enrollStudent(group.id, { parentEmail: drop })
 
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'CUSTOM',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [group.id],
@@ -309,7 +348,7 @@ describe('sendEmailCampaign — REENROLLMENT', () => {
     await enrollStudent(standard.group.id, { parentEmail: uniqEmail('std') })
     const target = await makeTarget()
 
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'REENROLLMENT',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [standard.group.id, radionica.group.id],
@@ -338,18 +377,18 @@ describe('sendEmailCampaign — REENROLLMENT', () => {
       ...CONTENT,
     }
 
-    const first = await sendEmailCampaign(input)
+    const first = await sendAndSettle(input)
     expect(first).toMatchObject({ success: true, sent: 2, alreadySent: 0 })
 
     sendMock.mockClear()
-    const second = await sendEmailCampaign(input)
+    const second = await sendAndSettle(input)
     expect(second).toMatchObject({ success: true, sent: 0, alreadySent: 2 })
     expect(sendMock).not.toHaveBeenCalled()
 
     // A different source cohort containing p1 still skips them for this target.
     const otherSource = await makeSourceGroup()
     await enrollStudent(otherSource.group.id, { parentEmail: p1 })
-    const third = await sendEmailCampaign({
+    const third = await sendAndSettle({
       ...input,
       sourceGroupIds: [otherSource.group.id],
     })
@@ -385,7 +424,7 @@ describe('sendEmailCampaign — REENROLLMENT', () => {
     }
 
     sendMock.mockRejectedValueOnce(new Error('resend down'))
-    const first = await sendEmailCampaign(input)
+    const first = await sendAndSettle(input)
     expect(first).toMatchObject({ success: true, sent: 1, failed: [failing] })
 
     const rows = await db.emailCampaignRecipient.findMany({
@@ -401,10 +440,222 @@ describe('sendEmailCampaign — REENROLLMENT', () => {
 
     sendMock.mockClear()
     sendMock.mockResolvedValue({ data: { id: 'sent' }, error: null })
-    const second = await sendEmailCampaign(input)
+    const second = await sendAndSettle(input)
     expect(second).toMatchObject({ success: true, sent: 1, alreadySent: 1, failed: [] })
     expect(sendMock).toHaveBeenCalledTimes(1)
     expect(sendMock.mock.calls[0][0].to).toBe(failing)
+  })
+
+  // The pre-flight `loadAlreadyInvited` read cannot stop two sends that both
+  // start before either has written a row — only the (sentKey, parentEmail)
+  // unique index can. This is the case the old snapshot approach let through.
+  it('mails each parent once when two identical sends overlap', async () => {
+    await loginAdmin()
+    const source = await makeSourceGroup()
+    const p1 = uniqEmail('race-a')
+    const p2 = uniqEmail('race-b')
+    await enrollStudent(source.group.id, { parentEmail: p1 })
+    await enrollStudent(source.group.id, { parentEmail: p2 })
+    const target = await makeTarget()
+    const input = {
+      kind: 'REENROLLMENT' as const,
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.group.id],
+      targetCourseId: target.course.id,
+      targetGroupIds: [target.group.id],
+      ...CONTENT,
+    }
+
+    sendMock.mockClear()
+    // Both sends start before either has written a row — the exact interleaving
+    // the old pre-flight snapshot could not defend against.
+    const [a, b] = await Promise.all([sendEmailCampaign(input), sendEmailCampaign(input)])
+    expect(a.success && b.success).toBe(true)
+    if (!a.success || !b.success) throw new Error('send did not start')
+    const [ra, rb] = await Promise.all([settle(a.campaignId), settle(b.campaignId)])
+
+    expect(ra.sent + rb.sent, 'each parent is mailed exactly once across both sends').toBe(2)
+    expect(sendMock).toHaveBeenCalledTimes(2)
+
+    const mailed = sendMock.mock.calls.map((c) => c[0].to).sort()
+    expect(mailed).toEqual([p1, p2].sort())
+
+    // And exactly one keyed row survives per parent — the loser of each race
+    // lost its insert on the unique index rather than sending.
+    const keyed = await db.emailCampaignRecipient.findMany({
+      where: { parentEmail: { in: [p1, p2] }, sentKey: { not: null } },
+      select: { parentEmail: true },
+    })
+    expect(keyed).toHaveLength(2)
+  })
+
+  it('keeps counts accurate per recipient rather than only at the end', async () => {
+    await loginAdmin()
+    const source = await makeSourceGroup()
+    await enrollStudent(source.group.id, { parentEmail: uniqEmail('count-a') })
+    await enrollStudent(source.group.id, { parentEmail: uniqEmail('count-b') })
+    const target = await makeTarget()
+
+    sendMock.mockClear()
+    const res = await sendAndSettle({
+      kind: 'REENROLLMENT',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.group.id],
+      targetCourseId: target.course.id,
+      targetGroupIds: [target.group.id],
+      ...CONTENT,
+    })
+    expect(res).toMatchObject({ success: true, sent: 2 })
+
+    const campaign = await db.emailCampaign.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { sentCount: true, failedCount: true },
+    })
+    expect(campaign).toMatchObject({ sentCount: 2, failedCount: 0 })
+  })
+
+  // CUSTOM is deliberately repeatable, so its rows must never be keyed —
+  // otherwise the second newsletter to the same parent would be swallowed.
+  it('lets a CUSTOM campaign reach the same parent twice', async () => {
+    await loginAdmin()
+    const source = await makeSourceGroup()
+    const parent = uniqEmail('custom-twice')
+    await enrollStudent(source.group.id, { parentEmail: parent })
+    const input = {
+      kind: 'CUSTOM' as const,
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.group.id],
+      ...CONTENT,
+    }
+
+    sendMock.mockClear()
+    expect(await sendAndSettle(input)).toMatchObject({ success: true, sent: 1 })
+    expect(await sendAndSettle(input)).toMatchObject({ success: true, sent: 1, alreadySent: 0 })
+    expect(sendMock).toHaveBeenCalledTimes(2)
+
+    const keyed = await db.emailCampaignRecipient.count({
+      where: { parentEmail: parent, sentKey: { not: null } },
+    })
+    expect(keyed, 'CUSTOM rows stay unkeyed so they never block each other').toBe(0)
+  })
+
+  // The whole point of the detail page: answering "did this child's parent
+  // actually get the mail?" — including the children nobody could mail at all.
+  it('lists every recipient by child name, and names the children with no e-mail', async () => {
+    await loginAdmin()
+    const source = await makeSourceGroup()
+    const mailed = uniqEmail('detail-ok')
+    await enrollStudent(source.group.id, {
+      parentEmail: mailed,
+      firstName: 'Ivo',
+      lastName: 'Primljeni',
+    })
+    await enrollStudent(source.group.id, {
+      parentEmail: null,
+      firstName: 'Ana',
+      lastName: 'BezMaila',
+    })
+
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.group.id],
+      ...CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) throw new Error('send failed')
+
+    const detail = await getCampaignDetail(res.campaignId)
+    expect(detail.recipients).toHaveLength(2)
+
+    const sentRow = detail.recipients.find((r) => r.status === 'SENT')
+    expect(sentRow?.parentEmail).toBe(mailed)
+    expect(sentRow?.childNames).toEqual(['Ivo Primljeni'])
+
+    const skippedRow = detail.recipients.find((r) => r.status === 'SKIPPED')
+    expect(skippedRow?.childNames, 'the un-mailable child is named, not just counted').toEqual([
+      'Ana BezMaila',
+    ])
+    expect(skippedRow?.failureReason).toMatch(/nema upisanu e-mail/)
+  })
+
+  it('records why a send failed on the recipient row', async () => {
+    await loginAdmin()
+    const source = await makeSourceGroup()
+    await enrollStudent(source.group.id, { parentEmail: uniqEmail('why-failed') })
+
+    sendMock.mockRejectedValueOnce(new Error('mailbox full'))
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.group.id],
+      ...CONTENT,
+    })
+    if (!res.success) throw new Error('send failed')
+
+    const detail = await getCampaignDetail(res.campaignId)
+    const failedRow = detail.recipients.find((r) => r.status === 'FAILED')
+    expect(failedRow?.failureReason).toContain('mailbox full')
+  })
+
+  it('reports progress and closes the campaign out when the send finishes', async () => {
+    await loginAdmin()
+    const source = await makeSourceGroup()
+    await enrollStudent(source.group.id, { parentEmail: uniqEmail('progress') })
+
+    const started = await sendEmailCampaign({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.group.id],
+      ...CONTENT,
+    })
+    if (!started.success) throw new Error('send did not start')
+    expect(started.total).toBe(1)
+
+    await settle(started.campaignId)
+    const progress = await getCampaignProgress(started.campaignId)
+    expect(progress).toMatchObject({ sentCount: 1, failedCount: 0, totalCount: 1, finished: true })
+  })
+
+  // A deploy mid-send leaves PENDING rows. Resuming must finish those and only
+  // those — the parents already mailed must not be mailed twice.
+  it('resumes an interrupted campaign without re-mailing anyone', async () => {
+    await loginAdmin()
+    const source = await makeSourceGroup()
+    const done = uniqEmail('resume-done')
+    const left = uniqEmail('resume-left')
+    await enrollStudent(source.group.id, { parentEmail: done })
+    await enrollStudent(source.group.id, { parentEmail: left })
+
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.group.id],
+      ...CONTENT,
+    })
+    if (!res.success) throw new Error('send failed')
+
+    // Simulate a run killed after one recipient: put the other back to PENDING.
+    await db.emailCampaignRecipient.updateMany({
+      where: { campaignId: res.campaignId, parentEmail: left },
+      data: { status: 'PENDING', sentKey: null },
+    })
+    await db.emailCampaign.update({
+      where: { id: res.campaignId },
+      data: { sentCount: 1, finishedAt: null },
+    })
+
+    sendMock.mockClear()
+    const resumed = await resumeEmailCampaign(res.campaignId)
+    expect(resumed).toMatchObject({ success: true, remaining: 1 })
+    await settle(res.campaignId)
+
+    expect(sendMock, 'only the parent still owed an e-mail is mailed').toHaveBeenCalledTimes(1)
+    expect(sendMock.mock.calls[0][0].to).toBe(left)
+
+    const detail = await getCampaignDetail(res.campaignId)
+    expect(detail.recipients.filter((r) => r.status === 'SENT')).toHaveLength(2)
+    expect(detail.finished).toBe(true)
   })
 
   it('surfaces each child’s source-year preporuka in the invitation recipient preview', async () => {
@@ -471,7 +722,7 @@ describe('sendEmailCampaign — REENROLLMENT', () => {
     await enrollStudent(source.group.id, { parentEmail: uniqEmail('arch') })
     const target = await makeTarget()
 
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'REENROLLMENT',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [source.group.id],
@@ -491,7 +742,7 @@ describe('sendEmailCampaign — REENROLLMENT', () => {
     const target = await makeTarget()
     const otherTarget = await makeTarget()
 
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'REENROLLMENT',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [source.group.id],
@@ -634,7 +885,7 @@ describe('preporuka selection mode', () => {
     const target = await makeTarget()
     const content = { ...CONTENT, targetCourseId: target.course.id, targetGroupIds: [target.group.id] }
 
-    const groupMode = await sendEmailCampaign({
+    const groupMode = await sendAndSettle({
       kind: 'REENROLLMENT',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [source.group.id],
@@ -643,7 +894,7 @@ describe('preporuka selection mode', () => {
     expect(groupMode).toMatchObject({ success: true, sent: 1 })
 
     sendMock.mockClear()
-    const recMode = await sendEmailCampaign({
+    const recMode = await sendAndSettle({
       kind: 'REENROLLMENT',
       sourceSchoolYear: SOURCE_YEAR,
       recommendations: ['COMPETITION_PREP'],
@@ -756,7 +1007,7 @@ describe('city scoping', () => {
     })
     expect(preview).toEqual({ success: false, error: 'Nevaljani podaci.' })
 
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'CUSTOM',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [split.group.id],
@@ -775,7 +1026,7 @@ describe('city scoping', () => {
     const splitTarget = await makeTarget('SPLIT')
 
     await loginAdmin('SIBENIK')
-    const res = await sendEmailCampaign({
+    const res = await sendAndSettle({
       kind: 'REENROLLMENT',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [sibenikSource.group.id],
@@ -791,7 +1042,7 @@ describe('city scoping', () => {
     await loginAdmin('SPLIT')
     const { group } = await makeSourceGroup({ city: 'SPLIT' })
     await enrollStudent(group.id, { parentEmail: uniqEmail('history') })
-    const sent = await sendEmailCampaign({
+    const sent = await sendAndSettle({
       kind: 'CUSTOM',
       sourceSchoolYear: SOURCE_YEAR,
       sourceGroupIds: [group.id],

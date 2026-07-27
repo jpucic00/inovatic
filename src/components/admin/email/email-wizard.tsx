@@ -9,6 +9,7 @@ import type { RecommendationOption } from '@/lib/assessment-rubric'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import {
+  getCampaignProgress,
   getEmailGroupTree,
   previewEmailHtml,
   previewEmailRecipients,
@@ -17,6 +18,80 @@ import {
   type SendEmailCampaignResult,
 } from '@/actions/admin/email-campaign'
 import { EmailPreviewDialog } from './email-preview-dialog'
+
+type StartedSend = Extract<SendEmailCampaignResult, { success: true }>
+
+/**
+ * The send runs on the server, so this polls rather than holding the request
+ * open — the admin can close the tab and the campaign still completes.
+ */
+function SendProgressPanel({ result }: Readonly<{ result: StartedSend }>) {
+  const [progress, setProgress] = useState({
+    sentCount: 0,
+    failedCount: 0,
+    finished: result.total === 0,
+  })
+
+  useEffect(() => {
+    if (progress.finished) return
+    let cancelled = false
+    const timer = setInterval(async () => {
+      try {
+        const next = await getCampaignProgress(result.campaignId)
+        if (cancelled) return
+        setProgress({
+          sentCount: next.sentCount,
+          failedCount: next.failedCount,
+          finished: next.finished,
+        })
+      } catch {
+        // A transient failure just means the next tick tries again.
+      }
+    }, 2000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [result.campaignId, progress.finished])
+
+  const done = progress.sentCount + progress.failedCount
+  const pct = result.total === 0 ? 100 : Math.round((done / result.total) * 100)
+
+  return (
+    <div
+      className={[
+        'mt-4 rounded-lg border p-4 text-sm text-gray-800',
+        progress.finished ? 'border-green-200 bg-green-50' : 'border-cyan-200 bg-cyan-50',
+      ].join(' ')}
+      aria-live="polite"
+    >
+      <p className="font-medium mb-1">
+        {progress.finished ? 'Kampanja poslana' : 'Slanje u tijeku…'}
+      </p>
+      {!progress.finished && (
+        <>
+          <div className="h-1.5 w-full rounded-full bg-white overflow-hidden mb-2">
+            <div className="h-full bg-cyan-500 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="text-xs text-gray-600 mb-1">
+            Slanje se nastavlja na poslužitelju — možete zatvoriti ovu stranicu.
+          </p>
+        </>
+      )}
+      <p>
+        Poslano: {progress.sentCount} / {result.total} · Neuspješno: {progress.failedCount} · Već
+        poslano ranije: {result.alreadySent} · Isključeno: {result.excluded} · Bez e-maila:{' '}
+        {result.skipped.length}
+      </p>
+      <a
+        href={`/admin/email/${result.campaignId}`}
+        className="mt-2 inline-block font-medium text-cyan-700 hover:text-cyan-800 underline"
+      >
+        Detalji kampanje — tko je primio poruku
+      </a>
+    </div>
+  )
+}
 
 type Kind = 'CUSTOM' | 'REENROLLMENT'
 type SelectionMode = 'GROUPS' | 'RECOMMENDATION'
@@ -357,7 +432,8 @@ export function EmailWizard({
         setConfirming(false)
         if (res.success) {
           setSendResult(res)
-          toast.success(`Poslano ${res.sent} poruka.`)
+          // The send continues on the server, so the admin may close the tab.
+          toast.success(`Slanje pokrenuto — ${res.total} primatelja.`)
           router.refresh()
         } else {
           toast.error(res.error)
@@ -851,21 +927,7 @@ export function EmailWizard({
               </div>
             </div>
 
-            {sendResult && (
-              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-gray-800">
-                <p className="font-medium mb-1">Kampanja poslana</p>
-                <p>
-                  Poslano: {sendResult.sent} · Već poslano ranije: {sendResult.alreadySent} ·
-                  Isključeno: {sendResult.excluded} · Neuspješno: {sendResult.failed.length} ·
-                  Preskočeno (bez e-maila): {sendResult.skipped.length}
-                </p>
-                {sendResult.failed.length > 0 && (
-                  <p className="mt-1 text-red-700">
-                    Neuspješno poslano: {sendResult.failed.join(', ')}
-                  </p>
-                )}
-              </div>
-            )}
+            {sendResult && <SendProgressPanel result={sendResult} />}
           </section>
         </div>
       )}

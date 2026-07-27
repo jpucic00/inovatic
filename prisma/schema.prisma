@@ -75,8 +75,19 @@ enum EmailCampaignKind {
 }
 
 enum EmailRecipientStatus {
+  /// Written upfront for every intended recipient, so the detail view lists the
+  /// whole cohort from the first second and an interrupted campaign knows
+  /// exactly who is left to mail.
+  PENDING
   SENT
   FAILED
+  /// The parent was already invited to this program for this year, so this send
+  /// deliberately skipped them.
+  ALREADY_SENT
+  /// The child could not be mailed at all — the parent has no usable address.
+  /// Persisted as a row (not just a count) so the admin can see WHICH child
+  /// was missed and fix the record.
+  SKIPPED
 }
 
 // ─── Models ──────────────────────────────────────────────────────────────────
@@ -486,6 +497,9 @@ model TeacherAttendance {
   @@unique([userId, scheduledGroupId, sessionDate])
   @@index([userId, sessionDate])
   @@index([scheduledGroupId, sessionDate])
+  // recordedById is ON DELETE RESTRICT — without this the FK check seq-scans
+  // the fastest-growing table in the schema on every User delete.
+  @@index([recordedById])
 }
 
 model Article {
@@ -606,15 +620,26 @@ model EmailCampaign {
   sourceRecommendations String[] @default([])
   targetSchoolYear String?
   targetCourseId   String?
+  /// The termini offered in an invitation. Audit-only (no FK — groups may be
+  /// deleted), but also what lets a resumed send rebuild the same schedule
+  /// boxes the first run used.
+  targetGroupIds   String[] @default([])
   subject          String
   bodyText         String            @db.Text
   sentById         String
-  // Denormalized at loop end for cheap history display; recipient rows are
-  // the ground truth (counts can be stale if the send aborted mid-loop).
+  // Incremented per recipient while the send runs, so progress polling and an
+  // interrupted campaign both read accurate numbers. Recipient rows remain the
+  // ground truth.
   sentCount        Int               @default(0)
   failedCount      Int               @default(0)
   skippedCount     Int               @default(0)
   excludedCount    Int               @default(0)
+  /// How many parents this send set out to mail — the denominator for progress.
+  totalCount       Int               @default(0)
+  /// Null while the send is still running. A campaign left unfinished by a
+  /// deploy or crash can be resumed; already-sent parents are skipped by the
+  /// (sentKey, parentEmail) unique index.
+  finishedAt       DateTime?
   createdAt        DateTime          @default(now())
 
   targetCourse Course? @relation("EmailCampaignTarget", fields: [targetCourseId], references: [id], onDelete: SetNull)
@@ -624,6 +649,10 @@ model EmailCampaign {
 
   @@index([city, createdAt])
   @@index([city, kind, targetCourseId, targetSchoolYear])
+  // The composite above leads with `city`, so it cannot serve either FK check:
+  // sentById is RESTRICT, targetCourseId is SET NULL on course delete.
+  @@index([sentById])
+  @@index([targetCourseId])
 }
 
 model EmailCampaignRecipient {
@@ -632,8 +661,20 @@ model EmailCampaignRecipient {
   parentEmail String
   status      EmailRecipientStatus
   sentAt      DateTime             @default(now())
+  /// Makes "one invitation per parent per program per year" a database rule
+  /// rather than a hope. Set to `city:kind:targetCourseId:targetSchoolYear`
+  /// **only** on a SENT REENROLLMENT row; null for CUSTOM (deliberately
+  /// repeatable) and for FAILED rows (so a retry may invite again). Postgres
+  /// treats NULLs as distinct, so those rows never collide with each other.
+  sentKey String?
+  /// Snapshot of the children this address was mailed for, taken at send time
+  /// so the detail view survives later renames, transfers or deletions.
+  childNames String[] @default([])
+  /// Why a FAILED send failed, or why a SKIPPED child had no usable address.
+  failureReason String?
 
   campaign EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
+  @@unique([sentKey, parentEmail])
   @@index([campaignId])
 }
