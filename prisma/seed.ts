@@ -1559,6 +1559,10 @@ async function main() {
   await prisma.teacherAssignment.deleteMany()
   await prisma.studentComment.deleteMany()
   await prisma.studentAssessment.deleteMany()
+  // recordedById is RESTRICT, so these must go before user.deleteMany(). They
+  // also cascade from scheduledGroup — clear them explicitly so the reseed does
+  // not silently depend on that ordering.
+  await prisma.teacherAttendance.deleteMany()
   await prisma.scheduledGroup.deleteMany()
   await prisma.courseModule.deleteMany()
   await prisma.course.deleteMany()

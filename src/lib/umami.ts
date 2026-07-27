@@ -25,6 +25,6 @@ declare global {
  * unset, ad blocker, or an internal page). Never put personal data in `data`.
  */
 export function trackUmamiEvent(event: string, data?: UmamiEventData): void {
-  if (typeof window === 'undefined') return
-  window.umami?.track(event, data)
+  if (globalThis.window === undefined) return
+  globalThis.window.umami?.track(event, data)
 }

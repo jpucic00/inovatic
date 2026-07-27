@@ -102,7 +102,9 @@ export function InquiryStep3({ register, errors, setValue, getValues, clearError
       setValue('courseId', courseId)
     } else {
       setValue('scheduledGroupId', undefined)
-      setValue('courseId', undefined)
+      // Clearing the termin must not drop the workshop association in the
+      // radionica flow — mirror handleGradeChange and restore the preselection.
+      setValue('courseId', preselectedCourseId || undefined)
     }
   }
 

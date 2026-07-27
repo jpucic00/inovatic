@@ -43,12 +43,14 @@ test.describe('Login Page', () => {
 })
 
 test.describe('Navbar Login Link', () => {
-  test('navbar contains Prijava link on desktop', async ({ page }) => {
+  test('navbar contains the portal login link on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 })
     await page.goto(`${BASE}/`)
     const loginLink = page.locator('header a[href="/prijava"]')
     await expect(loginLink).toBeVisible()
-    await expect(loginLink).toHaveText(/Prijava/)
+    // Renamed from "Prijava" to "Polaznički portal"; between md and lg only the
+    // icon renders, so the accessible name is the stable assertion.
+    await expect(loginLink).toHaveAccessibleName(/Polaznički portal/)
   })
 
   test('mobile menu contains Prijava link', async ({ page }) => {

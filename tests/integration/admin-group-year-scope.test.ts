@@ -35,8 +35,16 @@ function baseInput(courseId: string, locationId: string) {
   }
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   setSelectedYearCookie(SELECTED_YEAR)
+  // `getSelectedSchoolYear` ignores the cookie unless the year is in the
+  // SchoolYear registry, quietly falling back to the computed current year —
+  // register it here rather than inheriting it from whichever file ran first.
+  await db.schoolYear.upsert({
+    where: { label: SELECTED_YEAR },
+    create: { label: SELECTED_YEAR },
+    update: {},
+  })
 })
 
 describe('createGroup — school-year trust-boundary guard', () => {

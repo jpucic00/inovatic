@@ -1,23 +1,33 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { MaterialScope } from '@prisma/client'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
 import {
   createAdmin,
-  createCourse,
   createEnrollment,
   createEnrollmentWindow,
-  createGroup,
   createMaterial,
   createModule,
   createStudent,
   createTeacher,
   createTeacherAssignment,
 } from './helpers/factory'
+import { fixtureScope } from './helpers/cleanup'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 const { deleteCourse } = await import('@/actions/admin/course')
+
+// Half of these cases exist precisely because `deleteCourse` *refuses*, so the
+// courses, groups and RESTRICT-FK materials they set up survive the test. Left
+// behind, they FK-block the next file that wipes courses — and that failure
+// lands on whichever file happens to run after this one. Scoped teardown keeps
+// the blame here.
+const fx = fixtureScope()
+
+afterAll(async () => {
+  await fx.cleanup()
+})
 
 // P3 delete-integrity: deleteCourse must block while any material still hangs off
 // the course (COURSE-scoped) or its modules (MODULE-scoped), so the app returns a
@@ -27,7 +37,7 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
     await createMaterial({ scope: MaterialScope.COURSE, courseId: course.id })
 
     const res = await deleteCourse(course.id)
@@ -42,7 +52,7 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
     const mod = await createModule(course.id)
     await createMaterial({ scope: MaterialScope.MODULE, moduleId: mod.id })
 
@@ -57,7 +67,7 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await fx.course({ isCustom: false })
 
     const res = await deleteCourse(course.id)
 
@@ -70,7 +80,7 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
 
     const res = await deleteCourse(course.id)
 
@@ -88,8 +98,8 @@ describe('deleteCourse — pridružene grupe', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: true, schoolYear: '2026/2027' })
-    const group = await createGroup({ courseId: course.id, dateStart: '2027-02-01', dateEnd: '2027-02-05' })
+    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const group = await fx.group({ courseId: course.id, dateStart: '2027-02-01', dateEnd: '2027-02-05' })
     const teacher = await createTeacher()
     await createTeacherAssignment(teacher.id, group.id)
     await createEnrollmentWindow(course.id)
@@ -110,8 +120,8 @@ describe('deleteCourse — pridružene grupe', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: true, schoolYear: '2026/2027' })
-    const group = await createGroup({ courseId: course.id, name: 'Termin A' })
+    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const group = await fx.group({ courseId: course.id, name: 'Termin A' })
     const student = await createStudent()
     await createEnrollment(student.id, group.id)
 

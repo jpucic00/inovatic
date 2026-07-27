@@ -111,9 +111,10 @@ export default async function HomePage() {
                 <span className="text-cyan-400">Svijet LEGO Robotike</span>
               </h1>
               <p className="text-[15px] sm:text-lg lg:text-[19px] text-white/82 lg:text-white/85 leading-[1.55] lg:leading-[1.6] max-w-[560px]">
-                Učimo djecu od 6 do 14 godina STEM vještine kroz igru, kreativnost i programiranje.
+                Učimo djecu od 6 do 14 godina STEM vještine kroz igru, kreativnost i
+                programiranje.{' '}
                 <span className="hidden sm:inline">
-                  {' '}Splitska udruga za robotiku s tradicijom od 2014. godine.
+                  Splitska udruga za robotiku s tradicijom od 2014. godine.
                 </span>
               </p>
               <div className="flex w-full flex-col sm:w-auto sm:flex-row gap-4 lg:mt-2">

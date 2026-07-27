@@ -100,12 +100,15 @@ export function Navbar() {
 
           {/* CTA + Login + Mobile toggle */}
           <div className="flex items-center gap-3">
+            {/* Between md and lg the full nav sits alongside this cluster, and the
+                long label overflows the bar — drop to the icon alone in that band. */}
             <Link
               href="/prijava"
+              aria-label="Polaznički portal"
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:text-cyan-600 hover:bg-gray-50 rounded-md transition-colors"
             >
               <LogIn className="w-4 h-4" />
-              Polaznički portal
+              <span className="md:hidden lg:inline">Polaznički portal</span>
             </Link>
             <Link
               href="/upisi"

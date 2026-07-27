@@ -38,6 +38,10 @@ test.describe('Phase 3 Step 0 — Bootstrap (creates groups for downstream specs
       await dialog.locator('#create-dayOfWeek').selectOption(i === 0 ? 'Ponedjeljak' : 'Utorak')
       await dialog.locator('#create-startTime').fill('17:00')
       await dialog.locator('#create-endTime').fill('18:30')
+      // Downstream specs enrol into these groups and never clean up, so the
+      // default 12 seats fill within a single phase3 pass — the capacity guard
+      // then disables the radio and every seeding beforeAll fails. Take the max.
+      await dialog.locator('#create-maxStudents').fill('50')
 
       // Signup window moved to the program (per school year); phase-3 flows
       // don't need the public form, so no window is set here.

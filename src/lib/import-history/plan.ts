@@ -114,12 +114,12 @@ function splitTeacherName(full: string): { firstName: string; lastName: string }
 }
 
 class TeacherRegistry {
-  private byKey = new Map<string, PlannedTeacher>()
+  private readonly byKey = new Map<string, PlannedTeacher>()
 
   constructor(
-    private snapshot: DbSnapshot,
-    private takenEmails: Set<string>,
-    private warnings: ImportWarning[],
+    private readonly snapshot: DbSnapshot,
+    private readonly takenEmails: Set<string>,
+    private readonly warnings: ImportWarning[],
   ) {}
 
   /** Resolve a sheet teacher name to a planned teacher key (match or create). */
@@ -173,13 +173,13 @@ class TeacherRegistry {
 // ── Student registry ─────────────────────────────────────────────────────────
 
 class StudentRegistry {
-  private byKey = new Map<string, PlannedStudent>()
+  private readonly byKey = new Map<string, PlannedStudent>()
 
   constructor(
-    private snapshot: DbSnapshot,
-    private takenUsernames: Set<string>,
-    private takenEmails: Set<string>,
-    private warnings: ImportWarning[],
+    private readonly snapshot: DbSnapshot,
+    private readonly takenUsernames: Set<string>,
+    private readonly takenEmails: Set<string>,
+    private readonly warnings: ImportWarning[],
   ) {}
 
   resolve(

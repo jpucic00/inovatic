@@ -56,6 +56,22 @@ describe('WeeklySchedule empty-hour collapsing', () => {
     expect(Number.parseFloat(afternoon.style.height)).toBeCloseTo(90 * 0.9 - 2)
   })
 
+  // Regression: `endTime <= startTime` passes the HH:MM regex the group schemas
+  // use, and it used to collapse minTime/maxTime onto the same hour, leaving zero
+  // bands — the grid then crashed on `bands[bands.length - 1].top`.
+  it('renders a degenerate group instead of crashing when end <= start', () => {
+    expect(() =>
+      render(<WeeklySchedule groups={[group({ id: 'a', startTime: '18:00', endTime: '18:00' })]} />),
+    ).not.toThrow()
+    expect(screen.getByText('18:00')).toBeTruthy()
+  })
+
+  it('survives a group whose end time precedes its start time', () => {
+    expect(() =>
+      render(<WeeklySchedule groups={[group({ id: 'a', startTime: '18:30', endTime: '08:00' })]} />),
+    ).not.toThrow()
+  })
+
   it('leaves a single empty hour to scale', () => {
     render(
       <WeeklySchedule

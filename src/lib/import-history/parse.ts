@@ -105,7 +105,7 @@ export function dayOfWeekFromLabel(label: string): string | null {
 // "20:00" / "9:00" (hour unpadded, minutes two-digit — the prod convention).
 
 export function normalizeTimeToken(token: string): string | null {
-  const t = token.trim().replace(/\./g, ':')
+  const t = token.trim().replaceAll('.', ':')
   let hours: number
   let minutes: number
   const withColon = /^(\d{1,2}):(\d{2})$/.exec(t)
@@ -565,8 +565,7 @@ export function parseContactSheet(
   }
 
   let colMap: Map<string, number> | null = null
-  for (let r = 0; r < grid.length; r++) {
-    const row = grid[r]
+  for (const row of grid) {
     if (!colMap) {
       const program = matchLabelRow(row, ['NAZIV PROGRAMA', 'PROGRAM'])
       if (program !== null) {

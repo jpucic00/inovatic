@@ -70,10 +70,13 @@ function buildTimeBands(
   maxTime: number,
 ): TimeBand[] {
   const runs: { start: number; end: number; busy: boolean }[] = []
-  for (let t = minTime; t < maxTime; t += 60) {
+  // A group saved with endTime <= startTime can collapse the bounds onto a single
+  // hour; always emit at least one band so the grid degrades instead of throwing.
+  const upper = Math.max(maxTime, minTime + 60)
+  for (let t = minTime; t < upper; t += 60) {
     const busy = bounds.some((b) => b.start < t + 60 && b.end > t)
-    const last = runs[runs.length - 1]
-    if (last && last.busy === busy) last.end = t + 60
+    const last = runs.at(-1)
+    if (last?.busy === busy) last.end = t + 60
     else runs.push({ start: t, end: t + 60, busy })
   }
 
@@ -95,8 +98,8 @@ function timeToY(bands: TimeBand[], minutes: number): number {
       return band.top + band.height * Math.min(Math.max(ratio, 0), 1)
     }
   }
-  const last = bands[bands.length - 1]
-  return last.top + last.height
+  const last = bands.at(-1)
+  return last ? last.top + last.height : BODY_PAD
 }
 
 type Group = {
@@ -159,8 +162,8 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
     }
   }
 
-  const lastBand = bands[bands.length - 1]
-  const gridHeight = lastBand.top + lastBand.height + BODY_PAD
+  const lastBand = bands.at(-1)
+  const gridHeight = lastBand ? lastBand.top + lastBand.height + BODY_PAD : BODY_PAD * 2
 
   return (
     <div>

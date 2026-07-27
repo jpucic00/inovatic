@@ -180,6 +180,10 @@ async function createStudentAndEnroll(
   const dob = page.locator('#create-student-dob')
   await dob.fill('10.04.2016')
   await dob.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+  // Parent e-mail is mandatory on manual create — without it submit stays disabled.
+  await page
+    .locator('#create-student-parent-email')
+    .fill(`${firstName}.${lastName}`.toLowerCase().replaceAll(/[^a-z0-9.]/g, '') + '@test.com')
 
   // Program → pick SLR 1 by matching option text
   const courseSelect = page.locator('#create-student-course')

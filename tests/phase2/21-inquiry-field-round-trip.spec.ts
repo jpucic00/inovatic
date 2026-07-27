@@ -75,6 +75,18 @@ async function submitInquiry(page: Page, data: InquiryData) {
 
   // Step 3 — grade, optional referralSource, consent + submit
   await page.locator('select[name="grade"]').selectOption(data.grade)
+  // A termin is mandatory whenever the chosen grade has an open, non-full group
+  // (enforced client-side and mirrored server-side as TERMIN_REQUIRED), so take
+  // the first real option when the dropdown offers one.
+  // The enabled select only renders when the grade's level has an open program;
+  // otherwise a disabled placeholder (no id) takes its place and termin is optional.
+  const terminSelect = page.locator('select#scheduledGroupId')
+  if ((await terminSelect.count()) > 0) {
+    const values = await terminSelect
+      .locator('option')
+      .evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value).filter(Boolean))
+    if (values.length > 0) await terminSelect.selectOption(values[0])
+  }
   if (data.referralSource) {
     await page.locator('#referralSource').selectOption(data.referralSource)
   }

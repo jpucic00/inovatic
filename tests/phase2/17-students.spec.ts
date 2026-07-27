@@ -134,7 +134,13 @@ async function createStudentManuallyViaDialog(
   }
   if (data.childSchool) await page.locator('#create-student-school').fill(data.childSchool)
   if (data.parentName) await page.locator('#create-student-parent-name').fill(data.parentName)
-  if (data.parentEmail) await page.locator('#create-student-parent-email').fill(data.parentEmail)
+  // Parent e-mail is mandatory on manual create (it is the credentials recipient
+  // and the legacy-tier matcher), so default it rather than leaving submit disabled.
+  const parentEmail =
+    data.parentEmail ??
+    `roditelj.${data.firstName}.${data.lastName}`.toLowerCase().replaceAll(/[^a-z0-9.]/g, '') +
+      '@test.com'
+  await page.locator('#create-student-parent-email').fill(parentEmail)
   if (data.parentPhone) await page.locator('#create-student-parent-phone').fill(data.parentPhone)
 
   // The dialog has a footer submit button with identical label to the trigger.

@@ -23,8 +23,15 @@ const { getCourses, createCourse: createCourseAction } = await import(
   '@/actions/admin/course'
 )
 
-beforeAll(() => {
+beforeAll(async () => {
   setSelectedYearCookie(undefined)
+  // `getSelectedSchoolYear` silently falls back to the computed current year
+  // unless the cookie's year is in the SchoolYear registry — so every year this
+  // file selects has to be registered here. Relying on another file's beforeAll
+  // to do it made these cases pass or fail on file order.
+  for (const label of ['2025/2026', '2026/2027', '2020/2021']) {
+    await db.schoolYear.upsert({ where: { label }, create: { label }, update: {} })
+  }
 })
 
 describe('getCourses — school-year scoping', () => {

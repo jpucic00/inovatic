@@ -73,9 +73,9 @@ export function CourseModuleAccordion({ modules, gradient }: CourseModuleAccordi
                 <div className="relative mb-2.5 aspect-[4/3] w-full overflow-hidden rounded-[10px] bg-gray-200 md:hidden">
                   <Image src={mod.image} alt={mod.title} fill sizes="90vw" className="object-cover" />
                 </div>
-                {paras.map((para) => (
+                {paras.map((para, pIdx) => (
                   <p
-                    key={para.slice(0, 60)}
+                    key={`${mod.title}-${pIdx}`}
                     className="mb-2 text-[13px] leading-[1.6] text-gray-500 last:mb-0 md:mb-2.5 md:text-sm md:leading-[1.65]"
                   >
                     {para}

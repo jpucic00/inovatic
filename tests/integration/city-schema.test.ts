@@ -1,13 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { db } from '@/lib/db'
 import {
-  createCourse,
   createEnrollmentWindow,
-  createGroup,
-  createLocation,
   createModule,
   createModuleSchedule,
 } from './helpers/factory'
+import { fixtureScope } from './helpers/cleanup'
 
 // Schema-shape guarantees introduced by the city (Split/Šibenik) separation:
 // per-city composite uniques and the ScheduledGroup(locationId, city) →
@@ -15,36 +13,30 @@ import {
 // DB-level tenant invariants that every later scoping PR builds on.
 
 const SY = '2026/2027'
+const XMAS = new Date('2026-12-25T00:00:00.000Z')
+
+// These cases pin DB constraints, not global reads — so the teardown names the
+// ids this file created instead of emptying the tables. A global wipe here
+// would delete a neighbouring file's fixtures too, which is how an unrelated
+// file ends up failing on an FK RESTRICT it never touched.
+const fx = fixtureScope()
 
 beforeAll(async () => {
   await db.schoolYear.upsert({ where: { label: SY }, create: { label: SY }, update: {} })
+  // Other files plan holidays on 2026-12-25 too, and the per-city unique test
+  // below needs the slot empty — clear just that one date, on the way in and
+  // between tests.
+  await db.schoolYearHoliday.deleteMany({ where: { schoolYear: SY, date: XMAS } })
 })
 
 afterEach(async () => {
-  // Global wipe in FK-safe order (same rationale as the planner test's
-  // cleanup): earlier-running files can leave enrollments, inquiries,
-  // comments, or Restrict-FK materials pointing at groups/courses, which
-  // would block the ScheduledGroup/Course wipe below.
-  await db.attendance.deleteMany({})
-  await db.moduleEnrollment.deleteMany({})
-  await db.enrollment.deleteMany({})
-  await db.studentComment.deleteMany({})
-  await db.studentAssessment.deleteMany({})
-  await db.teacherAssignment.deleteMany({})
-  await db.inquiry.deleteMany({})
-  await db.material.deleteMany({})
-  await db.courseEnrollmentWindow.deleteMany({})
-  await db.moduleSchedule.deleteMany({})
-  await db.schoolYearHoliday.deleteMany({})
-  await db.scheduledGroup.deleteMany({})
-  await db.courseModule.deleteMany({})
-  await db.course.deleteMany({})
-  await db.location.deleteMany({})
+  await fx.cleanup()
+  await db.schoolYearHoliday.deleteMany({ where: { schoolYear: SY, date: XMAS } })
 })
 
 describe('city composite uniques', () => {
   it('lets each city open its own enrollment window for the same course + year', async () => {
-    const course = await createCourse()
+    const course = await fx.course()
     await createEnrollmentWindow(course.id, { schoolYear: SY, city: 'SPLIT' })
     await createEnrollmentWindow(course.id, { schoolYear: SY, city: 'SIBENIK' })
 
@@ -55,7 +47,7 @@ describe('city composite uniques', () => {
   })
 
   it('still rejects a duplicate window within one city', async () => {
-    const course = await createCourse()
+    const course = await fx.course()
     await createEnrollmentWindow(course.id, { schoolYear: SY, city: 'SIBENIK' })
     await expect(
       createEnrollmentWindow(course.id, { schoolYear: SY, city: 'SIBENIK' }),
@@ -63,7 +55,7 @@ describe('city composite uniques', () => {
   })
 
   it('lets each city plan its own module dates for the shared curriculum', async () => {
-    const course = await createCourse()
+    const course = await fx.course()
     const mod = await createModule(course.id)
     await createModuleSchedule(mod.id, {
       schoolYear: SY,
@@ -84,7 +76,7 @@ describe('city composite uniques', () => {
   })
 
   it('lets both cities mark the same holiday date independently', async () => {
-    const date = new Date('2026-12-25T00:00:00.000Z')
+    const date = XMAS
     await db.schoolYearHoliday.create({
       data: { schoolYear: SY, city: 'SPLIT', date, name: 'Božić' },
     })
@@ -101,15 +93,19 @@ describe('city composite uniques', () => {
 
 describe('ScheduledGroup city ↔ Location city FK backstop', () => {
   it('rejects a group whose city differs from its venue city', async () => {
-    const splitLocation = await createLocation({ city: 'SPLIT' })
+    // Course created up front rather than left to the factory: the group insert
+    // is meant to fail, and a course minted inside that call would never reach
+    // the tracker.
+    const course = await fx.course()
+    const splitLocation = await fx.location({ city: 'SPLIT' })
     await expect(
-      createGroup({ locationId: splitLocation.id, city: 'SIBENIK' }),
+      fx.group({ courseId: course.id, locationId: splitLocation.id, city: 'SIBENIK' }),
     ).rejects.toMatchObject({ code: 'P2003' })
   })
 
   it('accepts a group whose city matches its venue city', async () => {
-    const trokut = await createLocation({ city: 'SIBENIK' })
-    const group = await createGroup({ locationId: trokut.id, city: 'SIBENIK' })
+    const trokut = await fx.location({ city: 'SIBENIK' })
+    const group = await fx.group({ locationId: trokut.id, city: 'SIBENIK' })
     expect(group.city).toBe('SIBENIK')
   })
 })

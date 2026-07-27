@@ -285,6 +285,16 @@ test.describe('/admin/skolska-godina — holiday management', () => {
     await outsideCell.click()
     await page.getByLabel('Naziv (neobavezno)').fill('Solo praznik')
     await page.getByRole('button', { name: /^Spremi$/ }).click()
+    // A long-lived dev DB accumulates attendance on arbitrary dates, so this save
+    // may hit the cascade-confirmation branch (covered on its own above). The save
+    // button relabels itself in place once the action returns requiresConfirmation,
+    // so wait for that label rather than probing before the transition settles.
+    const confirmCascade = page.getByRole('button', { name: /Da, obriši dolaske i spremi/i })
+    const needsConfirm = await confirmCascade
+      .waitFor({ state: 'visible', timeout: 4000 })
+      .then(() => true)
+      .catch(() => false)
+    if (needsConfirm) await confirmCascade.click()
     await expect(page.getByRole('dialog')).toBeHidden()
     await expect(outsideCell).toHaveAttribute('data-holiday', 'true')
 

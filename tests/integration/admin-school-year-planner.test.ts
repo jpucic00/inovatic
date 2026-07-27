@@ -6,6 +6,7 @@ import {
   createCourse,
   createModule,
 } from './helpers/factory'
+import { wipePlanningTables } from './helpers/cleanup'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
@@ -26,27 +27,19 @@ beforeAll(async () => {
     create: { label: ARCHIVED_SY },
     update: {},
   })
+  // `completeSchoolYearPlan` walks *every* standard course in the database, so
+  // this file is one of the few that genuinely needs a global slate rather
+  // than a scoped teardown — one 3-module course left behind by any other file
+  // trips the drift guard. Wipe on the way in as well as between tests, so the
+  // first test isn't at the mercy of whichever file ran before it.
+  await wipePlanningTables()
 })
 
 afterEach(async () => {
-  // Each test seeds its own standard courses; if we left them lying around
-  // the planner's "standard programs" count + drift-detection guards would
-  // see polluted state across tests. Delete in FK-safe order: rows that
-  // reference ScheduledGroup (Attendance → ModuleEnrollment → Enrollment →
-  // TeacherAssignment) must go before ScheduledGroup itself. Without this,
-  // any prior test file that left enrollments behind would FK-block the
-  // ScheduledGroup wipe.
-  await db.attendance.deleteMany({})
-  await db.moduleEnrollment.deleteMany({})
-  await db.enrollment.deleteMany({})
-  await db.teacherAssignment.deleteMany({})
-  await db.studentAssessment.deleteMany({})
-  await db.moduleSchedule.deleteMany({})
-  await db.scheduledGroup.deleteMany({})
-  await db.courseModule.deleteMany({})
-  await db.course.deleteMany({})
-  await db.location.deleteMany({})
-  await db.schoolYearHoliday.deleteMany({})
+  // Each test seeds its own standard courses; left lying around, they'd skew
+  // the planner's "standard programs" count and its drift-detection guard for
+  // the next test.
+  await wipePlanningTables()
 })
 
 async function seedFourStandardCourses() {

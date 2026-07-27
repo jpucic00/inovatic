@@ -2,14 +2,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
-import {
-  createAdmin,
-  createCourse,
-  createGroup,
-  createLocation,
-  createStudent,
-  createTeacher,
-} from './helpers/factory'
+import { createAdmin, createStudent, createTeacher } from './helpers/factory'
+import { fixtureScope } from './helpers/cleanup'
 
 // The group/location actions revalidate, read the school-year cookie, and the
 // city guards throw notFound()/redirect() — stub the next integrations so the
@@ -45,6 +39,12 @@ const { getCourses } = await import('@/actions/admin/course')
 
 const SY = '2026/2027'
 
+// Scoped teardown: every course, group and venue this file mints is recorded
+// here so `afterAll` deletes exactly those ids. A global `deleteMany({})` would
+// also take out whatever the previously-run file left behind, which is how an
+// unrelated file ends up failing on an FK RESTRICT it never touched.
+const fx = fixtureScope()
+
 beforeAll(async () => {
   mockedCookies.mockResolvedValue({
     get: (name: string) =>
@@ -53,24 +53,8 @@ beforeAll(async () => {
   await db.schoolYear.upsert({ where: { label: SY }, create: { label: SY }, update: {} })
 })
 
-// FK-safe cleanup so later files' global wipes don't hit orphaned references.
 afterAll(async () => {
-  await db.attendance.deleteMany({})
-  await db.moduleEnrollment.deleteMany({})
-  await db.enrollment.deleteMany({})
-  await db.teacherAssignment.deleteMany({})
-  await db.materialGroupHide.deleteMany({})
-  await db.material.deleteMany({})
-  await db.studentComment.deleteMany({})
-  await db.studentAssessment.deleteMany({})
-  await db.galleryImage.deleteMany({})
-  await db.inquiry.deleteMany({})
-  await db.courseEnrollmentWindow.deleteMany({})
-  await db.moduleSchedule.deleteMany({})
-  await db.scheduledGroup.deleteMany({})
-  await db.courseModule.deleteMany({})
-  await db.course.deleteMany({})
-  await db.location.deleteMany({})
+  await fx.cleanup()
 })
 
 async function loginSibenikAdmin() {
@@ -79,29 +63,21 @@ async function loginSibenikAdmin() {
   return admin
 }
 
-let radionicaCounter = 0
-// The factory's createCourse has no city override yet — radionice (isCustom,
-// per-city) are created directly.
+// Radionice (isCustom, per-city) carry a schoolYear the factory's createCourse
+// doesn't set, so they're created directly — tracked all the same.
 function createRadionica(city: 'SPLIT' | 'SIBENIK') {
-  const id = `${Date.now().toString(36)}${(++radionicaCounter).toString(36)}`
-  return db.course.create({
-    data: {
-      slug: `radionica-${city.toLowerCase()}-${id}`,
-      title: `Radionica ${city} ${id}`,
-      description: 'Test radionica',
-      ageMin: 6,
-      ageMax: 14,
-      isCustom: true,
-      schoolYear: SY,
-      city,
-    },
+  return fx.course({
+    isCustom: true,
+    schoolYear: SY,
+    city,
+    title: `Radionica ${city}`,
   })
 }
 
 describe('group reads — city scoping', () => {
   it('getGroups shows own-city groups and hides the other city’s', async () => {
-    const splitGroup = await createGroup({ city: 'SPLIT', schoolYear: SY })
-    const sibenikGroup = await createGroup({ city: 'SIBENIK', schoolYear: SY })
+    const splitGroup = await fx.group({ city: 'SPLIT', schoolYear: SY })
+    const sibenikGroup = await fx.group({ city: 'SIBENIK', schoolYear: SY })
     await loginSibenikAdmin()
 
     const rows = await getGroups()
@@ -110,14 +86,14 @@ describe('group reads — city scoping', () => {
   })
 
   it('getGroupDetail throws NEXT_NOT_FOUND on a cross-city group id', async () => {
-    const splitGroup = await createGroup({ city: 'SPLIT', schoolYear: SY })
+    const splitGroup = await fx.group({ city: 'SPLIT', schoolYear: SY })
     await loginSibenikAdmin()
 
     await expect(getGroupDetail(splitGroup.id)).rejects.toThrow(/NEXT_NOT_FOUND/)
   })
 
   it('getGroupDetail returns an own-city group', async () => {
-    const sibenikGroup = await createGroup({ city: 'SIBENIK', schoolYear: SY })
+    const sibenikGroup = await fx.group({ city: 'SIBENIK', schoolYear: SY })
     await loginSibenikAdmin()
 
     const detail = await getGroupDetail(sibenikGroup.id)
@@ -127,8 +103,8 @@ describe('group reads — city scoping', () => {
 
 describe('createGroup — city scoping', () => {
   it('rejects a venue from the other city', async () => {
-    const course = await createCourse() // shared standard program (city null)
-    const splitLocation = await createLocation({ city: 'SPLIT' })
+    const course = await fx.course() // shared standard program (city null)
+    const splitLocation = await fx.location({ city: 'SPLIT' })
     await loginSibenikAdmin()
 
     const res = await createGroupAction({
@@ -149,7 +125,7 @@ describe('createGroup — city scoping', () => {
 
   it('rejects the other city’s radionica even at an own-city venue', async () => {
     const splitRadionica = await createRadionica('SPLIT')
-    const sibenikLocation = await createLocation({ city: 'SIBENIK' })
+    const sibenikLocation = await fx.location({ city: 'SIBENIK' })
     await loginSibenikAdmin()
 
     const res = await createGroupAction({
@@ -168,8 +144,8 @@ describe('createGroup — city scoping', () => {
   })
 
   it('rejects assignees from the other city and non-staff roles', async () => {
-    const course = await createCourse()
-    const sibenikLocation = await createLocation({ city: 'SIBENIK' })
+    const course = await fx.course()
+    const sibenikLocation = await fx.location({ city: 'SIBENIK' })
     const splitTeacher = await createTeacher({ city: 'SPLIT' })
     const sibenikStudent = await createStudent({ city: 'SIBENIK' })
     await loginSibenikAdmin()
@@ -200,8 +176,8 @@ describe('createGroup — city scoping', () => {
   })
 
   it('creates a group stamped with the venue city and syncs own-city staff', async () => {
-    const course = await createCourse()
-    const sibenikLocation = await createLocation({ city: 'SIBENIK' })
+    const course = await fx.course()
+    const sibenikLocation = await fx.location({ city: 'SIBENIK' })
     const sibenikTeacher = await createTeacher({ city: 'SIBENIK' })
     await loginSibenikAdmin()
 
@@ -218,7 +194,9 @@ describe('createGroup — city scoping', () => {
     })
     expect(res).toEqual({ success: true })
 
-    const created = await db.scheduledGroup.findFirstOrThrow({ where: { name } })
+    const created = fx.trackGroup(
+      await db.scheduledGroup.findFirstOrThrow({ where: { name } }),
+    )
     expect(created.city).toBe('SIBENIK')
     expect(
       await db.teacherAssignment.count({
@@ -230,7 +208,7 @@ describe('createGroup — city scoping', () => {
 
 describe('updateGroup — city scoping', () => {
   it('throws NEXT_NOT_FOUND on a cross-city group id', async () => {
-    const splitGroup = await createGroup({ city: 'SPLIT', schoolYear: SY })
+    const splitGroup = await fx.group({ city: 'SPLIT', schoolYear: SY })
     await loginSibenikAdmin()
 
     await expect(
@@ -241,8 +219,8 @@ describe('updateGroup — city scoping', () => {
   })
 
   it('rejects moving the group to the other city’s venue', async () => {
-    const sibenikGroup = await createGroup({ city: 'SIBENIK', schoolYear: SY })
-    const splitLocation = await createLocation({ city: 'SPLIT' })
+    const sibenikGroup = await fx.group({ city: 'SIBENIK', schoolYear: SY })
+    const splitLocation = await fx.location({ city: 'SPLIT' })
     await loginSibenikAdmin()
 
     const res = await updateGroup({ id: sibenikGroup.id, locationId: splitLocation.id })
@@ -253,7 +231,7 @@ describe('updateGroup — city scoping', () => {
   })
 
   it('rejects syncing cross-city or non-staff assignees', async () => {
-    const sibenikGroup = await createGroup({ city: 'SIBENIK', schoolYear: SY })
+    const sibenikGroup = await fx.group({ city: 'SIBENIK', schoolYear: SY })
     const splitTeacher = await createTeacher({ city: 'SPLIT' })
     const sibenikStudent = await createStudent({ city: 'SIBENIK' })
     await loginSibenikAdmin()
@@ -270,7 +248,7 @@ describe('updateGroup — city scoping', () => {
   })
 
   it('syncs an own-city teacher', async () => {
-    const sibenikGroup = await createGroup({ city: 'SIBENIK', schoolYear: SY })
+    const sibenikGroup = await fx.group({ city: 'SIBENIK', schoolYear: SY })
     const sibenikTeacher = await createTeacher({ city: 'SIBENIK' })
     await loginSibenikAdmin()
 
@@ -286,7 +264,7 @@ describe('updateGroup — city scoping', () => {
 
 describe('deleteGroup — city scoping', () => {
   it('throws NEXT_NOT_FOUND on a cross-city id and leaves the row', async () => {
-    const splitGroup = await createGroup({ city: 'SPLIT', schoolYear: SY })
+    const splitGroup = await fx.group({ city: 'SPLIT', schoolYear: SY })
     await loginSibenikAdmin()
 
     await expect(deleteGroup(splitGroup.id)).rejects.toThrow(/NEXT_NOT_FOUND/)
@@ -296,7 +274,7 @@ describe('deleteGroup — city scoping', () => {
   })
 
   it('deletes an own-city group', async () => {
-    const sibenikGroup = await createGroup({ city: 'SIBENIK', schoolYear: SY })
+    const sibenikGroup = await fx.group({ city: 'SIBENIK', schoolYear: SY })
     await loginSibenikAdmin()
 
     const res = await deleteGroup(sibenikGroup.id)
@@ -309,8 +287,8 @@ describe('deleteGroup — city scoping', () => {
 
 describe('locations — city scoping', () => {
   it('getLocations hides the other city’s venues', async () => {
-    const splitLocation = await createLocation({ city: 'SPLIT' })
-    const sibenikLocation = await createLocation({ city: 'SIBENIK' })
+    const splitLocation = await fx.location({ city: 'SPLIT' })
+    const sibenikLocation = await fx.location({ city: 'SIBENIK' })
     await loginSibenikAdmin()
 
     const rows = await getLocations()
@@ -330,12 +308,14 @@ describe('locations — city scoping', () => {
     })
     expect(res).toEqual({ success: true })
 
-    const created = await db.location.findFirstOrThrow({ where: { name } })
+    const created = fx.trackLocation(
+      await db.location.findFirstOrThrow({ where: { name } }),
+    )
     expect(created.city).toBe('SIBENIK')
   })
 
   it('deleteLocation throws NEXT_NOT_FOUND on a cross-city id and leaves the row', async () => {
-    const splitLocation = await createLocation({ city: 'SPLIT' })
+    const splitLocation = await fx.location({ city: 'SPLIT' })
     await loginSibenikAdmin()
 
     await expect(deleteLocation(splitLocation.id)).rejects.toThrow(/NEXT_NOT_FOUND/)
@@ -345,7 +325,7 @@ describe('locations — city scoping', () => {
   })
 
   it('deleteLocation removes an own-city venue without groups', async () => {
-    const sibenikLocation = await createLocation({ city: 'SIBENIK' })
+    const sibenikLocation = await fx.location({ city: 'SIBENIK' })
     await loginSibenikAdmin()
 
     const res = await deleteLocation(sibenikLocation.id)
@@ -358,7 +338,7 @@ describe('locations — city scoping', () => {
 
 describe('getCourses — course feed city scoping', () => {
   it('shows shared standard programs and own radionice, hides the other city’s radionice', async () => {
-    const standard = await createCourse() // shared: isCustom false, city null
+    const standard = await fx.course() // shared: isCustom false, city null
     const sibenikRadionica = await createRadionica('SIBENIK')
     const splitRadionica = await createRadionica('SPLIT')
     await loginSibenikAdmin()

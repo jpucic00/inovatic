@@ -15,4 +15,6 @@ export const ALL_PAGES = [
   { path: '/lokacije/sibenik', name: 'Šibenik location page' },
   { path: '/proslave', name: 'Birthday parties' },
   { path: '/donacije', name: 'Donations — WRO fundraising' },
+  { path: '/natjecanja', name: 'Competitions overview' },
+  { path: '/stem-edukacija', name: 'STEM edukacija — B2B mentor training' },
 ]

@@ -54,16 +54,18 @@ test.describe('News & Articles — Listing, detail pages, and 404 handling', () 
   })
 
   test('City filter: pills render, ?grad=sibenik activates Šibenik, unknown grad falls back to Sve', async ({ page }) => {
+    // Scope to <main>: the navbar's Lokacije submenu renders "Split" and "Šibenik"
+    // links too, so an unscoped getByRole matches two elements and trips strict mode.
+    const pill = (label: string) =>
+      page.getByRole('main').getByRole('link', { name: label, exact: true })
+
     await test.step('Default /novosti shows all three pills with "Sve" active', async () => {
       await page.goto(`${BASE}/novosti`)
       for (const label of ['Sve', 'Split', 'Šibenik']) {
-        await expect(
-          page.getByRole('link', { name: label, exact: true }).first(),
-          `filter pill "${label}" is rendered`,
-        ).toBeVisible()
+        await expect(pill(label), `filter pill "${label}" is rendered`).toBeVisible()
       }
       await expect(
-        page.getByRole('link', { name: 'Sve', exact: true }),
+        pill('Sve'),
         '"Sve" pill is marked as the active filter',
       ).toHaveAttribute('aria-current', 'page')
     })
@@ -71,7 +73,7 @@ test.describe('News & Articles — Listing, detail pages, and 404 handling', () 
     await test.step('?grad=sibenik marks the Šibenik pill active and keeps grad in pagination', async () => {
       await page.goto(`${BASE}/novosti?grad=sibenik`)
       await expect(
-        page.getByRole('link', { name: 'Šibenik', exact: true }),
+        pill('Šibenik'),
         'Šibenik pill is active under ?grad=sibenik',
       ).toHaveAttribute('aria-current', 'page')
 
@@ -88,7 +90,7 @@ test.describe('News & Articles — Listing, detail pages, and 404 handling', () 
     await test.step('Unknown ?grad=zagreb falls back to the unfiltered list', async () => {
       await page.goto(`${BASE}/novosti?grad=zagreb`)
       await expect(
-        page.getByRole('link', { name: 'Sve', exact: true }),
+        pill('Sve'),
         'invalid grad param resolves to "Sve"',
       ).toHaveAttribute('aria-current', 'page')
     })

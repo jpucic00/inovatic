@@ -26,8 +26,13 @@ import {
 } from '@prisma/client'
 import { db } from '@/lib/db'
 
+// Vitest gives every test file its own module registry, so `counter` restarts
+// at 0 per file — two files that start inside the same millisecond used to mint
+// the same email and fail on the User.email unique. The per-registry random
+// block makes the id unique regardless of clock resolution or file order.
+const REGISTRY_ID = Math.random().toString(36).slice(2, 8)
 let counter = 0
-const uniq = () => `${Date.now().toString(36)}${(++counter).toString(36)}`
+const uniq = () => `${Date.now().toString(36)}${REGISTRY_ID}${(++counter).toString(36)}`
 
 const HASH_ROUNDS = 4 // low rounds — tests don't need production security
 

@@ -126,7 +126,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
     `Nastava jednom tjedno, ${course.sessionDuration} minuta`,
     `Korištenje opreme (${course.equipment} + laptop)`,
     `Alati: ${course.tools}`,
-    'Mala grupa (do 12 polaznika)',
+    `Mala grupa (do ${course.groupSize} polaznika)`,
     'Stručni robo treneri',
     'Diploma o završetku',
     'Pristup online platformi',

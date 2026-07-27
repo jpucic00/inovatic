@@ -31,10 +31,24 @@ const CY = computeSchoolYear() // the journey runs in the CURRENT year — the p
 
 const GROUP_NAME = `Trokut Junior ${RUN_ID}`
 const MATERIAL_TITLE = `Šibenik upute ${RUN_ID}`
-// Monday, mid-cycle: 28 weekly sessions from here span past today (2026-07-10),
-// so a module is still enrolling and the group stays publicly visible.
-const PLAN_START_DISPLAY = '02.03.2026'
-const SESSION_DATE = '2026-07-06' // a Monday inside the arc
+// The plan start must be derived from today, not hardcoded: the public form only
+// shows a standard group while some module is still *about to* start, so a fixed
+// date silently rots out of the enrolling window as real time advances (a fixed
+// 02.03.2026 went stale on 2026-07-27, when its 4th module began).
+// Anchor on the most recent Monday and start the 28-week arc 8 weeks back: the
+// first two modules have begun, the later ones have not, and SESSION_DATE lands
+// on a past Monday inside the arc so attendance can be marked for it.
+function mondayOffsetWeeks(weeks: number): Date {
+  const d = new Date()
+  d.setHours(12, 0, 0, 0)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + weeks * 7)
+  return d
+}
+const pad = (n: number) => String(n).padStart(2, '0')
+const planStart = mondayOffsetWeeks(-8)
+const sessionMonday = mondayOffsetWeeks(-4)
+const PLAN_START_DISPLAY = `${pad(planStart.getDate())}.${pad(planStart.getMonth() + 1)}.${planStart.getFullYear()}`
+const SESSION_DATE = `${sessionMonday.getFullYear()}-${pad(sessionMonday.getMonth() + 1)}-${pad(sessionMonday.getDate())}`
 
 const PARENT = {
   parentName: `Roditelj Šibenik ${RUN_ID}`,

@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
 import {
@@ -13,6 +13,7 @@ import {
   createTeacher,
   createAttendance,
 } from './helpers/factory'
+import { wipePlanningTables } from './helpers/cleanup'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
@@ -58,33 +59,23 @@ async function splitAdminSession() {
   return admin
 }
 
-/** FK-safe wipe of everything the planner/holiday tests touch (users stay). */
-async function wipePlannerTables() {
-  await db.attendance.deleteMany({})
-  await db.moduleEnrollment.deleteMany({})
-  await db.enrollment.deleteMany({})
-  await db.studentComment.deleteMany({})
-  await db.studentAssessment.deleteMany({})
-  await db.teacherAssignment.deleteMany({})
-  await db.inquiry.deleteMany({})
-  await db.material.deleteMany({})
-  await db.courseEnrollmentWindow.deleteMany({})
-  await db.moduleSchedule.deleteMany({})
-  await db.schoolYearHoliday.deleteMany({})
-  await db.scheduledGroup.deleteMany({})
-  await db.courseModule.deleteMany({})
-  await db.course.deleteMany({})
-  await db.location.deleteMany({})
-}
-
 beforeAll(async () => {
   for (const label of [SY, ARCHIVED_SY]) {
     await db.schoolYear.upsert({ where: { label }, create: { label }, update: {} })
   }
 })
 
+// Like admin-school-year-planner: the planner action is global (it walks every
+// standard course), so this file wants an empty slate rather than a scoped
+// teardown. `wipePlanningTables` is FK-safe whatever an earlier file left.
 beforeEach(async () => {
-  await wipePlannerTables()
+  await wipePlanningTables()
+})
+
+// …and it takes its own fixtures with it, so the next file doesn't inherit a
+// year's worth of planned courses and holidays.
+afterAll(async () => {
+  await wipePlanningTables()
 })
 
 /** A group + enrolled student + one attendance row on `dateKey`, all in `city`. */

@@ -412,7 +412,9 @@ export default function DonacijePage() {
             </p>
             <video
               controls
-              preload="metadata"
+              // 6.6 MB clip — the poster carries the visual, so nothing is fetched
+              // until the visitor presses play.
+              preload="none"
               playsInline
               poster="/images/donacije/pametni-kist/video-poster.webp"
               className="mx-auto w-full max-w-[340px] rounded-2xl shadow-sm border border-gray-100 bg-black aspect-[464/832]"
