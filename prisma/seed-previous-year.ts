@@ -130,6 +130,8 @@ async function cleanup() {
   await prisma.moduleEnrollment.deleteMany({ where: { enrollment: { schoolYear: SCHOOL_YEAR } } })
   await prisma.enrollment.deleteMany({ where: { schoolYear: SCHOOL_YEAR } })
   await prisma.teacherAssignment.deleteMany({ where: { scheduledGroup: { schoolYear: SCHOOL_YEAR } } })
+  // TeacherAttendance is RESTRICT on its group — it must go before them.
+  await prisma.teacherAttendance.deleteMany({ where: { scheduledGroup: { schoolYear: SCHOOL_YEAR } } })
   await prisma.scheduledGroup.deleteMany({ where: { schoolYear: SCHOOL_YEAR } })
   await prisma.moduleSchedule.deleteMany({ where: { schoolYear: SCHOOL_YEAR } })
   await prisma.user.deleteMany({ where: { email: { startsWith: EMAIL_PREFIX } } })

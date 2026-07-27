@@ -192,7 +192,8 @@ export function HolidayImportDialog({ schoolYear, archived }: Readonly<Props>) {
                 Postoji <strong>{conflict.attendanceCount}</strong>{' '}
                 {conflict.attendanceCount === 1 ? 'zapis' : 'zapisa'} dolaska na{' '}
                 <strong>{conflict.dates.length}</strong>{' '}
-                {conflict.dates.length === 1 ? 'datum' : 'datuma'}. Spremanjem će biti obrisani.
+                {conflict.dates.length === 1 ? 'datum' : 'datuma'} — polaznika i
+                evidentiranih sati rada nastavnika. Spremanjem će biti obrisani.
                 <div className="mt-1 text-xs text-amber-800">
                   {conflict.dates.map((d) => formatDate(fromDateKey(d))).join(', ')}
                 </div>

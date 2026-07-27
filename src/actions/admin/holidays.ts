@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { City } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { archivedYearError } from '@/lib/school-year-guard'
@@ -35,6 +36,57 @@ function enumerateDateKeys(startKey: string, endKey: string): string[] {
     out.push(toDateKey(new Date(t)))
   }
   return out
+}
+
+/**
+ * Marking a date as a holiday cancels the lesson, so BOTH attendance ledgers
+ * have to go: the student rows and the `TeacherAttendance` rows that are the
+ * sole basis for hourly payout. Counting or deleting only the student side
+ * would leave the hour billable on `/admin/nastavnici/[id]` and understate the
+ * cascade in the confirmation dialog.
+ *
+ * `TeacherAttendance` carries `scheduledGroupId` directly, so its filter is one
+ * level shallower than the student one. The city filter is load-bearing in
+ * both: a Šibenik closure must never touch Split rows.
+ */
+function attendanceScope(dateValues: Date[], schoolYear: string, city: City) {
+  return {
+    student: {
+      sessionDate: { in: dateValues },
+      enrollment: { scheduledGroup: { schoolYear, city } },
+    },
+    teacher: {
+      sessionDate: { in: dateValues },
+      scheduledGroup: { schoolYear, city },
+    },
+  }
+}
+
+/** Combined student + teacher rows the cascade would delete. */
+async function countAffectedAttendance(
+  client: Pick<typeof db, 'attendance' | 'teacherAttendance'>,
+  dateValues: Date[],
+  schoolYear: string,
+  city: City,
+): Promise<number> {
+  const scope = attendanceScope(dateValues, schoolYear, city)
+  const [students, teachers] = await Promise.all([
+    client.attendance.count({ where: scope.student }),
+    client.teacherAttendance.count({ where: scope.teacher }),
+  ])
+  return students + teachers
+}
+
+/** Irreversible — only ever called behind `confirmDeleteAttendance`. */
+async function deleteAffectedAttendance(
+  tx: Pick<typeof db, 'attendance' | 'teacherAttendance'>,
+  dateValues: Date[],
+  schoolYear: string,
+  city: City,
+): Promise<void> {
+  const scope = attendanceScope(dateValues, schoolYear, city)
+  await tx.attendance.deleteMany({ where: scope.student })
+  await tx.teacherAttendance.deleteMany({ where: scope.teacher })
 }
 
 export type HolidayRow = {
@@ -112,12 +164,12 @@ export async function upsertHolidayRange(
   const name = data.name?.trim() ? data.name.trim() : null
 
   if (!data.confirmDeleteAttendance) {
-    const attendanceCount = await db.attendance.count({
-      where: {
-        sessionDate: { in: dateValues },
-        enrollment: { scheduledGroup: { schoolYear: data.schoolYear, city } },
-      },
-    })
+    const attendanceCount = await countAffectedAttendance(
+      db,
+      dateValues,
+      data.schoolYear,
+      city,
+    )
     if (attendanceCount > 0) {
       return { success: true, requiresConfirmation: true, attendanceCount }
     }
@@ -126,14 +178,7 @@ export async function upsertHolidayRange(
   try {
     await db.$transaction(async (tx) => {
       if (data.confirmDeleteAttendance) {
-        // City filter is load-bearing: this delete is irreversible, and a
-        // Šibenik closure must never destroy Split attendance rows.
-        await tx.attendance.deleteMany({
-          where: {
-            sessionDate: { in: dateValues },
-            enrollment: { scheduledGroup: { schoolYear: data.schoolYear, city } },
-          },
-        })
+        await deleteAffectedAttendance(tx, dateValues, data.schoolYear, city)
       }
       for (const dateUtc of dateValues) {
         await tx.schoolYearHoliday.upsert({
@@ -282,23 +327,20 @@ export async function previewHolidaysFromApi(
   }
   const dateValues = Array.from(allDates).map(fromDateKey)
 
-  const [existingRows, attendanceRows] = await Promise.all([
+  const scope = attendanceScope(dateValues, schoolYear, city)
+  const [existingRows, attendanceRows, teacherAttendanceRows] = await Promise.all([
     db.schoolYearHoliday.findMany({
       where: { schoolYear, city, date: { in: dateValues } },
       select: { date: true },
     }),
-    db.attendance.findMany({
-      where: {
-        sessionDate: { in: dateValues },
-        enrollment: { scheduledGroup: { schoolYear, city } },
-      },
-      select: { sessionDate: true },
-    }),
+    db.attendance.findMany({ where: scope.student, select: { sessionDate: true } }),
+    db.teacherAttendance.findMany({ where: scope.teacher, select: { sessionDate: true } }),
   ])
 
   const existingSet = new Set(existingRows.map((r) => toDateKey(r.date)))
   const attendanceCounts = new Map<string, number>()
-  for (const r of attendanceRows) {
+  // Both ledgers, so the preview promises the same number the import deletes.
+  for (const r of [...attendanceRows, ...teacherAttendanceRows]) {
     const k = toDateKey(r.sessionDate)
     attendanceCounts.set(k, (attendanceCounts.get(k) ?? 0) + 1)
   }
@@ -376,24 +418,19 @@ export async function bulkImportHolidays(
   try {
     await db.$transaction(async (tx) => {
       if (data.confirmDeleteAttendance) {
-        // City filter is load-bearing: this delete is irreversible, and a
-        // Šibenik import must never destroy Split attendance rows.
-        await tx.attendance.deleteMany({
-          where: {
-            sessionDate: { in: dateValues },
-            enrollment: { scheduledGroup: { schoolYear: data.schoolYear, city } },
-          },
-        })
+        await deleteAffectedAttendance(tx, dateValues, data.schoolYear, city)
       } else {
         // Same transaction as the writes below: no TOCTOU gap a concurrent
         // attendance insert could slip through to be silently skipped.
-        const conflictRows = await tx.attendance.findMany({
-          where: {
-            sessionDate: { in: dateValues },
-            enrollment: { scheduledGroup: { schoolYear: data.schoolYear, city } },
-          },
-          select: { sessionDate: true },
-        })
+        // Teacher rows count as a conflict in their own right — a session with
+        // an empty student roster still books payout hours, and importing over
+        // it unconfirmed would strand them behind a holiday.
+        const scope = attendanceScope(dateValues, data.schoolYear, city)
+        const [studentRows, teacherRows] = await Promise.all([
+          tx.attendance.findMany({ where: scope.student, select: { sessionDate: true } }),
+          tx.teacherAttendance.findMany({ where: scope.teacher, select: { sessionDate: true } }),
+        ])
+        const conflictRows = [...studentRows, ...teacherRows]
         if (conflictRows.length > 0) {
           const conflictDateSet = new Set<string>()
           for (const r of conflictRows) conflictDateSet.add(toDateKey(r.sessionDate))

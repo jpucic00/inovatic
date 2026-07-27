@@ -22,7 +22,8 @@
  *   Course         ← Material.courseId, ScheduledGroup.courseId
  *   CourseModule   ← Material.moduleId
  *   ScheduledGroup ← Enrollment, Material.scheduledGroupId,
- *                    StudentComment.groupId, StudentAssessment.groupId
+ *                    StudentComment.groupId, StudentAssessment.groupId,
+ *                    TeacherAttendance.scheduledGroupId
  *   Location       ← ScheduledGroup(locationId, city)
  */
 import { db } from '@/lib/db'
@@ -35,6 +36,7 @@ async function deleteGroupsDeep(groupIds: string[]): Promise<void> {
   await db.material.deleteMany({ where: { scheduledGroupId: ids } })
   await db.studentComment.deleteMany({ where: { groupId: ids } })
   await db.studentAssessment.deleteMany({ where: { groupId: ids } })
+  await db.teacherAttendance.deleteMany({ where: { scheduledGroupId: ids } })
   // Cascades Attendance + ModuleEnrollment.
   await db.enrollment.deleteMany({ where: { scheduledGroupId: ids } })
   await db.scheduledGroup.deleteMany({ where: { id: ids } })
@@ -86,6 +88,7 @@ export async function wipePlanningTables(): Promise<void> {
   await db.material.deleteMany({})
   await db.studentComment.deleteMany({})
   await db.studentAssessment.deleteMany({})
+  await db.teacherAttendance.deleteMany({})
   await db.enrollment.deleteMany({})
   await db.scheduledGroup.deleteMany({})
   await db.course.deleteMany({})

@@ -814,7 +814,8 @@ export function HolidayCalendar({
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Postoji <strong>{attendanceConflict}</strong>{' '}
               {attendanceConflict === 1 ? 'zapis' : 'zapisa'} dolaska
-              {isRange ? ' u rasponu' : ' na ovaj dan'}. Spremanjem će biti obrisani.
+              {isRange ? ' u rasponu' : ' na ovaj dan'} — polaznika i evidentiranih
+              sati rada nastavnika. Spremanjem će biti obrisani.
             </div>
           )}
 

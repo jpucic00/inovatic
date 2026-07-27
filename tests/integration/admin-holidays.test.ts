@@ -539,6 +539,7 @@ describe('previewHolidaysFromApi', () => {
     // SchoolYearHoliday). The preview action reports attendanceCount per
     // candidate date, so stray rows skew expectations here.
     await db.attendance.deleteMany({})
+    await db.teacherAttendance.deleteMany({})
   })
 
   it('rejects callers without ADMIN role', async () => {
@@ -604,6 +605,7 @@ describe('previewHolidaysFromApi', () => {
 describe('bulkImportHolidays', () => {
   beforeEach(async () => {
     await db.attendance.deleteMany({})
+    await db.teacherAttendance.deleteMany({})
   })
 
   it('inserts single + range items in one call', async () => {

@@ -373,6 +373,7 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
             studentComments: true,
             studentAssessments: true,
             galleryImages: true,
+            teacherAttendances: true,
           },
         },
       },
@@ -400,6 +401,14 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
     }
     if (group._count.galleryImages > 0) {
       return { success: false, error: 'Grupa ima slike u galeriji i ne može se obrisati.' }
+    }
+    // Reachable with an empty roster: bulkMarkSession books the teacher's hours
+    // even when no student is enrolled, and those hours are payout evidence.
+    if (group._count.teacherAttendances > 0) {
+      return {
+        success: false,
+        error: 'Grupa ima evidentirane sate rada nastavnika i ne može se obrisati.',
+      }
     }
 
     // Teacher assignments cascade-delete automatically

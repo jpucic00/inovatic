@@ -21,6 +21,7 @@ import {
   type ModuleSchedule,
   type ScheduledGroup,
   type TeacherAssignment,
+  type TeacherAttendance,
   type User,
   UserRole,
 } from '@prisma/client'
@@ -315,6 +316,28 @@ export async function createAttendance(
       sessionDate: overrides.sessionDate ?? new Date('2026-03-02T00:00:00.000Z'),
       present: overrides.present ?? true,
       note: overrides.note ?? null,
+    },
+  })
+}
+
+/**
+ * A teacher's booked hour on a group — the payout basis. Keyed on the group
+ * directly (not on TeacherAssignment), so a row survives unassignment.
+ * `recordedById` defaults to the teacher, matching the single-teacher group
+ * case where `bulkMarkSession` books them automatically.
+ */
+export async function createTeacherAttendance(
+  teacherId: string,
+  scheduledGroupId: string,
+  overrides: Partial<{ sessionDate: Date; present: boolean; recordedById: string }> = {},
+): Promise<TeacherAttendance> {
+  return db.teacherAttendance.create({
+    data: {
+      userId: teacherId,
+      scheduledGroupId,
+      recordedById: overrides.recordedById ?? teacherId,
+      sessionDate: overrides.sessionDate ?? new Date('2026-03-02T00:00:00.000Z'),
+      present: overrides.present ?? true,
     },
   })
 }

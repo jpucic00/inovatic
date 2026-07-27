@@ -491,7 +491,11 @@ model TeacherAttendance {
   updatedAt        DateTime @updatedAt
 
   user           User           @relation("TeacherAttendanceTeacher", fields: [userId], references: [id], onDelete: Cascade)
-  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id], onDelete: Cascade)
+  // RESTRICT, not Cascade: these rows are the sole basis for hourly payout, so
+  // deleting a group must never silently erase what a teacher already worked.
+  // `deleteGroup`/`deleteCourse` block on them explicitly; this is the backstop
+  // for any future path that forgets to.
+  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id], onDelete: Restrict)
   recordedBy     User           @relation("TeacherAttendanceRecorder", fields: [recordedById], references: [id])
 
   @@unique([userId, scheduledGroupId, sessionDate])

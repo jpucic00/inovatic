@@ -165,6 +165,7 @@ const GROUP_DELETE_BLOCKERS = [
   ['studentComments', 'komentare'],
   ['studentAssessments', 'ocjene'],
   ['galleryImages', 'slike u galeriji'],
+  ['teacherAttendances', 'evidentirane sate rada nastavnika'],
 ] as const
 
 type GroupDeleteCounts = { name: string | null } & {
@@ -207,6 +208,7 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
                 studentComments: true,
                 studentAssessments: true,
                 galleryImages: true,
+                teacherAttendances: true,
               },
             },
           },
