@@ -146,14 +146,33 @@ export async function getTeachers(
 
 export async function getTeacher(id: string) {
   const { city } = await requireAdminCtx()
+  // Explicit select, never `include`: this row crosses to the client in the RSC
+  // payload, and `include` ships every scalar — `passwordHash` with it. Add a
+  // field here only when the detail page actually renders it.
   const user = await db.user.findUnique({
     where: { id, role: { in: ['TEACHER', 'ADMIN'] }, deletedAt: null, city },
-    include: {
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      role: true,
+      createdAt: true,
+      deletedAt: true,
+      plainPassword: true,
       _count: { select: { teacherAttendances: true } },
       teacherAssignments: {
-        include: {
+        select: {
+          id: true,
           scheduledGroup: {
-            include: {
+            select: {
+              id: true,
+              name: true,
+              dayOfWeek: true,
+              startTime: true,
+              endTime: true,
+              schoolYear: true,
               course: { select: { id: true, title: true, slug: true } },
               location: { select: { name: true } },
             },
@@ -170,6 +189,12 @@ export async function getTeacher(id: string) {
     user._count.teacherAttendances === 0
   ) {
     return null
+  }
+  // The page hides the credentials block for an admin account, so the password
+  // has no reader there — don't ship it. Teachers keep theirs: the block is
+  // shown, and an admin uses it to help someone who lost their login.
+  if (user?.role === 'ADMIN') {
+    return { ...user, plainPassword: null }
   }
   return user
 }

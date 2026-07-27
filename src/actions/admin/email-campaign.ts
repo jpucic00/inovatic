@@ -129,8 +129,16 @@ function decodeRecommendationConditions(
   return conditions
 }
 
-/** Display labels for the campaign audit (course titles resolved server-side). */
-async function labelRecommendations(values: string[]): Promise<string[]> {
+/**
+ * Display labels for the campaign audit (course titles resolved server-side).
+ *
+ * `recommendations` arrives straight from the client and the validator only
+ * checks that each value decodes, which any `course:<cuid>` does — including
+ * another city's radionica. Scoped like every other course feed, so a smuggled
+ * id resolves to nothing; conditions whose course does not resolve are dropped
+ * rather than labelled, so the id cannot reach `sourceRecommendations` at all.
+ */
+async function labelRecommendations(values: string[], city: City): Promise<string[]> {
   const conditions = decodeRecommendationConditions(values)
   const courseIds = conditions
     .map((c) => c.recommendedCourseId)
@@ -139,18 +147,20 @@ async function labelRecommendations(values: string[]): Promise<string[]> {
     ? new Map(
         (
           await db.course.findMany({
-            where: { id: { in: courseIds } },
+            where: { id: { in: courseIds }, OR: [{ city: null }, { city }] },
             select: { id: true, title: true },
           })
         ).map((c) => [c.id, c.title]),
       )
     : new Map<string, string>()
-  return conditions.map((c) =>
-    formatRecommendationLabel(
-      c.recommendationKind,
-      c.recommendedCourseId ? (titles.get(c.recommendedCourseId) ?? null) : null,
-    ),
-  )
+  return conditions
+    .filter((c) => !c.recommendedCourseId || titles.has(c.recommendedCourseId))
+    .map((c) =>
+      formatRecommendationLabel(
+        c.recommendationKind,
+        c.recommendedCourseId ? (titles.get(c.recommendedCourseId) ?? null) : null,
+      ),
+    )
 }
 
 /**
@@ -499,7 +509,7 @@ export async function sendEmailCampaign(
         sourceSchoolYear: data.sourceSchoolYear,
         sourceGroupIds: data.sourceGroupIds ?? [],
         sourceRecommendations: data.recommendations?.length
-          ? await labelRecommendations(data.recommendations)
+          ? await labelRecommendations(data.recommendations, city)
           : [],
         targetSchoolYear: data.kind === 'REENROLLMENT' ? targetYear : null,
         targetCourseId: data.kind === 'REENROLLMENT' ? data.targetCourseId : null,

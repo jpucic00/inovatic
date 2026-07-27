@@ -199,6 +199,7 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
         scheduledGroups: {
           select: {
             name: true,
+            schoolYear: true,
             _count: {
               select: {
                 enrollments: true,
@@ -220,6 +221,14 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
       return { success: false, error: 'Program nije pronađen.' }
     }
     if (!course.isCustom) return { success: false, error: 'Standardni SLR programi se ne mogu brisati.' }
+
+    // `deleteGroup` refuses to touch an archived year, and this path cascade-
+    // deletes the very same groups — without the check the two disagree and a
+    // read-only year becomes mutable through the radionica.
+    for (const group of course.scheduledGroups) {
+      const archived = archivedYearError(group.schoolYear)
+      if (archived) return archived
+    }
 
     const moduleMaterialCount = course.modules.reduce((sum, m) => sum + m._count.materials, 0)
     if (course._count.materials + moduleMaterialCount > 0) {

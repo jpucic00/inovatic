@@ -913,6 +913,52 @@ describe('preporuka selection mode', () => {
     expect(campaign?.sourceGroupIds).toEqual([])
   })
 
+  // `recommendations` comes straight from the client and the validator only
+  // checks that each value decodes — which any `course:<cuid>` does, including
+  // another city's radionica. The cohort query is city-scoped so no student
+  // leaks, but the audit row used to store the smuggled course's TITLE and
+  // render it in Povijest slanja: an unscoped tenant read.
+  it('drops a smuggled cross-city course id instead of labelling it in the audit', async () => {
+    const admin = await loginAdmin('SPLIT')
+    const source = await makeSourceGroup()
+    const foreign = await createCourse({
+      title: 'Šibenska radionica – tajni naziv',
+      isCustom: true,
+      city: 'SIBENIK',
+    })
+    const student = await enrollStudent(source.group.id, {
+      parentEmail: uniqEmail('xcity'),
+      firstName: 'Pero',
+    })
+    await db.studentAssessment.create({
+      data: {
+        studentId: student.id,
+        groupId: source.group.id,
+        authorId: admin.id,
+        recommendationKind: 'COMPETITION_PREP',
+      },
+    })
+
+    const target = await makeTarget()
+    const res = await sendAndSettle({
+      kind: 'REENROLLMENT',
+      sourceSchoolYear: SOURCE_YEAR,
+      recommendations: ['COMPETITION_PREP', `course:${foreign.id}`],
+      targetCourseId: target.course.id,
+      targetGroupIds: [target.group.id],
+      ...CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+
+    const campaign = await db.emailCampaign.findUnique({ where: { id: res.campaignId } })
+    // The legitimate half is still labelled…
+    expect(campaign?.sourceRecommendations).toContain('Priprema za natjecanja')
+    // …and the foreign title never reaches the row, under any label.
+    expect(campaign?.sourceRecommendations.join(' ')).not.toMatch(/tajni naziv/i)
+    expect(campaign?.sourceRecommendations).toHaveLength(1)
+  })
+
   it('rejects a request selecting both modes or neither', async () => {
     await loginAdmin()
     const { group } = await makeSourceGroup()

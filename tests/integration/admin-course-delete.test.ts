@@ -138,4 +138,42 @@ describe('deleteCourse — pridružene grupe', () => {
     expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(1)
     expect(await db.enrollment.count({ where: { scheduledGroupId: group.id } })).toBe(1)
   })
+
+  // `deleteGroup` enforces the archived-year guard; this path cascade-deletes
+  // the same groups, so without the check the radionica is a way to mutate a
+  // year the rest of the admin surface treats as read-only.
+  it('refuses a radionica whose groups belong to an archived school year', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const ARCHIVED = '2020/2021'
+    await db.schoolYear.upsert({
+      where: { label: ARCHIVED },
+      create: { label: ARCHIVED },
+      update: {},
+    })
+    const course = await fx.course({ isCustom: true, schoolYear: ARCHIVED })
+    const group = await fx.group({ courseId: course.id, schoolYear: ARCHIVED })
+
+    const res = await deleteCourse(course.id)
+
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toMatch(/Arhivirana/i)
+    expect(await db.course.count({ where: { id: course.id } })).toBe(1)
+    expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(1)
+  })
+
+  it('still deletes a radionica whose groups are in the current year', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const group = await fx.group({ courseId: course.id, schoolYear: '2026/2027' })
+
+    const res = await deleteCourse(course.id)
+
+    expect(res).toEqual({ success: true })
+    expect(await db.course.count({ where: { id: course.id } })).toBe(0)
+    expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(0)
+  })
 })
