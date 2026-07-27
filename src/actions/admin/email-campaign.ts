@@ -559,6 +559,7 @@ export async function sendEmailCampaign(
 
     await startSendJob({
       campaignId: campaign.id,
+      city,
       subject: data.subject,
       bodyText: data.bodyText,
       options,
@@ -601,6 +602,8 @@ async function startSendJob(job: SendJob): Promise<void> {
 
 type SendJob = {
   campaignId: string
+  /** Decides the reply-to inbox — a Šibenik parent must not reply into Split. */
+  city: City
   subject: string
   bodyText: string
   options: GroupOption[] | undefined
@@ -655,6 +658,7 @@ async function runSendJob(job: SendJob): Promise<void> {
         to: recipient.parentEmail,
         subject: job.subject,
         bodyText: job.bodyText,
+        city: job.city,
         options: job.options,
         includeSignupCta: job.includeSignupCta,
       })
@@ -771,6 +775,8 @@ export async function resumeEmailCampaign(
   await db.emailCampaign.update({ where: { id: campaignId }, data: { finishedAt: null } })
   await startSendJob({
     campaignId: campaign.id,
+    // The lookup above is `where: { id, city }`, so this IS the campaign's city.
+    city,
     subject: campaign.subject,
     bodyText: campaign.bodyText,
     options,

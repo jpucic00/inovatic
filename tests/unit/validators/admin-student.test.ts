@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createStudentSchema,
   createStudentManuallySchema,
+  updateStudentSchema,
   addEnrollmentSchema,
 } from '@/lib/validators/admin/student'
 
@@ -114,5 +115,46 @@ describe('addEnrollmentSchema', () => {
 
   it('rejects empty studentId', () => {
     expect(addEnrollmentSchema.safeParse({ studentId: '', groupId: 'g1' }).success).toBe(false)
+  })
+})
+
+// Create requires parentEmail because it is the credentials recipient AND the
+// legacy-tier match key for DOB-less imported students. Update used to leave it
+// optional/nullable, so the Uredi dialog could clear it and break both — the
+// two schemas now agree.
+describe('updateStudentSchema — parentEmail parity with create', () => {
+  const minimal = {
+    id: 's1',
+    firstName: 'Luka',
+    lastName: 'Horvat',
+    dateOfBirth: '2015-06-15',
+    parentEmail: 'roditelj@example.com',
+  }
+
+  it('accepts a valid parent email', () => {
+    expect(updateStudentSchema.parse(minimal).parentEmail).toBe('roditelj@example.com')
+  })
+
+  it('rejects clearing it to an empty string', () => {
+    expect(updateStudentSchema.safeParse({ ...minimal, parentEmail: '' }).success).toBe(false)
+  })
+
+  it('rejects null and an omitted field', () => {
+    expect(updateStudentSchema.safeParse({ ...minimal, parentEmail: null }).success).toBe(false)
+    const { parentEmail: _omitted, ...withoutEmail } = minimal
+    expect(updateStudentSchema.safeParse(withoutEmail).success).toBe(false)
+  })
+
+  it('rejects a malformed address', () => {
+    expect(updateStudentSchema.safeParse({ ...minimal, parentEmail: 'nije-email' }).success).toBe(
+      false,
+    )
+  })
+
+  it('trims surrounding whitespace', () => {
+    expect(
+      updateStudentSchema.parse({ ...minimal, parentEmail: '  roditelj@example.com ' })
+        .parentEmail,
+    ).toBe('roditelj@example.com')
   })
 })

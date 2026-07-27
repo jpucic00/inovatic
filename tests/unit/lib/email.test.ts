@@ -87,6 +87,7 @@ describe('email senders', () => {
       to: 'roditelj@example.hr',
       subject: 'Upisi u školsku godinu 2026/2027 – Inovatic',
       bodyText: 'Pozivamo vas na upis.',
+      city: 'SPLIT',
     })
     expect(send.mock.calls[0][0]).toMatchObject({
       to: 'roditelj@example.hr',
@@ -95,12 +96,26 @@ describe('email senders', () => {
     })
   })
 
+  // A parent hitting Reply must reach the office that mailed them. Before this,
+  // every campaign fell back to the Split inbox regardless of who sent it.
+  it('routes a Šibenik campaign reply to the Šibenik inbox', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendBulkMessageEmail({
+      to: 'roditelj@example.hr',
+      subject: 'Obavijest – Inovatic',
+      bodyText: 'Kratka obavijest.',
+      city: 'SIBENIK',
+    })
+    expect(send.mock.calls[0][0].replyTo).toBe('prijave.sibenik@udruga-inovatic.hr')
+  })
+
   it('bulk-message no-ops without a key like every other sender', async () => {
     vi.stubEnv('RESEND_API_KEY', '')
     const sent = await sendBulkMessageEmail({
       to: 'roditelj@example.hr',
       subject: 'Obavijest – Inovatic',
       bodyText: 'Kratka obavijest.',
+      city: 'SPLIT',
     })
     expect(sent).toBe(false)
     expect(send).not.toHaveBeenCalled()

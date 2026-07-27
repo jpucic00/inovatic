@@ -60,7 +60,7 @@ describe('updateStudent — admin edit of child + parent data', () => {
     expect(updated?.parentPhone).toBe('+385998877')
   })
 
-  it('clears optional fields when passed empty strings', async () => {
+  async function studentWithFullParentRecord() {
     const admin = await createAdmin({ city: 'SPLIT' })
     const student = await createStudent({ city: 'SPLIT', dateOfBirth: '2014-01-01' })
     await db.user.update({
@@ -73,6 +73,11 @@ describe('updateStudent — admin edit of child + parent data', () => {
       },
     })
     mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    return student
+  }
+
+  it('clears the genuinely optional fields when passed empty strings', async () => {
+    const student = await studentWithFullParentRecord()
 
     const res = await updateStudent({
       id: student.id,
@@ -81,7 +86,7 @@ describe('updateStudent — admin edit of child + parent data', () => {
       dateOfBirth: '2014-01-01',
       childSchool: '',
       parentName: '',
-      parentEmail: '',
+      parentEmail: 'stari@test.local',
       parentPhone: '',
     })
 
@@ -89,8 +94,30 @@ describe('updateStudent — admin edit of child + parent data', () => {
     const updated = await db.user.findUnique({ where: { id: student.id } })
     expect(updated?.childSchool).toBeNull()
     expect(updated?.parentName).toBeNull()
-    expect(updated?.parentEmail).toBeNull()
     expect(updated?.parentPhone).toBeNull()
+    // Not optional — it survives.
+    expect(updated?.parentEmail).toBe('stari@test.local')
+  })
+
+  // parentEmail is mandatory on create because it receives the credentials and
+  // is the legacy-tier match key for DOB-less imports. An edit that could blank
+  // it broke both invariants after the fact.
+  it('refuses to blank parentEmail and leaves the row untouched', async () => {
+    const student = await studentWithFullParentRecord()
+
+    for (const parentEmail of ['', '   ', 'nije-email']) {
+      const res = await updateStudent({
+        id: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        dateOfBirth: '2014-01-01',
+        parentEmail,
+      })
+      expect(res.success).toBe(false)
+    }
+
+    const untouched = await db.user.findUnique({ where: { id: student.id } })
+    expect(untouched?.parentEmail).toBe('stari@test.local')
   })
 
   it('rejects invalid input (name too short) without writing', async () => {
@@ -107,6 +134,7 @@ describe('updateStudent — admin edit of child + parent data', () => {
       firstName: 'A',
       lastName: student.lastName,
       dateOfBirth: '2015-01-01',
+      parentEmail: 'roditelj@test.hr',
     })
 
     expect(res.success).toBe(false)
@@ -129,6 +157,7 @@ describe('updateStudent — admin edit of child + parent data', () => {
         firstName: 'Hakirano',
         lastName: 'Hakirano',
         dateOfBirth: '2000-01-01',
+        parentEmail: 'napadac@test.hr',
       }),
     ).rejects.toThrow()
 

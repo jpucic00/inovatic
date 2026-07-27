@@ -29,7 +29,13 @@ function SkillRow({
       {value === null ? (
         <span className="text-xs text-gray-400">Nije ocijenjeno</span>
       ) : (
+        // The chips are a picture of one value, and every one of them is
+        // aria-hidden — so the wrapper carries the whole accessible name. On a
+        // plain <div> (implicit role `generic`) ARIA forbids aria-label and
+        // browsers drop it, which left a parent's screen reader announcing the
+        // six skill names with no grades attached. `role="img"` permits a name.
         <div
+          role="img"
           className="inline-flex overflow-hidden rounded-md border border-gray-200"
           aria-label={`${label}: ${SKILL_LEVEL_LABELS[value]}`}
         >

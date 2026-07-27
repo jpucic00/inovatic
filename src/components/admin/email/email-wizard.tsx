@@ -153,6 +153,8 @@ export function EmailWizard({
   const [targetGroups, setTargetGroups] = useState<TargetGroup[]>([])
   const [targetGroupIds, setTargetGroupIds] = useState<string[]>([])
   const [loadingTargetGroups, setLoadingTargetGroups] = useState(false)
+  /** Distinguishes "the fetch failed" from "this program genuinely has no groups". */
+  const [targetGroupsError, setTargetGroupsError] = useState(false)
 
   // Step 2 — recipients
   const [sourceYear, setSourceYear] = useState(selectedYear)
@@ -307,6 +309,7 @@ export function EmailWizard({
     setTargetCourseId(courseId)
     setTargetGroupIds([])
     setTargetGroups([])
+    setTargetGroupsError(false)
     if (!courseId) return
     setLoadingTargetGroups(true)
     try {
@@ -332,6 +335,12 @@ export function EmailWizard({
           isFull: sg.isFull,
         })),
       )
+    } catch {
+      // Without this the empty list rendered as "Nema grupa za ovaj program" —
+      // an assertion about the data when the request merely failed, and the
+      // admin would drop a termin from the invitation believing it did not exist.
+      setTargetGroupsError(true)
+      toast.error('Greška pri učitavanju grupa.')
     } finally {
       setLoadingTargetGroups(false)
     }
@@ -527,11 +536,19 @@ export function EmailWizard({
                 {loadingTargetGroups && (
                   <p className="text-sm text-gray-400 italic py-3 text-center">Učitavam grupe...</p>
                 )}
-                {!loadingTargetGroups && targetCourseId !== '' && targetGroups.length === 0 && (
-                  <p className="text-sm text-gray-400 italic py-3 text-center">
-                    Nema grupa za ovaj program u {selectedYear}.
+                {!loadingTargetGroups && targetGroupsError && (
+                  <p className="text-sm text-red-600 py-3 text-center">
+                    Greška pri učitavanju — pokušajte ponovno.
                   </p>
                 )}
+                {!loadingTargetGroups &&
+                  !targetGroupsError &&
+                  targetCourseId !== '' &&
+                  targetGroups.length === 0 && (
+                    <p className="text-sm text-gray-400 italic py-3 text-center">
+                      Nema grupa za ovaj program u {selectedYear}.
+                    </p>
+                  )}
                 {!loadingTargetGroups &&
                   targetGroups.map((g) => {
                     const checked = targetGroupIds.includes(g.id)

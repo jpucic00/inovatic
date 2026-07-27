@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { stemEducationInquirySchema } from '@/lib/validators/stem-education'
+import { SERVICE_VALUES, stemEducationInquirySchema } from '@/lib/validators/stem-education'
 
 const valid = {
   contactName: 'Ivana Ivić',
@@ -67,5 +67,47 @@ describe('stemEducationInquirySchema', () => {
     })
     expect(parsed.contactName).toBe('Ivana Ivić')
     expect(parsed.institutionName).toBe('OŠ Meje')
+  })
+
+  // Only 7 service values exist, but the array was unbounded: a crafted payload
+  // (well within Next's 1 MB action-body limit) reached the email body as a
+  // giant join, and gave the confirmation template duplicate React keys.
+  it('rejects more services than there are values to choose from', () => {
+    const parsed = stemEducationInquirySchema.safeParse({
+      ...valid,
+      services: Array(5000).fill('OSNOVNA_EDUKACIJA'),
+    })
+    expect(parsed.success).toBe(false)
+    expect(parsed.error?.issues[0].message).toBe('Neispravan odabir usluga.')
+  })
+
+  it('de-duplicates a repeated service', () => {
+    const parsed = stemEducationInquirySchema.parse({
+      ...valid,
+      services: ['OSNOVNA_EDUKACIJA', 'OSNOVNA_EDUKACIJA', 'SAVJETOVANJE'],
+    })
+    expect(parsed.services).toEqual(['OSNOVNA_EDUKACIJA', 'SAVJETOVANJE'])
+  })
+
+  it('accepts one of every service — the cap is the enum length, not a guess', () => {
+    const parsed = stemEducationInquirySchema.safeParse({
+      ...valid,
+      services: [...SERVICE_VALUES],
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('caps contactName and email, which had no limit while their siblings did', () => {
+    const longName = stemEducationInquirySchema.safeParse({
+      ...valid,
+      contactName: 'a'.repeat(121),
+    })
+    expect(longName.success).toBe(false)
+
+    const longEmail = stemEducationInquirySchema.safeParse({
+      ...valid,
+      email: `${'a'.repeat(250)}@test.hr`,
+    })
+    expect(longEmail.success).toBe(false)
   })
 })

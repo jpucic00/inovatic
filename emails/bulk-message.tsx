@@ -60,14 +60,9 @@ function BulkMessageEmail({ bodyText, options, signupUrl, subject }: BulkMessage
           </Link>
         </Section>
       )}
-      <Hr style={emailStyles.hr} />
-      <Text style={emailStyles.text}>
-        Za sva pitanja slobodno nas kontaktirajte na{' '}
-        <Link href="mailto:prijave@udruga-inovatic.hr" style={emailStyles.link}>
-          prijave@udruga-inovatic.hr
-        </Link>{' '}
-        ili na <Link href="tel:+385993936993" style={emailStyles.link}>+385 99 393 6993</Link>.
-      </Text>
+      {/* No contact paragraph here on purpose: it hardcoded the Split inbox,
+          which is wrong for a Šibenik campaign, and EmailLayout's footer
+          already lists both cities' contacts. */}
     </EmailLayout>
   )
 }

@@ -51,13 +51,21 @@ export const TRAINING_PLACE_VALUES = Object.keys(TRAINING_PLACE_LABELS) as [
 ]
 
 export const stemEducationInquirySchema = z.object({
-  contactName: z.string().trim().min(2, 'Unesite ime i prezime (najmanje 2 znaka)'),
+  contactName: z
+    .string()
+    .trim()
+    .min(2, 'Unesite ime i prezime (najmanje 2 znaka)')
+    .max(120, 'Ime i prezime može imati najviše 120 znakova'),
   institutionName: z
     .string()
     .trim()
     .min(2, 'Unesite naziv ustanove (najmanje 2 znaka)')
     .max(200, 'Naziv ustanove može imati najviše 200 znakova'),
-  email: z.string().trim().email('Unesite valjanu email adresu'),
+  email: z
+    .string()
+    .trim()
+    .email('Unesite valjanu email adresu')
+    .max(254, 'E-mail adresa može imati najviše 254 znaka'),
   // Optional — the WP form does not require a phone number either.
   phone: z
     .union([z.string().trim().min(9, 'Unesite valjani broj telefona'), z.literal('')])
@@ -65,9 +73,14 @@ export const stemEducationInquirySchema = z.object({
   institutionType: z.enum(INSTITUTION_TYPE_VALUES, {
     errorMap: () => ({ message: 'Odaberite vrstu ustanove' }),
   }),
+  // Only 7 values exist, so anything longer is a crafted payload rather than a
+  // form submission. Unbounded, it reached the email body as a multi-megabyte
+  // join and gave the confirmation template duplicate React keys.
   services: z
     .array(z.enum(SERVICE_VALUES))
-    .min(1, 'Odaberite barem jednu uslugu'),
+    .min(1, 'Odaberite barem jednu uslugu')
+    .max(SERVICE_VALUES.length, 'Neispravan odabir usluga.')
+    .transform((s) => [...new Set(s)]),
   // Optional select — the placeholder option submits '' rather than nothing.
   trainingPlace: z.union([z.enum(TRAINING_PLACE_VALUES), z.literal('')]).optional(),
   message: z

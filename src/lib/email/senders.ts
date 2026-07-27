@@ -1,5 +1,6 @@
 import { createElement } from 'react'
 import { render } from '@react-email/components'
+import type { City } from '@prisma/client'
 import { ASSOCIATION_EMAIL, sendTransactionalEmail } from './client'
 import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
 import PartyInquiryConfirmationEmail from '../../../emails/party-inquiry-confirmation'
@@ -194,12 +195,18 @@ type BulkMessageParams = {
    * (no auto greeting — parent names are missing on many imported students). */
   subject: string
   bodyText: string
+  /** The campaign's city — decides which inbox a parent's reply lands in. */
+  city: City
   options?: GroupOption[]
   /** REENROLLMENT invitations link to the public signup form. */
   includeSignupCta?: boolean
 }
 
-function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to'>) {
+/** Šibenik parents reply to Šibenik; Split keeps the default association inbox. */
+const SIBENIK_EMAIL = 'prijave.sibenik@udruga-inovatic.hr'
+const replyToForCity = (city: City) => (city === 'SIBENIK' ? SIBENIK_EMAIL : undefined)
+
+function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>) {
   return createElement(BulkMessageEmail, {
     subject: params.subject,
     bodyText: params.bodyText,
@@ -214,6 +221,7 @@ export function sendBulkMessageEmail(params: BulkMessageParams): Promise<boolean
   return sendTransactionalEmail({
     to,
     subject: params.subject,
+    replyTo: replyToForCity(params.city),
     react: buildBulkMessageElement(rest),
   })
 }
@@ -222,6 +230,6 @@ export function sendBulkMessageEmail(params: BulkMessageParams): Promise<boolean
  * The composer's preview iframe renders through the same element builder as
  * the send path, so what the admin previews is exactly what parents receive.
  */
-export function renderBulkMessageHtml(params: Omit<BulkMessageParams, 'to'>): Promise<string> {
+export function renderBulkMessageHtml(params: Omit<BulkMessageParams, 'to' | 'city'>): Promise<string> {
   return render(buildBulkMessageElement(params))
 }

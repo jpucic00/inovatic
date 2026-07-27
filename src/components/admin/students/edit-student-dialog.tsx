@@ -48,7 +48,10 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
   const canSubmit =
     firstName.trim().length >= 2 &&
     lastName.trim().length >= 2 &&
-    dateOfBirth.trim().length > 0
+    dateOfBirth.trim().length > 0 &&
+    // Mandatory on create for two reasons that outlive creation: it receives the
+    // credentials, and it is the legacy-tier match key for DOB-less imports.
+    parentEmail.trim().length > 0
 
   // Reset the form to the persisted values whenever the dialog (re)opens, so a
   // cancelled edit doesn't leak into the next open.
@@ -67,7 +70,7 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
 
   const handleSubmit = () => {
     if (!canSubmit) {
-      toast.error('Ime, prezime i datum rođenja djeteta su obavezni.')
+      toast.error('Ime, prezime, datum rođenja djeteta i e-mail roditelja su obavezni.')
       return
     }
     startTransition(async () => {
@@ -78,7 +81,7 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
         dateOfBirth: dateOfBirth.trim(),
         childSchool: childSchool.trim() || null,
         parentName: parentName.trim() || null,
-        parentEmail: parentEmail.trim() || null,
+        parentEmail: parentEmail.trim(),
         parentPhone: parentPhone.trim() || null,
       })
       if (res.success) {
@@ -185,7 +188,7 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
               </div>
               <div>
                 <label htmlFor="edit-student-parent-email" className={labelClass}>
-                  E-mail
+                  E-mail *
                 </label>
                 <input
                   id="edit-student-parent-email"

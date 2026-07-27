@@ -703,7 +703,9 @@ export async function updateStudent(
         dateOfBirth,
         childSchool: childSchool?.trim() || null,
         parentName: parentName?.trim() || null,
-        parentEmail: parentEmail?.trim() || null,
+        // Required by the schema (and already trimmed there) — an edit can no
+        // longer blank the credentials recipient / legacy-match key.
+        parentEmail,
         parentPhone: parentPhone?.trim() || null,
       },
     })

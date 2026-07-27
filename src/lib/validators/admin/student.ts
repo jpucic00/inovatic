@@ -30,10 +30,10 @@ export const updateStudentSchema = z.object({
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Unesite datum rođenja (GGGG-MM-DD)'),
   childSchool: z.string().optional().nullable(),
   parentName: z.string().optional().nullable(),
-  parentEmail: z
-    .union([z.literal(''), z.string().email()])
-    .optional()
-    .nullable(),
+  // Required, exactly as on create. Optional here meant an edit could clear it
+  // and break both invariants the create side depends on — the credentials
+  // recipient and the legacy-tier matcher.
+  parentEmail: z.string().trim().email('Unesite valjanu email adresu'),
   parentPhone: z.string().optional().nullable(),
 })
 
