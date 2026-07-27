@@ -4,12 +4,14 @@ After a successful login, the user lands on the route that matches their `UserRo
 
 | Role | Post-login `router.push` target | Edge middleware allows | Server-side guard helpers that pass |
 |---|---|---|---|
-| `ADMIN` | `/admin` | `/admin/*`, `/nastavnik/*`, `/portal/*` (any auth) | `requireAuth`, `requireAdmin`, `requireTeacher` *(ADMIN bypass for support)* |
+| `ADMIN` | `/admin` — **unless dual-role**, then a panel chooser (see below) | `/admin/*`, `/nastavnik/*`, `/portal/*` (any auth) | `requireAuth`, `requireAdmin`, `requireTeacher` *(ADMIN bypass for support)* |
 | `TEACHER` | `/nastavnik` | `/nastavnik/*`, `/portal/*` (any auth) | `requireAuth`, `requireTeacher` |
 | `STUDENT` | `/portal` | `/portal/*` (any auth) | `requireAuth`, `requireStudent` |
 | unauthenticated | login page | none — every match redirects to `/prijava` | none |
 
 > Middleware lets any authenticated user through to `/portal/*`, but `requireStudent()` rejects non-STUDENT roles at the page level. ADMIN bypass inside `requireTeacher()` is deliberate so admins can support a class without holding a teacher seat.
+
+> **Dual-role admin.** An `ADMIN` who also holds at least one `TeacherAssignment` (e.g. the Šibenik city admin, who is also that city's only teacher) is **not** auto-redirected. `loginAction` returns `showTeacherPanel: true` and `LoginForm` swaps the form for a two-button chooser — *Administracija* → `/admin`, *Nastavnički panel* → `/nastavnik`. No guard or middleware change was needed: both prefixes already accept `ADMIN` via the middleware `/nastavnik` branch and the `requireTeacher` bypass. A non-teaching admin never sees the chooser.
 
 ## Login → first redirect
 
@@ -42,18 +44,30 @@ sequenceDiagram
     Note right of Action: AuthError → 'Pogrešno korisničko ime ili lozinka.'
     Note over Auth,DB: JWT callback stamps token.city on login and re-checks<br/>deletedAt + role + city every refresh (60s TTL) via revalidateTokenClaims.<br/>A legacy token WITHOUT a city claim is refreshed immediately regardless<br/>of TTL — a prod city flip propagates without re-login (src/lib/auth-token.ts)
 
-    Action->>DB: findUnique by email or username (re-fetch role for routing)
-    DB-->>Action: { role }
+    Action->>DB: findUnique by email or username (select id + role for routing)
+    DB-->>Action: { id, role }
     Note right of Action: missing row → same error string<br/>(don't leak which field was wrong)
 
-    Action-->>Form: { success: true, role }
-    Form->>Form: destination = '/portal' (default)<br/>ADMIN → '/admin'<br/>TEACHER → '/nastavnik'
+    alt role === 'ADMIN'
+        Action->>DB: teacherAssignment.count({ where: { userId: id } })
+        DB-->>Action: n
+        Note right of Action: showTeacherPanel = n > 0
+    end
 
-    Form->>Router: router.push(destination)
-    Form->>Router: router.refresh()
+    Action-->>Form: { success: true, role, showTeacherPanel }
+
+    alt ADMIN and showTeacherPanel
+        Form->>Form: renders "Prijava uspješna. Odaberite panel:"
+        User->>Form: clicks Administracija or Nastavnički panel
+        Form->>Router: goTo('/admin') or goTo('/nastavnik')
+    else
+        Form->>Form: destination = '/portal' (default)<br/>ADMIN → '/admin'<br/>TEACHER → '/nastavnik'
+        Form->>Router: goTo(destination)
+    end
+    Note over Form,Router: goTo(d) = router.push(d) + router.refresh()
 ```
 
-> Sources: `src/actions/login.ts:14-41` (server action), `src/components/auth/login-form.tsx:30-44` (client switch), `src/lib/auth.ts:17-33` (authorize callback: Zod email parse + deletedAt rejection), `src/lib/auth.ts:48-75` (JWT callback re-check on refresh).
+> Sources: `src/actions/login.ts` (server action + the dual-role `teacherAssignment.count` probe), `src/components/auth/login-form.tsx` (panel chooser + client role switch), `src/lib/auth.ts:17-33` (authorize callback: Zod email parse + deletedAt rejection), `src/lib/auth.ts:48-75` (JWT callback re-check on refresh). `auth.ts` / `auth-token.ts` / `auth-guard.ts` are unchanged by the dual-role work — the city claim and 60s re-check behave exactly as described above.
 
 ## Subsequent requests — edge middleware
 
@@ -111,6 +125,6 @@ Two layers cover slightly different concerns:
 - **Middleware** runs at the edge before any React rendering, so it bounces stale URLs cheaply and never paints a flash of unauthorized content.
 - **Guards** run inside Server Components and Server Actions, where role checks can be more granular (e.g. `assertTeacherOwnsGroup` builds on top of `requireTeacher` to also check `TeacherAssignment`). They also handle the case of someone calling a Server Action directly without crossing the middleware boundary.
 
-If you change a route's role expectation, update **both** layers — and the post-login switch in `LoginForm` if the new route should be the default landing page for that role.
+If you change a route's role expectation, update **both** layers — and the post-login switch in `LoginForm` if the new route should be the default landing page for that role, including the dual-role chooser branch, which hardcodes its two destinations.
 
 **City is enforced at the data layer, not in middleware.** Middleware stays role-only (it is non-authoritative); tenant separation comes from `session.user.city` flowing into every query/guard (`requireAdminCtx`, `adminAction` ctx, `city-guard.ts` asserts, city-bound ADMIN bypasses in `teacher-guard.ts`). There is no city switcher — an account's city is a static fact, changed only in the DB (the 60s JWT re-check propagates it without re-login).

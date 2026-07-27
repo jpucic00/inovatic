@@ -197,6 +197,47 @@ erDiagram
         string recordedById FK
     }
 
+    TeacherAttendance {
+        string id PK
+        string userId FK "the teacher whose hour this is"
+        string scheduledGroupId FK
+        datetime sessionDate "db.Date - YYYY-MM-DD"
+        boolean present
+        string recordedById FK "who typed it in - may differ from userId"
+    }
+
+    EmailCampaign {
+        string id PK
+        City city "tenant - the sending admin's city"
+        EmailCampaignKind kind "CUSTOM - REENROLLMENT"
+        string sourceSchoolYear "cohort source year"
+        string sourceGroupIds "String[] - audit-only snapshot, no FK; empty in preporuka mode"
+        string sourceRecommendations "String[] - preporuka labels; empty in group mode"
+        string targetSchoolYear "nullable - REENROLLMENT target year"
+        string targetCourseId FK "nullable - SetNull"
+        string targetGroupIds "String[] - termini offered; lets a resume rebuild the same boxes"
+        string subject
+        string bodyText "db.Text"
+        string sentById FK
+        int sentCount "incremented per recipient while sending"
+        int failedCount
+        int skippedCount
+        int excludedCount
+        int totalCount "denominator for progress polling"
+        datetime finishedAt "nullable - null while the send is still running"
+    }
+
+    EmailCampaignRecipient {
+        string id PK
+        string campaignId FK
+        string parentEmail
+        EmailRecipientStatus status "PENDING - SENT - FAILED - ALREADY_SENT - SKIPPED"
+        string childNames "String[] - snapshot at send time"
+        string failureReason "nullable - why FAILED, or why SKIPPED had no address"
+        string sentKey "nullable - invitation idempotency key, set only on SENT"
+        datetime sentAt
+    }
+
     Article {
         string id PK
         string slug UK
@@ -297,6 +338,14 @@ erDiagram
     Enrollment ||--o{ Attendance : "attendance records"
     ModuleSchedule ||--o{ ModuleEnrollment : "enrolled students"
 
+    User           ||--o{ TeacherAttendance : "teacher hours - Cascade"
+    User           ||--o{ TeacherAttendance : "recordedBy - no cascade"
+    ScheduledGroup ||--o{ TeacherAttendance : "sessions taught - RESTRICT"
+
+    User          ||--o{ EmailCampaign : "sentBy"
+    Course        ||--o{ EmailCampaign : "targetCourse - SetNull"
+    EmailCampaign ||--o{ EmailCampaignRecipient : "one row per parent inbox"
+
     Article ||--o{ ArticleImage : "inline images"
     Article ||--o{ ArticleTag : "tagged with"
     Tag ||--o{ ArticleTag : "articles"
@@ -315,6 +364,8 @@ erDiagram
 | RecommendationKind | `COURSE`, `COMPETITION_PREP`, `COMPETITION_PROGRAM` — `COURSE` pairs with `recommendedCourseId` |
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
 | MaterialScope | `MODULE`, `COURSE`, `GROUP` |
+| EmailCampaignKind | `CUSTOM`, `REENROLLMENT` — REENROLLMENT sends are idempotent per `(city, targetCourseId, targetSchoolYear)`; CUSTOM is deliberately repeatable |
+| EmailRecipientStatus | `PENDING`, `SENT`, `FAILED`, `ALREADY_SENT`, `SKIPPED` — every intended recipient is written as `PENDING` upfront, so the detail view lists the whole cohort immediately and a resumed send knows exactly who is still owed a mail |
 
 > There are no `EnrollmentStatus` / `ModuleEnrollmentStatus` enums. Presence of a row means the student is in the group/module; deletion is the only way out.
 
@@ -342,6 +393,9 @@ erDiagram
 | SchoolYear → SchoolYearHoliday | Per-year non-class days (holidays, breaks, ad-hoc closures). Excluded from `computeExpectedSessions` / `computeRadionicaSessions`. `SchoolYearHoliday.schoolYear` is a real Prisma FK to `SchoolYear.label` (`onDelete: Cascade`). |
 | User → SchoolYearHoliday | `createdBy` relation (nullable) — admin who added the holiday. |
 | SchoolYear | Standalone registry of valid year labels (`YYYY/YYYY`). The `schoolYear` string columns on `ScheduledGroup`, `ModuleSchedule`, `Enrollment`, `Inquiry`, `Course` (radionice) and `CourseEnrollmentWindow` reference `SchoolYear.label` by string with **no** Prisma FK relation; only `SchoolYearHoliday.schoolYear` is a true FK. |
+| User → TeacherAttendance ← ScheduledGroup | Teaching hours, keyed `(userId, scheduledGroupId, sessionDate)` — deliberately **not** keyed on `TeacherAssignment`, so unassigning a teacher or a stand-in covering one session never rewrites who worked which hour. Sole input to the admin payout report (`src/lib/teacher-work-report.ts`). Cascades from `User`, but **RESTRICT** from `ScheduledGroup`: these rows are payout evidence, so `deleteGroup`/`deleteCourse` block on them explicitly and the FK is the backstop. `recordedBy` is a separate non-cascading `User` relation — authorship, not entitlement. |
+| EmailCampaign → EmailCampaignRecipient | One row per parent inbox per send (`onDelete: Cascade`), written as `PENDING` **before** any mail goes out. A `SENT` row carries `sentKey`, and the `(sentKey, parentEmail)` unique index is what actually prevents a double invitation — two overlapping sends can't both win the insert. Cleared to null on `FAILED` so a retry may re-invite. The four `*Count` columns are display counters; recipient rows are ground truth. |
+| Course → EmailCampaign | `targetCourse` for REENROLLMENT invitations, `onDelete: SetNull` — deleting a program keeps the send history readable. |
 
 ## Unique Constraints
 
@@ -362,6 +416,8 @@ erDiagram
 | TeacherAssignment | `(userId, scheduledGroupId)` |
 | MaterialGroupHide | `(materialId, scheduledGroupId)` |
 | Attendance | `(enrollmentId, sessionDate)` |
+| TeacherAttendance | `(userId, scheduledGroupId, sessionDate)` |
+| EmailCampaignRecipient | `(sentKey, parentEmail)` — NULLs are distinct in Postgres, so CUSTOM and FAILED rows (both `sentKey = null`) never collide; only SENT invitations are constrained |
 | ArticleTag | `(articleId, tagId)` composite PK |
 
 ## Indexes (non-unique)
@@ -378,14 +434,19 @@ erDiagram
 | Material | `(scope, moduleId)`, `(scope, courseId)`, `(scope, scheduledGroupId)` |
 | GalleryImage | `(scheduledGroupId, moduleId, sortOrder)` |
 | Attendance | `sessionDate` |
+| TeacherAttendance | `(userId, sessionDate)`, `(scheduledGroupId, sessionDate)`, `recordedById` |
+| EmailCampaign | `(city, createdAt)`, `(city, kind, targetCourseId, targetSchoolYear)`, `sentById`, `targetCourseId` |
+| EmailCampaignRecipient | `campaignId` |
+
+> The trailing single-column entries on `TeacherAttendance` and `EmailCampaign` are FK-support indexes. Postgres does not create them automatically, and each of those FKs is `RESTRICT` or `SET NULL` — without the index every `User`/`Course` delete seq-scans the referencing table.
 
 ## City Tenancy (two-city separation)
 
 Split and Šibenik run as fully separated tenants inside one app. "City" is the tenant; `Location` stays the venue *within* a city (Trokut inkubator is a `Location` with `city = SIBENIK`).
 
-**Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `SchoolYearHoliday`, and `Course` (nullable — `null` = shared standard SLR program, set = per-city radionica).
+**Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `SchoolYearHoliday`, `EmailCampaign` (the sending admin's city — the tenant boundary for both recipient resolution and the `/admin/email` history list), and `Course` (nullable — `null` = shared standard SLR program, set = per-city radionica).
 
-**Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`Attendance`/`GalleryImage`/`TeacherAssignment`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `ArticleImage`/`ArticleTag` through their article.
+**Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`Attendance`/`TeacherAttendance`/`GalleryImage`/`TeacherAssignment`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `ArticleImage`/`ArticleTag` through their article, `EmailCampaignRecipient` through its campaign.
 
 **Deliberately shared (no city):** the `SchoolYear` label registry, the `Tag` taxonomy, `CourseModule` templates, and MODULE/COURSE-scoped `Material` rows (one curriculum for both cities). GROUP-scoped materials are per-group, hence per-city.
 

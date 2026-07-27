@@ -7,6 +7,8 @@ There is no `ClassSession` model. Expected session dates are derived on the fly 
 
 > A holiday is pre-filtered out of the expected set so attendance never shows a slot for it. Any further cancellation (snow day, ad-hoc) is the teacher's call — they leave the row unmarked or write a note.
 
+Since 2026-07 there are **two** record tables sharing that derived session date: `Attendance`, keyed `(enrollmentId, sessionDate)`, for students; and `TeacherAttendance`, keyed `(userId, scheduledGroupId, sessionDate)`, for teaching hours. Both are written by the same `bulkMarkSession` transaction. `TeacherAttendance` is keyed on the **group**, not on `TeacherAssignment`, so the rows outlive an unassignment — they are the sole input to the payout report (`getTeacherWorkReport` → `src/lib/teacher-work-report.ts`, each present row worth the group's `endTime − startTime`). Marking a date as a holiday after the fact deletes **both** tables' rows for that date, city-filtered, so a cancelled class is never still billed.
+
 ## Standard groups — per-group race-ahead arc
 
 `getGroupAttendance` (standard branch) builds the arc, then maps each `CourseModule` to a section. Session dates per section are the arc entry's 7 dates — **not** the raw `ModuleSchedule` windows.
@@ -108,12 +110,16 @@ sequenceDiagram
     UI->>UI: Loads roster for the group, pre-fills existing records for that date
 
     Teacher->>UI: Marks each student as Prisutan/Odsutan, optional notes
+    Teacher->>UI: (group with 2+ assigned teachers) ticks who actually taught
+    Note over UI: A single-teacher group shows no teacher control at all
     Teacher->>UI: Clicks Save
 
-    UI->>Server: bulkMarkSession(groupId, sessionDate, entries[])
+    UI->>Server: bulkMarkSession(groupId, sessionDate, entries[], teacherEntries?[])
 
     Server->>Server: Zod validation (bulkMarkSessionSchema)
     Server->>Server: assertTeacherOwnsGroup(groupId) — ADMIN pass-through is city-bound (cross-city group 404s)
+    Server->>Server: TEACHER only — teacherMarkingError(sessionDate)
+    Note right of Server: Outside [1st of current Zagreb month .. today] → reject before the<br/>transaction, nothing written. Admins are unrestricted.
 
     rect rgb(224, 242, 254)
         Note over Server,DB: $transaction (isolationLevel Serializable)
@@ -122,6 +128,11 @@ sequenceDiagram
         Note right of Server: If count mismatch → throw ENROLLMENT_MISMATCH (rolls back transaction)
         Server->>DB: Upsert Attendance for each entry
         Note right of DB: Upsert key: (enrollmentId, sessionDate). Sets present, note, recordedById.
+        Server->>DB: Fetch TeacherAssignment userIds for this group
+        Server->>Server: resolveTeacherEntries(teacherEntries, assignedUserIds)
+        Note right of Server: Drops entries for non-assigned users.<br/>Single-teacher group with no entry → auto { present: true }.
+        Server->>DB: Upsert TeacherAttendance for each resolved entry
+        Note right of DB: Upsert key: (userId, scheduledGroupId, sessionDate). Sets present, recordedById.
     end
 
     Server-->>UI: Success
@@ -130,6 +141,58 @@ sequenceDiagram
 ```
 
 > Source: `bulkMarkSession()` in `src/actions/teacher/attendance.ts`. The upsert means re-saving the same date updates existing records rather than creating duplicates.
+
+## Teaching hours — which rows get written
+
+```mermaid
+flowchart TD
+    A["bulkMarkSession input.teacherEntries (optional)"] --> B["assigned = TeacherAssignment userIds for this group"]
+    B --> C["entries = provided.filter(e => assigned.has(e.userId))"]
+    C --> H["Entries for non-assigned users are DROPPED — a stand-in must be assigned to the group first"]
+    C --> D{"assigned.length === 1 AND that teacher not already covered?"}
+    D -->|Yes| E["Auto-add { userId: assigned[0], present: true }"]
+    D -->|No| F["Use the filtered entries as-is"]
+    E --> G["Upsert TeacherAttendance (userId, scheduledGroupId, sessionDate)"]
+    F --> G
+
+    style E fill:#d1fae5
+    style H fill:#fee2e2
+    style G fill:#e0f2fe
+```
+
+> Source: `resolveTeacherEntries()` in `src/actions/teacher/attendance.ts`. Explicit entries win; a one-teacher group needs no interaction — marking the students books that teacher's hour. Nothing is ever booked for someone not assigned to the group, so a tampered payload cannot invent payable hours. Re-saving the same date updates rather than duplicates, exactly like the student upsert.
+
+## The teacher marking window
+
+Hours are money, so a **TEACHER** may only record the current calendar month, up to and including today — no marking a class that hasn't happened, and no filling in a whole month after the fact. The window is anchored on the Europe/Zagreb date (`teacherMarkingWindow` in `src/lib/attendance-window.ts`), matching how `monthWindows` computes the report, so the 1st never flips a couple of hours early on a UTC server.
+
+| Selected date | TEACHER | ADMIN |
+|---|---|---|
+| Today, or earlier this month | markable | markable |
+| Tomorrow / later | rejected — *"Ne možete evidentirati dolazak za budući termin."* | markable |
+| Any earlier month | rejected — *"Možete evidentirati samo termine tekućeg mjeseca…"* | markable |
+
+**Admins are deliberately unrestricted** — `src/actions/admin/attendance.ts` is the correction path, so a genuinely missed Friday never becomes permanently unrecordable. `getGroupAttendance` returns `markingWindow` (null for admins) so the UI degrades honestly: out-of-window dates stay clickable for viewing, but the Save button is replaced by the reason and the roster goes read-only. Past sessions remain visible; only writing is gated.
+
+## Retroactive holidays
+
+Marking a date as a holiday *after* attendance exists deletes both record tables for that date, inside one transaction and filtered by `(schoolYear, city)`:
+
+```mermaid
+flowchart LR
+    A["Admin marks date(s) as holiday"] --> B{Existing records?}
+    B -->|No| SAVE["Upsert SchoolYearHoliday rows"]
+    B -->|Yes| WARN["requiresConfirmation + count of BOTH student and teacher rows"]
+    WARN --> C{Admin confirms?}
+    C -->|No| STOP["Nothing written"]
+    C -->|Yes| DEL["deleteMany Attendance (via enrollment.scheduledGroup)<br/>deleteMany TeacherAttendance (via scheduledGroup)"]
+    DEL --> SAVE
+
+    style DEL fill:#fee2e2
+    style SAVE fill:#d1fae5
+```
+
+> Source: `src/actions/admin/holidays.ts` (`upsertHolidayRange` and `importHolidays` share the same scoped helper). The city filter is load-bearing — this delete is irreversible, and a Šibenik closure must never destroy Split rows. Deleting the teacher rows too is what stops a cancelled class from still being billed.
 
 ## Default Session Selection (standard groups)
 

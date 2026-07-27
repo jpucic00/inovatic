@@ -75,7 +75,7 @@ stateDiagram-v2
 
 | From | To | Action | Guard | Side effects |
 |------|-----|--------|-------|-------------|
-| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation; COURSE: `group.city === submitted city` | Inquiry created with `city`; confirmation email; spot reserved if group selected (COURSE) |
+| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation; COURSE: `group.city === submitted city`; COURSE **without** `scheduledGroupId`: `!isTerminRequired(programs, grade, courseId)` | Inquiry created with `city`; confirmation email; spot reserved if group selected (COURSE) |
 | `NEW` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED && status !== DECLINED`; `type === COURSE` | User + Enrollment + ModuleEnrollments; credentials email; `studentId` + `assignedGroupId` set |
 | `NEW` | `PARTY_SCHEDULED` | `schedulePartyInquiry` | `type === PARTY` | `partyConfirmedDate` + `partyStartTime` set; appears on Kalendar |
 | `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000) | `declineReason` persisted; spot freed |
@@ -208,6 +208,29 @@ flowchart TD
 
 > `GroupFullError` is a domain signal, **not** a serialization failure — it propagates straight to the caller and is never retried. Only Prisma `P2034` (Serializable write-write conflict) triggers the single re-run; a second `P2034` is rethrown for the caller to surface as a generic retry message.
 
+### Termin is conditionally mandatory (pre-transaction gate)
+
+```mermaid
+flowchart TD
+    A["submitInquiry(data) — Zod passed"] --> B{scheduledGroupId provided?}
+    B -->|Yes| TX["Capacity guard transaction (above)"]
+    B -->|No| C["programs = getActivePrograms(city)"]
+    C --> D["programsForSelection(programs, grade, courseId)<br/>radionica flow → only that course<br/>standard flow → radionice excluded, grade → SLR level"]
+    D --> E{"Selection chosen?<br/>grade OR preselected course"}
+    E -->|No| TX
+    E -->|Yes| F{"hasOpenTermin — any matching group with isFull = false?"}
+    F -->|No| TX
+    F -->|Yes| ERR["Reject: code TERMIN_REQUIRED<br/>'Za odabrani razred dostupni su termini – odaberite jedan.'<br/>+ fresh programs payload, no Inquiry row written"]
+
+    style ERR fill:#fee2e2
+    style TX fill:#d1fae5
+    style F fill:#e0f2fe
+```
+
+> Source: `isTerminRequired` / `programsForSelection` / `hasOpenTermin` in `src/lib/inquiry-availability.ts`, called from `submitInquiry` **before** `runWithGroupCapacityGuard`. It is the server mirror of the client's conditional requirement, so a stale or tampered payload can't skip the choice. When no enrolment window is open, or every matching group is full, the termin stays **optional** — a general "leave your details" inquiry still goes through. `courseId` is only sent in the radionica/preselected flow, so it maps to the same `preselectedCourseId` argument the client uses.
+>
+> The public result union therefore carries **two** codes — `code: 'GROUP_FULL' | 'TERMIN_REQUIRED'` — and both ship a fresh `programs[]` so the form re-renders live availability rather than acting on the stale list the visitor submitted against.
+
 ---
 
 ## 3. Student Deduplication
@@ -248,6 +271,8 @@ flowchart TD
 ## 4. Grade-to-Level Mapping and Group Filtering
 
 > Step 3 renders only the **Step-1 city's** programs/groups (`programsByCity` payload; changing the city clears any stale course/group selection). Grade filtering below then applies within that city.
+>
+> The mapping is a single source of truth: `GRADE_TO_LEVEL` in `src/lib/inquiry-availability.ts`, shared by the client dropdown filter and the server-side `TERMIN_REQUIRED` gate in §2 — so the two can't drift apart.
 
 ```mermaid
 flowchart TD
@@ -495,3 +520,35 @@ sequenceDiagram
 ```
 
 > The "available spots" number for standard courses comes from the **next-starting** module (first module by `sortOrder` whose arc has a future first session for that group's weekday), not the currently-running module.
+
+---
+
+## 9. What is NOT in this pipeline — `/stem-edukacija`
+
+The B2B institutional inquiry form (`submitStemEducationInquiry`, `src/actions/stem-education.ts`) is **email-only**. It writes nothing to the database — no `Inquiry` row, no status, no state machine, no spot reservation, no `city` stamp. The notification email to the association inbox is the record (owner decision 2026-07-25), which is why it is documented here as an explicit carve-out rather than left for a reader to hunt for.
+
+```mermaid
+flowchart LR
+    A["Institution submits /stem-edukacija form"] --> H{Honeypot filled?}
+    H -->|Yes| SILENT["return success, send nothing"]
+    H -->|No| RL{Within rate limit?<br/>5/h per IP, 3/h per e-mail}
+    RL -->|No| RLE["error: 'Primili smo previše upita s ove adrese.'"]
+    RL -->|Yes| Z["Zod: stemEducationInquirySchema"]
+    Z -->|fail| ZE["error: 'Podaci nisu valjani.'"]
+    Z -->|pass| N["sendStemEducationInquiryEmail → association inbox"]
+    N -->|throws or returns false| NE["error surfaced to the visitor — this is the only copy"]
+    N -->|sent| C["sendStemEducationConfirmationEmail → courtesy copy to the institution"]
+    C -->|throws| SWALLOW["logged and swallowed — submission still counts as successful"]
+    C -->|ok| OK["success"]
+
+    style ZE fill:#fee2e2
+    style NE fill:#fee2e2
+    style RLE fill:#fee2e2
+    style SWALLOW fill:#fef3c7
+    style SILENT fill:#fef3c7
+    style OK fill:#d1fae5
+```
+
+> The asymmetric error handling is deliberate: a failed **notification** loses the inquiry, so the visitor must see it; a failed **confirmation** loses nothing. Note the notification sender returning `false` (meaning `RESEND_API_KEY` is unset) is treated exactly like a throw — otherwise an unset key in production would destroy the inquiry while telling the visitor it arrived.
+>
+> Because the action is public, unauthenticated and mail-triggering, it is throttled per IP and per submitted address, with a honeypot field that reports success while sending nothing. Sources: `src/lib/rate-limit.ts`, `src/lib/validators/stem-education.ts`.
