@@ -20,6 +20,7 @@ Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Prisma + Postgr
 - Roles: ADMIN, TEACHER, STUDENT (future: PARENT)
 - Inquiry status flow: NEW -> ACCOUNT_CREATED (or DECLINED at any point)
 - Enrollment workflow: Public inquiry -> Admin reviews -> Creates student account + enrollment
+- **Radionica CRUD lives on `/admin/programi`** (create + edit + delete), with the same `<CourseFormDialog>` behind "Nova radionica" and "Uredi"; the Uredi trigger repeats in the `/admin/programi/[courseId]` header. `updateCourse` edits title/description/age range/price only and **never regenerates the slug** — `/radionice/<slug>` is the link admins copy and send to parents. Standard SLR programs are refused by the action and show no Uredi button (their copy is shared catalog content). `price` is genuinely optional: `createCourseSchema` preprocesses `''`/`null` to `undefined` so a blank input stores NULL instead of tripping `.positive()`.
 
 ## Phase 3 (student portal + teacher panel) conventions
 - **Student portal** at `/portal` is gated by `requireStudent()`. Students with exactly ONE active enrollment land directly on that group's current-module materials (no extra click); 2+ → grid of group cards; 0 → empty state.

@@ -240,9 +240,9 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       const dialog = page.locator('[role="dialog"]')
       await dialog.locator('input[placeholder*="Ljetne"]').fill(RADIONICA_TITLE)
       await dialog.locator('textarea').fill('Opis testne radionice za automatske testove.')
-      // ageMin/ageMax defaults (6/14) are fine
-      // price must be filled — z.coerce.number().positive() rejects empty string (Number("")=0)
-      await dialog.locator('input[placeholder*="80"]').fill('50')
+      // ageMin/ageMax defaults (6/14) are fine. Price is left blank on purpose:
+      // it is optional, and an empty number input used to be coerced to 0 and
+      // rejected by .positive() — the Uredi test below adds the price after.
       await dialog.locator('button', { hasText: 'Kreiraj radionicu' }).click()
 
       await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 10000 })
@@ -263,6 +263,45 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
         has: page.getByRole('heading', { level: 3, name: RADIONICA_TITLE }),
       })
       await expect(card.getByRole('button', { name: 'Kopiraj URL' })).toBeVisible()
+    })
+
+    test('"Uredi" opens the radionica prefilled and saves the changes', async ({ page }) => {
+      await loginAsAdmin(page)
+      await page.goto(`${BASE}/admin/programi`)
+      const card = page.locator('div.rounded-lg').filter({
+        has: page.getByRole('heading', { level: 3, name: RADIONICA_TITLE }),
+      })
+      const dialog = page.locator('[role="dialog"]')
+      await clickUntilVisible(card.getByRole('button', { name: 'Uredi' }), dialog)
+
+      // Opens on the stored row — including the blank price it was created with.
+      await expect(dialog.locator('#course-title')).toHaveValue(RADIONICA_TITLE)
+      await expect(dialog.locator('#course-price')).toHaveValue('')
+
+      await dialog.locator('#course-description').fill('Uređeni opis testne radionice.')
+      await dialog.locator('#course-price').fill('65')
+      await dialog.getByRole('button', { name: 'Spremi' }).click()
+
+      await expect(dialog).not.toBeVisible({ timeout: 10000 })
+      await expect(card).toContainText('65 EUR', { timeout: 10000 })
+    })
+
+    // The slug is the link admins send to parents — a save must not move it.
+    test('edited copy reaches the public page on the unchanged slug', async ({ page }) => {
+      const res = await page.goto(`${BASE}/radionice/${RADIONICA_SLUG}`)
+      expect(res?.status()).toBe(200)
+      await expect(page.locator('h1')).toContainText(RADIONICA_TITLE)
+      await expect(page.locator('body')).toContainText('Uređeni opis testne radionice.')
+      await expect(page.locator('body')).toContainText('65 €')
+    })
+
+    test('standard SLR programs offer no "Uredi" button', async ({ page }) => {
+      await loginAsAdmin(page)
+      await page.goto(`${BASE}/admin/programi`)
+      const slr1Card = page.locator('a.rounded-lg').filter({
+        has: page.getByRole('heading', { level: 3, name: /Robotike 1/ }),
+      })
+      await expect(slr1Card.getByRole('button', { name: 'Uredi' })).toHaveCount(0)
     })
 
     test('standard SLR courses cannot be deleted (no delete button)', async ({ page }) => {

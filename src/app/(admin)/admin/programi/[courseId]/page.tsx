@@ -6,6 +6,7 @@ import { getProgramDetail } from '@/actions/admin/program-materials'
 import { isArchivedYear } from '@/lib/school-year'
 import { ModuleDatesTable } from '@/components/admin/courses/module-dates-table'
 import { EnrollmentWindowEditor } from '@/components/admin/courses/enrollment-window-editor'
+import { CourseFormDialog } from '@/components/admin/courses/course-form-dialog'
 import { UploadMaterialDialog } from '@/components/material/upload-dialog'
 import { StaffMaterialList } from '@/components/material/staff-material-list'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
@@ -35,13 +36,29 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
       </Link>
 
       <header className="mb-6">
-        <div className="flex items-center gap-2.5">
-          {course.isCustom ? (
-            <Wrench className="w-6 h-6 text-orange-500 shrink-0" />
-          ) : (
-            <BookOpen className="w-6 h-6 text-cyan-600 shrink-0" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {course.isCustom ? (
+              <Wrench className="w-6 h-6 text-orange-500 shrink-0" />
+            ) : (
+              <BookOpen className="w-6 h-6 text-cyan-600 shrink-0" />
+            )}
+            <h1 className="text-2xl font-bold text-gray-900">{course.title}</h1>
+          </div>
+          {/* Standard SLR programs carry shared catalog copy — only radionice
+              are editable here (updateCourse refuses the rest anyway). */}
+          {course.isCustom && editable && (
+            <CourseFormDialog
+              course={{
+                id: course.id,
+                title: course.title,
+                description: course.description,
+                ageMin: course.ageMin,
+                ageMax: course.ageMax,
+                price: course.price,
+              }}
+            />
           )}
-          <h1 className="text-2xl font-bold text-gray-900">{course.title}</h1>
         </div>
         <div className="flex items-center gap-2 mt-1.5 flex-wrap text-sm text-gray-500">
           {course.isCustom ? (
@@ -54,6 +71,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
             </span>
           ) : null}
           <span>{course.ageMin}–{course.ageMax} god.</span>
+          {course.isCustom && course.price != null && <span>{course.price} EUR</span>}
           <Link
             href={course.isCustom ? '/admin/grupe?tab=__radionice__' : `/admin/grupe?tab=${course.id}`}
             className="inline-flex items-center gap-1 text-cyan-700 hover:underline"
@@ -62,6 +80,13 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
             {course.groupCount} {course.groupCount >= 2 && course.groupCount <= 4 ? 'grupe' : 'grupa'}
           </Link>
         </div>
+        {/* The public /radionice page renders this copy — show it here so the
+            admin sees what the Uredi dialog changes. */}
+        {course.isCustom && (
+          <p className="text-sm text-gray-600 mt-3 max-w-3xl whitespace-pre-line">
+            {course.description}
+          </p>
+        )}
       </header>
 
       {!editable && <ArchivedYearBanner year={selectedYear} />}

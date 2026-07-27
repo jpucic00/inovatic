@@ -12,12 +12,14 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { deleteCourse } from '@/actions/admin/course'
+import { CourseFormDialog } from '@/components/admin/courses/course-form-dialog'
 import Link from 'next/link'
 
 type Course = {
   id: string
   slug: string
   title: string
+  description: string
   level: string | null
   isCustom: boolean
   ageMin: number
@@ -157,7 +159,12 @@ function CourseCard({ course, editable }: Readonly<{ course: Course; editable: b
               {groupCount} {groupCount >= 2 && groupCount <= 4 ? 'grupe' : 'grupa'}
             </Link>
           )}
-          {editable && <DeleteCourseButton course={course} />}
+          {editable && (
+            <>
+              <CourseFormDialog compact course={course} />
+              <DeleteCourseButton course={course} />
+            </>
+          )}
         </div>
       </div>
     </div>

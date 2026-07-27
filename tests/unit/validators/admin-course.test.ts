@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createCourseSchema } from '@/lib/validators/admin/course'
+import { createCourseSchema, updateCourseSchema } from '@/lib/validators/admin/course'
 
 const validCourse = {
   title: 'SLR 1',
@@ -59,5 +59,49 @@ describe('createCourseSchema', () => {
     expect(
       createCourseSchema.safeParse({ ...validCourse, imageUrl: 'not-url' }).success,
     ).toBe(false)
+  })
+
+  // An emptied number input posts '' — coercion would make it 0 and trip
+  // .positive(), so a radionica without a price could not be saved at all.
+  it('treats an empty price as "no price"', () => {
+    const result = createCourseSchema.parse({ ...validCourse, price: '' })
+    expect(result.price).toBeUndefined()
+  })
+
+  it('treats a null price as "no price"', () => {
+    const result = createCourseSchema.parse({ ...validCourse, price: null })
+    expect(result.price).toBeUndefined()
+  })
+})
+
+describe('updateCourseSchema', () => {
+  const validUpdate = { ...validCourse, id: 'course-1' }
+
+  it('accepts a valid update', () => {
+    const result = updateCourseSchema.parse(validUpdate)
+    expect(result.id).toBe('course-1')
+    expect(result.title).toBe('SLR 1')
+  })
+
+  it('requires an id', () => {
+    expect(updateCourseSchema.safeParse(validCourse).success).toBe(false)
+    expect(updateCourseSchema.safeParse({ ...validUpdate, id: '' }).success).toBe(false)
+  })
+
+  it('inherits the field rules from createCourseSchema', () => {
+    expect(updateCourseSchema.safeParse({ ...validUpdate, title: 'S' }).success).toBe(false)
+    expect(updateCourseSchema.safeParse({ ...validUpdate, ageMax: 19 }).success).toBe(false)
+    expect(updateCourseSchema.safeParse({ ...validUpdate, price: 0 }).success).toBe(false)
+    expect(updateCourseSchema.parse({ ...validUpdate, price: '' }).price).toBeUndefined()
+  })
+
+  // imageUrl is omitted rather than optional: the edit dialog has no such
+  // field, so an update must never be able to blank a stored image.
+  it('drops imageUrl instead of writing it', () => {
+    const result = updateCourseSchema.parse({
+      ...validUpdate,
+      imageUrl: 'https://example.com/img.png',
+    })
+    expect(result).not.toHaveProperty('imageUrl')
   })
 })

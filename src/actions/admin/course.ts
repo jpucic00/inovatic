@@ -3,11 +3,12 @@
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
-import { createCourseSchema } from '@/lib/validators/admin/course'
-import type { CreateCourseInput } from '@/lib/validators/admin/course'
+import { createCourseSchema, updateCourseSchema } from '@/lib/validators/admin/course'
+import type { CreateCourseInput, UpdateCourseInput } from '@/lib/validators/admin/course'
 import type { AdminActionResult } from '@/lib/action-types'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { archivedYearError } from '@/lib/school-year-guard'
+import { adminAction } from '@/lib/admin-action'
 
 export async function getCourses() {
   const { city } = await requireAdminCtx()
@@ -114,6 +115,44 @@ export async function createCourse(data: CreateCourseInput): Promise<AdminAction
 
   revalidatePath('/admin/programi')
   return { success: true }
+}
+
+export async function updateCourse(data: UpdateCourseInput): Promise<AdminActionResult> {
+  return adminAction(updateCourseSchema, data, async (input, { city }) => {
+    const year = await getSelectedSchoolYear()
+    const archived = archivedYearError(year)
+    if (archived) return archived
+
+    const { id, title, description, ageMin, ageMax, price } = input
+
+    const course = await db.course.findUnique({
+      where: { id },
+      select: { isCustom: true, city: true, slug: true },
+    })
+    // Cross-city radionice read as nonexistent — same message as a missing id.
+    if (!course || (course.city !== null && course.city !== city)) {
+      return { success: false, error: 'Program nije pronađen.' }
+    }
+    if (!course.isCustom) {
+      return { success: false, error: 'Standardni SLR programi se ne mogu uređivati.' }
+    }
+
+    try {
+      await db.course.update({
+        where: { id },
+        // slug is deliberately left alone: it is the public /radionice/<slug>
+        // link admins copy and send to parents, so a rename must not break it.
+        data: { title, description, ageMin, ageMax, price: price ?? null },
+      })
+    } catch (err) {
+      console.error('updateCourse failed:', err)
+      return { success: false, error: 'Greška pri spremanju programa.' }
+    }
+
+    revalidatePath('/admin/programi', 'layout')
+    revalidatePath(`/radionice/${course.slug}`)
+    return { success: true }
+  })
 }
 
 // Same blockers deleteGroup enforces — a group carrying any of these must be

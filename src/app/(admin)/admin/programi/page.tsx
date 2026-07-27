@@ -6,7 +6,7 @@ import { getCourses } from '@/actions/admin/course'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
 import { CourseTable } from '@/components/admin/courses/course-table'
-import { CreateCourseDialog } from '@/components/admin/courses/create-course-dialog'
+import { CourseFormDialog } from '@/components/admin/courses/course-form-dialog'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 
 export const metadata: Metadata = { title: 'Admin – Programi' }
@@ -75,7 +75,7 @@ export default async function CoursesPage() {
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
             Radionice
           </h2>
-          {editable && <CreateCourseDialog />}
+          {editable && <CourseFormDialog />}
         </div>
         {custom.length > 0 ? (
           <CourseTable data={custom} editable={editable} />

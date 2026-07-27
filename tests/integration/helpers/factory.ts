@@ -99,6 +99,9 @@ type CreateCourseOverrides = {
   schoolYear?: string | null
   ageMin?: number
   ageMax?: number
+  price?: number | null
+  /** null (default) = shared standard SLR; set it for a per-city radionica. */
+  city?: City | null
 }
 
 export async function createCourse(overrides: CreateCourseOverrides = {}) {
@@ -110,8 +113,10 @@ export async function createCourse(overrides: CreateCourseOverrides = {}) {
       description: overrides.description ?? 'Test course',
       ageMin: overrides.ageMin ?? 6,
       ageMax: overrides.ageMax ?? 14,
+      price: overrides.price ?? null,
       isCustom: overrides.isCustom ?? false,
       schoolYear: overrides.schoolYear ?? null,
+      city: overrides.city ?? null,
     },
   })
 }

@@ -25,10 +25,13 @@ type ProgramDetail = {
   course: {
     id: string
     title: string
+    /** Radionica copy — editable from this page's Uredi dialog. */
+    description: string
     level: string | null
     isCustom: boolean
     ageMin: number
     ageMax: number
+    price: number | null
     equipment: string | null
     groupCount: number
     /** Selected-year public signup window (null when unset). */
@@ -58,11 +61,13 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
     select: {
       id: true,
       title: true,
+      description: true,
       level: true,
       isCustom: true,
       city: true,
       ageMin: true,
       ageMax: true,
+      price: true,
       equipment: true,
       // Shared course, city-scoped view: only the caller's city's groups,
       // window, and module dates.
@@ -152,10 +157,12 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
     course: {
       id: course.id,
       title: course.title,
+      description: course.description,
       level: course.level,
       isCustom: course.isCustom,
       ageMin: course.ageMin,
       ageMax: course.ageMax,
+      price: course.price,
       equipment: course.equipment,
       groupCount: course._count.scheduledGroups,
       enrollmentStart: course.enrollmentWindows[0]?.enrollmentStart ?? null,
