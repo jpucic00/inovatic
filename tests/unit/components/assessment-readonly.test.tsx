@@ -17,19 +17,20 @@ const base: StudentAssessmentReadonly = {
 }
 
 describe('AssessmentReadonly', () => {
-  // Queried by ROLE, not by getByLabelText: the latter reads the raw attribute,
-  // so it passed even while the levels were unreachable to a screen reader —
-  // `aria-label` on a plain <div> (role `generic`) is dropped by browsers. Only
-  // a role that permits a name exposes them, and only getByRole proves it.
+  // Asserted as real TEXT, not via getByLabelText: the latter reads the raw
+  // attribute, so it passed even while the levels were unreachable to a screen
+  // reader — `aria-label` on a plain <div> (role `generic`) is dropped by
+  // browsers. Visually hidden text is in the accessibility tree by construction,
+  // needs no role, and `getByText` proves it is actually rendered.
   it('exposes every skill level to assistive tech, not just as an attribute', () => {
     render(<AssessmentReadonly assessment={base} />)
 
-    expect(screen.getByRole('img', { name: 'Slaganje: Ostvareno' })).toBeTruthy()
-    expect(screen.getByRole('img', { name: 'Programiranje: U razvoju' })).toBeTruthy()
-    expect(screen.getByRole('img', { name: 'Inovacije: Početno' })).toBeTruthy()
-    expect(screen.getByRole('img', { name: 'Suradnja: Ostvareno' })).toBeTruthy()
-    expect(screen.getByRole('img', { name: 'Komunikacija: U razvoju' })).toBeTruthy()
-    expect(screen.getByRole('img', { name: 'Zabava: Ostvareno' })).toBeTruthy()
+    expect(screen.getByText('Slaganje: Ostvareno')).toBeTruthy()
+    expect(screen.getByText('Programiranje: U razvoju')).toBeTruthy()
+    expect(screen.getByText('Inovacije: Početno')).toBeTruthy()
+    expect(screen.getByText('Suradnja: Ostvareno')).toBeTruthy()
+    expect(screen.getByText('Komunikacija: U razvoju')).toBeTruthy()
+    expect(screen.getByText('Zabava: Ostvareno')).toBeTruthy()
   })
 
   it('renders the descriptive grade, preporuka and author line', () => {

@@ -38,7 +38,7 @@ function refineGroupWindow(
       path: [hasStart ? 'dateEnd' : 'dateStart'],
       message: 'Unesite oba datuma (početak i kraj).',
     })
-  } else if (hasStart && hasEnd && data.dateEnd! < data.dateStart!) {
+  } else if (data.dateStart && data.dateEnd && data.dateEnd < data.dateStart) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['dateEnd'],

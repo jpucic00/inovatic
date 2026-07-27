@@ -67,7 +67,7 @@ export const stemEducationInquirySchema = z.object({
     // 'OS Meje\r\nBcc: x@y.com'. Resend's JSON API almost certainly encodes it,
     // so this is defence in depth rather than a live exploit.
     // eslint-disable-next-line no-control-regex
-    .transform((s) => s.replace(/[\u0000-\u001f]+/g, ' ').trim()),
+    .transform((s) => s.replaceAll(/[\u0000-\u001f]+/g, ' ').trim()),
   email: z
     .string()
     .trim()

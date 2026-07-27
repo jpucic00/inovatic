@@ -28,16 +28,15 @@ function SkillRow({
       {value === null ? (
         <span className="text-xs text-gray-400">Nije ocijenjeno</span>
       ) : (
-        // The chips are a picture of one value, and every one of them is
-        // aria-hidden — so the wrapper carries the whole accessible name. On a
-        // plain <div> (implicit role `generic`) ARIA forbids aria-label and
-        // browsers drop it, which left a parent's screen reader announcing the
-        // six skill names with no grades attached. `role="img"` permits a name.
-        <div
-          role="img"
-          className="inline-flex overflow-hidden rounded-md border border-gray-200"
-          aria-label={`${label}: ${SKILL_LEVEL_LABELS[value]}`}
-        >
+        // The chips are a picture of one value and are all aria-hidden, so
+        // without help a parent's screen reader announced the six skill names
+        // with no grades attached. An `aria-label` on the wrapper does not fix
+        // it — on a plain <div> (implicit role `generic`) ARIA forbids the
+        // attribute and browsers drop it — and `role="img"` only trades that
+        // for a rule against faking an image. Real text in the accessibility
+        // tree is what actually works, and it needs no role at all.
+        <div className="inline-flex overflow-hidden rounded-md border border-gray-200">
+          <span className="sr-only">{`${label}: ${SKILL_LEVEL_LABELS[value]}`}</span>
           {SKILL_LEVELS.map((level, i) => (
             <span
               key={level}
