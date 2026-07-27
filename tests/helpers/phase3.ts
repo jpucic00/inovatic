@@ -16,7 +16,6 @@ import { expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { v2 as cloudinarySdk } from 'cloudinary'
-import { submitUntilUrl } from './hydration'
 
 export const BASE = 'http://localhost:3000'
 const ADMIN_EMAIL = 'jpucic00@gmail.com'
@@ -51,12 +50,15 @@ export type StudentData = {
   parentPhone: string
 }
 
+/**
+ * Delegates to `loginWithEmail` rather than driving the form itself: the seeded
+ * admin can acquire a TeacherAssignment (any spec that assigns them to a group),
+ * which flips login to the dual-role panel chooser. This helper used to wait for
+ * /admin forever in that case — a login that had actually *succeeded* looked
+ * like a hung page, and took down whichever beforeAll called it.
+ */
 export async function loginAsAdmin(page: Page) {
-  await page.goto(`${BASE}/prijava`)
-  await page.locator('#identifier').fill(ADMIN_EMAIL)
-  await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
-  await page.waitForLoadState('domcontentloaded')
+  await loginWithEmail(page, ADMIN_EMAIL, ADMIN_PASSWORD)
 }
 
 export async function loginWithEmail(page: Page, email: string, password: string) {

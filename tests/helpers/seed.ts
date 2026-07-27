@@ -156,3 +156,48 @@ export async function seedStudentInGroup(
   return { studentId: result.id, username, password }
 }
 
+
+/**
+ * Clear test students out of the phase3 fixture groups.
+ *
+ * `createStudentInGroup` and `seedStudentInGroup` enrol into the same two
+ * bootstrap groups and never clean up, so the groups fill over successive runs
+ * until the capacity guard disables their radio. Every spec whose `beforeAll`
+ * seeds a student then fails with "element is not enabled", reported against
+ * whatever test owned that hook — which reads as an unrelated bug.
+ *
+ * Called from `20-bootstrap.spec.ts`, so a full phase3 run always starts from
+ * an empty fixture group regardless of how many runs preceded it.
+ *
+ * Deliberately narrow: only STUDENT rows enrolled in the given groups. Deletes
+ * in FK order — Attendance and the assessment/comment tables are RESTRICT.
+ */
+export async function clearFixtureGroupEnrollments(groupIds: string[]): Promise<number> {
+  if (groupIds.length === 0) return 0
+
+  const enrollments = await db.enrollment.findMany({
+    where: { scheduledGroupId: { in: groupIds }, user: { role: 'STUDENT' } },
+    select: { id: true, userId: true },
+  })
+  if (enrollments.length === 0) return 0
+
+  const enrollmentIds = enrollments.map((e) => e.id)
+  const userIds = [...new Set(enrollments.map((e) => e.userId))]
+
+  await db.attendance.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } })
+  await db.moduleEnrollment.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } })
+  await db.studentComment.deleteMany({ where: { studentId: { in: userIds } } })
+  await db.studentAssessment.deleteMany({ where: { studentId: { in: userIds } } })
+  await db.enrollment.deleteMany({ where: { id: { in: enrollmentIds } } })
+
+  // Only remove students left with no enrolment anywhere — a child seeded into
+  // another group by a different spec must survive.
+  const orphaned = await db.user.findMany({
+    where: { id: { in: userIds }, role: 'STUDENT', enrollments: { none: {} } },
+    select: { id: true },
+  })
+  if (orphaned.length > 0) {
+    await db.user.deleteMany({ where: { id: { in: orphaned.map((u) => u.id) } } })
+  }
+  return enrollments.length
+}

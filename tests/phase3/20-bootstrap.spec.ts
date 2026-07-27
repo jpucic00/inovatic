@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { BASE, loginAsAdmin } from '../helpers/phase3'
+import { clearFixtureGroupEnrollments } from '../helpers/seed'
 
 const STATE_FILE = path.resolve(__dirname, '../fixtures/phase3-state.json')
 
@@ -65,6 +66,12 @@ test.describe('Phase 3 Step 0 — Bootstrap (creates groups for downstream specs
     }
 
     expect(groupIds.length).toBeGreaterThanOrEqual(2)
+
+    // Downstream specs enrol into these groups and never clean up, so without
+    // this a full run eventually fills them past maxStudents and every seeding
+    // beforeAll fails on the capacity guard's disabled radio.
+    const cleared = await clearFixtureGroupEnrollments(groupIds)
+    if (cleared > 0) console.log(`bootstrap: cleared ${cleared} stale enrolment(s) from fixture groups`)
 
     fs.writeFileSync(STATE_FILE, JSON.stringify({ groupIds }, null, 2))
   })
