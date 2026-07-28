@@ -160,10 +160,21 @@
   margin-bottom: 0.5rem;
 }
 
+/* Tailwind preflight strips list markers — restore them, otherwise the
+   ::marker colors below have nothing to paint. */
 .article-body ul,
 .article-body ol {
   padding-left: 1.5rem;
   margin-bottom: 1.25rem;
+  list-style-position: outside;
+}
+
+.article-body ul {
+  list-style-type: disc;
+}
+
+.article-body ol {
+  list-style-type: decimal;
 }
 
 .article-body li {

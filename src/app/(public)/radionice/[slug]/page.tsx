@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { OG_DEFAULTS } from '@/lib/seo'
-import { CheckCircle } from 'lucide-react'
 import { db } from '@/lib/db'
 import { getActivePrograms } from '@/actions/public/programs'
 import { InquiryForm } from '@/components/public/inquiry-form'
@@ -48,14 +47,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-const perks = [
-  'Bez obveza – samo šaljete upit',
-  'Kontaktiramo vas u roku 48h',
-  'Objašnjavamo sve detalje',
-]
-
-const perkIconColors = ['text-cyan-500', 'text-yellow-400', 'text-emerald-400']
-
 export default async function WorkshopPage({ params }: Readonly<Props>) {
   const { slug } = await params
   const workshop = await getWorkshop(slug)
@@ -100,18 +91,6 @@ export default async function WorkshopPage({ params }: Readonly<Props>) {
           <div className="grid lg:grid-cols-5 gap-10">
             {/* Sidebar */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-orange-50 rounded-2xl p-5 border border-orange-100">
-                <h3 className="font-bold text-gray-900 mb-3 text-sm">Prednosti</h3>
-                <div className="space-y-2">
-                  {perks.map((perk, i) => (
-                    <div key={perk} className="flex items-center gap-2">
-                      <CheckCircle className={`w-4 h-4 flex-shrink-0 ${perkIconColors[i]}`} />
-                      <span className="text-sm text-gray-600">{perk}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <div className="bg-cyan-50 rounded-xl p-4 border border-cyan-100 text-sm text-gray-500 space-y-1">
                 <p className="font-medium text-gray-700">Imate pitanja?</p>
                 <a href="mailto:prijave@udruga-inovatic.hr" className="text-cyan-500 hover:underline block">
