@@ -65,6 +65,46 @@ export const emailStyles = {
   },
 }
 
+// Full-bleed contact band at the very bottom, styled off the website's own
+// footer so the two read as one brand: `bg-gray-900` (Tailwind v4
+// `oklch(21% 0.034 264.665)` = #101828), a white section heading, and
+// `text-gray-400` (#99a1af) contact lines. Sits OUTSIDE the body container on
+// purpose — a website footer spans the full width, it is not a card.
+const contactFooter = {
+  backgroundColor: '#101828',
+  margin: '0',
+}
+
+const contactFooterInner = {
+  margin: '0 auto',
+  maxWidth: '560px',
+  padding: '32px 24px',
+}
+
+const contactCity = {
+  color: '#ffffff',
+  fontSize: '16px',
+  fontWeight: '600' as const,
+  margin: '0 0 10px',
+}
+
+const contactCitySecond = {
+  ...contactCity,
+  margin: '24px 0 10px',
+}
+
+const contactLine = {
+  color: '#99a1af',
+  fontSize: '14px',
+  lineHeight: '1.7',
+  margin: '0',
+}
+
+const contactLink = {
+  color: '#99a1af',
+  textDecoration: 'none',
+}
+
 interface EmailLayoutProps {
   preview: string
   children: ReactNode
@@ -103,31 +143,35 @@ export function EmailLayout({ preview, children, showSignature = true }: EmailLa
                 <br />
                 Udruga za robotiku &quot;Inovatic&quot;
               </Text>
-              <Text style={emailStyles.footer}>
-                <strong>Kontakt Split</strong>
-                <br />
-                <Link href="mailto:prijave@udruga-inovatic.hr" style={emailStyles.link}>
-                  prijave@udruga-inovatic.hr
-                </Link>
-                {' · '}
-                <Link href="tel:+385993936993" style={emailStyles.link}>
-                  +385 99 393 6993
-                </Link>
-                <br />
-                <br />
-                <strong>Kontakt Šibenik</strong>
-                <br />
-                <Link href="mailto:prijave.sibenik@udruga-inovatic.hr" style={emailStyles.link}>
-                  prijave.sibenik@udruga-inovatic.hr
-                </Link>
-                {' · '}
-                <Link href="tel:+385921689987" style={emailStyles.link}>
-                  +385 92 168 9987
-                </Link>
-              </Text>
             </>
           )}
         </Container>
+        {showSignature && (
+          <Section style={contactFooter}>
+            <Container style={contactFooterInner}>
+              <Text style={contactCity}>Kontakt Split</Text>
+              <Text style={contactLine}>
+                <Link href="mailto:prijave@udruga-inovatic.hr" style={contactLink}>
+                  prijave@udruga-inovatic.hr
+                </Link>
+                <br />
+                <Link href="tel:+385993936993" style={contactLink}>
+                  +385 99 393 6993
+                </Link>
+              </Text>
+              <Text style={contactCitySecond}>Kontakt Šibenik</Text>
+              <Text style={contactLine}>
+                <Link href="mailto:prijave.sibenik@udruga-inovatic.hr" style={contactLink}>
+                  prijave.sibenik@udruga-inovatic.hr
+                </Link>
+                <br />
+                <Link href="tel:+385921689987" style={contactLink}>
+                  +385 92 168 9987
+                </Link>
+              </Text>
+            </Container>
+          </Section>
+        )}
       </Body>
     </Html>
   )
