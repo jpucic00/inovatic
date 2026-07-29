@@ -5,19 +5,23 @@ import { getAssignableTeachers } from '@/actions/admin/teacher'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
 import { db } from '@/lib/db'
-import { AdminGroupTabs } from '@/components/admin/groups/group-tabs'
-import { WeeklySchedule } from '@/components/admin/groups/weekly-schedule'
+import { GroupsBoard } from '@/components/admin/groups/groups-board'
 import { CreateGroupDialog } from '@/components/admin/groups/create-group-dialog'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
-import { isRadionica } from '@/lib/program-kind'
+import { resolveGroupFilter } from '@/lib/group-filter'
 
 export const metadata: Metadata = { title: 'Admin – Grupe' }
 
-export default async function GroupsPage() {
+interface PageProps {
+  searchParams: Promise<Record<string, string | undefined>>
+}
+
+export default async function GroupsPage({ searchParams }: Readonly<PageProps>) {
   const { city } = await requireAdminCtx()
 
   const selectedYear = await getSelectedSchoolYear()
   const editable = !isArchivedYear(selectedYear)
+  const params = await searchParams
 
   const [groups, courses, locations, teachers] = await Promise.all([
     getGroups(),
@@ -32,7 +36,7 @@ export default async function GroupsPage() {
         ],
       },
       orderBy: [{ sortOrder: 'asc' }],
-      select: { id: true, title: true, kind: true },
+      select: { id: true, title: true, kind: true, level: true },
     }),
     db.location.findMany({
       where: { city },
@@ -41,17 +45,6 @@ export default async function GroupsPage() {
     }),
     getAssignableTeachers(),
   ])
-
-  // Every non-radionica program gets its own tab (SLR 1–4 and the competitive
-  // program); radionica groups share one combined tab.
-  const standardCourses = courses.filter((c) => !isRadionica(c.kind))
-  const standardTabs = standardCourses.map((course) => ({
-    courseId: course.id,
-    title: course.title,
-    groups: groups.filter((g) => g.course.id === course.id),
-  }))
-
-  const radioniceTabs = groups.filter((g) => isRadionica(g.course.kind))
 
   const courseOptions = courses.map((c) => ({ id: c.id, title: c.title, kind: c.kind }))
 
@@ -76,15 +69,10 @@ export default async function GroupsPage() {
 
       {!editable && <ArchivedYearBanner year={selectedYear} />}
 
-      <div className="mb-8">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Tjedni raspored</h2>
-        <WeeklySchedule groups={groups} />
-      </div>
-
-      <AdminGroupTabs
-        standardTabs={standardTabs}
-        radioniceTabs={radioniceTabs}
+      <GroupsBoard
+        groups={groups}
         editable={editable}
+        initialFilter={resolveGroupFilter(params.tab, courses)}
       />
     </div>
   )

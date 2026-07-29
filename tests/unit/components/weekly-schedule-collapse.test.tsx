@@ -21,6 +21,7 @@ describe('WeeklySchedule empty-hour collapsing', () => {
   it('collapses the dead stretch between morning and afternoon groups', () => {
     render(
       <WeeklySchedule
+        activeFilter="all"
         groups={[
           group({ id: 'a', name: 'Jutarnja', startTime: '09:00', endTime: '10:30' }),
           group({ id: 'b', name: 'Popodnevna', startTime: '17:00', endTime: '18:30' }),
@@ -42,6 +43,7 @@ describe('WeeklySchedule empty-hour collapsing', () => {
   it('lifts the afternoon block up to just below the collapsed band', () => {
     const { container } = render(
       <WeeklySchedule
+        activeFilter="all"
         groups={[
           group({ id: 'a', name: 'Jutarnja', startTime: '09:00', endTime: '10:30' }),
           group({ id: 'b', name: 'Popodnevna', startTime: '17:00', endTime: '18:30' }),
@@ -61,20 +63,21 @@ describe('WeeklySchedule empty-hour collapsing', () => {
   // bands — the grid then crashed on `bands[bands.length - 1].top`.
   it('renders a degenerate group instead of crashing when end <= start', () => {
     expect(() =>
-      render(<WeeklySchedule groups={[group({ id: 'a', startTime: '18:00', endTime: '18:00' })]} />),
+      render(<WeeklySchedule activeFilter="all" groups={[group({ id: 'a', startTime: '18:00', endTime: '18:00' })]} />),
     ).not.toThrow()
     expect(screen.getByText('18:00')).toBeTruthy()
   })
 
   it('survives a group whose end time precedes its start time', () => {
     expect(() =>
-      render(<WeeklySchedule groups={[group({ id: 'a', startTime: '18:30', endTime: '08:00' })]} />),
+      render(<WeeklySchedule activeFilter="all" groups={[group({ id: 'a', startTime: '18:30', endTime: '08:00' })]} />),
     ).not.toThrow()
   })
 
   it('leaves a single empty hour to scale', () => {
     render(
       <WeeklySchedule
+        activeFilter="all"
         groups={[
           group({ id: 'a', startTime: '17:00', endTime: '18:30' }),
           group({ id: 'b', dayOfWeek: 'Utorak', startTime: '19:00', endTime: '20:00' }),

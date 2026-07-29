@@ -1,0 +1,64 @@
+'use client'
+
+import { useEffect, useState, type ComponentProps } from 'react'
+import { ProgramFilterBar } from './program-filter-bar'
+import { WeeklySchedule } from './weekly-schedule'
+import { GroupTable } from './group-table'
+import {
+  FILTER_LABEL,
+  isSingleProgramFilter,
+  matchesGroupFilter,
+  type GroupFilterKey,
+} from '@/lib/group-filter'
+
+type Group = ComponentProps<typeof GroupTable>['data'][number]
+
+interface GroupsBoardProps {
+  groups: Group[]
+  editable: boolean
+  /** Resolved from `?tab=` so the /admin/programi links land on their program. */
+  initialFilter: GroupFilterKey
+}
+
+/**
+ * One filter over both views of the same groups: the weekly grid draws the
+ * selection, the table lists it. They used to be steered separately — chips
+ * over the grid, a tab strip over the table — which meant the two could
+ * disagree about which program you were looking at.
+ */
+export function GroupsBoard({ groups, editable, initialFilter }: Readonly<GroupsBoardProps>) {
+  const [activeFilter, setActiveFilter] = useState<GroupFilterKey>(initialFilter)
+  // A client-side nav to /admin/grupe?tab=… re-renders the page with a fresh
+  // initialFilter; state alone would keep showing the previous selection.
+  useEffect(() => setActiveFilter(initialFilter), [initialFilter])
+
+  const visible = groups.filter((g) => matchesGroupFilter(g, activeFilter))
+
+  return (
+    <div>
+      <ProgramFilterBar groups={groups} activeFilter={activeFilter} onChange={setActiveFilter} />
+
+      <div className="mt-6 mb-8">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Tjedni raspored
+        </h2>
+        <WeeklySchedule groups={groups} activeFilter={activeFilter} />
+      </div>
+
+      <div className="flex items-baseline gap-2 mb-3">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+          {FILTER_LABEL[activeFilter]}
+        </h2>
+        <span className="text-xs text-gray-400 tabular-nums">
+          {visible.length} {visible.length >= 2 && visible.length <= 4 ? 'grupe' : 'grupa'}
+        </span>
+      </div>
+
+      <GroupTable
+        data={visible}
+        editable={editable}
+        hideProgram={isSingleProgramFilter(activeFilter)}
+      />
+    </div>
+  )
+}
