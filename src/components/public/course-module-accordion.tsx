@@ -21,6 +21,10 @@ interface CourseModuleAccordionProps {
  * clicking a header toggles that module (multiple may be open, each independent).
  * Desktop headers show a thumbnail + one-line lead; mobile headers are badge +
  * title only and render the module image full-width inside the open body.
+ *
+ * Both image boxes are 4:3 to match the module art (see CLAUDE.md), so
+ * `object-cover` has nothing to crop. The thumbnail was 64x52 until 2026-07-30
+ * and silently ate 7.7% of every program's width.
  */
 export function CourseModuleAccordion({ modules, gradient }: CourseModuleAccordionProps) {
   const [openModules, setOpenModules] = useState<ReadonlySet<number>>(() => new Set<number>())
@@ -52,8 +56,8 @@ export function CourseModuleAccordion({ modules, gradient }: CourseModuleAccordi
                 src={mod.image}
                 alt={mod.title}
                 width={64}
-                height={52}
-                className="hidden h-[52px] w-16 flex-shrink-0 rounded-lg bg-gray-200 object-cover md:block"
+                height={48}
+                className="hidden h-12 w-16 flex-shrink-0 rounded-lg bg-gray-200 object-cover md:block"
               />
               <span
                 className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${gradient} text-xs font-bold text-white md:h-[26px] md:w-[26px] md:text-[12.5px]`}
