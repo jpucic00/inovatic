@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs'
 
-import type { CellValue, Grid } from './parse'
+import type { CellValue, Grid } from './grid'
 
 type SheetGrid = { name: string; grid: Grid }
 

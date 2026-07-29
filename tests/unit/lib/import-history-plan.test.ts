@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import type { Grid, ImportWarning } from '@/lib/import-common/grid'
 import {
   parseContactSheet,
   parseEvaluationSheet,
   type ContactSheet,
   type EvaluationBlock,
-  type Grid,
-  type ImportWarning,
 } from '@/lib/import-history/parse'
 import { buildImportPlan, type DbSnapshot } from '@/lib/import-history/plan'
 

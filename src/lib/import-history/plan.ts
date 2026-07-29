@@ -1,17 +1,15 @@
 import type { RecommendationKind, SkillLevel } from '@prisma/client'
 
 import type { SkillKey } from '../assessment-rubric'
+import { claimUnique, usernameBase } from '../import-common/credentials'
+import { personKey, titleCaseName, type ImportWarning } from '../import-common/grid'
 import {
   buildGroupName,
   identityKey,
   parseGroupName,
-  personKey,
-  stripDiacritics,
-  titleCaseName,
   type ContactSheet,
   type EvaluationBlock,
   type GroupIdentity,
-  type ImportWarning,
 } from './parse'
 
 // ── Snapshot of the target DB (read by the caller, kept plain for tests) ─────
@@ -91,23 +89,6 @@ export type ImportPlan = {
   enrollments: PlannedEnrollment[]
   assessments: PlannedAssessment[]
   warnings: ImportWarning[]
-}
-
-// ── Credential synthesis (mirrors src/actions/admin/student.ts) ──────────────
-
-function usernameBase(firstName: string, lastName: string): string {
-  return stripDiacritics(`${firstName}${lastName}`)
-    .toLowerCase()
-    .replaceAll(/\s+/g, '')
-    .replaceAll(/[^a-z0-9]/g, '')
-}
-
-function claimUnique(base: string, taken: Set<string>): string {
-  let candidate = base
-  let suffix = 2
-  while (taken.has(candidate)) candidate = `${base}${suffix++}`
-  taken.add(candidate)
-  return candidate
 }
 
 // ── Teacher registry ─────────────────────────────────────────────────────────

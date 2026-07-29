@@ -1,10 +1,9 @@
+import type { Grid, ImportWarning } from '../import-common/grid'
 import {
   parseContactSheet,
   parseEvaluationSheet,
   type ContactSheet,
   type EvaluationBlock,
-  type Grid,
-  type ImportWarning,
 } from './parse'
 
 type ParsedWorkbook = {

@@ -22,11 +22,12 @@ import { basename } from 'node:path'
 import { PrismaClient } from '@prisma/client'
 
 import { applyImportPlan } from '../src/lib/import-history/apply'
-import { inferSchoolYearFromFilename, type ImportWarning } from '../src/lib/import-history/parse'
+import { type ImportWarning } from '../src/lib/import-common/grid'
+import { inferSchoolYearFromFilename } from '../src/lib/import-common/values'
 import { buildImportPlan, type ImportPlan } from '../src/lib/import-history/plan'
 import { loadSnapshot } from '../src/lib/import-history/snapshot'
 import { parseWorkbookSheets } from '../src/lib/import-history/workbook'
-import { readWorkbookGrids } from '../src/lib/import-history/xlsx'
+import { readWorkbookGrids } from '../src/lib/import-common/xlsx'
 
 const prisma = new PrismaClient()
 

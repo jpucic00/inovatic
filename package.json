@@ -29,6 +29,7 @@
     "db:seed:programs": "tsx prisma/seed-programs.ts",
     "db:seed:previous-year": "tsx prisma/seed-previous-year.ts",
     "db:import-history": "tsx scripts/import-history.ts",
+    "db:import-competition": "tsx scripts/import-competition.ts",
     "download-wp-images": "tsx scripts/download-wp-images.ts",
     "migrate-images": "tsx scripts/migrate-images-to-cloudinary.ts",
     "db:studio": "prisma studio",

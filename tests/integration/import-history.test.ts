@@ -9,13 +9,13 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import { db } from '@/lib/db'
 import { applyImportPlan } from '@/lib/import-history/apply'
-import type { ImportWarning } from '@/lib/import-history/parse'
+import type { ImportWarning } from '@/lib/import-common/grid'
 import { buildImportPlan, type ImportPlan } from '@/lib/import-history/plan'
 import { loadSnapshot } from '@/lib/import-history/snapshot'
 import { parseWorkbookSheets } from '@/lib/import-history/workbook'
-import { readWorkbookGrids } from '@/lib/import-history/xlsx'
+import { readWorkbookGrids } from '@/lib/import-common/xlsx'
 
-import { createCourse, createGroup, createLocation, createTeacher } from './helpers/factory'
+import { createGroup, createLocation, createTeacher, ensureCourse } from './helpers/factory'
 
 const YEAR = '2025/2026'
 
@@ -91,8 +91,8 @@ describe('import-history pipeline', () => {
 
   beforeAll(async () => {
     const location = await createLocation({ name: 'Velebitska 32', city: 'SPLIT' })
-    const slr1 = await createCourse({ slug: 'slr-1', title: 'Svijet LEGO robotike 1' })
-    const slr2 = await createCourse({ slug: 'slr-2', title: 'Svijet LEGO robotike 2' })
+    const slr1 = await ensureCourse({ slug: 'slr-1', title: 'Svijet LEGO robotike 1' })
+    const slr2 = await ensureCourse({ slug: 'slr-2', title: 'Svijet LEGO robotike 2' })
     slr2Id = slr2.id
 
     // Teacher who already has an account (must be matched, not duplicated).

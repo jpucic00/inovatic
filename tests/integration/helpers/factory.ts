@@ -123,6 +123,17 @@ type CreateCourseOverrides = {
   city?: City | null
 }
 
+/**
+ * Course slugs are globally unique and the integration DB is shared by every
+ * test file in the tier, so two files both needing a well-known slug (`slr-2`,
+ * `natjecateljski-program`) would race on whichever ran second. Reuse the row
+ * instead of failing — use this whenever the slug is fixed rather than generated.
+ */
+export async function ensureCourse(overrides: CreateCourseOverrides & { slug: string }) {
+  const existing = await db.course.findUnique({ where: { slug: overrides.slug } })
+  return existing ?? createCourse(overrides)
+}
+
 export async function createCourse(overrides: CreateCourseOverrides = {}) {
   const id = uniq()
   return db.course.create({

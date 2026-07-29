@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
+import { titleCaseName, type Grid, type ImportWarning } from '@/lib/import-common/grid'
 import {
-  buildGroupName,
   courseSlugFromLabel,
   dayOfWeekFromLabel,
   inferSchoolYearFromFilename,
   normalizeTimeToken,
-  parseContactSheet,
-  parseEvaluationSheet,
-  parseGroupName,
   parsePaidValue,
   parseRecommendation,
   parseSkillValue,
-  titleCaseName,
-  type Grid,
-  type ImportWarning,
+} from '@/lib/import-common/values'
+import {
+  buildGroupName,
+  parseContactSheet,
+  parseEvaluationSheet,
+  parseGroupName,
 } from '@/lib/import-history/parse'
 
 describe('normalizeTimeToken', () => {

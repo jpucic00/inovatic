@@ -1,128 +1,34 @@
-import type { RecommendationKind, SkillLevel } from '@prisma/client'
+import type { SkillLevel } from '@prisma/client'
 
+import {
+  buildColumnMap,
+  cellText,
+  col,
+  isBlankRow,
+  matchLabelRow,
+  normalizeKey,
+  titleCaseName,
+  type CellValue,
+  type Grid,
+  type ImportWarning,
+} from '../import-common/grid'
+import {
+  courseSlugFromLabel,
+  dayOfWeekFromLabel,
+  isPlainEmail,
+  normalizeTimeToken,
+  parsePaidValue,
+  parseRecommendation,
+  parseSkillValue,
+  sanitizeEmail,
+  type ParsedRecommendation,
+} from '../import-common/values'
 import type { SkillKey } from '../assessment-rubric'
-
-// ── Grid model ───────────────────────────────────────────────────────────────
-// Sheets arrive as plain 2-D value grids (row-major, 0-based) so every parser
-// stays pure and unit-testable without touching an .xlsx reader.
-
-export type CellValue = string | number | boolean | Date | null
-
-export type Grid = CellValue[][]
-
-export type WarningLevel = 'error' | 'warn' | 'info'
-
-export type ImportWarning = {
-  level: WarningLevel
-  where: string
-  message: string
-}
-
-// ── Normalization helpers ────────────────────────────────────────────────────
-
-const DIACRITICS_MAP: Record<string, string> = {
-  č: 'c', ć: 'c', š: 's', ž: 'z', đ: 'd',
-  Č: 'C', Ć: 'C', Š: 'S', Ž: 'Z', Đ: 'D',
-}
-
-export function stripDiacritics(str: string): string {
-  return str.replaceAll(/[čćšžđČĆŠŽĐ]/g, (ch) => DIACRITICS_MAP[ch] ?? ch)
-}
-
-/** Uppercase, diacritic-free, single-spaced, no trailing colon — for matching. */
-function normalizeKey(value: CellValue): string {
-  if (value === null || value === undefined) return ''
-  return stripDiacritics(String(value))
-    .toUpperCase()
-    .replaceAll(/\s+/g, ' ')
-    .trim()
-    .replace(/:$/, '')
-    .trim()
-}
-
-function cellText(value: CellValue): string {
-  if (value === null || value === undefined) return ''
-  if (value instanceof Date) return value.toISOString()
-  return String(value).trim()
-}
-
-/** "KRISTIAN MUTABDŽIJA" → "Kristian Mutabdžija" (per space/hyphen segment). */
-export function titleCaseName(raw: string): string {
-  return raw
-    .trim()
-    .replaceAll(/\s+/g, ' ')
-    .toLowerCase()
-    .replaceAll(/(^|[\s-])(\p{L})/gu, (_m, sep: string, ch: string) => sep + ch.toUpperCase())
-}
-
-/** Case/diacritic-insensitive identity key for a person name. */
-export function personKey(firstName: string, lastName: string): string {
-  return normalizeKey(firstName) + '|' + normalizeKey(lastName)
-}
-
-// ── Course + day vocabularies ────────────────────────────────────────────────
-
-/** Tab-name token (SLR1) and full title (SVIJET LEGO ROBOTIKE 1) → course slug. */
-const COURSE_BY_TOKEN: Record<string, string> = {
-  SLR1: 'slr-1',
-  SLR2: 'slr-2',
-  SLR3: 'slr-3',
-  SLR4: 'slr-4',
-}
-
-export function courseSlugFromLabel(label: string): string | null {
-  const norm = normalizeKey(label)
-  const compact = norm.replaceAll(' ', '')
-  if (COURSE_BY_TOKEN[compact]) return COURSE_BY_TOKEN[compact]
-  const title = /^SVIJET LEGO ROBOTIKE (\d)$/.exec(norm)
-  if (title) return COURSE_BY_TOKEN[`SLR${title[1]}`] ?? null
-  return null
-}
-
-/** Day abbreviation (PON) and full name (PONEDJELJAK) → app dayOfWeek value. */
-const DAY_BY_KEY: Record<string, string> = {
-  PON: 'Ponedjeljak', PONEDJELJAK: 'Ponedjeljak',
-  UTO: 'Utorak', UTORAK: 'Utorak',
-  SRI: 'Srijeda', SRIJEDA: 'Srijeda',
-  CET: 'Četvrtak', CETVRTAK: 'Četvrtak',
-  PET: 'Petak', PETAK: 'Petak',
-  SUB: 'Subota', SUBOTA: 'Subota',
-  NED: 'Nedjelja', NEDJELJA: 'Nedjelja',
-}
 
 /** App dayOfWeek → prod group-name abbreviation (SRI). */
 const DAY_ABBREV: Record<string, string> = {
   Ponedjeljak: 'PON', Utorak: 'UTO', Srijeda: 'SRI', Četvrtak: 'ČET',
   Petak: 'PET', Subota: 'SUB', Nedjelja: 'NED',
-}
-
-export function dayOfWeekFromLabel(label: string): string | null {
-  return DAY_BY_KEY[normalizeKey(label)] ?? null
-}
-
-// ── Time tokens ──────────────────────────────────────────────────────────────
-// Accepts "18:30", "1830", "930", "20", "9" → canonical "18:30" / "9:30" /
-// "20:00" / "9:00" (hour unpadded, minutes two-digit — the prod convention).
-
-export function normalizeTimeToken(token: string): string | null {
-  const t = token.trim().replaceAll('.', ':')
-  let hours: number
-  let minutes: number
-  const withColon = /^(\d{1,2}):(\d{2})$/.exec(t)
-  if (withColon) {
-    hours = Number(withColon[1])
-    minutes = Number(withColon[2])
-  } else if (/^\d{3,4}$/.test(t)) {
-    hours = Number(t.slice(0, -2))
-    minutes = Number(t.slice(-2))
-  } else if (/^\d{1,2}$/.test(t)) {
-    hours = Number(t)
-    minutes = 0
-  } else {
-    return null
-  }
-  if (hours > 23 || minutes > 59) return null
-  return `${hours}:${String(minutes).padStart(2, '0')}`
 }
 
 // ── Group identity (tab names + prod group names) ────────────────────────────
@@ -143,20 +49,6 @@ export function identityKey(id: {
   startTime: string | null
 }): string {
   return `${id.courseSlug}|${id.dayOfWeek}|${id.startTime ?? ''}`
-}
-
-/**
- * Sniffs a school year out of a workbook filename ("Evidencija_Anić_2024_2025"
- * → "2024/2025"). Only two consecutive years count — anything else is null.
- * Used as a guard against importing a workbook under the wrong --year.
- */
-export function inferSchoolYearFromFilename(fileName: string): string | null {
-  const match = /(\d{4})[._/-](\d{4})/.exec(fileName)
-  if (!match) return null
-  const first = Number(match[1])
-  const second = Number(match[2])
-  if (second !== first + 1) return null
-  return `${first}/${second}`
 }
 
 export function parseGroupName(name: string): GroupIdentity | null {
@@ -186,88 +78,6 @@ export function buildGroupName(identity: GroupIdentity): string {
   const base = `${day}_${identity.courseToken}`
   if (!identity.startTime || !identity.endTime) return base
   return `${base}_${identity.startTime}-${identity.endTime}`
-}
-
-// ── Cell-value coercers ──────────────────────────────────────────────────────
-
-const SKILL_VALUE_MAP: Record<string, SkillLevel> = {
-  'POCETNO': 'POCETNO',
-  'U RAZVOJU': 'U_RAZVOJU',
-  'U_RAZVOJU': 'U_RAZVOJU',
-  'OSTVARENO': 'OSTVARENO',
-}
-
-export function parseSkillValue(value: CellValue): SkillLevel | null | 'unknown' {
-  const norm = normalizeKey(value)
-  if (!norm) return null
-  return SKILL_VALUE_MAP[norm] ?? 'unknown'
-}
-
-type ParsedRecommendation =
-  | { kind: Extract<RecommendationKind, 'COMPETITION_PREP' | 'COMPETITION_PROGRAM'> }
-  | { kind: 'COURSE'; courseSlug: string }
-
-export function parseRecommendation(value: CellValue): ParsedRecommendation | null | 'unknown' {
-  const norm = normalizeKey(value)
-  if (!norm) return null
-  // PRIPR?EMA: the real 2025/2026 archive spells it "PRIPEMA" (missing R) in
-  // places; singular/plural NATJECANJE/NATJECANJA both appear too.
-  if (/^PRIPR?EMA ZA NATJECANJ[AE]$/.test(norm)) {
-    return { kind: 'COMPETITION_PREP' }
-  }
-  if (norm === 'NATJECATELJSKI PROGRAM') return { kind: 'COMPETITION_PROGRAM' }
-  const courseSlug = courseSlugFromLabel(norm)
-  if (courseSlug) return { kind: 'COURSE', courseSlug }
-  return 'unknown'
-}
-
-export function parsePaidValue(value: CellValue): boolean | 'unknown' {
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'number') return value !== 0
-  const norm = normalizeKey(value)
-  if (!norm) return false
-  if (['TRUE', 'DA', 'YES', '1', 'PLACENO', 'X', '✓', 'TOCNO'].includes(norm)) return true
-  if (['FALSE', 'NE', 'NO', '0', 'NIJE PLACENO'].includes(norm)) return false
-  return 'unknown'
-}
-
-// ── Shared label-row helpers ─────────────────────────────────────────────────
-
-/** If the row starts a `LABEL: value` line, return the value (same cell after
- *  the colon, or the next non-empty cell). `labels` are normalized keys. */
-function matchLabelRow(row: CellValue[], labels: string[]): string | null {
-  const firstIdx = row.findIndex((c) => cellText(c) !== '')
-  if (firstIdx === -1) return null
-  const first = cellText(row[firstIdx])
-  const colon = first.indexOf(':')
-  const head = normalizeKey(colon === -1 ? first : first.slice(0, colon))
-  if (!labels.includes(head)) return null
-  const inline = colon === -1 ? '' : first.slice(colon + 1).trim()
-  if (inline) return inline
-  const rest = row.slice(firstIdx + 1).find((c) => cellText(c) !== '')
-  return rest === undefined ? '' : cellText(rest)
-}
-
-function isBlankRow(row: CellValue[]): boolean {
-  return row.every((c) => cellText(c) === '')
-}
-
-/** Map normalized header captions → column index, scanning one or two rows
- *  (the evaluation sheet splits captions across a merged two-row header). */
-function buildColumnMap(rows: CellValue[][], known: Record<string, string>): Map<string, number> {
-  const map = new Map<string, number>()
-  for (const row of rows) {
-    for (const [idx, cell] of row.entries()) {
-      const key = known[normalizeKey(cell)]
-      if (key && !map.has(key)) map.set(key, idx)
-    }
-  }
-  return map
-}
-
-function col(row: CellValue[], map: Map<string, number>, key: string): CellValue {
-  const idx = map.get(key)
-  return idx === undefined ? null : (row[idx] ?? null)
 }
 
 // ── Evaluation sheet ─────────────────────────────────────────────────────────
@@ -413,13 +223,22 @@ export function parseEvaluationSheet(grid: Grid, warnings: ImportWarning[]): Eva
     }
 
     if (!colMap) {
-      const candidate = buildColumnMap([row, grid[r + 1] ?? []], EVALUATION_HEADERS)
+      const next = grid[r + 1] ?? []
+      const candidate = buildColumnMap([row, next], EVALUATION_HEADERS)
       if (candidate.has('ime') && candidate.has('prezime')) {
         colMap = candidate
-        // Skip the second header row (skill captions) when it contributed columns.
-        const nextIsHeader = (grid[r + 1] ?? []).some(
-          (cell) => EVALUATION_HEADERS[normalizeKey(cell)] !== undefined,
-        )
+        // The header is merged across two rows, the second holding the skill
+        // captions. Its name cells are either blank or — where the merge is
+        // vertical, so the master value repeats downward — the captions again.
+        // Testing THOSE cells rather than "the row contains a caption word" is
+        // what keeps a child whose PREPORUKA reads "Inovacije" from being
+        // mistaken for a header row and silently dropped.
+        const isCaptionCell = (cell: CellValue): boolean =>
+          cellText(cell) === '' || EVALUATION_HEADERS[normalizeKey(cell)] !== undefined
+        const nextIsHeader =
+          next.some((cell) => EVALUATION_HEADERS[normalizeKey(cell)] !== undefined) &&
+          isCaptionCell(col(next, candidate, 'ime')) &&
+          isCaptionCell(col(next, candidate, 'prezime'))
         if (nextIsHeader) r++
         inTable = true
       }
@@ -454,21 +273,6 @@ export function parseEvaluationSheet(grid: Grid, warnings: ImportWarning[]): Eva
 }
 
 // ── Contact sheets (one tab per group) ───────────────────────────────────────
-
-/**
- * Extracts a bare address from Outlook-style contact strings pasted into MAIL
- * cells: `Marija Perić <marija@outlook.com>` → `marija@outlook.com`. Also
- * strips a `mailto:` prefix and lowercases — the stored value must equal what
- * a parent later types into the inquiry form, or legacy matching breaks.
- */
-function sanitizeEmail(raw: string): string {
-  let email = raw.trim()
-  const angled = /<([^<>]+)>/.exec(email)
-  if (angled) email = angled[1].trim()
-  return email.replace(/^mailto:/i, '').trim().toLowerCase()
-}
-
-const PLAIN_EMAIL = /^\S+@\S+\.\S+$/
 
 export type ContactRow = {
   firstName: string
@@ -527,7 +331,7 @@ function parseContactRow(
   }
 
   const parentEmail = sanitizeEmail(cellText(col(row, map, 'mail'))) || null
-  if (parentEmail && !PLAIN_EMAIL.test(parentEmail)) {
+  if (parentEmail && !isPlainEmail(parentEmail)) {
     warnings.push({
       level: 'warn',
       where,
