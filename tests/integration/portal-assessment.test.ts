@@ -201,9 +201,13 @@ describe('getMyAssessmentForGroup — bilješke stay staff-only', () => {
     const view = await getMyAssessmentForGroup(group.id)
 
     expect(JSON.stringify(view)).not.toContain('Interna bilješka')
+    // Exhaustive on purpose: any new field on the portal payload has to be
+    // added here deliberately, which is what keeps bilješke from drifting in.
+    // `kind` only selects which rubric the card renders.
     expect(view).toEqual({
       group: expect.anything(),
       gradable: true,
+      kind: 'STANDARD',
       assessment: expect.anything(),
     })
   })

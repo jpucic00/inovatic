@@ -72,10 +72,16 @@ enum SkillLevel {
   OSTVARENO
 }
 
+/// What a report card recommends the child does next. `COURSE` points at a real
+/// Course row (`recommendedCourseId`); every other value is a track that has no
+/// single course to name — the competitive program's teams are picked per
+/// natjecanje, so a mentor recommends the team, not a catalog entry.
 enum RecommendationKind {
   COURSE
   COMPETITION_PREP
   COMPETITION_PROGRAM
+  COMPETITION_FLL
+  COMPETITION_WRO
 }
 
 enum MaterialType {
@@ -658,9 +664,17 @@ model StudentAssessment {
   groupId   String
   authorId  String
 
-  // PRAKTIČNE VJEŠTINE
+  // PRAKTIČNE VJEŠTINE — the rubric differs by program kind, so each skill has
+  // its own column rather than three reused slots: a query for `slaganje` must
+  // always mean slaganje, never "whatever the practical slot held for this
+  // group's kind". Only the columns belonging to the group's kind are ever
+  // written (enforced in `upsertStudentAssessment`); the rest stay null.
+  //   STANDARD    slaganje, programiranje, inovacije
+  //   COMPETITION razradaIdeja, izvedivost, inovacije
   slaganje      SkillLevel?
   programiranje SkillLevel?
+  razradaIdeja  SkillLevel?
+  izvedivost    SkillLevel?
   inovacije     SkillLevel?
 
   // TIMSKE VJEŠTINE

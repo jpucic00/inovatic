@@ -22,6 +22,7 @@ import {
   createEnrollmentWindow,
   createModule,
   createStudent,
+  createTeacher,
 } from './helpers/factory'
 import { fixtureScope } from './helpers/cleanup'
 
@@ -50,6 +51,8 @@ const { addEnrollment, getStudents } = await import('@/actions/admin/student')
 const { completeSchoolYearPlan } = await import('@/actions/admin/school-year-planner')
 const { getGroupAttendance } = await import('@/actions/teacher/attendance')
 const { submitInquiry } = await import('@/actions/inquiry')
+const { GET: availabilityGET } = await import('@/app/api/group-availability/route')
+const { upsertStudentAssessment } = await import('@/lib/student-assessment-core')
 
 const SY = '2026/2027'
 const fx = fixtureScope()
@@ -134,6 +137,38 @@ describe('the competitive program is invitation-only', () => {
     await fx.group({ courseId: course.id, schoolYear: SY, city: 'SPLIT' })
 
     expect(await getSignupProgram('SPLIT', course.slug)).toBeNull()
+  })
+
+  it('survives the signup form live availability poll', async () => {
+    // Regression: the form re-polls /api/group-availability every 30s. It used
+    // to answer from the public catalog for every request, so a competition
+    // page rendered its termini and then blanked them a second later — the
+    // program is deliberately absent from that feed. The poll must ask for the
+    // program the page is actually on.
+    const course = await competitionCourse()
+    await createEnrollmentWindow(course.id, {
+      schoolYear: SY,
+      city: 'SPLIT',
+      enrollmentStart: d('2020-01-01'),
+      enrollmentEnd: d('2099-12-31'),
+    })
+    const group = await fx.group({ courseId: course.id, schoolYear: SY, city: 'SPLIT' })
+
+    const poll = async (query: string) => {
+      const res = await availabilityGET(
+        new Request(`http://localhost/api/group-availability?${query}`),
+      )
+      expect(res.status).toBe(200)
+      return (await res.json()) as { id: string; groups: { id: string }[] }[]
+    }
+
+    // The public catalog: absent, as designed.
+    expect((await poll('city=SPLIT')).map((p) => p.id)).not.toContain(course.id)
+
+    // The per-program poll the signup page issues: present, with its termini.
+    const scoped = await poll(`city=SPLIT&courseId=${course.id}`)
+    expect(scoped.map((p) => p.id)).toEqual([course.id])
+    expect(scoped[0].groups.map((g) => g.id)).toContain(group.id)
   })
 
   it('does not leak a Split program into the Šibenik link', async () => {
@@ -533,5 +568,82 @@ describe('high-school grades reach only the competitive program', () => {
       scheduledGroupId: group.id,
     })
     expect(res.success).toBe(true)
+  })
+})
+
+// ─── Report card rubric ──────────────────────────────────────────────────────
+
+describe('the competition report card grades a different practical rubric', () => {
+  beforeEach(async () => {
+    await loginSplitAdmin()
+  })
+
+  async function gradedStudent(kind: 'COMPETITION' | 'STANDARD') {
+    const course =
+      kind === 'COMPETITION' ? await competitionCourse() : await fx.course()
+    const group = await fx.group({ courseId: course.id, schoolYear: SY, city: 'SPLIT' })
+    const student = await createStudent({ city: 'SPLIT' })
+    const teacher = await createTeacher({ city: 'SPLIT' })
+    await createEnrollment(student.id, group.id, { schoolYear: SY })
+    return { group, student, teacher }
+  }
+
+  it('stores razradaIdeja + izvedivost, and never the SLR practical skills', async () => {
+    const { group, student, teacher } = await gradedStudent('COMPETITION')
+
+    await upsertStudentAssessment(
+      {
+        studentId: student.id,
+        groupId: group.id,
+        razradaIdeja: 'OSTVARENO',
+        izvedivost: 'U_RAZVOJU',
+        inovacije: 'POCETNO',
+        suradnja: 'OSTVARENO',
+        komunikacija: 'U_RAZVOJU',
+        zabava: 'OSTVARENO',
+        // A stale or hand-rolled client could still post these; the server must
+        // drop them rather than write "idea development" into `slaganje`.
+        slaganje: 'OSTVARENO',
+        programiranje: 'OSTVARENO',
+      },
+      teacher.id,
+    )
+
+    const row = await db.studentAssessment.findFirstOrThrow({
+      where: { studentId: student.id, groupId: group.id },
+    })
+    expect(row.razradaIdeja).toBe('OSTVARENO')
+    expect(row.izvedivost).toBe('U_RAZVOJU')
+    expect(row.inovacije).toBe('POCETNO')
+    // Team skills are shared by both rubrics.
+    expect(row.suradnja).toBe('OSTVARENO')
+    // Not in this rubric — refused, not stored.
+    expect(row.slaganje).toBeNull()
+    expect(row.programiranje).toBeNull()
+  })
+
+  it('leaves the SLR rubric alone — no competition skills leak into it', async () => {
+    const { group, student, teacher } = await gradedStudent('STANDARD')
+
+    await upsertStudentAssessment(
+      {
+        studentId: student.id,
+        groupId: group.id,
+        slaganje: 'OSTVARENO',
+        programiranje: 'U_RAZVOJU',
+        inovacije: 'POCETNO',
+        razradaIdeja: 'OSTVARENO',
+        izvedivost: 'OSTVARENO',
+      },
+      teacher.id,
+    )
+
+    const row = await db.studentAssessment.findFirstOrThrow({
+      where: { studentId: student.id, groupId: group.id },
+    })
+    expect(row.slaganje).toBe('OSTVARENO')
+    expect(row.programiranje).toBe('U_RAZVOJU')
+    expect(row.razradaIdeja).toBeNull()
+    expect(row.izvedivost).toBeNull()
   })
 })

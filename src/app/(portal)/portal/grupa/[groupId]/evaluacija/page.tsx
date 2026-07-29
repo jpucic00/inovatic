@@ -10,7 +10,7 @@ export default async function PortalGroupEvaluacijaPage({
   params,
 }: Readonly<{ params: Promise<{ groupId: string }> }>) {
   const { groupId } = await params
-  const { group, gradable, assessment } = await getMyAssessmentForGroup(groupId)
+  const { group, gradable, assessment, kind } = await getMyAssessmentForGroup(groupId)
 
   return (
     <div className="max-w-2xl">
@@ -44,7 +44,9 @@ export default async function PortalGroupEvaluacijaPage({
         </p>
       )}
 
-      {gradable && assessment && <AssessmentReadonly assessment={assessment} />}
+      {gradable && assessment && (
+        <AssessmentReadonly assessment={assessment} kind={kind} />
+      )}
     </div>
   )
 }

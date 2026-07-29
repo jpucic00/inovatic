@@ -67,6 +67,8 @@ const assessmentSelect = {
   groupId: true,
   slaganje: true,
   programiranje: true,
+  razradaIdeja: true,
+  izvedivost: true,
   inovacije: true,
   suradnja: true,
   komunikacija: true,

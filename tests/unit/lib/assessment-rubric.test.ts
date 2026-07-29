@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { RecommendationKind } from '@prisma/client'
 import {
-  SKILL_CATEGORIES,
+  RECOMMENDATION_SPECIALS,
+  skillCategories,
+  skillKeysFor,
   SKILL_KEYS,
   SKILL_LEVELS,
   decodeRecommendation,
@@ -64,14 +67,85 @@ describe('formatRecommendationLabel', () => {
   it('maps the special tracks to their canonical Croatian labels', () => {
     expect(formatRecommendationLabel('COMPETITION_PREP', null)).toBe('Priprema za natjecanja')
     expect(formatRecommendationLabel('COMPETITION_PROGRAM', null)).toBe('Natjecateljski program')
+    expect(formatRecommendationLabel('COMPETITION_FLL', null)).toBe(
+      'Natjecateljski program – FLL',
+    )
+    expect(formatRecommendationLabel('COMPETITION_WRO', null)).toBe(
+      'Natjecateljski program – WRO',
+    )
+  })
+
+  it('gives every non-COURSE RecommendationKind a special-track entry', () => {
+    // The guard that matters: adding an enum value without a label here would
+    // otherwise surface in the dropdown as the raw enum name, and
+    // encode/decodeRecommendation would silently drop it on the way through.
+    const labelled = new Set(RECOMMENDATION_SPECIALS.map((s) => s.kind))
+    for (const kind of Object.values(RecommendationKind)) {
+      if (kind === 'COURSE') continue
+      expect(labelled).toContain(kind)
+    }
+    expect(labelled.size).toBe(Object.values(RecommendationKind).length - 1)
+  })
+
+  it('round-trips every special track through encode/decode', () => {
+    for (const { kind } of RECOMMENDATION_SPECIALS) {
+      expect(encodeRecommendation(kind, null)).toBe(kind)
+      expect(decodeRecommendation(kind)).toEqual({
+        recommendationKind: kind,
+        recommendedCourseId: null,
+      })
+    }
   })
 })
 
 describe('rubric shape', () => {
-  it('has exactly the 6 skills of SKILL_KEYS across the 2 categories', () => {
-    const keys = SKILL_CATEGORIES.flatMap((c) => c.skills.map((s) => s.key))
-    expect(keys).toEqual([...SKILL_KEYS])
-    expect(keys).toHaveLength(6)
+  it('grades a standard program on six skills across two categories', () => {
+    const cats = skillCategories('STANDARD')
+    expect(cats.map((c) => c.title)).toEqual(['Praktične vještine', 'Timske vještine'])
+    expect(skillKeysFor('STANDARD')).toEqual([
+      'slaganje',
+      'programiranje',
+      'inovacije',
+      'suradnja',
+      'komunikacija',
+      'zabava',
+    ])
+  })
+
+  it('swaps only the practical skills for a competition program', () => {
+    const cats = skillCategories('COMPETITION')
+    expect(cats.map((c) => c.title)).toEqual(['Praktične vještine', 'Timske vještine'])
+    expect(skillKeysFor('COMPETITION')).toEqual([
+      'razradaIdeja',
+      'izvedivost',
+      'inovacije',
+      'suradnja',
+      'komunikacija',
+      'zabava',
+    ])
+    // Timske vještine are identical in both rubrics — same objects, so the
+    // labels and descriptions cannot drift apart.
+    expect(cats[1]).toBe(skillCategories('STANDARD')[1])
+  })
+
+  it('gives every skill of either rubric a label and a description', () => {
+    for (const kind of ['STANDARD', 'COMPETITION'] as const) {
+      for (const c of skillCategories(kind)) {
+        for (const skill of c.skills) {
+          expect(skill.label.length).toBeGreaterThan(0)
+          expect(skill.description.length).toBeGreaterThan(0)
+        }
+      }
+    }
+  })
+
+  it('keeps SKILL_KEYS a superset of both rubrics — it is the column list', () => {
+    for (const kind of ['STANDARD', 'COMPETITION'] as const) {
+      for (const key of skillKeysFor(kind)) {
+        expect(SKILL_KEYS).toContain(key)
+      }
+    }
+    expect(SKILL_KEYS).toHaveLength(8)
   })
 
   it('exposes the three grading levels', () => {

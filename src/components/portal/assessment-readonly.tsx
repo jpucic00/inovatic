@@ -1,7 +1,7 @@
-import type { SkillLevel } from '@prisma/client'
+import type { ProgramKind, SkillLevel } from '@prisma/client'
 import { Award } from 'lucide-react'
 import {
-  SKILL_CATEGORIES,
+  skillCategories,
   SKILL_LEVELS,
   SKILL_LEVEL_BADGE_CLASS,
   SKILL_LEVEL_DESCRIPTIONS,
@@ -61,10 +61,13 @@ function SkillRow({
 /** Read-only report card for the student portal — no editing, no bilješke. */
 export function AssessmentReadonly({
   assessment,
-}: Readonly<{ assessment: StudentAssessmentReadonly }>) {
+  kind,
+}: Readonly<{ assessment: StudentAssessmentReadonly; kind: ProgramKind }>) {
   const skills: Record<SkillKey, SkillLevel | null> = {
     slaganje: assessment.slaganje,
     programiranje: assessment.programiranje,
+    razradaIdeja: assessment.razradaIdeja,
+    izvedivost: assessment.izvedivost,
     inovacije: assessment.inovacije,
     suradnja: assessment.suradnja,
     komunikacija: assessment.komunikacija,
@@ -81,7 +84,7 @@ export function AssessmentReadonly({
           ).join(' · ')}
         </p>
 
-        {SKILL_CATEGORIES.map((category) => (
+        {skillCategories(kind).map((category) => (
           <section key={category.title} className="space-y-2">
             <h2
               className="text-xs font-semibold uppercase tracking-wide text-gray-700"

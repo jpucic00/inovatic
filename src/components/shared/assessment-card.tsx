@@ -3,10 +3,10 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import type { SkillLevel } from '@prisma/client'
+import type { SkillLevel, ProgramKind } from '@prisma/client'
 import {
-  SKILL_CATEGORIES,
-  SKILL_KEYS,
+  skillCategories,
+  skillKeysFor,
   SKILL_LEVELS,
   SKILL_LEVEL_DESCRIPTIONS,
   SKILL_LEVEL_LABELS,
@@ -32,9 +32,13 @@ import { formatDate } from '@/lib/format'
 
 type Skills = Record<SkillKey, SkillLevel | null>
 
+// Every skill column, so a card can be built for either rubric; only the ones
+// this group's kind uses are rendered and saved.
 const EMPTY_SKILLS: Skills = {
   slaganje: null,
   programiranje: null,
+  razradaIdeja: null,
+  izvedivost: null,
   inovacije: null,
   suradnja: null,
   komunikacija: null,
@@ -48,6 +52,8 @@ function skillsFrom(initial: AssessmentValue | null): Skills {
   return {
     slaganje: initial.slaganje,
     programiranje: initial.programiranje,
+    razradaIdeja: initial.razradaIdeja,
+    izvedivost: initial.izvedivost,
     inovacije: initial.inovacije,
     suradnja: initial.suradnja,
     komunikacija: initial.komunikacija,
@@ -58,6 +64,8 @@ function skillsFrom(initial: AssessmentValue | null): Skills {
 interface Props {
   studentId: string
   groupId: string
+  /** Which rubric to render — the practical skills differ by program kind. */
+  kind: ProgramKind
   initial: AssessmentValue | null
   recommendationOptions: RecommendationOption[]
   onSave: (input: AssessmentSaveInput) => Promise<AdminActionResult>
@@ -70,6 +78,7 @@ interface Props {
 export function AssessmentCard({
   studentId,
   groupId,
+  kind,
   initial,
   recommendationOptions,
   onSave,
@@ -101,7 +110,7 @@ export function AssessmentCard({
   const dirty = useMemo(() => {
     if (opisna !== baseline.opisna) return true
     if (rec !== baseline.rec) return true
-    return SKILL_KEYS.some((k) => skills[k] !== baseline.skills[k])
+    return skillKeysFor(kind).some((k) => skills[k] !== baseline.skills[k])
   }, [skills, opisna, rec, baseline])
 
   const setSkill = (key: SkillKey, value: SkillLevel | null) =>
@@ -160,7 +169,7 @@ export function AssessmentCard({
           ).join(' · ')}
         </p>
 
-        {SKILL_CATEGORIES.map((category) => (
+        {skillCategories(kind).map((category) => (
           <fieldset key={category.title} className="space-y-2">
             <legend
               className="text-xs font-semibold uppercase tracking-wide text-gray-700"

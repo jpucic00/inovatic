@@ -1,6 +1,8 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
+import type { SkillLevel } from '@prisma/client'
 import { isGradable } from '@/lib/program-kind'
+import { SKILL_KEYS, skillKeysFor, type SkillKey } from '@/lib/assessment-rubric'
 import type { AssessmentInput } from '@/lib/validators/admin/student-assessment'
 
 /** Thrown when an assessment is attempted on a radionica group. */
@@ -47,13 +49,17 @@ export async function upsertStudentAssessment(
     if (!course) throw new InvalidRecommendationError()
   }
 
+  // Only the skills this group's rubric actually has are stored; anything else
+  // the client sent is nulled rather than trusted. That is what keeps a column
+  // honest — `slaganje` on a competition row would otherwise hold whatever a
+  // stale form posted, and no reader could tell.
+  const allowed = new Set(skillKeysFor(group.course.kind))
+  const skills = Object.fromEntries(
+    SKILL_KEYS.map((key) => [key, allowed.has(key) ? (input[key] ?? null) : null]),
+  ) as Record<SkillKey, SkillLevel | null>
+
   const payload = {
-    slaganje: input.slaganje ?? null,
-    programiranje: input.programiranje ?? null,
-    inovacije: input.inovacije ?? null,
-    suradnja: input.suradnja ?? null,
-    komunikacija: input.komunikacija ?? null,
-    zabava: input.zabava ?? null,
+    ...skills,
     opisnaOcjena: input.opisnaOcjena ?? null,
     recommendationKind: input.recommendationKind ?? null,
     recommendedCourseId:

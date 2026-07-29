@@ -6,14 +6,21 @@ const recommendationKindSchema = z.enum([
   'COURSE',
   'COMPETITION_PREP',
   'COMPETITION_PROGRAM',
+  'COMPETITION_FLL',
+  'COMPETITION_WRO',
 ])
 
 export const upsertAssessmentSchema = z
   .object({
     studentId: z.string().min(1),
     groupId: z.string().min(1),
+    // Every skill any rubric can hold; which of them a given group actually
+    // stores is decided server-side from its program kind, so the schema stays
+    // permissive and `upsertStudentAssessment` is the one that narrows.
     slaganje: skillLevelSchema.nullish(),
     programiranje: skillLevelSchema.nullish(),
+    razradaIdeja: skillLevelSchema.nullish(),
+    izvedivost: skillLevelSchema.nullish(),
     inovacije: skillLevelSchema.nullish(),
     suradnja: skillLevelSchema.nullish(),
     komunikacija: skillLevelSchema.nullish(),

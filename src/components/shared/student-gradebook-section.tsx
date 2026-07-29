@@ -94,6 +94,7 @@ export function StudentGradebookSection({
               <AssessmentCard
                 studentId={studentId}
                 groupId={section.groupId}
+                kind={section.kind}
                 initial={section.assessment}
                 recommendationOptions={recommendationOptions}
                 onSave={onSaveAssessment}

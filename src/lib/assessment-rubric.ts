@@ -1,4 +1,5 @@
-import type { RecommendationKind, SkillLevel } from '@prisma/client'
+import type { ProgramKind, RecommendationKind, SkillLevel } from '@prisma/client'
+import { isCompetition } from '@/lib/program-kind'
 
 // ── Skill levels (POČETNO / U RAZVOJU / OSTVARENO) ───────────────────────────
 
@@ -32,16 +33,29 @@ export const SKILL_LEVEL_BADGE_CLASS: Record<SkillLevel, string> = {
 // ── Skills, grouped into the two rubric categories ───────────────────────────
 
 export type SkillKey =
+  // Praktične vještine — STANDARD
   | 'slaganje'
   | 'programiranje'
+  // Praktične vještine — COMPETITION
+  | 'razradaIdeja'
+  | 'izvedivost'
+  // Praktične vještine — both rubrics
   | 'inovacije'
+  // Timske vještine — both rubrics
   | 'suradnja'
   | 'komunikacija'
   | 'zabava'
 
+/**
+ * Every skill any rubric can hold. Use this only where you genuinely mean "all
+ * columns" (clearing a card, nulling what a kind doesn't use);
+ * {@link skillKeysFor} is what a form or a diff should iterate.
+ */
 export const SKILL_KEYS: readonly SkillKey[] = [
   'slaganje',
   'programiranje',
+  'razradaIdeja',
+  'izvedivost',
   'inovacije',
   'suradnja',
   'komunikacija',
@@ -56,68 +70,134 @@ type SkillCategory = {
   skills: SkillDef[]
 }
 
-export const SKILL_CATEGORIES: readonly SkillCategory[] = [
-  {
-    title: 'Praktične vještine',
-    description:
-      'Postignuća vezana za praktični dio unutar projektnih zadataka.',
-    skills: [
-      {
-        key: 'slaganje',
-        label: 'Slaganje',
-        description:
-          'Postojanje točno složenih projekata prema uputama za slaganje.',
-      },
-      {
-        key: 'programiranje',
-        label: 'Programiranje',
-        description: 'Postojanje točno riješenih programskih zadataka.',
-      },
-      {
-        key: 'inovacije',
-        label: 'Inovacije',
-        description:
-          'Rješavanje problema na kreativan, inovativan i funkcionalan način.',
-      },
-    ],
-  },
-  {
-    title: 'Timske vještine',
-    description:
-      'Postignuća vezana za odnos člana prema ostalim članovima i predavaču.',
-    skills: [
-      {
-        key: 'suradnja',
-        label: 'Suradnja',
-        description:
-          'Rad za dobrobit tima, poštivanje i prihvaćanje međusobnih razlika.',
-      },
-      {
-        key: 'komunikacija',
-        label: 'Komunikacija',
-        description:
-          'Učinkovito prezentiranje trenutnih rješenja i informacija s ostalim članovima i predavačem.',
-      },
-      {
-        key: 'zabava',
-        label: 'Zabava',
-        description: 'Zadovoljstvo i pozitivan stav za vrijeme rada.',
-      },
-    ],
-  },
-]
+const INOVACIJE: SkillDef = {
+  key: 'inovacije',
+  label: 'Inovacije',
+  description:
+    'Rješavanje problema na kreativan, inovativan i funkcionalan način.',
+}
+
+/** PRAKTIČNE VJEŠTINE as graded on the SLR curriculum. */
+const STANDARD_PRACTICAL: SkillCategory = {
+  title: 'Praktične vještine',
+  description: 'Postignuća vezana za praktični dio unutar projektnih zadataka.',
+  skills: [
+    {
+      key: 'slaganje',
+      label: 'Slaganje',
+      description:
+        'Postojanje točno složenih projekata prema uputama za slaganje.',
+    },
+    {
+      key: 'programiranje',
+      label: 'Programiranje',
+      description: 'Postojanje točno riješenih programskih zadataka.',
+    },
+    INOVACIJE,
+  ],
+}
+
+/**
+ * PRAKTIČNE VJEŠTINE as graded on the Natjecateljski program. Competitors are
+ * judged on the idea and its realisation rather than on following build and
+ * programming instructions, so the first two skills differ; Inovacije is the
+ * one practical skill both rubrics share.
+ */
+const COMPETITION_PRACTICAL: SkillCategory = {
+  title: 'Praktične vještine',
+  description: 'Postignuća vezana za praktični dio unutar projektnih zadataka.',
+  skills: [
+    {
+      key: 'razradaIdeja',
+      label: 'Razrada ideja',
+      description:
+        'Postojanje inovativnih ideja, odabiranje jedne od njih te izrada plana kako je razviti / usavršiti.',
+    },
+    {
+      key: 'izvedivost',
+      label: 'Izvedivost',
+      description:
+        'Razvijanje vlastite izvorne ideje ili nadovezivanje na već postojeću, te uz pomoć prototipa modela predstavljanje rješenja.',
+    },
+    INOVACIJE,
+  ],
+}
+
+/** TIMSKE VJEŠTINE — identical in both rubrics. */
+const TEAM_SKILLS: SkillCategory = {
+  title: 'Timske vještine',
+  description:
+    'Postignuća vezana za odnos člana prema ostalim članovima i predavaču.',
+  skills: [
+    {
+      key: 'suradnja',
+      label: 'Suradnja',
+      description:
+        'Rad za dobrobit tima, poštivanje i prihvaćanje međusobnih razlika.',
+    },
+    {
+      key: 'komunikacija',
+      label: 'Komunikacija',
+      description:
+        'Učinkovito prezentiranje trenutnih rješenja i informacija s ostalim članovima i predavačem.',
+    },
+    {
+      key: 'zabava',
+      label: 'Zabava',
+      description: 'Zadovoljstvo i pozitivan stav za vrijeme rada.',
+    },
+  ],
+}
+
+/**
+ * The rubric a group's report card renders, by program kind. Radionice are
+ * never graded at all (`isGradable`), so they never reach this.
+ */
+export function skillCategories(kind: ProgramKind): readonly SkillCategory[] {
+  return [
+    isCompetition(kind) ? COMPETITION_PRACTICAL : STANDARD_PRACTICAL,
+    TEAM_SKILLS,
+  ]
+}
+
+/** The skills that rubric actually holds — what a form or a diff iterates. */
+export function skillKeysFor(kind: ProgramKind): readonly SkillKey[] {
+  return skillCategories(kind).flatMap((c) => c.skills.map((s) => s.key))
+}
 
 // ── Recommendation (PREPORUKA) ───────────────────────────────────────────────
 // A recommendation is either one of the standard SLR courses (kind = COURSE,
-// with a courseId) or one of two special tracks.
+// with a courseId) or one of the special tracks below.
 
+/** Every preporuka that is a track rather than a Course row. */
+type SpecialRecommendationKind = Exclude<RecommendationKind, 'COURSE'>
+
+/**
+ * The special tracks, in dropdown order. Adding one is a single entry here plus
+ * the enum value — `encodeRecommendation`/`decodeRecommendation` and every
+ * dropdown read from this list, and a unit test asserts no enum member is
+ * missing from it.
+ *
+ * The competitive program appears both as a whole and per team: a mentor
+ * recommending FLL or WRO is naming the team the child should join, which the
+ * program-level entry cannot express (the teams are separate groups).
+ */
 export const RECOMMENDATION_SPECIALS: readonly {
-  kind: Extract<RecommendationKind, 'COMPETITION_PREP' | 'COMPETITION_PROGRAM'>
+  kind: SpecialRecommendationKind
   label: string
 }[] = [
   { kind: 'COMPETITION_PREP', label: 'Priprema za natjecanja' },
   { kind: 'COMPETITION_PROGRAM', label: 'Natjecateljski program' },
+  { kind: 'COMPETITION_FLL', label: 'Natjecateljski program – FLL' },
+  { kind: 'COMPETITION_WRO', label: 'Natjecateljski program – WRO' },
 ]
+
+/** Type guard: is this select value one of the special tracks? */
+function isSpecialRecommendation(
+  value: string,
+): value is SpecialRecommendationKind {
+  return RECOMMENDATION_SPECIALS.some((s) => s.kind === value)
+}
 
 /**
  * Display label for a stored preporuka: the recommended course's title for
@@ -144,7 +224,7 @@ export function encodeRecommendation(
   courseId: string | null,
 ): string {
   if (kind === 'COURSE' && courseId) return `course:${courseId}`
-  if (kind === 'COMPETITION_PREP' || kind === 'COMPETITION_PROGRAM') return kind
+  if (kind && isSpecialRecommendation(kind)) return kind
   return ''
 }
 
@@ -159,7 +239,7 @@ export function decodeRecommendation(value: string): {
       ? { recommendationKind: 'COURSE', recommendedCourseId: id }
       : { recommendationKind: null, recommendedCourseId: null }
   }
-  if (value === 'COMPETITION_PREP' || value === 'COMPETITION_PROGRAM') {
+  if (isSpecialRecommendation(value)) {
     return { recommendationKind: value, recommendedCourseId: null }
   }
   return { recommendationKind: null, recommendedCourseId: null }

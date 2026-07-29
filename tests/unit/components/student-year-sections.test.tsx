@@ -125,6 +125,7 @@ function makeSection(groupId: string, schoolYear: string): GradebookSection {
   return {
     groupId,
     schoolYear,
+    kind: 'STANDARD',
     program: `Program ${groupId}`,
     groupLabel: `Grupa ${groupId}`,
     teacherNames: [],

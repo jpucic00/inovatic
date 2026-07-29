@@ -1,10 +1,12 @@
-import type { RecommendationKind, SkillLevel } from '@prisma/client'
+import type { ProgramKind, RecommendationKind, SkillLevel } from '@prisma/client'
 import { isGradable } from '@/lib/program-kind'
 import type { StudentDetail } from '@/lib/student-detail'
 import type { CommentListItem } from '@/components/shared/comment-list'
 
 export type AssessmentValue = {
   slaganje: SkillLevel | null
+  razradaIdeja: SkillLevel | null
+  izvedivost: SkillLevel | null
   programiranje: SkillLevel | null
   inovacije: SkillLevel | null
   suradnja: SkillLevel | null
@@ -21,6 +23,8 @@ export type AssessmentValue = {
 export type GradebookSection = {
   groupId: string
   schoolYear: string
+  /** Which rubric this group's report card uses. */
+  kind: ProgramKind
   program: string // course title (Excel "PROGRAM")
   groupLabel: string // group name or weekday (Excel "GRUPA")
   teacherNames: string[] // Excel "PREDAVAČ"
@@ -36,6 +40,8 @@ export type AssessmentSaveInput = {
   studentId: string
   groupId: string
   slaganje: SkillLevel | null
+  razradaIdeja: SkillLevel | null
+  izvedivost: SkillLevel | null
   programiranje: SkillLevel | null
   inovacije: SkillLevel | null
   suradnja: SkillLevel | null
@@ -54,6 +60,7 @@ export type GradebookYearTab = {
 type SectionMeta = {
   groupId: string
   schoolYear: string
+  kind: ProgramKind
   gradable: boolean
   hasEnrollment: boolean
   program: string
@@ -80,6 +87,7 @@ export function buildGradebookTabs(
     meta.set(sg.id, {
       groupId: sg.id,
       schoolYear: e.schoolYear,
+      kind: sg.course.kind,
       gradable: isGradable(sg.course.kind),
       hasEnrollment: true,
       program: sg.course.title,
@@ -95,7 +103,10 @@ export function buildGradebookTabs(
     meta.set(c.group.id, {
       groupId: c.group.id,
       schoolYear: c.group.schoolYear,
-      gradable: false, // unknown without an enrollment; irrelevant (hasEnrollment=false gates the card)
+      // Both unknown without an enrollment, and irrelevant: hasEnrollment=false
+      // gates the card, so no rubric is ever rendered for these.
+      kind: 'STANDARD',
+      gradable: false,
       hasEnrollment: false,
       program: c.group.course.title,
       groupLabel: c.group.name ?? '—',
@@ -123,6 +134,8 @@ export function buildGradebookTabs(
   for (const a of student.studentAssessments) {
     assessmentByGroup.set(a.groupId, {
       slaganje: a.slaganje,
+      razradaIdeja: a.razradaIdeja,
+      izvedivost: a.izvedivost,
       programiranje: a.programiranje,
       inovacije: a.inovacije,
       suradnja: a.suradnja,
@@ -143,6 +156,7 @@ export function buildGradebookTabs(
     const section: GradebookSection = {
       groupId: m.groupId,
       schoolYear: m.schoolYear,
+      kind: m.kind,
       program: m.program,
       groupLabel: m.groupLabel,
       teacherNames: m.teacherNames,
