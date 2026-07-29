@@ -189,6 +189,33 @@
   color: #4BBDCA;
 }
 
+/* Toggle list (BlockNote toggleListItem) — native <details>, no client JS. */
+.article-body details {
+  margin-bottom: 1.25rem;
+  padding: 0.875rem 1.125rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background-color: #f9fafb;
+}
+
+.article-body summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #111827;
+}
+
+.article-body summary::marker {
+  color: #4BBDCA;
+}
+
+.article-body details > *:not(summary) {
+  margin-top: 0.75rem;
+}
+
+.article-body details > :last-child {
+  margin-bottom: 0;
+}
+
 .article-body figure {
   margin: 1.5rem 0;
 }
