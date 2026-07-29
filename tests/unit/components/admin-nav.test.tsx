@@ -22,7 +22,6 @@ const baseProps = {
   years: ['2025/2026'],
   selectedYear: '2025/2026',
   currentYear: '2025/2026',
-  showTeacherPanel: false,
 }
 
 const WARNING_LABEL = 'Školska godina nije isplanirana'
@@ -79,22 +78,10 @@ describe('AdminDesktopSidebar — city chip placement', () => {
 })
 
 describe('AdminDesktopSidebar — "Nastavnički panel" shortcut', () => {
-  it('links to /nastavnik when the admin also teaches', () => {
-    render(<AdminDesktopSidebar {...baseProps} calendarNeedsPlanning={false} showTeacherPanel />)
+  it('links to /nastavnik for every admin, teaching or not', () => {
+    render(<AdminDesktopSidebar {...baseProps} calendarNeedsPlanning={false} />)
 
     const link = screen.getByRole('link', { name: /Nastavnički panel/ })
     expect(link.getAttribute('href')).toBe('/nastavnik')
-  })
-
-  it('is hidden for a Split-only admin who does not teach', () => {
-    render(
-      <AdminDesktopSidebar
-        {...baseProps}
-        calendarNeedsPlanning={false}
-        showTeacherPanel={false}
-      />,
-    )
-
-    expect(screen.queryByRole('link', { name: /Nastavnički panel/ })).toBeNull()
   })
 })

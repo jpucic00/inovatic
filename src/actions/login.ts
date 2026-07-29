@@ -39,7 +39,9 @@ export async function loginAction(data: LoginFormData): Promise<LoginActionResul
   if (!user) return { success: false, error: 'Pogrešno korisničko ime ili lozinka.' }
 
   // A dual-role admin (city admin who also teaches, e.g. Slavica in Šibenik)
-  // gets a post-login panel choice instead of an auto-redirect to /admin.
+  // gets a post-login panel choice instead of an auto-redirect to /admin —
+  // her landing page is the ambiguous one. Every admin can still reach
+  // /nastavnik from the sidebar shortcut.
   const showTeacherPanel =
     user.role === 'ADMIN' &&
     (await db.teacherAssignment.count({ where: { userId: user.id } })) > 0

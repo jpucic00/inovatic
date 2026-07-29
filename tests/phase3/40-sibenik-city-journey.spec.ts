@@ -190,8 +190,8 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
 
   await test.step('reaches the teacher panel via the sidebar shortcut and adds a group material', async () => {
     await page.goto(`${BASE}/admin`)
-    // The "Nastavnički panel" shortcut appears only for a city admin who also
-    // teaches — Slavica has an assignment now (PR6's deferred browser check).
+    // The "Nastavnički panel" shortcut is on every admin's sidebar; here it has
+    // to land Slavica on her own Šibenik groups (PR6's deferred browser check).
     await submitUntilUrl(
       page,
       page.getByRole('link', { name: 'Nastavnički panel' }).first(),

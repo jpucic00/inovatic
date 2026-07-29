@@ -11,7 +11,7 @@ After a successful login, the user lands on the route that matches their `UserRo
 
 > Middleware lets any authenticated user through to `/portal/*`, but `requireStudent()` rejects non-STUDENT roles at the page level. ADMIN bypass inside `requireTeacher()` is deliberate so admins can support a class without holding a teacher seat.
 
-> **Dual-role admin.** An `ADMIN` who also holds at least one `TeacherAssignment` (e.g. the Šibenik city admin, who is also that city's only teacher) is **not** auto-redirected. `loginAction` returns `showTeacherPanel: true` and `LoginForm` swaps the form for a two-button chooser — *Administracija* → `/admin`, *Nastavnički panel* → `/nastavnik`. No guard or middleware change was needed: both prefixes already accept `ADMIN` via the middleware `/nastavnik` branch and the `requireTeacher` bypass. A non-teaching admin never sees the chooser.
+> **Dual-role admin.** An `ADMIN` who also holds at least one `TeacherAssignment` (e.g. the Šibenik city admin, who is also that city's only teacher) is **not** auto-redirected. `loginAction` returns `showTeacherPanel: true` and `LoginForm` swaps the form for a two-button chooser — *Administracija* → `/admin`, *Nastavnički panel* → `/nastavnik`. No guard or middleware change was needed: both prefixes already accept `ADMIN` via the middleware `/nastavnik` branch and the `requireTeacher` bypass. A non-teaching admin never sees the chooser — `/admin` is their unambiguous landing page — but the admin sidebar's "Nastavnički panel" shortcut is unconditional, so `/nastavnik` is one click away for them too.
 
 ## Login → first redirect
 

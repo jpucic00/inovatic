@@ -102,9 +102,9 @@ WHERE email = 'slavica.jurcevic@udruga-inovatic.hr';
 ```
 
 Then, as Slavica: `/admin` lists are empty (no Šibenik operational data yet), Lokacije
-shows only Trokut, the sidebar city chip reads **Šibenik**. `/nastavnik` is empty until
-she is assigned to a Šibenik group (the "Nastavnički panel" sidebar shortcut appears only
-once she has ≥1 assignment).
+shows only Trokut, the sidebar city chip reads **Šibenik**. The "Nastavnički panel"
+sidebar shortcut is there from the start (every admin has it); `/nastavnik` lists her
+city's groups, so it stays empty until Šibenik has any.
 
 ---
 

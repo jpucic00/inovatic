@@ -20,10 +20,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
 
   // Drive the "plan the year" badge: the selected non-archived year needs
   // planning when it has no standard-program module dates or no holidays yet.
-  // teacherAssignmentCount surfaces the "Nastavnički panel" shortcut only for a
-  // city admin who also teaches (Slavica in Šibenik) — Split-only admins never
-  // see it.
-  const [datedModuleCount, holidayCount, teacherAssignmentCount] = await Promise.all([
+  const [datedModuleCount, holidayCount] = await Promise.all([
     db.moduleSchedule.count({
       where: {
         schoolYear: selectedYear,
@@ -33,9 +30,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
       },
     }),
     db.schoolYearHoliday.count({ where: { schoolYear: selectedYear, city } }),
-    db.teacherAssignment.count({ where: { userId: session.user.id } }),
   ])
-  const showTeacherPanel = teacherAssignmentCount > 0
   const calendarNeedsPlanning = schoolYearNeedsPlanning({
     archived: isArchivedYear(selectedYear),
     datedModuleCount,
@@ -51,7 +46,6 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
         selectedYear={selectedYear}
         currentYear={currentYear}
         calendarNeedsPlanning={calendarNeedsPlanning}
-        showTeacherPanel={showTeacherPanel}
       />
 
       <div className="flex">
@@ -62,7 +56,6 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
           selectedYear={selectedYear}
           currentYear={currentYear}
           calendarNeedsPlanning={calendarNeedsPlanning}
-          showTeacherPanel={showTeacherPanel}
         />
 
         <div className="flex-1 flex flex-col min-w-0">

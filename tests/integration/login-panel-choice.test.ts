@@ -33,6 +33,8 @@ describe('loginAction — dual-role panel flag', () => {
     expect(result).toEqual({ success: true, role: 'ADMIN', showTeacherPanel: true })
   })
 
+  // The flag drives only the login landing page — an admin without assignments
+  // still reaches /nastavnik from the sidebar shortcut.
   it('does not flag an admin without teacher assignments', async () => {
     const admin = await createAdmin()
 

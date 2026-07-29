@@ -36,12 +36,10 @@ const navGroups = [
 function NavLinks({
   pathname,
   calendarNeedsPlanning,
-  showTeacherPanel,
   onNavigate,
 }: Readonly<{
   pathname: string
   calendarNeedsPlanning: boolean
-  showTeacherPanel: boolean
   onNavigate?: () => void
 }>) {
   return (
@@ -82,23 +80,22 @@ function NavLinks({
           })}
         </div>
       ))}
-      {/* Shortcut into the teacher panel — only shown to a city admin who also
-          teaches (Slavica in Šibenik). Split-only admins never see it. */}
-      {showTeacherPanel && (
-        <div className="space-y-1 mt-4 pt-4 border-t border-gray-800">
-          <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Nastava
-          </p>
-          <Link
-            href="/nastavnik"
-            onClick={onNavigate}
-            className="flex items-center gap-3 px-3 py-2 text-sm rounded-md text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
-          >
-            <Presentation className="w-4 h-4" />
-            Nastavnički panel
-          </Link>
-        </div>
-      )}
+      {/* Shortcut into the teacher panel — every admin gets it: /nastavnik is a
+          tenant-bound admin pass-through that lists their own city's groups,
+          whether or not they hold a TeacherAssignment. */}
+      <div className="space-y-1 mt-4 pt-4 border-t border-gray-800">
+        <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">
+          Nastava
+        </p>
+        <Link
+          href="/nastavnik"
+          onClick={onNavigate}
+          className="flex items-center gap-3 px-3 py-2 text-sm rounded-md text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+        >
+          <Presentation className="w-4 h-4" />
+          Nastavnički panel
+        </Link>
+      </div>
     </>
   )
 }
@@ -177,7 +174,6 @@ interface AdminNavProps {
   selectedYear: string
   currentYear: string
   calendarNeedsPlanning: boolean
-  showTeacherPanel: boolean
 }
 
 export function AdminDesktopSidebar({
@@ -187,7 +183,6 @@ export function AdminDesktopSidebar({
   selectedYear,
   currentYear,
   calendarNeedsPlanning,
-  showTeacherPanel,
 }: Readonly<AdminNavProps>) {
   const pathname = usePathname()
 
@@ -199,11 +194,7 @@ export function AdminDesktopSidebar({
       </div>
       <SchoolYearSwitcher years={years} selectedYear={selectedYear} currentYear={currentYear} />
       <nav className="flex-1 py-4 px-2">
-        <NavLinks
-          pathname={pathname}
-          calendarNeedsPlanning={calendarNeedsPlanning}
-          showTeacherPanel={showTeacherPanel}
-        />
+        <NavLinks pathname={pathname} calendarNeedsPlanning={calendarNeedsPlanning} />
       </nav>
       <UserFooter userName={userName} />
     </aside>
@@ -217,7 +208,6 @@ export function AdminMobileNav({
   selectedYear,
   currentYear,
   calendarNeedsPlanning,
-  showTeacherPanel,
 }: Readonly<AdminNavProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
@@ -264,7 +254,6 @@ export function AdminMobileNav({
             <NavLinks
               pathname={pathname}
               calendarNeedsPlanning={calendarNeedsPlanning}
-              showTeacherPanel={showTeacherPanel}
               onNavigate={() => setIsOpen(false)}
             />
           </div>
