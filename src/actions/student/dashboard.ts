@@ -1,5 +1,6 @@
 'use server'
 
+import type { ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireStudent } from '@/lib/auth-guard'
 import { computeSchoolYear } from '@/lib/school-year'
@@ -18,7 +19,7 @@ export type StudentEnrollmentSummary = {
     course: {
       id: string
       title: string
-      isCustom: boolean
+      kind: ProgramKind
     }
     location: {
       name: string
@@ -89,6 +90,7 @@ export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummar
       modules: e.scheduledGroup.course.modules,
       schoolYear,
       city: e.scheduledGroup.city,
+      kind: e.scheduledGroup.course.kind,
       holidayDates: holidaysByCity.get(e.scheduledGroup.city) ?? new Set(),
     })
 
@@ -104,7 +106,7 @@ export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummar
         course: {
           id: e.scheduledGroup.course.id,
           title: e.scheduledGroup.course.title,
-          isCustom: e.scheduledGroup.course.isCustom,
+          kind: e.scheduledGroup.course.kind,
         },
         location: { name: e.scheduledGroup.location.name },
         teacherNames: e.scheduledGroup.teacherAssignments.map(

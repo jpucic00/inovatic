@@ -46,6 +46,7 @@ describe('getCurrentActiveModuleForGroup', () => {
   it('returns null for an empty module list (radionice)', () => {
     expect(
       getCurrentActiveModuleForGroup({
+        kind: 'STANDARD',
         dayOfWeek: 'Srijeda',
         modules: [],
         schoolYear: SCHOOL_YEAR,
@@ -58,6 +59,7 @@ describe('getCurrentActiveModuleForGroup', () => {
 
   it('picks the in-progress module when asOfDate is inside an arc entry', () => {
     const result = getCurrentActiveModuleForGroup({
+      kind: 'STANDARD',
       dayOfWeek: 'Srijeda',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
@@ -72,6 +74,7 @@ describe('getCurrentActiveModuleForGroup', () => {
     // Wed M1 lastSession = 14.10. Wed M2 firstSession = 21.10. On 16.10, no
     // module is in progress for Wed — fall back to last completed.
     const result = getCurrentActiveModuleForGroup({
+      kind: 'STANDARD',
       dayOfWeek: 'Srijeda',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
@@ -84,6 +87,7 @@ describe('getCurrentActiveModuleForGroup', () => {
 
   it('picks the next-enrolling module before the arc starts (pre-school-year)', () => {
     const result = getCurrentActiveModuleForGroup({
+      kind: 'STANDARD',
       dayOfWeek: 'Srijeda',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
@@ -102,6 +106,7 @@ describe('getCurrentActiveModuleForGroup', () => {
     ]
     expect(
       getCurrentActiveModuleForGroup({
+        kind: 'STANDARD',
         dayOfWeek: 'Srijeda',
         modules,
         schoolYear: SCHOOL_YEAR,
@@ -115,6 +120,7 @@ describe('getCurrentActiveModuleForGroup', () => {
   it('falls back to first-by-sortOrder when dayOfWeek is null (radionica with modules — unusual but handled)', () => {
     expect(
       getCurrentActiveModuleForGroup({
+        kind: 'STANDARD',
         dayOfWeek: null,
         modules: STD_MODULES,
         schoolYear: SCHOOL_YEAR,
@@ -130,6 +136,7 @@ describe('getCurrentActiveModuleForGroup', () => {
     // is unaffected. On 30.10 Wed is mid-Module-2 and Mon is still in M1.
     const holidays = new Set(['2026-09-21', '2026-10-05'])
     const wed = getCurrentActiveModuleForGroup({
+      kind: 'STANDARD',
       dayOfWeek: 'Srijeda',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
@@ -138,6 +145,7 @@ describe('getCurrentActiveModuleForGroup', () => {
       now: utc(2026, 11, 4),
     })
     const mon = getCurrentActiveModuleForGroup({
+      kind: 'STANDARD',
       dayOfWeek: 'Ponedjeljak',
       modules: STD_MODULES,
       schoolYear: SCHOOL_YEAR,
@@ -153,6 +161,7 @@ describe('getCurrentActiveModuleForGroup', () => {
     // Past 2027-03-15, Wed is "done" — last completed = M4.
     expect(
       getCurrentActiveModuleForGroup({
+        kind: 'STANDARD',
         dayOfWeek: 'Srijeda',
         modules: STD_MODULES,
         schoolYear: SCHOOL_YEAR,
@@ -185,6 +194,7 @@ describe('getCurrentActiveModuleForGroup', () => {
     ]
     expect(
       getCurrentActiveModuleForGroup({
+        kind: 'STANDARD',
         dayOfWeek: 'Srijeda',
         modules,
         schoolYear: '2026/2027',
@@ -226,6 +236,7 @@ describe('getCurrentActiveModuleForGroup', () => {
     ]
     expect(
       getCurrentActiveModuleForGroup({
+        kind: 'STANDARD',
         dayOfWeek: 'Srijeda',
         modules,
         schoolYear: SCHOOL_YEAR,
@@ -247,6 +258,7 @@ describe('getCurrentActiveModuleForGroup', () => {
     ]
     expect(
       getCurrentActiveModuleForGroup({
+        kind: 'STANDARD',
         dayOfWeek: 'Srijeda',
         modules,
         schoolYear: SCHOOL_YEAR,

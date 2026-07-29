@@ -5,6 +5,7 @@ import { getEffectiveMaterialsForStudent } from '@/actions/student/materials'
 import { GroupMaterialsScreen } from '@/components/portal/group-materials-screen'
 import { GroupCard, groupByCourse } from '@/components/shared/group-card'
 import { formatGroupSchedule } from '@/lib/format'
+import { isRadionica } from '@/lib/program-kind'
 
 export const metadata: Metadata = {
   title: 'Portal – Moje grupe',
@@ -55,7 +56,7 @@ function MultiEnrollmentGrid({ enrollments }: Readonly<{ enrollments: StudentEnr
                   key={e.enrollmentId}
                   href={`/portal/grupa/${e.group.id}`}
                   name={e.group.name}
-                  schedule={formatGroupSchedule({ isCustom: e.group.course.isCustom, dayOfWeek: e.group.dayOfWeek, startTime: e.group.startTime, endTime: e.group.endTime })}
+                  schedule={formatGroupSchedule({ dateRange: isRadionica(e.group.course.kind), dayOfWeek: e.group.dayOfWeek, startTime: e.group.startTime, endTime: e.group.endTime })}
                   locationName={e.group.location.name}
                   footer={e.activeModule ? (
                     <p className="mt-3 text-xs text-cyan-700">

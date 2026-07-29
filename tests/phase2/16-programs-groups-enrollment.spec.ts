@@ -39,6 +39,15 @@ const RADIONICA_GROUP_NAME = `Test Grupa RAD ${RUN_ID}`
 // Max spots — small so we can fill the group quickly in tests
 const MAX_SPOTS = 2
 
+// The radionica group below must stay signup-able on its public page, and a
+// workshop is only offered while its start date is still ahead — so date it
+// relative to the run, never with a literal that quietly expires.
+const RADIONICA_DATE = (() => {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + 30)
+  return d.toISOString().slice(0, 10)
+})()
+
 // Parent data for standard-program inquiries
 const PARENT_1 = {
   parentName: `Pero Perić ${RUN_ID}`,
@@ -403,8 +412,8 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       // Both are required — a single-day workshop uses the same date twice.
       // nth(0)/nth(1) are the native companions of #create-dateStart/#create-dateEnd.
       const dateInputs = dialog.locator('input[type="date"]')
-      await dateInputs.nth(0).fill('2026-07-15')
-      await dateInputs.nth(1).fill('2026-07-15')
+      await dateInputs.nth(0).fill(RADIONICA_DATE)
+      await dateInputs.nth(1).fill(RADIONICA_DATE)
 
       await dialog.locator('input[placeholder="19:00"]').fill('10:00')
       await dialog.locator('input[placeholder="20:30"]').fill('12:00')

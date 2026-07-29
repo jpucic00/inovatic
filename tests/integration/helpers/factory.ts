@@ -5,6 +5,7 @@
  *
  * Reused by the Playwright tier via `tests/helpers/seed.ts` (Flux lu3f9sh).
  */
+import type { ProgramKind } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import {
   type Attendance,
@@ -36,6 +37,18 @@ let counter = 0
 const uniq = () => `${Date.now().toString(36)}${REGISTRY_ID}${(++counter).toString(36)}`
 
 const HASH_ROUNDS = 4 // low rounds — tests don't need production security
+
+/**
+ * A `YYYY-MM-DD` key `days` from today. Radionica groups are only offered on the
+ * public form while their `dateStart` is still ahead (`isRadionicaOpenForSignup`),
+ * so any fixture that needs a bookable workshop must be dated relative to now —
+ * a hardcoded literal silently expires and takes the test with it.
+ */
+export function relativeDateKey(days: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
 
 async function createUser(
   overrides: Partial<{
@@ -101,7 +114,7 @@ type CreateCourseOverrides = {
   title?: string
   slug?: string
   description?: string
-  isCustom?: boolean
+  kind?: ProgramKind
   schoolYear?: string | null
   ageMin?: number
   ageMax?: number
@@ -120,7 +133,9 @@ export async function createCourse(overrides: CreateCourseOverrides = {}) {
       ageMin: overrides.ageMin ?? 6,
       ageMax: overrides.ageMax ?? 14,
       price: overrides.price ?? null,
-      isCustom: overrides.isCustom ?? false,
+      kind: overrides.kind ?? 'STANDARD',
+      // Legacy mirror of `kind` — kept in sync exactly as createCourse does.
+      isCustom: (overrides.kind ?? 'STANDARD') === 'RADIONICA',
       schoolYear: overrides.schoolYear ?? null,
       city: overrides.city ?? null,
     },
@@ -181,6 +196,26 @@ export async function createGroup(overrides: CreateGroupOverrides = {}): Promise
       startTime: overrides.startTime ?? '17:00',
       endTime: overrides.endTime ?? '18:30',
       city,
+    },
+  })
+}
+
+export async function createCourseSeason(
+  courseId: string,
+  overrides: Partial<{
+    schoolYear: string
+    city: City
+    startDate: Date | null
+    endDate: Date | null
+  }> = {},
+) {
+  return db.courseSeason.create({
+    data: {
+      courseId,
+      schoolYear: overrides.schoolYear ?? '2026/2027',
+      city: overrides.city ?? 'SPLIT',
+      startDate: overrides.startDate ?? new Date('2026-09-15T00:00:00.000Z'),
+      endDate: overrides.endDate ?? new Date('2027-06-15T00:00:00.000Z'),
     },
   })
 }

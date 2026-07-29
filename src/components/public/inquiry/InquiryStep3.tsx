@@ -11,10 +11,12 @@ import type {
 } from 'react-hook-form'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import type { ActiveProgram } from '@/actions/public/programs'
-import { GRADE_VALUES, GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
+import { ELEMENTARY_GRADE_VALUES, GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
 import { programsForSelection } from '@/lib/inquiry-availability'
 import { formatGroupSchedule } from '@/lib/format'
 import { FieldError } from './FieldError'
+import { hasModules, isRadionica } from '@/lib/program-kind'
+import type { ProgramKind } from '@prisma/client'
 
 interface Props {
   register: UseFormRegister<InquiryFormData>
@@ -24,6 +26,12 @@ interface Props {
   clearErrors: UseFormClearErrors<InquiryFormData>
   programs: ActiveProgram[]
   preselectedCourseId?: string
+  /**
+   * Which razred options to offer. Defaults to osnovna škola — the competition
+   * signup link passes the full set so srednjoškolci can apply there and only
+   * there.
+   */
+  gradeOptions?: readonly Grade[]
   /** Whether the current grade/course selection forces a termin choice. */
   terminRequired: boolean
 }
@@ -32,11 +40,11 @@ const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gr
 const selectClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition'
 const selectDisabledClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed transition'
 
-function formatGroupLabel(g: ActiveProgram['groups'][number], isCustom: boolean): string {
+function formatGroupLabel(g: ActiveProgram['groups'][number], kind: ProgramKind): string {
   const parts: string[] = []
   if (g.name) parts.push(g.name)
   const schedule = formatGroupSchedule({
-    isCustom,
+    dateRange: isRadionica(kind),
     dayOfWeek: g.dayOfWeek,
     dateStart: g.dateStart,
     dateEnd: g.dateEnd,
@@ -52,7 +60,17 @@ function formatGroupLabel(g: ActiveProgram['groups'][number], isCustom: boolean)
   return parts.join(' · ')
 }
 
-export function InquiryStep3({ register, errors, setValue, getValues, clearErrors, programs, preselectedCourseId, terminRequired }: Readonly<Props>) {
+export function InquiryStep3({
+  register,
+  errors,
+  setValue,
+  getValues,
+  clearErrors,
+  programs,
+  preselectedCourseId,
+  gradeOptions = ELEMENTARY_GRADE_VALUES,
+  terminRequired,
+}: Readonly<Props>) {
   const [selectedGroupKey, setSelectedGroupKey] = useState(() => {
     const courseId = getValues('courseId')
     const groupId = getValues('scheduledGroupId')
@@ -125,15 +143,15 @@ export function InquiryStep3({ register, errors, setValue, getValues, clearError
             if (preselectedCourseId) {
               return p.groups.map((g) => (
                 <option key={g.id} value={g.isFull ? '' : `${p.id}|${g.id}`} disabled={g.isFull}>
-                  {formatGroupLabel(g, p.isCustom)}
+                  {formatGroupLabel(g, p.kind)}
                 </option>
               ))
             }
             return (
-              <optgroup key={p.id} label={p.isCustom ? p.title : `${p.title} (${p.ageMin}–${p.ageMax} god.)`}>
+              <optgroup key={p.id} label={hasModules(p.kind) ? `${p.title} (${p.ageMin}–${p.ageMax} god.)` : p.title}>
                 {p.groups.map((g) => (
                   <option key={g.id} value={g.isFull ? '' : `${p.id}|${g.id}`} disabled={g.isFull}>
-                    {formatGroupLabel(g, p.isCustom)}
+                    {formatGroupLabel(g, p.kind)}
                   </option>
                 ))}
               </optgroup>
@@ -183,7 +201,7 @@ export function InquiryStep3({ register, errors, setValue, getValues, clearError
           className={selectClass}
         >
           <option value="">– Odaberite razred –</option>
-          {GRADE_VALUES.map((v) => (
+          {gradeOptions.map((v) => (
             <option key={v} value={v}>{GRADE_LABELS[v]}</option>
           ))}
         </select>

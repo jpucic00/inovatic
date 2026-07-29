@@ -22,7 +22,7 @@ export async function loadSnapshot(db: PrismaClient, schoolYear: string): Promis
 
   const [courses, groups, staff, students, users] = await Promise.all([
     db.course.findMany({
-      where: { isCustom: false },
+      where: { kind: 'STANDARD' },
       select: { id: true, slug: true },
     }),
     db.scheduledGroup.findMany({

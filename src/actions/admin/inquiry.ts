@@ -19,6 +19,7 @@ import { formatGroupSchedule } from '@/lib/format'
 import type { Grade } from '@/lib/inquiry-status'
 import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
+import { isRadionica } from '@/lib/program-kind'
 
 type InquiryFilters = {
   status?: InquiryStatus | 'ALL'
@@ -200,7 +201,7 @@ export async function getInquiryCourses() {
     // the other city's radionice.
     where: {
       AND: [
-        { OR: [{ isCustom: false }, { schoolYear: year }] },
+        { OR: [{ kind: { not: 'RADIONICA' } }, { schoolYear: year }] },
         { OR: [{ city: null }, { city }] },
       ],
     },
@@ -295,7 +296,7 @@ export async function getGroupsForCourse(courseId: string) {
       course: {
         select: {
           title: true,
-          isCustom: true,
+          kind: true,
           modules: {
             orderBy: { sortOrder: 'asc' },
             select: {
@@ -354,7 +355,7 @@ export async function getGroupsForCourseInSelectedYear(courseId: string) {
       course: {
         select: {
           title: true,
-          isCustom: true,
+          kind: true,
           modules: {
             orderBy: { sortOrder: 'asc' },
             select: {
@@ -421,7 +422,7 @@ export async function sendScheduleOptions(
     // cross-city id makes the whole send invalid.
     const groups = await db.scheduledGroup.findMany({
       where: { id: { in: groupIds }, city: inquiry.city },
-      include: { location: true, course: { select: { isCustom: true } } },
+      include: { location: true, course: { select: { kind: true } } },
     })
     if (groups.length !== new Set(groupIds).size) {
       return { success: false, error: 'Nevaljani podaci.' }
@@ -430,7 +431,7 @@ export async function sendScheduleOptions(
     const options = groups.map((g) => ({
       groupName: g.name ?? 'Grupa',
       schedule: formatGroupSchedule({
-        isCustom: g.course.isCustom,
+        dateRange: isRadionica(g.course.kind),
         dayOfWeek: g.dayOfWeek,
         dateStart: g.dateStart,
         dateEnd: g.dateEnd,

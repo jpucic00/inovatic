@@ -9,6 +9,7 @@ import { AdminGroupTabs } from '@/components/admin/groups/group-tabs'
 import { WeeklySchedule } from '@/components/admin/groups/weekly-schedule'
 import { CreateGroupDialog } from '@/components/admin/groups/create-group-dialog'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
+import { isRadionica } from '@/lib/program-kind'
 
 export const metadata: Metadata = { title: 'Admin – Grupe' }
 
@@ -26,12 +27,12 @@ export default async function GroupsPage() {
       // Shared standard programs have city = null; radionice belong to one city.
       where: {
         AND: [
-          { OR: [{ isCustom: false }, { schoolYear: selectedYear }] },
+          { OR: [{ kind: { not: 'RADIONICA' } }, { schoolYear: selectedYear }] },
           { OR: [{ city: null }, { city }] },
         ],
       },
-      orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }],
-      select: { id: true, title: true, isCustom: true },
+      orderBy: [{ sortOrder: 'asc' }],
+      select: { id: true, title: true, kind: true },
     }),
     db.location.findMany({
       where: { city },
@@ -41,16 +42,18 @@ export default async function GroupsPage() {
     getAssignableTeachers(),
   ])
 
-  const standardCourses = courses.filter((c) => !c.isCustom)
+  // Every non-radionica program gets its own tab (SLR 1–4 and the competitive
+  // program); radionica groups share one combined tab.
+  const standardCourses = courses.filter((c) => !isRadionica(c.kind))
   const standardTabs = standardCourses.map((course) => ({
     courseId: course.id,
     title: course.title,
     groups: groups.filter((g) => g.course.id === course.id),
   }))
 
-  const radioniceTabs = groups.filter((g) => g.course.isCustom)
+  const radioniceTabs = groups.filter((g) => isRadionica(g.course.kind))
 
-  const courseOptions = courses.map((c) => ({ id: c.id, title: c.title, isCustom: c.isCustom }))
+  const courseOptions = courses.map((c) => ({ id: c.id, title: c.title, kind: c.kind }))
 
   return (
     <div>

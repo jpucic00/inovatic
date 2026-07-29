@@ -72,7 +72,7 @@ async function fillGroup(groupId: string, count: number, schoolYear?: string): P
 describe('addEnrollment — capacity guardrail', () => {
   it('rejects with code GROUP_FULL when target group is at maxStudents', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true }) // skip the standard-course module-schedule branch
+    const radionica = await createCourse({ kind: 'RADIONICA' }) // skip the standard-course module-schedule branch
     const group = await createGroup({ courseId: radionica.id, maxStudents: 2 })
     await fillGroup(group.id, 2, group.schoolYear)
 
@@ -93,7 +93,7 @@ describe('addEnrollment — capacity guardrail', () => {
 
   it('succeeds when student already has an Enrollment in that group (idempotent module add)', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const group = await createGroup({ courseId: radionica.id, maxStudents: 1 })
     const sittingStudent = await createStudent()
     await createEnrollment(sittingStudent.id, group.id, { schoolYear: group.schoolYear })
@@ -112,7 +112,7 @@ describe('addEnrollment — capacity guardrail', () => {
 
   it('succeeds when spots are available', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const group = await createGroup({ courseId: radionica.id, maxStudents: 5 })
     await fillGroup(group.id, 2, group.schoolYear)
 
@@ -128,7 +128,7 @@ describe('addEnrollment — capacity guardrail', () => {
 describe('createStudentManually — capacity guardrail', () => {
   it('rejects with GROUP_FULL when group is full and student is new', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const group = await createGroup({ courseId: radionica.id, maxStudents: 1 })
     await fillGroup(group.id, 1, group.schoolYear)
 
@@ -161,7 +161,7 @@ describe('createStudentFromInquiry — capacity guardrail', () => {
   it('succeeds when admin picks the SAME group the inquiry preferred and it is at exact capacity', async () => {
     const admin = await createAdmin()
     const location = await createLocation()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const group = await createGroup({
       courseId: radionica.id,
       locationId: location.id,
@@ -199,7 +199,7 @@ describe('createStudentFromInquiry — capacity guardrail', () => {
 
   it('rejects with GROUP_FULL when admin picks a DIFFERENT full group', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const preferred = await createGroup({ courseId: radionica.id, maxStudents: 3 })
     const fullOther = await createGroup({ courseId: radionica.id, maxStudents: 2 })
     await fillGroup(fullOther.id, 2, fullOther.schoolYear)
@@ -229,7 +229,7 @@ describe('createStudentFromInquiry — capacity guardrail', () => {
 
   it('rolls back the inquiry status update if the capacity assertion throws', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const preferred = await createGroup({ courseId: radionica.id, maxStudents: 5 })
     const fullOther = await createGroup({ courseId: radionica.id, maxStudents: 1 })
     await fillGroup(fullOther.id, 1, fullOther.schoolYear)
@@ -270,7 +270,7 @@ describe('createStudentFromInquiry — error contract (named-error mapping)', ()
   // demoting the error to the generic 'Greška pri kreiranju računa.' branch.
   it('returns "Upit nije pronađen." for a non-existent inquiry', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const group = await createGroup({ courseId: radionica.id, maxStudents: 5 })
     mockSession({ id: admin.id, role: 'ADMIN' })
 
@@ -282,7 +282,7 @@ describe('createStudentFromInquiry — error contract (named-error mapping)', ()
 
   it('returns "Grupa nije pronađena." for a valid inquiry but non-existent group', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
 
     const inquiry = await db.inquiry.create({
       data: {
@@ -315,7 +315,7 @@ describe('createStudentFromInquiry — error contract (named-error mapping)', ()
 describe('archived-school-year guard — enrollment-creating actions', () => {
   it('addEnrollment rejects when target group is in an archived school year', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const archivedGroup = await createGroup({
       courseId: radionica.id,
       schoolYear: '2024/2025',
@@ -339,7 +339,7 @@ describe('archived-school-year guard — enrollment-creating actions', () => {
 
   it('createStudentManually rejects when supplied groupId is in an archived year — no User, no Enrollment', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const archivedGroup = await createGroup({
       courseId: radionica.id,
       schoolYear: '2024/2025',
@@ -374,7 +374,7 @@ describe('archived-school-year guard — enrollment-creating actions', () => {
   it('createStudentFromInquiry rejects archived-year group and leaves inquiry status NEW', async () => {
     const admin = await createAdmin()
     const location = await createLocation()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const archivedGroup = await createGroup({
       courseId: radionica.id,
       locationId: location.id,
@@ -422,7 +422,7 @@ describe('group pickers — scope by selected school year', () => {
 
   it('getGroupsForCourseInSelectedYear returns only the cookie-selected year', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const currentYear = computeSchoolYear()
     const futureYear = getNextSchoolYear(currentYear)
     // Register all years used as cookies so getSelectedSchoolYear passes validation.
@@ -458,7 +458,7 @@ describe('group pickers — scope by selected school year', () => {
 
   it('getGroupsForCourse returns only the cookie-selected year', async () => {
     const admin = await createAdmin()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const currentYear = computeSchoolYear()
     const futureYear = getNextSchoolYear(currentYear)
     await db.schoolYear.upsert({ where: { label: currentYear }, create: { label: currentYear }, update: {} })
@@ -500,7 +500,7 @@ describe('createStudent* — Resend failure is non-fatal', () => {
 
   async function makeRadionicaGroup() {
     const location = await createLocation()
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const group = await createGroup({
       courseId: radionica.id,
       locationId: location.id,

@@ -1,10 +1,15 @@
 import type { ActiveProgram } from '@/actions/public/programs'
 import type { Grade } from '@/lib/inquiry-status'
+import { hasDatedModules } from '@/lib/program-kind'
 
 // Child grade → standard SLR level. Preschool + grades 1–2 share SLR 1, then
 // two grades per level up to SLR 4. Used to narrow the open programs to the
 // ones a given child's grade can actually enrol into.
-const GRADE_TO_LEVEL: Record<Grade, string> = {
+//
+// The srednja škola grades map to null: no SLR level is right for them. They
+// exist only for the competitive program, which is reached through its own
+// signup link and bypasses this narrowing entirely.
+const GRADE_TO_LEVEL: Record<Grade, string | null> = {
   predskolci: 'SLR_1',
   '1': 'SLR_1',
   '2': 'SLR_1',
@@ -14,6 +19,10 @@ const GRADE_TO_LEVEL: Record<Grade, string> = {
   '6': 'SLR_3',
   '7': 'SLR_4',
   '8': 'SLR_4',
+  ss1: null,
+  ss2: null,
+  ss3: null,
+  ss4: null,
 }
 
 /**
@@ -32,9 +41,16 @@ export function programsForSelection(
 ): ActiveProgram[] {
   if (preselectedCourseId) return programs.filter((p) => p.id === preselectedCourseId)
   return programs.filter((p) => {
-    if (p.isCustom) return false
+    // Radionice enrol through their own /radionice/<slug> page, and the
+    // competitive program only through its invitation link — neither belongs in
+    // the grade-driven catalog.
+    if (!hasDatedModules(p.kind)) return false
     if (!grade) return true
-    return p.level === GRADE_TO_LEVEL[grade]
+    const level = GRADE_TO_LEVEL[grade]
+    // A srednja škola grade matches no SLR level — nothing in the public
+    // catalog is right for them.
+    if (!level) return false
+    return p.level === level
   })
 }
 

@@ -24,7 +24,7 @@ function makeProgram(id: string, groupId: string, groupName: string): ActiveProg
     slug: id,
     title: `Program ${id}`,
     level: 'SLR_1',
-    isCustom: false,
+    kind: 'STANDARD' as const,
     ageMin: 6,
     ageMax: 8,
     price: 50,

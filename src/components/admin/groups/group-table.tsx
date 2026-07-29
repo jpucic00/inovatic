@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/dialog'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { deleteGroup } from '@/actions/admin/group'
+import type { ProgramKind } from '@prisma/client'
+import { isRadionica } from '@/lib/program-kind'
 import {
   getEnrollmentWindowState,
   ENROLLMENT_WINDOW_LABEL,
@@ -34,7 +36,7 @@ type Group = {
   enrollmentEnd: Date | null
   courseId: string
   locationId: string
-  course: { id: string; title: string; level: string | null; isCustom: boolean }
+  course: { id: string; title: string; level: string | null; kind: ProgramKind }
   location: { id: string; name: string }
   _count: {
     enrollments: number
@@ -202,7 +204,7 @@ function buildColumns(hideProgram: boolean, editable: boolean): ColumnDef<Group>
       key: 'schedule',
       header: 'Termin',
       cell: (row) => {
-        if (row.course.isCustom && row.dateStart && row.dateEnd) {
+        if (isRadionica(row.course.kind) && row.dateStart && row.dateEnd) {
           const range =
             row.dateStart === row.dateEnd
               ? formatDate(row.dateStart)

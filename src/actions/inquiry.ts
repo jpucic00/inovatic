@@ -1,6 +1,7 @@
 'use server'
 
 import { Prisma } from '@prisma/client'
+import type { City, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { sendInquiryConfirmationEmail, sendPartyInquiryConfirmationEmail } from '@/lib/email'
 import {
@@ -9,7 +10,7 @@ import {
   type InquiryFormData,
   type PartyInquiryFormData,
 } from '@/lib/validators/inquiry'
-import { getActivePrograms, type ActiveProgram } from '@/actions/public/programs'
+import { getActivePrograms, getSignupProgram, type ActiveProgram } from '@/actions/public/programs'
 import { isTerminRequired } from '@/lib/inquiry-availability'
 import {
   GroupFullError,
@@ -18,15 +19,66 @@ import {
 } from '@/lib/group-capacity'
 import { CITY_LABELS } from '@/lib/city'
 import { computeSchoolYear } from '@/lib/school-year'
+import { isHighSchoolGrade } from '@/lib/inquiry-status'
+import { isCompetition, isRadionica } from '@/lib/program-kind'
+import { isRadionicaOpenForSignup } from '@/lib/session-dates'
 
 // Thrown when a submitted group does not belong to the submitted city — a
 // stale/tampered payload the client-side city filter would normally prevent.
 class GroupCityMismatchError extends Error {}
 
+// Thrown when the submitted termin is a radionica that has already started. The
+// form drops those groups (see `isRadionicaOpenForSignup`), so reaching here
+// means a tab that was open across the start date, or a crafted payload.
+class RadionicaStartedError extends Error {}
+
+/**
+ * The program an inquiry targets, from its chosen group when there is one (the
+ * authoritative source — the client cannot make a group belong to a different
+ * course) and otherwise from the submitted courseId.
+ */
+async function resolveTargetCourse(
+  scheduledGroupId: string | undefined,
+  courseId: string | undefined,
+): Promise<{ id: string; slug: string; kind: ProgramKind } | null> {
+  const select = { id: true, slug: true, kind: true } as const
+  if (scheduledGroupId) {
+    const group = await db.scheduledGroup.findUnique({
+      where: { id: scheduledGroupId },
+      select: { course: { select } },
+    })
+    if (group) return group.course
+  }
+  if (courseId) return db.course.findUnique({ where: { id: courseId }, select })
+  return null
+}
+
+/**
+ * The program list the "termin required" re-check runs against: the public
+ * catalog for an ordinary inquiry, or the single program behind a per-program
+ * signup link. Without the second branch a competition inquiry would always see
+ * an empty catalog and treat its termin as optional.
+ */
+async function loadProgramsForCheck(
+  city: City,
+  targetCourse: { slug: string } | null,
+): Promise<ActiveProgram[]> {
+  if (targetCourse) {
+    const program = await getSignupProgram(city, targetCourse.slug)
+    return program ? [program] : []
+  }
+  return getActivePrograms(city)
+}
+
 type InquiryActionResult =
   | { success: true }
   | { success: false; error: string }
-  | { success: false; error: string; code: 'GROUP_FULL' | 'TERMIN_REQUIRED'; programs: ActiveProgram[] }
+  | {
+      success: false
+      error: string
+      code: 'GROUP_FULL' | 'TERMIN_REQUIRED' | 'TERMIN_CLOSED'
+      programs: ActiveProgram[]
+    }
 
 export async function submitInquiry(data: InquiryFormData): Promise<InquiryActionResult> {
   const parsed = inquirySchema.safeParse(data)
@@ -50,13 +102,33 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     referralSource,
   } = parsed.data
 
+  // Which program this inquiry is for, resolved server-side. Preferred source
+  // is the chosen group (a tampered `courseId` cannot contradict it); the
+  // submitted courseId is the fallback for the preselected flows that allow a
+  // termin-less "leave your details" inquiry.
+  const targetCourse = await resolveTargetCourse(scheduledGroupId, courseId)
+
+  // Srednja škola razredi exist only for the competitive program, whose signup
+  // link is the only form that offers them. Enforced here rather than trusting
+  // which <option>s rendered, so a tampered payload cannot file a srednjoškolac
+  // into an SLR group.
+  if (isHighSchoolGrade(grade) && (!targetCourse || !isCompetition(targetCourse.kind))) {
+    return {
+      success: false,
+      error: 'Za odabrani program nije moguće odabrati srednjoškolski razred.',
+    }
+  }
+
   // Server-side mirror of the client's conditional requirement: when no termin
   // was sent but the grade/course still has an open, non-full group, reject with
   // the fresh programs so a stale or tampered payload can't skip the choice. The
   // client passes `courseId` only in the radionica/preselected flow, so it maps
   // to the same "preselected course" argument the client uses.
   if (!scheduledGroupId) {
-    const programs = await getActivePrograms(city)
+    // Per-program links resolve against their own feed: the competitive program
+    // is deliberately absent from getActivePrograms, so checking against the
+    // public catalog would silently make its termin optional.
+    const programs = await loadProgramsForCheck(city, targetCourse)
     if (isTerminRequired(programs, grade, courseId)) {
       return {
         success: false,
@@ -77,12 +149,26 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
         await assertGroupHasAvailableSpot(tx, scheduledGroupId)
         const group = await tx.scheduledGroup.findUnique({
           where: { id: scheduledGroupId },
-          select: { schoolYear: true, city: true },
+          select: {
+            schoolYear: true,
+            city: true,
+            dateStart: true,
+            course: { select: { kind: true } },
+          },
         })
         // Fail closed: a group must belong to the submitted city. The client
         // only offers same-city groups, so a mismatch is a stale/tampered
         // payload — reject rather than mis-file the inquiry cross-city.
         if (group?.city !== city) throw new GroupCityMismatchError()
+        // Same fail-closed mirror for the radionica start-date cutoff: the form
+        // stops offering a workshop on its first day, so accepting one here
+        // would let a long-open tab book a termin that has already run.
+        if (
+          isRadionica(group.course.kind) &&
+          !isRadionicaOpenForSignup(group.dateStart, new Date())
+        ) {
+          throw new RadionicaStartedError()
+        }
         schoolYear = group.schoolYear
       }
       return tx.inquiry.create({
@@ -110,6 +196,16 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       return {
         success: false,
         error: 'Odabrani termin nije dostupan za odabrani grad. Osvježite stranicu i pokušajte ponovno.',
+      }
+    }
+    if (err instanceof RadionicaStartedError) {
+      // Hand back the same feed the page renders from, so the expired termin
+      // disappears from the dropdown instead of waiting for the 30s poll.
+      return {
+        success: false,
+        error: 'Odabrana radionica je u međuvremenu započela. Molimo odaberite drugi termin.',
+        code: 'TERMIN_CLOSED' as const,
+        programs: await loadProgramsForCheck(city, targetCourse),
       }
     }
     if (err instanceof GroupFullError) {

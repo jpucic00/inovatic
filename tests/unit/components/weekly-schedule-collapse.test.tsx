@@ -10,7 +10,7 @@ function group(overrides: Partial<Group> & Pick<Group, 'id' | 'startTime' | 'end
     name: 'Grupa',
     dayOfWeek: 'Ponedjeljak',
     maxStudents: 12,
-    course: { title: 'Svijet LEGO robotike 1', level: 'SLR_1', isCustom: false },
+    course: { title: 'Svijet LEGO robotike 1', level: 'SLR_1', kind: 'STANDARD' as const },
     location: { name: 'Velebitska 32' },
     _count: { enrollments: 5, preferredInquiries: 0 },
     ...overrides,

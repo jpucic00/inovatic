@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { assignLanes } from '@/lib/calendar-lanes'
+import type { ProgramKind } from '@prisma/client'
+import { isRadionica } from '@/lib/program-kind'
 
 const DAYS = ['Ponedjeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota', 'Nedjelja']
 const DAY_SHORT = ['Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub', 'Ned']
@@ -109,7 +111,7 @@ type Group = {
   startTime: string | null
   endTime: string | null
   maxStudents: number
-  course: { title: string; level: string | null; isCustom: boolean }
+  course: { title: string; level: string | null; kind: ProgramKind }
   location: { name: string }
   _count: { enrollments: number; preferredInquiries: number }
 }
@@ -121,10 +123,10 @@ interface WeeklyScheduleProps {
 export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
 
-  // Radionice (Course.isCustom = true) live on a calendar date range, not a weekday —
+  // Radionice live on a calendar date range, not a weekday —
   // they're shown on the /admin/skolska-godina calendar instead of this weekly grid.
   const withEffectiveDay = groups
-    .filter((g) => !g.course.isCustom)
+    .filter((g) => !isRadionica(g.course.kind))
     .map((g) => ({
       ...g,
       effectiveDay: g.dayOfWeek ?? null,

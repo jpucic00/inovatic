@@ -37,7 +37,8 @@ export default async function SchoolYearPage() {
   const [holidays, standardCoursesRaw, customCoursesRaw, radionicaGroupsRaw, scheduledPartiesRaw] = await Promise.all([
     listHolidays(schoolYear),
     db.course.findMany({
-      where: { isCustom: false },
+      // STANDARD only: the competitive program has no dated modules to draw.
+      where: { kind: 'STANDARD' },
       select: {
         id: true,
         title: true,
@@ -60,7 +61,7 @@ export default async function SchoolYearPage() {
     }),
     db.course.findMany({
       where: {
-        isCustom: true,
+        kind: 'RADIONICA',
         OR: [{ city: null }, { city }],
         modules: { some: { schedules: { some: { schoolYear, city } } } },
       },
@@ -87,7 +88,7 @@ export default async function SchoolYearPage() {
       where: {
         schoolYear,
         city,
-        course: { isCustom: true },
+        course: { kind: 'RADIONICA' },
         dateStart: { not: null },
         dateEnd: { not: null },
       },

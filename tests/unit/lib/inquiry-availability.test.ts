@@ -1,3 +1,4 @@
+import type { ProgramKind } from '@prisma/client'
 import { describe, expect, it } from 'vitest'
 import type { ActiveGroup, ActiveProgram } from '@/actions/public/programs'
 import {
@@ -22,14 +23,14 @@ function group(isFull = false): ActiveGroup {
 
 function program(
   id: string,
-  opts: Readonly<{ isCustom?: boolean; level?: string | null; groups?: ActiveGroup[] }> = {},
+  opts: Readonly<{ kind?: ProgramKind; level?: string | null; groups?: ActiveGroup[] }> = {},
 ): ActiveProgram {
   return {
     id,
     slug: id,
     title: `Program ${id}`,
     level: opts.level ?? 'SLR_1',
-    isCustom: opts.isCustom ?? false,
+    kind: opts.kind ?? 'STANDARD',
     ageMin: 6,
     ageMax: 14,
     price: 50,
@@ -40,8 +41,8 @@ function program(
 const slr1Open = program('slr1', { level: 'SLR_1', groups: [group()] })
 const slr1Full = program('slr1-full', { level: 'SLR_1', groups: [group(true)] })
 const slr2Open = program('slr2', { level: 'SLR_2', groups: [group()] })
-const radionicaOpen = program('rad', { isCustom: true, level: null, groups: [group()] })
-const radionicaFull = program('rad-full', { isCustom: true, level: null, groups: [group(true)] })
+const radionicaOpen = program('rad', { kind: 'RADIONICA' as const, level: null, groups: [group()] })
+const radionicaFull = program('rad-full', { kind: 'RADIONICA' as const, level: null, groups: [group(true)] })
 
 describe('programsForSelection', () => {
   it('narrows the standard flow to the selected grade\'s level and drops radionice', () => {

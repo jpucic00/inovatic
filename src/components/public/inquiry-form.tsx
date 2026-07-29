@@ -12,6 +12,7 @@ import { isTerminRequired } from '@/lib/inquiry-availability'
 import type { ActiveProgram } from '@/actions/public/programs'
 import { InquiryStep1 } from './inquiry/InquiryStep1'
 import { InquiryStep2 } from './inquiry/InquiryStep2'
+import type { Grade } from '@/lib/inquiry-status'
 import { InquiryStep3 } from './inquiry/InquiryStep3'
 
 function getStepClass(currentStep: number, stepId: number): string {
@@ -39,12 +40,18 @@ interface InquiryFormProps {
   preselectedCourseId?: string
   /** Fixed city for the radionica flow — hides the Step-1 city dropdown. */
   preselectedCity?: City
+  /**
+   * Razred options offered on Step 3. Defaults to osnovna škola; the
+   * competition signup link passes the full set (srednja škola included).
+   */
+  gradeOptions?: readonly Grade[]
 }
 
 export function InquiryForm({
   programsByCity,
   preselectedCourseId,
   preselectedCity,
+  gradeOptions,
 }: Readonly<InquiryFormProps>) {
   const [step, setStep] = useState(1)
   const [done, setDone] = useState(false)
@@ -88,15 +95,20 @@ export function InquiryForm({
   const watchedGrade = watch('grade')
   const terminRequired = isTerminRequired(activePrograms, watchedGrade, preselectedCourseId)
 
-  // Poll availability for the selected city while on Step 3.
+  // Poll availability for the selected city while on Step 3. On a per-program
+  // signup link the poll must ask for THAT program — the default feed is the
+  // public catalog, which omits the competitive program entirely.
   useEffect(() => {
     if (step !== 3 || !selectedCity) return
 
     const cityParam = selectedCity
+    const courseParam = preselectedCourseId
+      ? `&courseId=${encodeURIComponent(preselectedCourseId)}`
+      : ''
     let cancelled = false
     async function refresh() {
       try {
-        const res = await fetch(`/api/group-availability?city=${cityParam}`)
+        const res = await fetch(`/api/group-availability?city=${cityParam}${courseParam}`)
         if (!res.ok) return
         const fresh: ActiveProgram[] = await res.json()
         if (!cancelled) setLiveByCity((m) => ({ ...m, [cityParam]: fresh }))
@@ -106,7 +118,7 @@ export function InquiryForm({
     void refresh()
     const interval = setInterval(refresh, 30_000)
     return () => { cancelled = true; clearInterval(interval) }
-  }, [step, selectedCity])
+  }, [step, selectedCity, preselectedCourseId])
 
   // Changing the city invalidates any Step-3 course/group already chosen for
   // the previous city — clear it (keeping the radionica preselect, if any).
@@ -163,9 +175,10 @@ export function InquiryForm({
         trackUmamiEvent('course-inquiry', { city: data.city })
         setSubmittedCount((c) => c + 1)
         setDone(true)
-      } else if ('code' in result && (result.code === 'GROUP_FULL' || result.code === 'TERMIN_REQUIRED')) {
-        // Availability shifted since render (a slot opened / filled) — refresh
-        // the city's programs so Step 3 re-renders against the true state.
+      } else if ('code' in result) {
+        // Availability shifted since render (a slot opened or filled, a
+        // radionica started) — refresh the city's programs so Step 3 re-renders
+        // against the true state.
         setLiveByCity((m) => ({ ...m, [data.city]: result.programs }))
         if (result.code === 'TERMIN_REQUIRED') {
           setError('scheduledGroupId', { type: 'manual', message: result.error })
@@ -242,7 +255,7 @@ export function InquiryForm({
         {step === 1 && <InquiryStep1 register={register} errors={errors} showCity={!preselectedCity} />}
         {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} getValues={getValues} />}
         {step === 3 && (
-          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} clearErrors={clearErrors} programs={activePrograms} preselectedCourseId={preselectedCourseId} terminRequired={terminRequired} />
+          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} clearErrors={clearErrors} programs={activePrograms} preselectedCourseId={preselectedCourseId} gradeOptions={gradeOptions} terminRequired={terminRequired} />
         )}
 
         {serverError && (

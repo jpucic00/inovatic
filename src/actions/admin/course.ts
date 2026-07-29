@@ -9,22 +9,24 @@ import type { AdminActionResult } from '@/lib/action-types'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { archivedYearError } from '@/lib/school-year-guard'
 import { adminAction } from '@/lib/admin-action'
+import { isEditableCourse } from '@/lib/program-kind'
 
 export async function getCourses() {
   const { city } = await requireAdminCtx()
   const year = await getSelectedSchoolYear()
 
   return db.course.findMany({
-    // Standard SLR courses are global (schoolYear/city = null) and always
-    // appear. Radionice are year- and city-scoped — only those stamped with
-    // the selected year and the admin's own city.
+    // Standard SLR courses and the competitive program are global
+    // (schoolYear/city = null) and always appear. Radionice are year- and
+    // city-scoped — only those stamped with the selected year and the admin's
+    // own city.
     where: {
       AND: [
-        { OR: [{ isCustom: false }, { schoolYear: year }] },
+        { OR: [{ kind: { not: 'RADIONICA' } }, { schoolYear: year }] },
         { OR: [{ city: null }, { city }] },
       ],
     },
-    orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
     select: {
       id: true,
       slug: true,
@@ -38,7 +40,7 @@ export async function getCourses() {
       price: true,
       imageUrl: true,
       sortOrder: true,
-      isCustom: true,
+      kind: true,
       createdAt: true,
       updatedAt: true,
       // Shared standard courses have groups in both cities — count own only.
@@ -100,6 +102,8 @@ export async function createCourse(data: CreateCourseInput): Promise<AdminAction
         ageMax,
         price: price ?? null,
         imageUrl: imageUrl || null,
+        kind: 'RADIONICA',
+        // Legacy mirror of `kind` — see the schema note on Course.isCustom.
         isCustom: true,
         schoolYear: year,
         // Radionice are venue-bound: owned by the creating admin's city
@@ -127,13 +131,15 @@ export async function updateCourse(data: UpdateCourseInput): Promise<AdminAction
 
     const course = await db.course.findUnique({
       where: { id },
-      select: { isCustom: true, city: true, slug: true },
+      select: { kind: true, city: true, slug: true },
     })
     // Cross-city radionice read as nonexistent — same message as a missing id.
     if (!course || (course.city !== null && course.city !== city)) {
       return { success: false, error: 'Program nije pronađen.' }
     }
-    if (!course.isCustom) {
+    // Radionice and the competitive program carry association-authored copy;
+    // standard SLR copy is shared catalog content mirrored on the public site.
+    if (!isEditableCourse(course.kind)) {
       return { success: false, error: 'Standardni SLR programi se ne mogu uređivati.' }
     }
 
@@ -192,7 +198,7 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
     const course = await db.course.findUnique({
       where: { id },
       select: {
-        isCustom: true,
+        kind: true,
         city: true,
         _count: { select: { materials: true } },
         modules: { select: { _count: { select: { materials: true } } } },
@@ -220,7 +226,14 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
     if (!course || (course.city !== null && course.city !== city)) {
       return { success: false, error: 'Program nije pronađen.' }
     }
-    if (!course.isCustom) return { success: false, error: 'Standardni SLR programi se ne mogu brisati.' }
+    // Only radionice are deletable: standard SLR is shared catalog content, and
+    // the competitive program is a fixture with live monthly billing behind it.
+    if (course.kind === 'STANDARD') {
+      return { success: false, error: 'Standardni SLR programi se ne mogu brisati.' }
+    }
+    if (course.kind === 'COMPETITION') {
+      return { success: false, error: 'Natjecateljski program se ne može brisati.' }
+    }
 
     // `deleteGroup` refuses to touch an archived year, and this path cascade-
     // deletes the very same groups — without the check the two disagree and a

@@ -7,6 +7,7 @@ import {
   createLocation,
   createStudent,
   createEnrollment,
+  relativeDateKey,
 } from './helpers/factory'
 import { GRADE_VALUES } from '@/lib/inquiry-status'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
@@ -42,7 +43,7 @@ function validForm(overrides: Partial<InquiryFormData> = {}): InquiryFormData {
 // surface an open, non-full group without wiring the standard module arc —
 // capacity for a custom course is just enrollments vs maxStudents.
 async function openRadionicaWithGroup(maxStudents: number) {
-  const course = await createCourse({ isCustom: true, schoolYear: YEAR })
+  const course = await createCourse({ kind: 'RADIONICA', schoolYear: YEAR })
   await createEnrollmentWindow(course.id, {
     schoolYear: YEAR,
     city: 'SPLIT',
@@ -56,8 +57,10 @@ async function openRadionicaWithGroup(maxStudents: number) {
     city: 'SPLIT',
     schoolYear: YEAR,
     maxStudents,
-    dateStart: '2026-07-15',
-    dateEnd: '2026-07-21',
+    // Ahead of today — a workshop that has already started is dropped from the
+    // feed, which would make every termin here look non-existent.
+    dateStart: relativeDateKey(30),
+    dateEnd: relativeDateKey(35),
   })
   return { course, group }
 }
@@ -97,14 +100,15 @@ describe('submitInquiry — termin required when an open group exists', () => {
 
   it('accepts a group-less inquiry when no enrolment window is open', async () => {
     // A course + group but NO enrollment window → getActivePrograms hides it.
-    const course = await createCourse({ isCustom: true, schoolYear: YEAR })
+    const course = await createCourse({ kind: 'RADIONICA', schoolYear: YEAR })
     await createGroup({
       courseId: course.id,
       city: 'SPLIT',
       schoolYear: YEAR,
       maxStudents: 5,
-      dateStart: '2026-07-15',
-      dateEnd: '2026-07-21',
+      // Upcoming, so the missing window is provably the only thing hiding it.
+      dateStart: relativeDateKey(30),
+      dateEnd: relativeDateKey(35),
     })
 
     const form = validForm({ courseId: course.id })

@@ -11,6 +11,7 @@ import {
   type UpdateMaterialInput,
 } from '@/lib/validators/material'
 import { destroyCloudinaryMaterialUrls } from '@/lib/cloudinary-cleanup'
+import { isRadionica } from '@/lib/program-kind'
 import {
   canManageMaterial,
   materialTarget,
@@ -25,10 +26,10 @@ async function validateScopeConsistency(
   if (data.scope === 'MODULE') {
     const mod = await db.courseModule.findUnique({
       where: { id: data.moduleId },
-      select: { course: { select: { isCustom: true } } },
+      select: { course: { select: { kind: true } } },
     })
     if (!mod) return { success: false, error: 'Modul nije pronađen.' }
-    if (mod.course.isCustom) {
+    if (isRadionica(mod.course.kind)) {
       return { success: false, error: 'Radionica nema module — koristite COURSE razinu.' }
     }
   } else if (data.scope === 'COURSE') {

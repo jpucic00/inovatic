@@ -34,7 +34,7 @@ test.beforeAll(async () => {
       slug: `radionica-${RUN_ID}`,
       title: WORKSHOP_TITLE,
       description: 'Test radionica',
-      isCustom: true,
+      kind: 'RADIONICA',
       schoolYear: SY,
       ageMin: 6,
       ageMax: 14,

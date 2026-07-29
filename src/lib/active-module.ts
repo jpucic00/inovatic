@@ -8,11 +8,12 @@
  * weekdays can return different modules on the same date (race-ahead from
  * `getGroupModuleArc`). Holidays slow down only the weekday they land on.
  */
-import type { City } from '@prisma/client'
+import type { City, ProgramKind } from '@prisma/client'
 import {
   getActiveModuleForGroup,
   getGroupModuleArc,
 } from '@/lib/group-module-arc'
+import { hasDatedModules } from '@/lib/program-kind'
 
 type ModuleWithSchedule = {
   id: string
@@ -37,6 +38,10 @@ type ModuleWithSchedule = {
  *
  * `dayOfWeek` may be null for radionice (custom courses) which have no modules
  * to begin with — function short-circuits to null.
+ *
+ * COMPETITION programs also return null, but for the opposite reason: their
+ * natjecanja run the whole season in parallel, so there is no "module the group
+ * is on right now" to pick. Callers must show all of them instead of narrowing.
  */
 export function getCurrentActiveModuleForGroup(input: {
   dayOfWeek: string | null
@@ -44,9 +49,12 @@ export function getCurrentActiveModuleForGroup(input: {
   schoolYear: string
   /** The group's city — schedules are per-city since the Šibenik expansion. */
   city: City
+  /** Program kind — only STANDARD has an active module at all. */
+  kind: ProgramKind
   holidayDates: ReadonlySet<string>
   now?: Date
 }): ModuleWithSchedule | null {
+  if (!hasDatedModules(input.kind)) return null
   if (input.modules.length === 0) return null
 
   const arcInput = input.modules.map((m) => {

@@ -37,7 +37,7 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     await createMaterial({ scope: MaterialScope.COURSE, courseId: course.id })
 
     const res = await deleteCourse(course.id)
@@ -52,7 +52,7 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const mod = await createModule(course.id)
     await createMaterial({ scope: MaterialScope.MODULE, moduleId: mod.id })
 
@@ -67,7 +67,7 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await fx.course({ isCustom: false })
+    const course = await fx.course({ kind: 'STANDARD' })
 
     const res = await deleteCourse(course.id)
 
@@ -80,7 +80,7 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
 
     const res = await deleteCourse(course.id)
 
@@ -98,7 +98,7 @@ describe('deleteCourse — pridružene grupe', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const group = await fx.group({ courseId: course.id, dateStart: '2027-02-01', dateEnd: '2027-02-05' })
     const teacher = await createTeacher()
     await createTeacherAssignment(teacher.id, group.id)
@@ -120,7 +120,7 @@ describe('deleteCourse — pridružene grupe', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const group = await fx.group({ courseId: course.id, name: 'Termin A' })
     const student = await createStudent()
     await createEnrollment(student.id, group.id)
@@ -152,7 +152,7 @@ describe('deleteCourse — pridružene grupe', () => {
       create: { label: ARCHIVED },
       update: {},
     })
-    const course = await fx.course({ isCustom: true, schoolYear: ARCHIVED })
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: ARCHIVED })
     const group = await fx.group({ courseId: course.id, schoolYear: ARCHIVED })
 
     const res = await deleteCourse(course.id)
@@ -167,7 +167,7 @@ describe('deleteCourse — pridružene grupe', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const group = await fx.group({ courseId: course.id, schoolYear: '2026/2027' })
 
     const res = await deleteCourse(course.id)

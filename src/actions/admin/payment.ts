@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import {
   setModulePaidSchema,
+  setEnrollmentMonthPaidSchema,
   setEnrollmentYearPaidSchema,
 } from '@/lib/validators/admin/payment'
 import { adminAction } from '@/lib/admin-action'
@@ -37,6 +38,44 @@ export async function setModulePaid(
       })
     } catch (err) {
       console.error('setModulePaid failed:', err)
+      return { success: false, error: 'Greška pri spremanju plaćanja.' }
+    }
+
+    revalidatePath(`/admin/ucenici/${row.enrollment.userId}`)
+    revalidatePath('/admin/ucenici')
+    return { success: true }
+  })
+}
+
+/**
+ * Mark one month of a monthly-fee (COMPETITION) enrollment paid or unpaid.
+ * Same city guard as the other two: the month is reached through its
+ * enrollment's group, and a cross-city row answers like a missing one.
+ */
+export async function setEnrollmentMonthPaid(
+  enrollmentMonthId: string,
+  paid: boolean,
+): Promise<AdminActionResult> {
+  return adminAction(setEnrollmentMonthPaidSchema, { enrollmentMonthId, paid }, async (d, { city }) => {
+    const row = await db.enrollmentMonth.findUnique({
+      where: { id: d.enrollmentMonthId },
+      select: {
+        enrollment: {
+          select: { userId: true, scheduledGroup: { select: { city: true } } },
+        },
+      },
+    })
+    if (row?.enrollment.scheduledGroup.city !== city) {
+      return { success: false, error: 'Mjesec nije pronađen.' }
+    }
+
+    try {
+      await db.enrollmentMonth.update({
+        where: { id: d.enrollmentMonthId },
+        data: { paidAt: d.paid ? new Date() : null },
+      })
+    } catch (err) {
+      console.error('setEnrollmentMonthPaid failed:', err)
       return { success: false, error: 'Greška pri spremanju plaćanja.' }
     }
 

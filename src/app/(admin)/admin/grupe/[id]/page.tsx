@@ -14,6 +14,7 @@ import { GroupMaterialsPanel } from '@/components/admin/groups/group-materials-p
 import { isArchivedYear } from '@/lib/school-year'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 import { loadHolidayDateKeys } from '@/lib/holidays'
+import { hasDatedModules, isRadionica } from '@/lib/program-kind'
 
 export const metadata: Metadata = { title: 'Admin – Detalji grupe' }
 
@@ -31,8 +32,8 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
     db.course.findMany({
       // Shared standard programs (city = null) plus own-city radionice.
       where: { OR: [{ city: null }, { city }] },
-      orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }],
-      select: { id: true, title: true, isCustom: true },
+      orderBy: [{ sortOrder: 'asc' }],
+      select: { id: true, title: true, kind: true },
     }),
     db.location.findMany({
       where: { city },
@@ -44,7 +45,8 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   if (!group) notFound()
 
   const editable = !isArchivedYear(group.schoolYear)
-  const holidayDateKeys = group.course.isCustom
+  // Radionice run on a fixed date range, so they never need the holiday set.
+  const holidayDateKeys = isRadionica(group.course.kind)
     ? []
     : Array.from(await loadHolidayDateKeys(group.schoolYear, group.city))
 
@@ -74,7 +76,7 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
       id: group.course.id,
       title: group.course.title,
       level: group.course.level,
-      isCustom: group.course.isCustom,
+      kind: group.course.kind,
     },
     location: { id: group.location.id, name: group.location.name },
     enrolledCount,
@@ -127,8 +129,10 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
         />
       </div>
 
-      {/* Module enrollment panel for standard courses */}
-      {!group.course.isCustom && group.course.modules.length > 0 ? (
+      {/* Per-module enrollment panel — standard programs only. Competition
+          groups have modules but no ModuleEnrollment rows (they pay monthly),
+          so there is nothing to distribute here. */}
+      {hasDatedModules(group.course.kind) && group.course.modules.length > 0 ? (
         <div className="bg-white rounded-xl border p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-700">

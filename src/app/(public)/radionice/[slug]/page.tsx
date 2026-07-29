@@ -12,7 +12,7 @@ interface Props {
 
 async function getWorkshop(slug: string) {
   return db.course.findFirst({
-    where: { slug, isCustom: true },
+    where: { slug, kind: 'RADIONICA' },
     select: {
       id: true,
       slug: true,
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const workshop = await getWorkshop(slug)
   if (!workshop) return { title: 'Radionica nije pronađena' }
 
-  // Radionice are per-city (isCustom courses carry a city); brand the metadata
+  // Radionice are per-city (they carry a city); brand the metadata
   // with that city so a Šibenik workshop never reads "Inovatic Split".
   const brand = workshop.city ? `Inovatic ${CITY_LABELS[workshop.city]}` : 'Inovatic'
 
@@ -51,7 +51,7 @@ export default async function WorkshopPage({ params }: Readonly<Props>) {
   const { slug } = await params
   const workshop = await getWorkshop(slug)
 
-  // A radionica always belongs to one city (isCustom courses are city-stamped);
+  // A radionica always belongs to one city (they are city-stamped);
   // a null city would be a data defect, so treat it as not-found.
   if (!workshop?.city) notFound()
 

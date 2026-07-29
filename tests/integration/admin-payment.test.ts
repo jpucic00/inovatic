@@ -140,7 +140,7 @@ describe('getStudents payment filter + computed status', () => {
 
   async function radionicaStudent(key: string, opts: { paid: boolean }) {
     const s = await createStudent({ lastName: `${MARKER}_${key}` })
-    const course = await createCourse({ isCustom: true })
+    const course = await createCourse({ kind: 'RADIONICA' })
     const group = await createGroup({ courseId: course.id, schoolYear: CY })
     await createEnrollment(s.id, group.id, {
       schoolYear: CY,

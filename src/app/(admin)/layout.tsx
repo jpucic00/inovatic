@@ -28,7 +28,7 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
       where: {
         schoolYear: selectedYear,
         city,
-        module: { course: { isCustom: false } },
+        module: { course: { kind: 'STANDARD' } },
         OR: [{ startDate: { not: null } }, { endDate: { not: null } }],
       },
     }),

@@ -1,8 +1,9 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
+import { isGradable } from '@/lib/program-kind'
 import type { AssessmentInput } from '@/lib/validators/admin/student-assessment'
 
-/** Thrown when an assessment is attempted on a radionica (isCustom) group. */
+/** Thrown when an assessment is attempted on a radionica group. */
 class RadionicaNotGradableError extends Error {}
 /** Thrown when a COURSE recommendation points at a non-standard/absent course. */
 class InvalidRecommendationError extends Error {}
@@ -17,8 +18,10 @@ function revalidateStudent(studentId: string): void {
 /**
  * Upserts the single report card for (student, group). City/ownership scoping is
  * the caller's responsibility (admin vs teacher action). Here we enforce the two
- * data-level invariants: grading exists ONLY for standard programs (radionice are
- * skipped), and a COURSE recommendation must reference a real standard SLR course.
+ * data-level invariants: radionice are never graded (competition groups are, just
+ * like standard ones), and a COURSE recommendation must reference a real standard
+ * SLR course — never a radionica, and never the competitive program, which is
+ * offered as its own special track instead.
  */
 export async function upsertStudentAssessment(
   input: AssessmentInput,
@@ -26,17 +29,17 @@ export async function upsertStudentAssessment(
 ): Promise<void> {
   const group = await db.scheduledGroup.findUnique({
     where: { id: input.groupId },
-    select: { course: { select: { isCustom: true } } },
+    select: { course: { select: { kind: true } } },
   })
   if (!group) throw new AssessmentGroupNotFoundError()
-  if (group.course.isCustom) throw new RadionicaNotGradableError()
+  if (!isGradable(group.course.kind)) throw new RadionicaNotGradableError()
 
   if (input.recommendationKind === 'COURSE') {
     if (!input.recommendedCourseId) throw new InvalidRecommendationError()
     const course = await db.course.findFirst({
       where: {
         id: input.recommendedCourseId,
-        isCustom: false,
+        kind: 'STANDARD',
         level: { not: null },
       },
       select: { id: true },

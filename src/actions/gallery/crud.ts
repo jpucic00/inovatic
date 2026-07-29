@@ -10,6 +10,7 @@ import {
   type AddGalleryImagesInput,
 } from '@/lib/validators/gallery'
 import { destroyCloudinaryAssetsByPublicId } from '@/lib/cloudinary-cleanup'
+import { isRadionica } from '@/lib/program-kind'
 import { archivedYearError } from '@/lib/school-year-guard'
 
 type CreatedGalleryImage = {
@@ -81,7 +82,7 @@ export async function addGalleryImages(
       schoolYear: true,
       course: {
         select: {
-          isCustom: true,
+          kind: true,
           modules: { select: { id: true } },
         },
       },
@@ -92,7 +93,7 @@ export async function addGalleryImages(
   const blocked = archivedYearError(group.schoolYear)
   if (blocked) return blocked
 
-  if (group.course.isCustom) {
+  if (isRadionica(group.course.kind)) {
     if (data.moduleId !== null) {
       return {
         success: false,

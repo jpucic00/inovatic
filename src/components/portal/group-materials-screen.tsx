@@ -3,6 +3,7 @@ import { ArrowLeft, ClipboardCheck, Image as ImageIcon } from 'lucide-react'
 import type { GroupMaterialsView } from '@/lib/group-materials-view'
 import { formatGroupSchedule } from '@/lib/format'
 import { GroupHeader } from '@/components/shared/group-header'
+import { isGradable, isRadionica } from '@/lib/program-kind'
 import { MaterialList } from './material-list'
 
 interface Props {
@@ -14,7 +15,7 @@ interface Props {
 export function GroupMaterialsScreen({ view, backHref, backLabel }: Readonly<Props>) {
   const { group } = view
   const schedule = formatGroupSchedule({
-    isCustom: group.course.isCustom,
+    dateRange: isRadionica(group.course.kind),
     dayOfWeek: group.dayOfWeek,
     startTime: group.startTime,
     endTime: group.endTime,
@@ -49,7 +50,7 @@ export function GroupMaterialsScreen({ view, backHref, backLabel }: Readonly<Pro
           Galerija
         </Link>
         {/* Radionice are never graded — no evaluation page to link to. */}
-        {!group.course.isCustom && (
+        {isGradable(group.course.kind) && (
           <Link
             href={`/portal/grupa/${group.id}/evaluacija`}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded-md transition-colors"

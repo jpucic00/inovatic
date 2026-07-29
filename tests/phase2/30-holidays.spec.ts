@@ -56,7 +56,7 @@ test.beforeAll(async () => {
       slug: `holiday-course-${RUN_ID}`,
       title: `Holiday Course ${RUN_ID}`,
       description: 'Test course za praznike',
-      isCustom: false,
+      kind: 'STANDARD',
       ageMin: 6,
       ageMax: 14,
     },

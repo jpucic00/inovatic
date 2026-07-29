@@ -42,7 +42,7 @@ const { createStudentFromInquiry, createStudentManually } =
 
 async function makeRadionicaGroup() {
   const location = await createLocation()
-  const radionica = await createCourse({ isCustom: true })
+  const radionica = await createCourse({ kind: 'RADIONICA' })
   const group = await createGroup({
     courseId: radionica.id,
     locationId: location.id,

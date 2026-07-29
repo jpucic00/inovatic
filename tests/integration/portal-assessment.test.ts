@@ -143,7 +143,7 @@ describe('getMyAssessmentForGroup — report card', () => {
 
   it('reports a radionica as not gradable', async () => {
     const student = await createStudent()
-    const course = await createCourse({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await createCourse({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const group = await createGroup({
       courseId: course.id,
       dateStart: '2026-11-02',
@@ -161,7 +161,7 @@ describe('getMyAssessmentForGroup — report card', () => {
   it('never carries a radionica card even if a stray row exists', async () => {
     const teacher = await createTeacher()
     const student = await createStudent()
-    const course = await createCourse({ isCustom: true, schoolYear: '2026/2027' })
+    const course = await createCourse({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const group = await createGroup({
       courseId: course.id,
       dateStart: '2026-11-02',

@@ -4,6 +4,7 @@ import { getMyAssignedGroups } from '@/actions/teacher/dashboard'
 import { computeSchoolYear } from '@/lib/school-year'
 import { formatGroupSchedule } from '@/lib/format'
 import { GroupCard, groupByCourse } from '@/components/shared/group-card'
+import { isRadionica } from '@/lib/program-kind'
 
 export const metadata: Metadata = {
   title: 'Nastavnik – Moje grupe',
@@ -39,7 +40,7 @@ export default async function TeacherDashboard() {
                     key={g.id}
                     href={`/nastavnik/grupa/${g.id}`}
                     name={g.name}
-                    schedule={formatGroupSchedule({ isCustom: g.course.isCustom, dayOfWeek: g.dayOfWeek, startTime: g.startTime, endTime: g.endTime })}
+                    schedule={formatGroupSchedule({ dateRange: isRadionica(g.course.kind), dayOfWeek: g.dayOfWeek, startTime: g.startTime, endTime: g.endTime })}
                     locationName={g.location.name}
                     extraRows={
                       <div className="flex items-center gap-1.5">

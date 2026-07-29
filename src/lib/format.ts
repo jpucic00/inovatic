@@ -72,7 +72,8 @@ export function formatMonthYear(year: number, month: number): string {
 }
 
 type GroupScheduleParts = {
-  isCustom?: boolean
+  /** Radionice run on a closed calendar range instead of a weekday. */
+  dateRange?: boolean
   dayOfWeek?: string | null
   dateStart?: string | null
   dateEnd?: string | null
@@ -81,14 +82,16 @@ type GroupScheduleParts = {
 }
 
 /**
- * Build the human-readable termin line for a ScheduledGroup. Radionice (isCustom)
- * with a [dateStart, dateEnd] range render as "15.07.2026. – 21.07.2026." (or
- * a single date when start === end); standard programs render the Croatian
- * weekday name. The time range is always appended when startTime is present.
+ * Build the human-readable termin line for a ScheduledGroup. Groups on a
+ * [dateStart, dateEnd] range (radionice — pass `dateRange`) render as
+ * "15.07.2026. – 21.07.2026." (or a single date when start === end); weekly
+ * groups (standard programs and the competitive track alike) render the
+ * Croatian weekday name. The time range is always appended when startTime is
+ * present.
  */
 export function formatGroupSchedule(parts: GroupScheduleParts): string {
   const segments: string[] = []
-  if (parts.isCustom && parts.dateStart && parts.dateEnd) {
+  if (parts.dateRange && parts.dateStart && parts.dateEnd) {
     segments.push(
       parts.dateStart === parts.dateEnd
         ? formatDateKey(parts.dateStart)

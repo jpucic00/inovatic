@@ -3,20 +3,22 @@
 import { useMemo, useState } from 'react'
 import { StaffMaterialList, type StaffMaterialRow } from './staff-material-list'
 import { tabClass } from '@/lib/ui-classes'
+import type { ProgramKind } from '@prisma/client'
+import { hasModules } from '@/lib/program-kind'
 
 interface Props {
   rows: StaffMaterialRow[]
   modules: { id: string; title: string }[]
   inGroupId: string
-  isCustom: boolean
+  kind: ProgramKind
 }
 
 type TabDef = { id: string; label: string }
 
-export function MaterialFilterTabs({ rows, modules, inGroupId, isCustom }: Readonly<Props>) {
+export function MaterialFilterTabs({ rows, modules, inGroupId, kind }: Readonly<Props>) {
   const tabs = useMemo<TabDef[]>(() => {
     const result: TabDef[] = [{ id: '__all__', label: 'Svi' }]
-    if (!isCustom) {
+    if (hasModules(kind)) {
       for (const m of modules) {
         result.push({ id: m.id, label: m.title })
       }
@@ -28,7 +30,7 @@ export function MaterialFilterTabs({ rows, modules, inGroupId, isCustom }: Reado
       result.push({ id: '__group__', label: 'Grupa' })
     }
     return result
-  }, [rows, modules, isCustom])
+  }, [rows, modules, kind])
 
   const [activeTab, setActiveTab] = useState('__all__')
 

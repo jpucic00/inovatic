@@ -12,6 +12,7 @@ import { RobocampEmbed } from '@/components/material/robocamp-embed'
 import { CompactMediaCard } from './compact-media-card'
 import { formatBytes } from '@/components/material/material-type-badge'
 import { resolveHref } from '@/components/material/staff-material-list'
+import { isRadionica } from '@/lib/program-kind'
 
 // ─── Compact rows for documents + links ──────────────────────────────────────
 
@@ -166,7 +167,7 @@ function Section({
 // ─── Root ────────────────────────────────────────────────────────────────────
 
 export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
-  const isCustom = view.group.course.isCustom
+  const flatLayout = isRadionica(view.group.course.kind)
 
   const hasAny =
     view.featuredRobocamp.length > 0 ||
@@ -183,7 +184,7 @@ export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
     )
   }
 
-  if (isCustom) {
+  if (flatLayout) {
     return (
       <div className="space-y-8">
         <FeaturedRobocamp items={view.featuredRobocamp} />

@@ -99,7 +99,7 @@ describe('upsertHoliday', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id, schoolYear: SY })
     const student = await createStudent()
     const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
@@ -123,7 +123,7 @@ describe('upsertHoliday', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id, schoolYear: SY })
     const s1 = await createStudent()
     const s2 = await createStudent()
@@ -150,7 +150,7 @@ describe('upsertHoliday', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id, schoolYear: SY })
     const student = await createStudent()
     const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
@@ -181,7 +181,7 @@ describe('upsertHoliday', () => {
       update: {},
     })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const groupThisYear = await createGroup({ courseId: course.id, schoolYear: SY })
     const groupOtherYear = await createGroup({ courseId: course.id, schoolYear: OTHER_SY })
     const student = await createStudent()
@@ -253,7 +253,7 @@ describe('upsertHolidayRange', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id, schoolYear: SY })
     const student = await createStudent()
     const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
@@ -287,7 +287,7 @@ describe('upsertHolidayRange', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id, schoolYear: SY })
     const student = await createStudent()
     const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
@@ -357,7 +357,7 @@ describe('getGroupAttendance — honours holidays', () => {
       },
     })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const moduleRow = await createModule(course.id)
     // Window: 2027-01-04 (Mon) → 2027-01-25 (Mon) — 4 Mondays.
     await db.moduleSchedule.create({
@@ -552,7 +552,7 @@ describe('previewHolidaysFromApi', () => {
     mockSession({ id: admin.id, role: 'ADMIN' })
 
     // Seed: one of the fixture dates is already a holiday + has attendance.
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id, schoolYear: SY })
     const student = await createStudent()
     const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
@@ -661,7 +661,7 @@ describe('bulkImportHolidays', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id, schoolYear: SY })
     const student = await createStudent()
     const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
@@ -695,7 +695,7 @@ describe('bulkImportHolidays', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id, schoolYear: SY })
     const student = await createStudent()
     const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
@@ -721,7 +721,7 @@ describe('bulkImportHolidays', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id, schoolYear: SY })
     const student = await createStudent()
     const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })

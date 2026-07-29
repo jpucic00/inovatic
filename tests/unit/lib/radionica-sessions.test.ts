@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { computeRadionicaSessions, toDateKey } from '@/lib/session-dates'
+import {
+  computeRadionicaSessions,
+  isRadionicaOpenForSignup,
+  toDateKey,
+} from '@/lib/session-dates'
 import { computeWorkshopLabels } from '@/lib/school-year-planner'
 
 describe('computeRadionicaSessions', () => {
@@ -69,6 +73,37 @@ describe('computeRadionicaSessions', () => {
     expect(
       computeRadionicaSessions({ dateStart: '2026-07-21', dateEnd: '2026-07-15' }),
     ).toEqual([])
+  })
+})
+
+describe('isRadionicaOpenForSignup', () => {
+  // 2026-07-15 12:00 UTC → 14:00 in Zagreb (CEST), so "today" is 2026-07-15.
+  const MIDDAY = new Date('2026-07-15T12:00:00Z')
+
+  it('offers a workshop whose first day is still ahead', () => {
+    expect(isRadionicaOpenForSignup('2026-07-16', MIDDAY)).toBe(true)
+    expect(isRadionicaOpenForSignup('2026-12-01', MIDDAY)).toBe(true)
+  })
+
+  it('stops offering it on its own start day', () => {
+    expect(isRadionicaOpenForSignup('2026-07-15', MIDDAY)).toBe(false)
+  })
+
+  it('stops offering a workshop that has already run', () => {
+    expect(isRadionicaOpenForSignup('2026-07-14', MIDDAY)).toBe(false)
+    expect(isRadionicaOpenForSignup('2025-01-02', MIDDAY)).toBe(false)
+  })
+
+  it('keeps a dateless group bookable — nothing to compare against', () => {
+    expect(isRadionicaOpenForSignup(null, MIDDAY)).toBe(true)
+  })
+
+  it('flips on the Zagreb calendar day, not the UTC one', () => {
+    // 22:30 UTC on the 14th is already 00:30 on the 15th in Zagreb, so a
+    // workshop starting the 15th is no longer offered.
+    const lateNight = new Date('2026-07-14T22:30:00Z')
+    expect(isRadionicaOpenForSignup('2026-07-15', lateNight)).toBe(false)
+    expect(isRadionicaOpenForSignup('2026-07-16', lateNight)).toBe(true)
   })
 })
 

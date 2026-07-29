@@ -6,6 +6,9 @@ dotenv.config({ path: '.env' })
 import { PrismaClient, CourseLevel, UserRole, Prisma, type City } from '@prisma/client'
 // courses-data.ts is the source of truth for standard SLR program content.
 import { courses as coursesData } from '../src/lib/courses-data'
+// competitions-data.ts is the source of truth for the natjecanja names.
+import { competitions as competitionsData } from '../src/lib/competitions-data'
+import { COMPETITION_PROGRAM_SLUG } from '../src/lib/signup-links'
 import bcrypt from 'bcryptjs'
 import path from 'node:path'
 
@@ -1546,6 +1549,78 @@ async function seedGalleryImages() {
   console.log(`   Gallery: ${total} image(s) seeded across ${Object.keys(GALLERY_IMAGES).length} article(s)`)
 }
 
+/**
+ * The Natjecateljski program — one course whose "modules" are the natjecanja
+ * rather than a curriculum arc. Idempotent (upsert by slug, modules upserted by
+ * title), so `db:seed:competition` can be run against a live database to
+ * introduce or refresh it without touching anything else.
+ *
+ * Shared across cities like the SLR catalog (`city: null`): each city creates
+ * its own groups and plans its own CourseSeason.
+ *
+ * Module titles come from `competitions-data.ts` so the admin materials sections
+ * and the public /natjecanja pages can never drift apart, plus the general
+ * preparation track that the report card already offers as a preporuka.
+ */
+export async function seedCompetitionProgram() {
+  const course = await prisma.course.upsert({
+    where: { slug: COMPETITION_PROGRAM_SLUG },
+    update: {},
+    create: {
+      slug: COMPETITION_PROGRAM_SLUG,
+      // No CourseLevel: it sits alongside SLR 1–4, not inside the ladder. This
+      // is also what keeps it out of the report card's "recommended course"
+      // dropdown, which offers it as a special track instead.
+      level: null,
+      kind: 'COMPETITION',
+      title: 'Natjecateljski program',
+      subtitle: 'FLL, WRO, NMT i Robokup — po preporuci mentora',
+      description:
+        'Natjecateljski program okuplja polaznike koji nakon završenog programa Svijet LEGO robotike ' +
+        'žele dodatne izazove. Kroz cijelu školsku godinu timovi se pripremaju i nastupaju na ' +
+        'najprestižnijim robotičkim natjecanjima u Hrvatskoj i svijetu. Upis je isključivo po ' +
+        'preporuci mentora, putem osobne poveznice za prijavu.',
+      ageMin: 10,
+      ageMax: 15,
+      // After SLR 1–4 (sortOrder 1–4), before radionice (99).
+      sortOrder: 5,
+      // Shared catalog, like the standard programs.
+      city: null,
+      schoolYear: null,
+    },
+    select: { id: true },
+  })
+
+  // The four competitions plus the general preparation track. Order matches
+  // competitions-data.ts; Pripreme sits last as the catch-all.
+  const moduleTitles = [
+    ...competitionsData.map((c) => c.title),
+    'Pripreme za natjecanja',
+  ]
+
+  for (const [index, title] of moduleTitles.entries()) {
+    const existing = await prisma.courseModule.findFirst({
+      where: { courseId: course.id, title },
+      select: { id: true },
+    })
+    if (existing) {
+      await prisma.courseModule.update({
+        where: { id: existing.id },
+        data: { sortOrder: index + 1 },
+      })
+    } else {
+      await prisma.courseModule.create({
+        data: { courseId: course.id, title, sortOrder: index + 1 },
+      })
+    }
+  }
+
+  console.log(
+    `✅ Natjecateljski program (${moduleTitles.length} natjecanja) seeded`,
+  )
+  return course
+}
+
 async function main() {
   console.log('🌱 Starting seed...')
 
@@ -1666,6 +1741,8 @@ async function main() {
   )
   console.log('✅ Courses and modules created')
 
+  const competitionCourse = await seedCompetitionProgram()
+
   // ── Signup windows ───────────────────────────────────────────────────────────
   // The public signup window lives per (course, school year). Open a wide
   // current-year window for each standard program so groups created via the
@@ -1676,13 +1753,28 @@ async function main() {
   const currentSchoolYear =
     seedMonth >= 9 ? `${seedYear}/${seedYear + 1}` : `${seedYear - 1}/${seedYear}`
   await prisma.courseEnrollmentWindow.createMany({
-    data: seededCourses.map((c) => ({
-      city: 'SPLIT',
+    // The competitive program gets a window too: its signup page is unlisted,
+    // not ungated — closing the window is how upisi are closed without having
+    // to retract a link already mailed out.
+    data: [...seededCourses, competitionCourse].map((c) => ({
+      city: 'SPLIT' as const,
       courseId: c.id,
       schoolYear: currentSchoolYear,
       enrollmentStart: new Date(`${seedYear}-01-01`),
       enrollmentEnd: new Date(`${seedYear + 1}-12-31`),
     })),
+  })
+
+  // Dev season for the competitive program so its groups have termini and
+  // monthly charges out of the box.
+  await prisma.courseSeason.create({
+    data: {
+      courseId: competitionCourse.id,
+      schoolYear: currentSchoolYear,
+      city: 'SPLIT',
+      startDate: new Date(`${currentSchoolYear.slice(0, 4)}-09-15`),
+      endDate: new Date(`${currentSchoolYear.slice(5)}-06-15`),
+    },
   })
 
   console.log('✅ Signup windows created')

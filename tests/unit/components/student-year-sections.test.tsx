@@ -84,6 +84,9 @@ function makeEnrollment(
           },
         ]
       : [],
+    // Monthly-fee items exist only on COMPETITION enrollments; every fixture
+    // here is a radionica, so the list is empty but must still be present.
+    enrollmentMonths: [],
     scheduledGroup: {
       id: `sg-${opts.id}`,
       name: `Grupa ${opts.id}`,
@@ -94,7 +97,7 @@ function makeEnrollment(
         id: `c-${opts.id}`,
         title: opts.courseTitle,
         level: null,
-        isCustom: true,
+        kind: 'RADIONICA',
         modules: [],
       },
       location: { name: 'Split centar', address: 'Testna ulica 1' },

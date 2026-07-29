@@ -190,10 +190,10 @@ describe('getScheduledParties — city-scoped calendar feed', () => {
 
 describe('getInquiryCourses — shared standard programs + own-city radionice', () => {
   it('offers shared courses and own-city radionice, never the other city’s radionice', async () => {
-    const shared = await createCourse({ isCustom: false })
-    const sibRadionica = await createCourse({ isCustom: true, schoolYear: SY })
+    const shared = await createCourse({ kind: 'STANDARD' })
+    const sibRadionica = await createCourse({ kind: 'RADIONICA', schoolYear: SY })
     await db.course.update({ where: { id: sibRadionica.id }, data: { city: 'SIBENIK' } })
-    const splitRadionica = await createCourse({ isCustom: true, schoolYear: SY })
+    const splitRadionica = await createCourse({ kind: 'RADIONICA', schoolYear: SY })
     await db.course.update({ where: { id: splitRadionica.id }, data: { city: 'SPLIT' } })
     await sibenikAdminSession()
 

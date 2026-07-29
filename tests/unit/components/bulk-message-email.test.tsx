@@ -53,11 +53,20 @@ describe('BulkMessageEmail template', () => {
 })
 
 describe('renderBulkMessageHtml', () => {
-  it('injects the /upisi CTA link only when includeSignupCta is set', async () => {
+  it('injects the CTA link only when a signupPath is given', async () => {
     const base = { subject: 'Upisi', bodyText: 'Tekst poruke.' }
-    const withCta = await renderBulkMessageHtml({ ...base, includeSignupCta: true })
+    const withCta = await renderBulkMessageHtml({ ...base, signupPath: '/upisi/slr-3' })
     const withoutCta = await renderBulkMessageHtml(base)
     expect(withCta).toContain('/upisi')
     expect(withoutCta).not.toContain('/upisi')
+  })
+
+  it('links the CTA at the invited program, not the generic catalog', async () => {
+    const html = await renderBulkMessageHtml({
+      subject: 'Upisi',
+      bodyText: 'Tekst poruke.',
+      signupPath: '/upisi/natjecateljski-program',
+    })
+    expect(html).toContain('/upisi/natjecateljski-program')
   })
 })

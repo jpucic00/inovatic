@@ -17,6 +17,9 @@ import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { formatGroupSchedule, formatModuleDateRange as fmtModuleDateRange } from '@/lib/format'
 import { toast } from 'sonner'
+import { isRadionica } from '@/lib/program-kind'
+import { hasDatedModules } from '@/lib/program-kind'
+import type { ProgramKind } from '@prisma/client'
 
 type ModuleOption = {
   id: string
@@ -36,7 +39,7 @@ interface GroupOption {
   availableSpots: number
   isFull: boolean
   location: { name: string }
-  course: { title: string; isCustom: boolean; modules?: ModuleOption[] }
+  course: { title: string; kind: ProgramKind; modules?: ModuleOption[] }
 }
 
 interface CourseOption {
@@ -73,7 +76,7 @@ function mapGroupOption(sg: {
   availableSpots?: number
   isFull?: boolean
   location: { name: string }
-  course: { title: string; isCustom: boolean; modules?: ModuleOption[] }
+  course: { title: string; kind: ProgramKind; modules?: ModuleOption[] }
 }): GroupOption {
   return {
     id: sg.id,
@@ -88,7 +91,7 @@ function mapGroupOption(sg: {
     location: { name: sg.location.name },
     course: {
       title: sg.course.title,
-      isCustom: sg.course.isCustom,
+      kind: sg.course.kind,
       modules: sg.course.modules,
     },
   }
@@ -119,7 +122,7 @@ export function CreateAccountDialog({
 
   const selectedGroup = loadedGroups.find((g) => g.id === selectedGroupId)
   const courseModules = selectedGroup?.course.modules ?? []
-  const isStandardCourse = selectedGroup ? !selectedGroup.course.isCustom : false
+  const isStandardCourse = selectedGroup ? hasDatedModules(selectedGroup.course.kind) : false
 
   // Get schedule IDs for all modules
   const allScheduleIds = courseModules
@@ -246,7 +249,7 @@ export function CreateAccountDialog({
               {!loadingGroups && loadedGroups.length > 0 && (
                 loadedGroups.map((g) => {
                   const schedule = formatGroupSchedule({
-                    isCustom: g.course.isCustom,
+                    dateRange: isRadionica(g.course.kind),
                     dayOfWeek: g.dayOfWeek,
                     dateStart: g.dateStart,
                     dateEnd: g.dateEnd,

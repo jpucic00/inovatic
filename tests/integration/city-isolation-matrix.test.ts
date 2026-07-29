@@ -33,6 +33,7 @@ import {
   createModuleSchedule,
   createStudent,
   createTeacher,
+  relativeDateKey,
 } from './helpers/factory'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -154,7 +155,7 @@ describe('gallery writes — ADMIN pass-through is tenant-bound', () => {
 
   async function seedRadionicaGroup(city: 'SPLIT' | 'SIBENIK') {
     // Radionica groups take moduleId: null — the simplest valid gallery shape.
-    const course = await createCourse({ isCustom: true, schoolYear: YEAR })
+    const course = await createCourse({ kind: 'RADIONICA', schoolYear: YEAR })
     createdCourseIds.push(course.id)
     return createGroup({
       courseId: course.id,
@@ -301,7 +302,7 @@ describe('material writes — GROUP is tenant-bound, MODULE curriculum stays sha
   })
 
   it('createMaterial: MODULE curriculum on a shared program is writable from either city', async () => {
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     createdCourseIds.push(course.id)
     const moduleRow = await createModule(course.id)
 
@@ -332,7 +333,7 @@ describe('GET /api/download — GROUP downloads are tenant-bound, curriculum sha
 
   it('an ADMIN 404s the other city GROUP material and 200s their own + shared curriculum', async () => {
     const uploader = await createAdmin({ city: 'SPLIT' })
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     createdCourseIds.push(course.id)
     const moduleRow = await createModule(course.id)
 
@@ -390,15 +391,17 @@ describe('GET /api/group-availability — fail-closed ?city= param, per-city pay
   })
 
   it('the payload for a city contains only that city groups', async () => {
-    const course = await createCourse({ isCustom: true, schoolYear: YEAR })
+    const course = await createCourse({ kind: 'RADIONICA', schoolYear: YEAR })
     createdCourseIds.push(course.id)
+    // Dated ahead of today: this asserts the city filter, so the radionica
+    // start-date cutoff must not be what removes a group from the payload.
     const splitGroup = await createGroup({
       courseId: course.id, city: 'SPLIT', schoolYear: YEAR,
-      dateStart: '2026-07-15', dateEnd: '2026-07-21',
+      dateStart: relativeDateKey(30), dateEnd: relativeDateKey(35),
     })
     const sibGroup = await createGroup({
       courseId: course.id, city: 'SIBENIK', schoolYear: YEAR,
-      dateStart: '2026-07-15', dateEnd: '2026-07-21',
+      dateStart: relativeDateKey(30), dateEnd: relativeDateKey(35),
     })
     const openRange = {
       enrollmentStart: new Date('2026-01-01'),
@@ -422,7 +425,7 @@ describe('GET /api/group-availability — fail-closed ?city= param, per-city pay
 describe('getActivePrograms — a window in one city never opens the shared program in the other', () => {
   it('a SPLIT-only window on a shared standard program leaves Šibenik closed', async () => {
     // Shared standard program (city = null): one curriculum, per-city windows.
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     createdCourseIds.push(course.id)
     const moduleRow = await createModule(course.id)
     // Only SPLIT has planned the year — its group needs an arc to render.

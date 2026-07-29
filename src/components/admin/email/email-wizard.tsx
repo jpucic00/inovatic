@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Eye, Send } from 'lucide-react'
 import { formatGroupSchedule } from '@/lib/format'
+import { isRadionica } from '@/lib/program-kind'
 import type { RecommendationOption } from '@/lib/assessment-rubric'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { getGroupsForCourse } from '@/actions/admin/inquiry'
@@ -202,14 +203,14 @@ export function EmailWizard({
   // CUSTOM + selected-year tree comes preloaded from the server).
   const treeKeyRef = useRef(`${selectedYear}:false`)
   useEffect(() => {
-    const standardOnly = kind === 'REENROLLMENT'
-    const key = `${sourceYear}:${standardOnly}`
+    const graduatingOnly = kind === 'REENROLLMENT'
+    const key = `${sourceYear}:${graduatingOnly}`
     if (treeKeyRef.current === key) return
     treeKeyRef.current = key
     let cancelled = false
     setLoadingTree(true)
     setTree([])
-    getEmailGroupTree(sourceYear, standardOnly)
+    getEmailGroupTree(sourceYear, graduatingOnly)
       .then((next) => {
         if (!cancelled) setTree(next)
       })
@@ -320,7 +321,7 @@ export function EmailWizard({
           label: [
             sg.name,
             formatGroupSchedule({
-              isCustom: sg.course.isCustom,
+              dateRange: isRadionica(sg.course.kind),
               dayOfWeek: sg.dayOfWeek,
               dateStart: sg.dateStart,
               dateEnd: sg.dateEnd,
@@ -739,7 +740,7 @@ export function EmailWizard({
                           className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
                         />
                         <span className="text-sm font-medium text-gray-900">{course.title}</span>
-                        {course.isCustom && (
+                        {isRadionica(course.kind) && (
                           <span className="text-[10px] font-medium rounded px-1.5 py-0.5 border bg-amber-50 text-amber-700 border-amber-200">
                             Radionica
                           </span>
@@ -751,7 +752,7 @@ export function EmailWizard({
                           const label = [
                             g.name,
                             formatGroupSchedule({
-                              isCustom: course.isCustom,
+                              dateRange: isRadionica(course.kind),
                               dayOfWeek: g.dayOfWeek,
                               dateStart: g.dateStart,
                               dateEnd: g.dateEnd,

@@ -21,7 +21,6 @@ async function studentAllowed(
           course: {
             select: {
               id: true,
-              isCustom: true,
               modules: { select: { id: true } },
             },
           },

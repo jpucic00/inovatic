@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
-import type { Material, MaterialType } from '@prisma/client'
+import type { Material, MaterialType, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
+import { isRadionica, showsAllModules } from '@/lib/program-kind'
 import { computeSchoolYear } from '@/lib/school-year'
 import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
@@ -45,15 +46,19 @@ export type GroupMaterialsView = {
     dayOfWeek: string | null
     startTime: string | null
     endTime: string | null
-    course: { id: string; title: string; isCustom: boolean }
+    course: { id: string; title: string; kind: ProgramKind }
     location: { name: string }
     teacherNames: string[]
   }
   /** Active-module RoboCamp tutorials, surfaced at the very top of the page. */
   featuredRobocamp: MaterialItem[]
-  /** Per-module sections for standard programs. Empty for radionice. */
+  /**
+   * Per-module sections. Standard programs get exactly one (the module the
+   * group is working on now); COMPETITION programs get one per natjecanje, all
+   * of them, all year. Empty for radionice.
+   */
   moduleSections: ModuleMaterialGroup[]
-  /** COURSE-scoped materials on a standard program ("for the whole program"). */
+  /** COURSE-scoped materials ("for the whole program"). Empty for radionice. */
   programMaterials: KindBuckets
   /** GROUP-scoped materials (this group's own extras). */
   groupMaterials: KindBuckets
@@ -121,12 +126,12 @@ type MaterialPartition = {
 /**
  * Sort every material into its display bucket: MODULE-scoped rows group by
  * moduleId; on a radionica everything else folds into one flat bucket; on a
- * standard program COURSE-scoped rows go to the program bucket and the rest to
- * the group bucket.
+ * program with modules COURSE-scoped rows go to the program bucket and the rest
+ * to the group bucket.
  */
 function partitionMaterials(
   materials: Material[],
-  isCustom: boolean,
+  kind: ProgramKind,
 ): MaterialPartition {
   const moduleBuckets = new Map<string, KindBuckets>()
   const programMaterials = emptyBuckets()
@@ -135,7 +140,7 @@ function partitionMaterials(
 
   for (const m of materials) {
     const item = toItem(m)
-    const kind = kindOf(m)
+    const bucketKind = kindOf(m)
 
     if (m.scope === 'MODULE' && m.moduleId) {
       let bucket = moduleBuckets.get(m.moduleId)
@@ -143,14 +148,14 @@ function partitionMaterials(
         bucket = emptyBuckets()
         moduleBuckets.set(m.moduleId, bucket)
       }
-      bucket[kind].push(item)
-    } else if (isCustom) {
+      bucket[bucketKind].push(item)
+    } else if (isRadionica(kind)) {
       // Radionica: COURSE + GROUP both fold into one flat bucket (no modules).
-      radionicaMaterials[kind].push(item)
+      radionicaMaterials[bucketKind].push(item)
     } else if (m.scope === 'COURSE') {
-      programMaterials[kind].push(item)
+      programMaterials[bucketKind].push(item)
     } else {
-      groupMaterials[kind].push(item)
+      groupMaterials[bucketKind].push(item)
     }
   }
 
@@ -185,7 +190,8 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
   })
   if (!group) notFound()
 
-  const isCustom = group.course.isCustom
+  const kind = group.course.kind
+  const allModules = showsAllModules(kind)
   // Pacing follows the group's own city: its holiday calendar and its city's
   // module schedule rows (the resolver ignores the other city's schedules).
   const holidayDates = await loadHolidayDateKeys(schoolYear, group.city)
@@ -194,13 +200,18 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
     modules: group.course.modules,
     schoolYear,
     city: group.city,
+    kind,
     holidayDates,
   })
 
-  // Kids only see the module they're working on now (per this group's calendar).
-  // Other modules' materials are hidden; program-wide (COURSE) and group (GROUP)
-  // materials stay visible. Radionice have no modules → no module restriction.
-  const visibleModuleIds = !isCustom && activeModule ? [activeModule.id] : []
+  // Standard programs: kids only see the module they're working on now (per this
+  // group's calendar); other modules' materials are hidden. COMPETITION: every
+  // natjecanje is live all season and nothing in the data says which one this
+  // group attends, so all of them are visible. Radionice have no modules at all.
+  // Program-wide (COURSE) and group (GROUP) materials stay visible either way.
+  let visibleModuleIds: string[] = []
+  if (allModules) visibleModuleIds = group.course.modules.map((m) => m.id)
+  else if (activeModule) visibleModuleIds = [activeModule.id]
 
   const materials = await db.material.findMany({
     where: buildEffectiveMaterialsWhere({
@@ -212,25 +223,36 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
   })
 
   const { moduleBuckets, programMaterials, groupMaterials, radionicaMaterials } =
-    partitionMaterials(materials, isCustom)
+    partitionMaterials(materials, kind)
 
-  // Only the active module is shown to kids (and in the staff preview).
-  const moduleSections: ModuleMaterialGroup[] =
-    !isCustom && activeModule
-      ? [
-          {
-            moduleId: activeModule.id,
-            title: activeModule.title,
-            sortOrder: activeModule.sortOrder,
-            isActive: true,
-            buckets: moduleBuckets.get(activeModule.id) ?? emptyBuckets(),
-          },
-        ]
-      : []
+  let moduleSections: ModuleMaterialGroup[] = []
+  if (allModules) {
+    // Every natjecanje, in sortOrder. None is "active" — the season runs them
+    // all in parallel — so the UI must not highlight one over the others.
+    moduleSections = group.course.modules.map((m) => ({
+      moduleId: m.id,
+      title: m.title,
+      sortOrder: m.sortOrder,
+      isActive: false,
+      buckets: moduleBuckets.get(m.id) ?? emptyBuckets(),
+    }))
+  } else if (activeModule) {
+    moduleSections = [
+      {
+        moduleId: activeModule.id,
+        title: activeModule.title,
+        sortOrder: activeModule.sortOrder,
+        isActive: true,
+        buckets: moduleBuckets.get(activeModule.id) ?? emptyBuckets(),
+      },
+    ]
+  }
 
   let featuredRobocamp: MaterialItem[] = []
-  if (isCustom) {
+  if (isRadionica(kind)) {
     featuredRobocamp = radionicaMaterials.robocamp
+  } else if (allModules) {
+    featuredRobocamp = moduleSections.flatMap((s) => s.buckets.robocamp)
   } else if (activeModule) {
     featuredRobocamp = moduleBuckets.get(activeModule.id)?.robocamp ?? []
   }
@@ -245,7 +267,7 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
       course: {
         id: group.course.id,
         title: group.course.title,
-        isCustom,
+        kind,
       },
       location: { name: group.location.name },
       teacherNames: group.teacherAssignments.map(

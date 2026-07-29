@@ -50,6 +50,8 @@ stateDiagram-v2
         Parent contact data + GDPR consent copied to User
         Enrollment row created (no status column)
         ModuleEnrollment rows created for standard courses
+        EnrollmentMonth rows (join month → season end) for the
+        Natjecateljski program instead — it is billed monthly
         Inquiry.studentId + assignedGroupId set
         Email: AccountCredentialsEmail to parent
         TERMINAL STATE (COURSE only)
@@ -287,6 +289,9 @@ flowchart TD
     B -->|6. razred| E
     B -->|7. razred| F[SLR_4]
     B -->|8. razred| F
+    B -->|"Srednja škola 1–4 (ss1–ss4)"| SS[No SLR level]
+
+    SS --> SSX["No match — never offered on the public /upisi form"]
 
     C --> G[Filter programs where level = SLR_1]
     D --> G2[Filter programs where level = SLR_2]
@@ -298,7 +303,7 @@ flowchart TD
     G3 --> H
     G4 --> H
 
-    H --> I["Exclude radionice: isCustom courses filtered out from standard /upisi form"]
+    H --> I["Exclude everything without dated modules: radionice enrol via /radionice/slug, the Natjecateljski program only via its invitation link"]
 
     style C fill:#dbeafe
     style D fill:#e0e7ff
@@ -321,11 +326,39 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["Parent visits /programi/slug/prijava"] --> B[preselectedCourseId passed to InquiryForm]
-    B --> C[Grade dropdown hidden in Step 3]
+    A["Parent visits /radionice/slug"] --> B[preselectedCourseId + preselectedCity passed to InquiryForm]
+    B --> C[City dropdown hidden in Step 1]
     C --> D[Only show groups for preselected course]
     D --> E[No grade-to-level filtering applied]
     E --> F[Group dropdown shows flat list not optgroups]
+```
+
+### Per-program signup link (`/upisi/<slug>`)
+
+The link you send when the program is already decided — a returning student
+moving up a level, or a competitor invited into the Natjecateljski program. It
+deliberately **bypasses §4's grade→level rule**: last year's SLR 1 group moves
+on to SLR 2 whatever their razred says. `/upisi` itself is unchanged.
+
+```mermaid
+flowchart TD
+    A["Parent opens /upisi/<slug> from an invitation e-mail"] --> B[preselectedCourseId passed to InquiryForm]
+    B --> C{Program city}
+    C -->|"shared (SLR, natjecateljski)"| C1[Parent picks Split/Šibenik in Step 1]
+    C -->|per-city| C2[City fixed, dropdown hidden]
+    C1 --> D[Step 3 offers ONLY this program's groups in that city]
+    C2 --> D
+    D --> E["programsForSelection short-circuits on preselectedCourseId → grade filters nothing"]
+    E --> F{Program kind}
+    F -->|COMPETITION| G["Razred dropdown adds Srednja škola 1–4"]
+    F -->|STANDARD| H[Razred dropdown stops at 8. razred]
+    G --> I[Submit]
+    H --> I
+    I --> J["submitInquiry re-checks: a high-school grade is refused unless the resolved course is COMPETITION"]
+    J --> K[Ordinary NEW inquiry → admin review → account]
+
+    style G fill:#fef3c7
+    style J fill:#fee2e2
 ```
 
 ---

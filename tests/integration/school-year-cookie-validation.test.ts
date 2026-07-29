@@ -69,7 +69,7 @@ describe('createGroup — bogus cookie cannot stamp an unregistered year', () =>
     })
     await db.schoolYear.deleteMany({ where: { label: BOGUS_YEAR } })
 
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const location = await createLocation()
 
     setCookie(BOGUS_YEAR)

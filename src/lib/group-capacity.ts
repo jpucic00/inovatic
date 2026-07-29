@@ -1,5 +1,6 @@
-import { Prisma, type City } from '@prisma/client'
+import { Prisma, type City, type ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
+import { hasDatedModules } from '@/lib/program-kind'
 import {
   getActiveModuleForGroup,
   getGroupModuleArc,
@@ -30,7 +31,7 @@ type GroupCapacityRow = {
   }[]
   _count: { preferredInquiries: number }
   course: {
-    isCustom: boolean
+    kind: ProgramKind
     modules: {
       id: string
       title: string
@@ -80,7 +81,10 @@ interface GroupCapacityInfo {
  * the public inquiry form. Admin loaders return them on purpose so admins
  * can still review/manage.
  *
- * Custom course (radionica): `enrolledCount = enrollments.length`.
+ * Radionica and competition groups: `enrolledCount = enrollments.length`.
+ * Neither is paced by dated modules — a radionica has none, and a competition
+ * group runs one continuous season — so there is no "next module" to count a
+ * seat against and the lifetime enrollment total IS the occupancy.
  */
 export function computeGroupCapacity(
   group: GroupCapacityRow,
@@ -90,7 +94,7 @@ export function computeGroupCapacity(
   let enrolledCount: number
   let nextEnrollingModule: GroupCapacityInfo['nextEnrollingModule'] = null
 
-  if (group.course.isCustom) {
+  if (!hasDatedModules(group.course.kind)) {
     enrolledCount = group.enrollments.length
   } else {
     const arc = getGroupModuleArc({
@@ -170,7 +174,7 @@ export async function assertGroupHasAvailableSpot(
       },
       course: {
         select: {
-          isCustom: true,
+          kind: true,
           modules: {
             orderBy: { sortOrder: 'asc' },
             select: {
@@ -205,15 +209,15 @@ export async function assertGroupHasAvailableSpot(
 
   if (!group) throw new GroupFullError()
   // Load holidays INSIDE the same transaction so the arc/capacity decision
-  // sees a consistent snapshot under Serializable isolation. Holidays for
-  // standard courses only — radionice short-circuit before arc computation
-  // so the empty-set fast-path is fine for them.
-  const holidayRows = group.course.isCustom
-    ? []
-    : await tx.schoolYearHoliday.findMany({
+  // sees a consistent snapshot under Serializable isolation. Only programs with
+  // dated modules reach the arc — radionica and competition groups short-circuit
+  // before it, so the empty-set fast-path is fine for them.
+  const holidayRows = hasDatedModules(group.course.kind)
+    ? await tx.schoolYearHoliday.findMany({
         where: { schoolYear: group.schoolYear, city: group.city },
         select: { date: true },
       })
+    : []
   const holidayDates = new Set(holidayRows.map((r) => toDateKey(r.date)))
   if (computeGroupCapacity(group, holidayDates).isFull) throw new GroupFullError()
 }

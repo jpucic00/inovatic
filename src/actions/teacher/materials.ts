@@ -92,7 +92,7 @@ export async function getGroupUploadTargets(groupId: string) {
     groupName: group.name,
     courseId: group.course.id,
     courseTitle: group.course.title,
-    isCustom: group.course.isCustom,
+    kind: group.course.kind,
     modules: group.course.modules,
   }
 }

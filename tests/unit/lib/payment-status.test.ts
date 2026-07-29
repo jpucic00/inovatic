@@ -21,11 +21,12 @@ function standardEnrollment(
   return {
     schoolYear: opts.schoolYear ?? CURRENT_YEAR,
     fullYearPaidAt: opts.fullYearPaidAt ?? null,
-    scheduledGroup: { course: { isCustom: false } },
+    scheduledGroup: { course: { kind: 'STANDARD' } },
     moduleEnrollments: modules.map((m) => ({
       paidAt: m.paidAt,
       moduleSchedule: { startDate: m.startDate },
     })),
+    enrollmentMonths: [],
   }
 }
 
@@ -35,8 +36,9 @@ function radionica(
   return {
     schoolYear: opts.schoolYear ?? CURRENT_YEAR,
     fullYearPaidAt: opts.fullYearPaidAt ?? null,
-    scheduledGroup: { course: { isCustom: true } },
+    scheduledGroup: { course: { kind: 'RADIONICA' } },
     moduleEnrollments: [],
+    enrollmentMonths: [],
   }
 }
 
@@ -181,11 +183,14 @@ describe('computeStudentPaymentStatus', () => {
 })
 
 describe('pendingEnrollmentWhere (drift guard)', () => {
-  it('builds a year-independent where with radionica + started-module branches', () => {
+  it('builds a year-independent where with one branch per billing model', () => {
     const where = pendingEnrollmentWhere(NOW)
     expect(where.fullYearPaidAt).toBeNull()
     expect(where).not.toHaveProperty('schoolYear')
     expect(Array.isArray(where.OR)).toBe(true)
-    expect(where.OR).toHaveLength(2)
+    // radionica (always owed) + competition (a started, unpaid month) +
+    // standard (a started, unpaid module). One arm per arm of
+    // `isEnrollmentPending` — the two MUST stay in sync.
+    expect(where.OR).toHaveLength(3)
   })
 })

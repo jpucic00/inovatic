@@ -19,7 +19,12 @@ import type { AdminActionResult } from '@/lib/action-types'
 
 /**
  * Commits the school-year planner preview into ModuleSchedule rows for every
- * standard program (Course.isCustom = false). Identical (startDate, endDate)
+ * standard program (ProgramKind.STANDARD).
+
+ * The competitive program is deliberately out of scope: it has five undated
+ * natjecanja rather than four dated modules, so including it would trip the
+ * MODULE_COUNT assertion below and abort the whole run. Its dates live on
+ * CourseSeason and are set on `/admin/programi/[courseId]` instead. Identical (startDate, endDate)
  * pairs are written for every standard course's matching module-by-position —
  * SLR 1's Modul 1 and SLR 4's Modul 1 always get the same dates.
  *
@@ -61,7 +66,7 @@ export async function completeSchoolYearPlan(
     where: {
       schoolYear,
       city,
-      module: { course: { isCustom: false } },
+      module: { course: { kind: 'STANDARD' } },
       OR: [{ startDate: { not: null } }, { endDate: { not: null } }],
     },
   })
@@ -76,7 +81,7 @@ export async function completeSchoolYearPlan(
   // share the same plan". ScheduledGroup existence is irrelevant: admin may
   // plan before any groups are created.
   const standardModules = await db.courseModule.findMany({
-    where: { course: { isCustom: false } },
+    where: { course: { kind: 'STANDARD' } },
     select: {
       id: true,
       sortOrder: true,

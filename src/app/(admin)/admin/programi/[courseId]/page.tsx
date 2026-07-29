@@ -1,11 +1,20 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowLeft, Wrench, BookOpen, Users } from 'lucide-react'
+import { ArrowLeft, Wrench, BookOpen, Trophy, Users } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getProgramDetail } from '@/actions/admin/program-materials'
 import { isArchivedYear } from '@/lib/school-year'
+import {
+  hasDatedModules,
+  hasModules,
+  isCompetition,
+  isEditableCourse,
+  isRadionica,
+} from '@/lib/program-kind'
 import { ModuleDatesTable } from '@/components/admin/courses/module-dates-table'
 import { EnrollmentWindowEditor } from '@/components/admin/courses/enrollment-window-editor'
+import { CourseSeasonEditor } from '@/components/admin/courses/course-season-editor'
+import { CopyLinkButton } from '@/components/admin/courses/copy-link-button'
 import { CourseFormDialog } from '@/components/admin/courses/course-form-dialog'
 import { UploadMaterialDialog } from '@/components/material/upload-dialog'
 import { StaffMaterialList } from '@/components/material/staff-material-list'
@@ -22,7 +31,9 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
   const { courseId } = await params
 
   const detail = await getProgramDetail(courseId)
-  const { course, moduleDates, courseMaterials, moduleSections, selectedYear } = detail
+  const { course, season, moduleDates, courseMaterials, moduleSections, selectedYear } = detail
+  const competition = isCompetition(course.kind)
+  const radionica = isRadionica(course.kind)
   const editable = !isArchivedYear(selectedYear)
 
   return (
@@ -38,16 +49,17 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
       <header className="mb-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            {course.isCustom ? (
-              <Wrench className="w-6 h-6 text-orange-500 shrink-0" />
-            ) : (
+            {radionica && <Wrench className="w-6 h-6 text-orange-500 shrink-0" />}
+            {competition && <Trophy className="w-6 h-6 text-amber-500 shrink-0" />}
+            {!radionica && !competition && (
               <BookOpen className="w-6 h-6 text-cyan-600 shrink-0" />
             )}
             <h1 className="text-2xl font-bold text-gray-900">{course.title}</h1>
           </div>
-          {/* Standard SLR programs carry shared catalog copy — only radionice
-              are editable here (updateCourse refuses the rest anyway). */}
-          {course.isCustom && editable && (
+          {/* Standard SLR programs carry shared catalog copy mirrored on the
+              public site — only association-authored programs are editable here
+              (updateCourse refuses the rest anyway). */}
+          {isEditableCourse(course.kind) && editable && (
             <CourseFormDialog
               course={{
                 id: course.id,
@@ -61,9 +73,13 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
           )}
         </div>
         <div className="flex items-center gap-2 mt-1.5 flex-wrap text-sm text-gray-500">
-          {course.isCustom ? (
+          {radionica ? (
             <span className="rounded-full bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 text-xs font-medium">
               Radionica
+            </span>
+          ) : competition ? (
+            <span className="rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-xs font-medium">
+              Natjecateljski program
             </span>
           ) : course.level ? (
             <span className="rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-0.5 text-xs font-medium">
@@ -71,18 +87,30 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
             </span>
           ) : null}
           <span>{course.ageMin}–{course.ageMax} god.</span>
-          {course.isCustom && course.price != null && <span>{course.price} EUR</span>}
+          {course.price != null && (
+            <span>
+              {course.price} EUR{competition ? ' / mjesec' : ''}
+            </span>
+          )}
           <Link
-            href={course.isCustom ? '/admin/grupe?tab=__radionice__' : `/admin/grupe?tab=${course.id}`}
+            href={radionica ? '/admin/grupe?tab=__radionice__' : `/admin/grupe?tab=${course.id}`}
             className="inline-flex items-center gap-1 text-cyan-700 hover:underline"
           >
             <Users className="w-3.5 h-3.5" />
             {course.groupCount} {course.groupCount >= 2 && course.groupCount <= 4 ? 'grupe' : 'grupa'}
           </Link>
         </div>
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <CopyLinkButton path={course.signupPath} />
+          <span className="text-xs text-gray-400">
+            {competition
+              ? 'Prijava samo putem ove poveznice — program nije na javnim upisima.'
+              : 'Prikazuje samo termine ovog programa, bez obzira na razred djeteta.'}
+          </span>
+        </div>
         {/* The public /radionice page renders this copy — show it here so the
             admin sees what the Uredi dialog changes. */}
-        {course.isCustom && (
+        {isEditableCourse(course.kind) && (
           <p className="text-sm text-gray-600 mt-3 max-w-3xl whitespace-pre-line">
             {course.description}
           </p>
@@ -101,7 +129,19 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
         />
       </section>
 
-      {!course.isCustom && (
+      {competition && (
+        <section className="mb-10">
+          <CourseSeasonEditor
+            courseId={course.id}
+            schoolYear={selectedYear}
+            startDate={season.startDate}
+            endDate={season.endDate}
+            editable={editable}
+          />
+        </section>
+      )}
+
+      {hasDatedModules(course.kind) && (
         <section className="mb-10">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Moduli i datumi
@@ -132,7 +172,11 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
               Vidljivo u svim grupama ovog programa
-              {course.isCustom ? '.' : ', bez obzira na modul.'}
+              {hasModules(course.kind)
+                ? competition
+                  ? ', bez obzira na natjecanje.'
+                  : ', bez obzira na modul.'
+                : '.'}
             </p>
           </div>
           <UploadMaterialDialog
@@ -147,7 +191,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
         />
       </section>
 
-      {!course.isCustom &&
+      {hasModules(course.kind) &&
         moduleSections.map((section) => (
           <section key={section.module.id} className="mb-10">
             <div className="flex items-center justify-between gap-3 mb-3">
@@ -157,7 +201,11 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
               <UploadMaterialDialog
                 target={{ scope: 'MODULE', moduleId: section.module.id }}
                 label="Dodaj"
-                scopeLabel={`Vidljivo svim grupama na modulu „${section.module.title}".`}
+                scopeLabel={
+                  competition
+                    ? `Vidljivo svim grupama natjecateljskog programa, pod „${section.module.title}".`
+                    : `Vidljivo svim grupama na modulu „${section.module.title}".`
+                }
               />
             </div>
             <StaffMaterialList

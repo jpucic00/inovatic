@@ -1,3 +1,4 @@
+import type { ProgramKind } from '@prisma/client'
 import { describe, expect, it } from 'vitest'
 import { computeGroupCapacity } from '@/lib/group-capacity'
 
@@ -44,7 +45,7 @@ const mkEnrollment = (id: string, moduleScheduleIds: string[]) => ({
 
 const mkGroup = (input: {
   maxStudents: number
-  isCustom: boolean
+  kind: ProgramKind
   dayOfWeek?: string | null
   modules: ReturnType<typeof mkModule>[]
   enrollments: ReturnType<typeof mkEnrollment>[]
@@ -57,7 +58,7 @@ const mkGroup = (input: {
   enrollments: input.enrollments,
   _count: { preferredInquiries: input.reservedInquiriesCount ?? 0 },
   course: {
-    isCustom: input.isCustom,
+    kind: input.kind,
     modules: input.modules,
   },
 })
@@ -99,7 +100,7 @@ describe('computeGroupCapacity — radionica branch', () => {
   it('counts all enrollments for custom (radionica) courses', () => {
     const group = mkGroup({
       maxStudents: 10,
-      isCustom: true,
+      kind: 'RADIONICA' as const,
       modules: [],
       enrollments: [
         mkEnrollment('e1', []),
@@ -124,7 +125,7 @@ describe('computeGroupCapacity — per-group arc resolution', () => {
     // so nextEnrollingModule = M2.
     const group = mkGroup({
       maxStudents: 8,
-      isCustom: false,
+      kind: 'STANDARD' as const,
       dayOfWeek: 'Srijeda',
       modules: [STD_M1, STD_M2, STD_M3, STD_M4],
       enrollments: [
@@ -151,14 +152,14 @@ describe('computeGroupCapacity — per-group arc resolution', () => {
 
     const wed = mkGroup({
       maxStudents: 8,
-      isCustom: false,
+      kind: 'STANDARD' as const,
       dayOfWeek: 'Srijeda',
       modules: [STD_M1, STD_M2, STD_M3, STD_M4],
       enrollments,
     })
     const mon = mkGroup({
       maxStudents: 8,
-      isCustom: false,
+      kind: 'STANDARD' as const,
       dayOfWeek: 'Ponedjeljak',
       modules: [STD_M1, STD_M2, STD_M3, STD_M4],
       enrollments,
@@ -180,7 +181,7 @@ describe('computeGroupCapacity — per-group arc resolution', () => {
     // Wed past 15.03.2027 — all 4 modules completed, no future module.
     const group = mkGroup({
       maxStudents: 12,
-      isCustom: false,
+      kind: 'STANDARD' as const,
       dayOfWeek: 'Srijeda',
       modules: [STD_M1, STD_M2, STD_M3, STD_M4],
       enrollments: [
@@ -209,7 +210,7 @@ describe('computeGroupCapacity — per-group arc resolution', () => {
     })
     const group = mkGroup({
       maxStudents: 10,
-      isCustom: false,
+      kind: 'STANDARD' as const,
       modules: [m1NoEnd],
       enrollments: [
         mkEnrollment('e1', ['s1']),
@@ -227,7 +228,7 @@ describe('computeGroupCapacity — per-group arc resolution', () => {
   it('returns module title on nextEnrollingModule for caller display', () => {
     const group = mkGroup({
       maxStudents: 8,
-      isCustom: false,
+      kind: 'STANDARD' as const,
       modules: [STD_M1, STD_M2, STD_M3, STD_M4],
       enrollments: [],
     })

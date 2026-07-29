@@ -56,7 +56,7 @@ describe('createGroup — school-year trust-boundary guard', () => {
     const location = await createLocation()
     const foreignRadionica = await createCourse({
       title: 'Stara radionica',
-      isCustom: true,
+      kind: 'RADIONICA',
       schoolYear: OTHER_YEAR,
     })
 
@@ -80,7 +80,7 @@ describe('createGroup — school-year trust-boundary guard', () => {
     const location = await createLocation()
     const radionica = await createCourse({
       title: 'Tekuća radionica',
-      isCustom: true,
+      kind: 'RADIONICA',
       schoolYear: SELECTED_YEAR,
     })
 
@@ -101,7 +101,7 @@ describe('createGroup — school-year trust-boundary guard', () => {
 
     const location = await createLocation()
     // Standard programs are global (schoolYear = null) and always selectable.
-    const standard = await createCourse({ title: 'SLR 1', isCustom: false })
+    const standard = await createCourse({ title: 'SLR 1', kind: 'STANDARD' })
 
     const res = await createGroup({
       ...baseInput(standard.id, location.id),

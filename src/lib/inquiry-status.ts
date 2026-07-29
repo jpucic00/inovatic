@@ -41,7 +41,14 @@ export const STATUS_FLOW = [
 // group selection. Legacy rows submitted before this normalization may
 // still carry the literal string 'workshop' — admin views render those
 // via the GRADE_LABELS[v] ?? v fallback.
-export const GRADE_VALUES = [
+//
+// Split in two because which set a FORM OFFERS is not the same as what the
+// column accepts: `/upisi` and the radionica pages stop at 8. razred (the
+// programs behind them are osnovnoškolski), while competitors carry on through
+// srednja škola. `GRADE_VALUES` is the union — the Zod schema and every admin
+// view accept all of them; `submitInquiry` is what enforces that a high-school
+// grade only reaches a competition inquiry.
+export const ELEMENTARY_GRADE_VALUES = [
   'predskolci',
   '1',
   '2',
@@ -53,7 +60,20 @@ export const GRADE_VALUES = [
   '8',
 ] as const
 
+const HIGH_SCHOOL_GRADE_VALUES = ['ss1', 'ss2', 'ss3', 'ss4'] as const
+
+export const GRADE_VALUES = [
+  ...ELEMENTARY_GRADE_VALUES,
+  ...HIGH_SCHOOL_GRADE_VALUES,
+] as const
+
 export type Grade = (typeof GRADE_VALUES)[number]
+type HighSchoolGrade = (typeof HIGH_SCHOOL_GRADE_VALUES)[number]
+
+/** True for the four srednja škola grades — offered only on the competition form. */
+export function isHighSchoolGrade(value: string): value is HighSchoolGrade {
+  return (HIGH_SCHOOL_GRADE_VALUES as readonly string[]).includes(value)
+}
 
 export const GRADE_LABELS: Record<Grade, string> = {
   predskolci: 'Predškolci',
@@ -65,6 +85,10 @@ export const GRADE_LABELS: Record<Grade, string> = {
   '6': '6. razred',
   '7': '7. razred',
   '8': '8. razred',
+  ss1: 'Srednja škola – 1. razred',
+  ss2: 'Srednja škola – 2. razred',
+  ss3: 'Srednja škola – 3. razred',
+  ss4: 'Srednja škola – 4. razred',
 }
 
 export const GRADE_SORT_KEY: Record<Grade, number> = {
@@ -77,4 +101,8 @@ export const GRADE_SORT_KEY: Record<Grade, number> = {
   '6': 6,
   '7': 7,
   '8': 8,
+  ss1: 9,
+  ss2: 10,
+  ss3: 11,
+  ss4: 12,
 }

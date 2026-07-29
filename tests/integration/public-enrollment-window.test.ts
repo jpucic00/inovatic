@@ -7,6 +7,7 @@ import {
   createEnrollmentWindow,
   createGroup,
   createLocation,
+  relativeDateKey,
 } from './helpers/factory'
 
 // upsertEnrollmentWindow revalidates on success — stub next/cache so the action
@@ -18,6 +19,10 @@ const { getActivePrograms } = await import('@/actions/public/programs')
 
 const YEAR = '2026/2027'
 const createdCourseIds: string[] = []
+// The workshops here exist to prove the *window* gate — keep them safely ahead
+// of today so the radionica start-date cutoff never becomes the reason they
+// disappear.
+const UPCOMING = { dateStart: relativeDateKey(30), dateEnd: relativeDateKey(35) }
 
 afterAll(async () => {
   await db.courseEnrollmentWindow.deleteMany({ where: { courseId: { in: createdCourseIds } } })
@@ -27,15 +32,14 @@ afterAll(async () => {
 
 async function setup() {
   const admin = await createAdmin()
-  const course = await createCourse({ isCustom: true, schoolYear: YEAR })
+  const course = await createCourse({ kind: 'RADIONICA', schoolYear: YEAR })
   createdCourseIds.push(course.id)
   const location = await createLocation()
   await createGroup({
     courseId: course.id,
     locationId: location.id,
     schoolYear: YEAR,
-    dateStart: '2026-07-15',
-    dateEnd: '2026-07-21',
+    ...UPCOMING,
   })
   mockSession({ id: admin.id, role: 'ADMIN' })
   return course
@@ -100,18 +104,18 @@ describe('getActivePrograms — city isolation under open windows', () => {
     // One shared course with a group AND an open window in EACH city — so the
     // only thing that can keep them apart is the city filter, not a closed
     // window or a missing program.
-    const course = await createCourse({ isCustom: true, schoolYear: YEAR })
+    const course = await createCourse({ kind: 'RADIONICA', schoolYear: YEAR })
     createdCourseIds.push(course.id)
 
     const splitLoc = await createLocation({ city: 'SPLIT' })
     const sibLoc = await createLocation({ city: 'SIBENIK' })
     const splitGroup = await createGroup({
       courseId: course.id, locationId: splitLoc.id, city: 'SPLIT',
-      schoolYear: YEAR, dateStart: '2026-07-15', dateEnd: '2026-07-21',
+      schoolYear: YEAR, ...UPCOMING,
     })
     const sibGroup = await createGroup({
       courseId: course.id, locationId: sibLoc.id, city: 'SIBENIK',
-      schoolYear: YEAR, dateStart: '2026-07-15', dateEnd: '2026-07-21',
+      schoolYear: YEAR, ...UPCOMING,
     })
 
     const openRange = {

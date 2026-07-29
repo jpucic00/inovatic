@@ -235,8 +235,12 @@ function TeacherSection({
   )
 }
 
+/**
+ * Radionica groups read as a date range ("15.07. – 21.07. · 10:00–13:00");
+ * every weekly group — standard or competition — reads as its weekday.
+ */
 function scheduleHint(
-  isCustom: boolean,
+  dateRange: boolean,
   dayOfWeek: string | null,
   dateStart: string | null,
   dateEnd: string | null,
@@ -245,7 +249,7 @@ function scheduleHint(
 ): string | null {
   const endSuffix = endTime ? `–${endTime}` : ''
   const timeRange = startTime ? ` · ${startTime}${endSuffix}` : ''
-  if (isCustom && dateStart && dateEnd) {
+  if (dateRange && dateStart && dateEnd) {
     const rangeLabel =
       dateStart === dateEnd
         ? formatDate(fromDateKey(dateStart))
@@ -453,15 +457,17 @@ function RosterTable({
 // ─── Public component ───────────────────────────────────────────────────────
 
 export function AttendanceMarker(props: Readonly<GroupAttendance>) {
-  if (props.kind === 'custom') return <RadionicaAttendanceMarker {...props} />
-  return <StandardAttendanceMarker {...props} />
+  // Radionica and competition groups share the flat marker: both are a plain
+  // list of dates with no module sections to slice.
+  if (props.kind === 'standard') return <StandardAttendanceMarker {...props} />
+  return <FlatAttendanceMarker {...props} />
 }
 
-// ─── Radionica (flat) branch ────────────────────────────────────────────────
+// ─── Flat branch (radionica + competition season) ───────────────────────────
 
-type RadionicaProps = Extract<GroupAttendance, { kind: 'custom' }>
+type FlatProps = Extract<GroupAttendance, { kind: 'custom' | 'season' }>
 
-function pickRadionicaDefault(expected: string[], extras: string[]): string {
+function pickFlatDefault(expected: string[], extras: string[]): string {
   const today = toDateKey(todayUtc())
   const all = [...new Set([...expected, ...extras])].sort((a, b) =>
     a.localeCompare(b),
@@ -473,8 +479,9 @@ function pickRadionicaDefault(expected: string[], extras: string[]): string {
   return all[0]
 }
 
-function RadionicaAttendanceMarker({
+function FlatAttendanceMarker({
   groupId,
+  kind,
   dayOfWeek,
   dateStart,
   dateEnd,
@@ -487,7 +494,7 @@ function RadionicaAttendanceMarker({
   teachers,
   teacherRecords,
   markingWindow,
-}: Readonly<RadionicaProps>) {
+}: Readonly<FlatProps>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const recordIndex = useMemo(() => indexRecords(records), [records])
@@ -505,7 +512,7 @@ function RadionicaAttendanceMarker({
   }, [expectedSessions, extraSessions, adhocDates])
 
   const [selected, setSelected] = useState<string>(() =>
-    pickRadionicaDefault(expectedSessions, extraSessions),
+    pickFlatDefault(expectedSessions, extraSessions),
   )
   const [draft, setDraft] = useState<Draft>(() =>
     initDraft(roster, recordIndex.get(selected)),
@@ -573,7 +580,7 @@ function RadionicaAttendanceMarker({
     )
   }
 
-  const hint = scheduleHint(true, dayOfWeek, dateStart, dateEnd, startTime, endTime)
+  const hint = scheduleHint(kind === 'custom', dayOfWeek, dateStart, dateEnd, startTime, endTime)
 
   return (
     <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">

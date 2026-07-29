@@ -13,6 +13,8 @@
  * are the teacher's call — they simply leave the row unmarked or write a note.
  */
 
+import { zagrebDateKey } from './attendance-window'
+
 const DAY_INDEX: Record<string, number> = {
   // 0 = Sunday to match JS Date.getUTCDay()
   Nedjelja: 0,
@@ -161,10 +163,62 @@ export function computeExpectedSessions(input: {
   return out
 }
 
+/**
+ * Weekly sessions for a COMPETITION group: every occurrence of `dayOfWeek`
+ * inside the program's season, minus holidays.
+ *
+ * Deliberately has no session-count target and no make-up logic — a holiday
+ * landing on a group's weekday simply removes that week. Two groups meeting on
+ * different weekdays can therefore end the season with different totals, which
+ * is the intended behaviour: the competitive track is paced by the calendar,
+ * not by a fixed curriculum length.
+ *
+ * Returns [] when the season is unplanned or the weekday is missing.
+ */
+export function computeSeasonSessions(input: {
+  dayOfWeek: string | null
+  startDate: Date | null
+  endDate: Date | null
+  holidayDates?: ReadonlySet<string>
+}): Date[] {
+  return computeExpectedSessions({
+    dayOfWeek: input.dayOfWeek,
+    moduleWindows: [{ startDate: input.startDate, endDate: input.endDate }],
+    holidayDates: input.holidayDates,
+  })
+}
+
 /** Return today's date as a UTC-midnight `Date` (matching `@db.Date` storage). */
 export function todayUtc(): Date {
   const now = new Date()
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+}
+
+/**
+ * Whether a radionica group may still be offered as a termin on the public
+ * signup form.
+ *
+ * A workshop runs once, on a closed [dateStart, dateEnd] range, so a parent can
+ * only usefully join one that has not begun: an inquiry still has to be read and
+ * turned into an account by an admin ("kontaktiramo vas u roku 48h"), which a
+ * workshop starting today or already finished cannot wait for. The cutoff is the
+ * **start** day — from midnight of `dateStart` onward the group drops out of the
+ * form, which covers "already running" and "long over" in one rule.
+ *
+ * Anchored on the Europe/Zagreb calendar day so the group doesn't vanish a
+ * couple of hours early on a UTC server. `YYYY-MM-DD` keys compare correctly as
+ * strings, so nothing here can drift across a timezone boundary.
+ *
+ * A radionica group with no dates (the admin form accepts both bounds blank)
+ * has no start to compare against and stays bookable — hiding it would silently
+ * remove a termin over missing data rather than over an expired one.
+ */
+export function isRadionicaOpenForSignup(
+  dateStart: string | null,
+  now: Date,
+): boolean {
+  if (!dateStart) return true
+  return dateStart > zagrebDateKey(now)
 }
 
 /**

@@ -63,9 +63,9 @@ type Props = {
   archived: boolean
   holidays: HolidayRow[]
   holidayDateKeys: string[]
-  /** All standard programs (Course.isCustom = false), modules sorted by sortOrder. */
+  /** All standard programs (ProgramKind.STANDARD), modules sorted by sortOrder. */
   standardCourses: SchoolYearCourseInput[]
-  /** Radionice (Course.isCustom = true). Planning never touches these. */
+  /** Radionice (ProgramKind.RADIONICA). Planning never touches these. */
   customCourses: SchoolYearCourseInput[]
   /** Radionica ScheduledGroups with date ranges (for the workshop labels on the calendar). */
   radionicaGroups: SchoolYearRadionicaGroupInput[]

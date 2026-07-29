@@ -52,7 +52,7 @@ test.beforeAll(async () => {
       slug: `pay-course-${RUN_ID}`,
       title: `Program ${RUN_ID}`,
       description: 'Test program',
-      isCustom: false,
+      kind: 'STANDARD',
       ageMin: 6,
       ageMax: 14,
     },

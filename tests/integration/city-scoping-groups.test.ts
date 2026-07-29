@@ -63,11 +63,11 @@ async function loginSibenikAdmin() {
   return admin
 }
 
-// Radionice (isCustom, per-city) carry a schoolYear the factory's createCourse
+// Radionice (per-city) carry a schoolYear the factory's createCourse
 // doesn't set, so they're created directly — tracked all the same.
 function createRadionica(city: 'SPLIT' | 'SIBENIK') {
   return fx.course({
-    isCustom: true,
+    kind: 'RADIONICA',
     schoolYear: SY,
     city,
     title: `Radionica ${city}`,
@@ -338,7 +338,7 @@ describe('locations — city scoping', () => {
 
 describe('getCourses — course feed city scoping', () => {
   it('shows shared standard programs and own radionice, hides the other city’s radionice', async () => {
-    const standard = await fx.course() // shared: isCustom false, city null
+    const standard = await fx.course() // shared: kind STANDARD, city null
     const sibenikRadionica = await createRadionica('SIBENIK')
     const splitRadionica = await createRadionica('SPLIT')
     await loginSibenikAdmin()

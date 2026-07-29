@@ -24,6 +24,7 @@ import {
 } from '@/lib/inquiry-status'
 import { formatChildName, formatDate } from '@/lib/format'
 import { toDateKey } from '@/lib/session-dates'
+import type { ProgramKind } from '@prisma/client'
 
 export const metadata: Metadata = { title: 'Admin – Upit' }
 
@@ -285,7 +286,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     location: { name: string }
     course: {
       title: string
-      isCustom: boolean
+      kind: ProgramKind
       modules?: {
         id: string
         title: string
@@ -304,7 +305,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     availableSpots: sg.availableSpots,
     isFull: sg.isFull,
     location: { name: sg.location.name },
-    course: { title: sg.course.title, isCustom: sg.course.isCustom, modules: sg.course.modules },
+    course: { title: sg.course.title, kind: sg.course.kind, modules: sg.course.modules },
   })
 
   const groupsForInitial = inquiry.courseId

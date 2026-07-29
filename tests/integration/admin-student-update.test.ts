@@ -192,7 +192,7 @@ describe('createStudentFromInquiry — reuse updates the existing account with n
 
     // Radionica group → no module selection required to enroll.
     const location = await createLocation({ city: 'SPLIT' })
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const group = await createGroup({
       courseId: radionica.id,
       locationId: location.id,

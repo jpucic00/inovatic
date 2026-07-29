@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import type { ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
@@ -29,7 +30,7 @@ export type GalleryView = {
     course: {
       id: string
       title: string
-      isCustom: boolean
+      kind: ProgramKind
     }
   }
   modules: GalleryModule[]
@@ -51,7 +52,7 @@ export async function buildGroupGalleryView(groupId: string): Promise<GalleryVie
         select: {
           id: true,
           title: true,
-          isCustom: true,
+          kind: true,
           modules: {
             orderBy: { sortOrder: 'asc' },
             select: {
@@ -92,6 +93,7 @@ export async function buildGroupGalleryView(groupId: string): Promise<GalleryVie
     modules: group.course.modules,
     schoolYear,
     city: group.city,
+    kind: group.course.kind,
     holidayDates,
   })
 
@@ -102,7 +104,7 @@ export async function buildGroupGalleryView(groupId: string): Promise<GalleryVie
       course: {
         id: group.course.id,
         title: group.course.title,
-        isCustom: group.course.isCustom,
+        kind: group.course.kind,
       },
     },
     modules: group.course.modules.map((m) => ({

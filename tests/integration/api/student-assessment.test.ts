@@ -30,7 +30,7 @@ async function createStandardCourseWithLevel() {
       description: 'Standardni program',
       ageMin: 6,
       ageMax: 14,
-      isCustom: false,
+      kind: 'STANDARD',
       level: 'SLR_2',
     },
   })
@@ -98,7 +98,7 @@ describe('upsertAssessment / clearAssessment — admin', () => {
     const student = await createStudent({ city: 'SPLIT' })
     const group = await createGroup({ city: 'SPLIT' })
     await createEnrollment(student.id, group.id, { schoolYear: group.schoolYear })
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
 
     const res = await upsertAssessment({
       studentId: student.id,
@@ -118,7 +118,7 @@ describe('upsertAssessment / clearAssessment — admin', () => {
     const admin = await createAdmin({ city: 'SPLIT' })
     mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
     const student = await createStudent({ city: 'SPLIT' })
-    const radionicaCourse = await createCourse({ isCustom: true })
+    const radionicaCourse = await createCourse({ kind: 'RADIONICA' })
     const group = await createGroup({ city: 'SPLIT', courseId: radionicaCourse.id })
     await createEnrollment(student.id, group.id, { schoolYear: group.schoolYear })
 

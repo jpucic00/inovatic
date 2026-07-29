@@ -13,7 +13,7 @@ describe('bulk-message template', () => {
     const html = await renderBulkMessageHtml({
       subject: 'Upisi u školsku godinu 2026/2027 – Inovatic',
       bodyText: 'Pozivamo vas na upis.',
-      includeSignupCta: true,
+      signupPath: '/upisi/slr-2',
     })
 
     expect(html).toContain('prijave@udruga-inovatic.hr')

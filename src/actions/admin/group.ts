@@ -9,6 +9,7 @@ import { createGroupSchema, updateGroupSchema } from '@/lib/validators/admin/gro
 import type { CreateGroupInput, UpdateGroupInput } from '@/lib/validators/admin/group'
 import type { AdminActionResult } from '@/lib/action-types'
 import { computeSchoolYear } from '@/lib/school-year'
+import { isRadionica } from '@/lib/program-kind'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 
@@ -38,7 +39,7 @@ export async function getGroups(filters: GroupFilters = {}) {
           id: true,
           title: true,
           level: true,
-          isCustom: true,
+          kind: true,
           // Windows are per (course, schoolYear, city) — only this city's.
           enrollmentWindows: {
             where: { schoolYear: year, city },
@@ -187,9 +188,9 @@ export async function createGroup(data: CreateGroupInput): Promise<AdminActionRe
   // attaching a stale radionica from another school year.
   const course = await db.course.findUnique({
     where: { id: courseId },
-    select: { isCustom: true, schoolYear: true, city: true },
+    select: { kind: true, schoolYear: true, city: true },
   })
-  if (!course || (course.isCustom && course.schoolYear !== schoolYear)) {
+  if (!course || (isRadionica(course.kind) && course.schoolYear !== schoolYear)) {
     return { success: false, error: 'Odabrani program ne pripada ovoj školskoj godini.' }
   }
   // Shared standard programs (city = null) are open to both cities; a

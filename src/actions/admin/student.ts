@@ -1,6 +1,6 @@
 'use server'
 
-import type { City, Prisma } from '@prisma/client'
+import type { City, Prisma, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertUserInCity } from '@/lib/city-guard'
@@ -28,6 +28,8 @@ import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
 import { formatGroupSchedule } from '@/lib/format'
 import { computeSchoolYear } from '@/lib/school-year'
+import { isMonthlyBilled, isRadionica } from '@/lib/program-kind'
+import { seasonMonths } from '@/lib/monthly-charges'
 import {
   computeStudentPaymentStatus,
   paymentStatusUserWhere,
@@ -104,7 +106,7 @@ export type StudentRow = {
       name: string | null
       dayOfWeek: string | null
       startTime: string | null
-      course: { id: string; title: string; isCustom: boolean }
+      course: { id: string; title: string; kind: ProgramKind }
       location: { name: string }
     }
     moduleEnrollments: {
@@ -196,7 +198,7 @@ type CoreResult = {
     startTime: string | null
     endTime: string | null
     schoolYear: string
-    course: { title: string; isCustom: boolean }
+    course: { title: string; kind: ProgramKind }
     location: { name: string; address: string }
   } | null
 }
@@ -303,7 +305,7 @@ async function ensureEnrollment(
     where: { id: groupId },
     include: {
       location: { select: { name: true, address: true } },
-      course: { select: { title: true, isCustom: true } },
+      course: { select: { title: true, kind: true } },
     },
   })
   if (!sg) throw new GroupNotFoundError()
@@ -342,7 +344,43 @@ async function ensureEnrollment(
     })
   }
 
+  if (isMonthlyBilled(sg.course.kind)) {
+    await createSeasonMonths(tx, enrollmentId, sg.courseId, sg.schoolYear, city)
+  }
+
   return { enrollmentId, group: sg }
+}
+
+/**
+ * Write the payable months for a monthly-fee enrollment: every month from the
+ * one the child is joining in through the end of the program's season.
+ *
+ * Deliberately floored at "now" rather than the season start — a child enrolled
+ * in January owes January onwards, never the autumn they didn't attend.
+ * `skipDuplicates` keeps re-running it (a second enrollment call on the same
+ * group) a no-op. An unplanned season writes nothing; setting the dates later
+ * backfills through `upsertCourseSeason`.
+ */
+async function createSeasonMonths(
+  tx: TxClient,
+  enrollmentId: string,
+  courseId: string,
+  schoolYear: string,
+  city: City,
+): Promise<void> {
+  const season = await tx.courseSeason.findUnique({
+    where: { courseId_schoolYear_city: { courseId, schoolYear, city } },
+    select: { startDate: true, endDate: true },
+  })
+  if (!season) return
+
+  const months = seasonMonths(season.startDate, season.endDate, new Date())
+  if (months.length === 0) return
+
+  await tx.enrollmentMonth.createMany({
+    data: months.map((periodStart) => ({ enrollmentId, periodStart })),
+    skipDuplicates: true,
+  })
 }
 
 /**
@@ -561,7 +599,7 @@ async function dispatchStudentCredentials(
   if (!core.group) return
 
   const schedule = formatGroupSchedule({
-    isCustom: core.group.course.isCustom,
+    dateRange: isRadionica(core.group.course.kind),
     dayOfWeek: core.group.dayOfWeek,
     dateStart: core.group.dateStart,
     dateEnd: core.group.dateEnd,
@@ -865,7 +903,7 @@ export async function getStudents(
           include: {
             scheduledGroup: {
               include: {
-                course: { select: { id: true, title: true, isCustom: true } },
+                course: { select: { id: true, title: true, kind: true } },
                 location: { select: { name: true } },
               },
             },
@@ -875,6 +913,9 @@ export async function getStudents(
                 paidAt: true,
                 moduleSchedule: { select: { startDate: true } },
               },
+            },
+            enrollmentMonths: {
+              select: { paidAt: true, periodStart: true },
             },
           },
         },

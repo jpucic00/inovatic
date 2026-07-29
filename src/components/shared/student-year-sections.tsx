@@ -199,12 +199,17 @@ export function StudentYearSections({
                   {isAdmin && (
                     <EnrollmentPaymentPanel
                       enrollmentId={enrollment.id}
-                      isCustom={sg.course.isCustom}
+                      kind={sg.course.kind}
                       fullYearPaidAt={enrollment.fullYearPaidAt}
                       modules={enrollment.moduleEnrollments.map((me) => ({
                         moduleEnrollmentId: me.id,
                         title: me.moduleSchedule.module.title,
                         paidAt: me.paidAt,
+                      }))}
+                      months={enrollment.enrollmentMonths.map((m) => ({
+                        enrollmentMonthId: m.id,
+                        periodStart: m.periodStart,
+                        paidAt: m.paidAt,
                       }))}
                     />
                   )}

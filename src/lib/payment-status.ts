@@ -1,4 +1,5 @@
-import type { Prisma } from '@prisma/client'
+import type { Prisma, ProgramKind } from '@prisma/client'
+import { isMonthlyBilled, isRadionica } from '@/lib/program-kind'
 
 export type PaymentStatus = 'PAID' | 'PENDING' | 'NONE'
 
@@ -27,20 +28,29 @@ export type PaymentFilter = (typeof PAYMENT_FILTER_VALUES)[number]
 export type PaymentStatusEnrollment = {
   schoolYear: string
   fullYearPaidAt: Date | null
-  scheduledGroup: { course: { isCustom: boolean } }
+  scheduledGroup: { course: { kind: ProgramKind } }
   moduleEnrollments: {
     paidAt: Date | null
     moduleSchedule: { startDate: Date | null }
+  }[]
+  /** Monthly-fee rows. Empty for every kind except COMPETITION. */
+  enrollmentMonths: {
+    paidAt: Date | null
+    periodStart: Date
   }[]
 }
 
 /**
  * Year-independent: a debt counts regardless of which school year the
  * enrollment belongs to. An enrollment is "pending" (still owes money) when it
- * is not marked whole-year-paid AND either it is a radionica (the enrollment
- * itself is the single payable item) or it has at least one started, unpaid
- * module. A module is "started" once its window has begun (startDate <= now);
- * a NULL startDate is treated as started/owed.
+ * is not marked whole-year-paid AND, per program kind:
+ *
+ *   RADIONICA   always — the enrollment itself is the single payable item.
+ *   COMPETITION at least one month whose 1st has passed is unpaid. This is what
+ *               makes the status flip on the 1st with no scheduled job.
+ *   STANDARD    at least one started, unpaid module. A module is "started" once
+ *               its window has begun (startDate <= now); a NULL startDate is
+ *               treated as started/owed.
  *
  * MUST stay in sync with `pendingEnrollmentWhere` below.
  */
@@ -49,7 +59,13 @@ export function isEnrollmentPending(
   now: Date,
 ): boolean {
   if (enrollment.fullYearPaidAt) return false
-  if (enrollment.scheduledGroup.course.isCustom) return true
+  const kind = enrollment.scheduledGroup.course.kind
+  if (isRadionica(kind)) return true
+  if (isMonthlyBilled(kind)) {
+    return enrollment.enrollmentMonths.some(
+      (m) => m.paidAt === null && m.periodStart <= now,
+    )
+  }
   return enrollment.moduleEnrollments.some(
     (me) =>
       me.paidAt === null &&
@@ -80,7 +96,11 @@ export function pendingEnrollmentWhere(now: Date): Prisma.EnrollmentWhereInput {
   return {
     fullYearPaidAt: null,
     OR: [
-      { scheduledGroup: { course: { isCustom: true } } },
+      { scheduledGroup: { course: { kind: 'RADIONICA' } } },
+      {
+        scheduledGroup: { course: { kind: 'COMPETITION' } },
+        enrollmentMonths: { some: { paidAt: null, periodStart: { lte: now } } },
+      },
       {
         moduleEnrollments: {
           some: {

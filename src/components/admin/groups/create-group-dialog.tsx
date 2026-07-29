@@ -18,12 +18,14 @@ import { createGroup } from '@/actions/admin/group'
 import { DAYS_HR } from '@/lib/format'
 import { adminInputClass, adminSelectClass } from '@/lib/admin-styles'
 import { DateInput } from '@/components/ui/date-input'
+import type { ProgramKind } from '@prisma/client'
+import { isRadionica } from '@/lib/program-kind'
 import {
   TeacherMultiSelect,
   type TeacherOption,
 } from '@/components/admin/teachers/teacher-multi-select'
 
-type CourseOption = { id: string; title: string; isCustom: boolean }
+type CourseOption = { id: string; title: string; kind: ProgramKind }
 type LocationOption = { id: string; name: string }
 
 interface CreateGroupDialogProps {
@@ -51,7 +53,11 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
   })
 
   const selectedCourseId = useWatch({ control, name: 'courseId' })
-  const isRadionica = courses.find((c) => c.id === selectedCourseId)?.isCustom ?? false
+  // Only a radionica is scheduled as a date range; standard and competition
+  // groups both meet weekly on a `dayOfWeek`.
+  const isDateRangeGroup = isRadionica(
+    courses.find((c) => c.id === selectedCourseId)?.kind ?? 'STANDARD',
+  )
 
   function onSubmit(data: CreateGroupInput) {
     startTransition(async () => {
@@ -110,7 +116,7 @@ export function CreateGroupDialog({ courses, locations, currentYear, teachers }:
             <input id="create-name" {...register('name')} className={adminInputClass} placeholder="npr. Grupa A, Ujutro" />
             {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
           </div>
-          {isRadionica ? (
+          {isDateRangeGroup ? (
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>

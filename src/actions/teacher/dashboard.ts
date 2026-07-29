@@ -1,5 +1,6 @@
 'use server'
 
+import type { ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireTeacher } from '@/lib/auth-guard'
 import { computeSchoolYear } from '@/lib/school-year'
@@ -11,7 +12,7 @@ type TeacherGroupSummary = {
   startTime: string | null
   endTime: string | null
   schoolYear: string
-  course: { id: string; title: string; isCustom: boolean }
+  course: { id: string; title: string; kind: ProgramKind }
   location: { id: string; name: string }
   enrollmentCount: number
   materialCount: number
@@ -38,7 +39,7 @@ export async function getMyAssignedGroups(): Promise<TeacherGroupSummary[]> {
     },
     orderBy: [{ course: { sortOrder: 'asc' } }, { name: 'asc' }, { createdAt: 'asc' }],
     include: {
-      course: { select: { id: true, title: true, isCustom: true } },
+      course: { select: { id: true, title: true, kind: true } },
       location: { select: { id: true, name: true } },
       _count: { select: { enrollments: true, materials: true } },
     },

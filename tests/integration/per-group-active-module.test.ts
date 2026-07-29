@@ -47,7 +47,7 @@ const MODULE_WINDOWS = [
 
 async function seedStandardCourseWithFourModules() {
   const location = await createLocation()
-  const course = await createCourse({ isCustom: false, title: 'SLR 1' })
+  const course = await createCourse({ kind: 'STANDARD' as const, title: 'SLR 1' })
   const modules = await Promise.all(
     MODULE_WINDOWS.map((_, i) =>
       createModule(course.id, { sortOrder: i, title: `Modul ${i + 1}` }),
@@ -162,7 +162,7 @@ describe('per-group active module — capacity diverges by weekday + holidays', 
           },
           course: {
             select: {
-              isCustom: true,
+              kind: true,
               modules: {
                 orderBy: { sortOrder: 'asc' },
                 select: {

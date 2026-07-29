@@ -16,6 +16,8 @@ import { sendScheduleOptions, getGroupsForCourse } from '@/actions/admin/inquiry
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { formatGroupSchedule } from '@/lib/format'
 import { toast } from 'sonner'
+import { isRadionica } from '@/lib/program-kind'
+import type { ProgramKind } from '@prisma/client'
 
 interface GroupOption {
   id: string
@@ -28,7 +30,7 @@ interface GroupOption {
   availableSpots: number
   isFull: boolean
   location: { name: string }
-  course: { isCustom: boolean }
+  course: { kind: ProgramKind }
 }
 
 interface CourseOption {
@@ -79,7 +81,7 @@ export function SendScheduleDialog({
           availableSpots: sg.availableSpots,
           isFull: sg.isFull,
           location: { name: sg.location.name },
-          course: { isCustom: sg.course.isCustom },
+          course: { kind: sg.course.kind },
         })),
       )
     } finally {
@@ -162,7 +164,7 @@ export function SendScheduleDialog({
             loadedGroups.map((g) => {
               const checked = selectedIds.includes(g.id)
               const schedule = formatGroupSchedule({
-                isCustom: g.course.isCustom,
+                dateRange: isRadionica(g.course.kind),
                 dayOfWeek: g.dayOfWeek,
                 dateStart: g.dateStart,
                 dateEnd: g.dateEnd,

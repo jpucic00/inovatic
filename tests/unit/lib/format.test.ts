@@ -83,7 +83,7 @@ describe('formatGroupSchedule', () => {
   it('renders a date range with time for radionice', () => {
     expect(
       formatGroupSchedule({
-        isCustom: true,
+        dateRange: true,
         dateStart: '2026-07-15',
         dateEnd: '2026-07-21',
         startTime: '09:00',
@@ -95,7 +95,7 @@ describe('formatGroupSchedule', () => {
   it('collapses to a single date when start === end', () => {
     expect(
       formatGroupSchedule({
-        isCustom: true,
+        dateRange: true,
         dateStart: '2026-07-15',
         dateEnd: '2026-07-15',
         startTime: '09:00',
@@ -107,7 +107,7 @@ describe('formatGroupSchedule', () => {
   it('renders the weekday + time for standard programs', () => {
     expect(
       formatGroupSchedule({
-        isCustom: false,
+        dateRange: false,
         dayOfWeek: 'Ponedjeljak',
         startTime: '17:00',
         endTime: '18:30',
@@ -115,10 +115,10 @@ describe('formatGroupSchedule', () => {
     ).toBe('Ponedjeljak · 17:00–18:30')
   })
 
-  it('falls back to weekday when isCustom but no date range supplied', () => {
+  it('falls back to weekday when dateRange is set but no date range supplied', () => {
     expect(
       formatGroupSchedule({
-        isCustom: true,
+        dateRange: true,
         dayOfWeek: 'Ponedjeljak',
         startTime: '17:00',
         endTime: '18:30',

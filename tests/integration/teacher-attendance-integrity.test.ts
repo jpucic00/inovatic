@@ -53,7 +53,7 @@ afterEach(async () => {
 /** A group with one teacher who has booked an hour on SESSION_DATE. */
 async function groupWithBookedHours(city: 'SPLIT' | 'SIBENIK' = 'SPLIT') {
   const teacher = await createTeacher({ city })
-  const course = await fixtures.course({ isCustom: false })
+  const course = await fixtures.course({ kind: 'STANDARD' })
   const location = await fixtures.location({ city })
   const group = await fixtures.group({
     courseId: course.id,
@@ -215,7 +215,7 @@ describe('deleteCourse — a radionica cannot take booked hours with it', () => 
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await fixtures.course({ isCustom: true, city: 'SPLIT', schoolYear: SY })
+    const course = await fixtures.course({ kind: 'RADIONICA', city: 'SPLIT', schoolYear: SY })
     const group = await fixtures.group({ courseId: course.id, schoolYear: SY, city: 'SPLIT' })
     const teacher = await createTeacher()
     await createTeacherAttendance(teacher.id, group.id, { sessionDate: SESSION_DATE })
@@ -233,7 +233,7 @@ describe('deleteCourse — a radionica cannot take booked hours with it', () => 
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const course = await fixtures.course({ isCustom: true, city: 'SPLIT', schoolYear: SY })
+    const course = await fixtures.course({ kind: 'RADIONICA', city: 'SPLIT', schoolYear: SY })
     const group = await fixtures.group({ courseId: course.id, schoolYear: SY, city: 'SPLIT' })
 
     const res = await deleteCourse(course.id)

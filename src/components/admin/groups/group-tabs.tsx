@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { GroupTable } from './group-table'
 import { tabClass } from '@/lib/ui-classes'
+import type { ProgramKind } from '@prisma/client'
 
 type Group = {
   id: string
@@ -19,7 +20,7 @@ type Group = {
   enrollmentEnd: Date | null
   courseId: string
   locationId: string
-  course: { id: string; title: string; level: string | null; isCustom: boolean }
+  course: { id: string; title: string; level: string | null; kind: ProgramKind }
   location: { id: string; name: string }
   _count: {
     enrollments: number

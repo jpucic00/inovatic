@@ -483,7 +483,7 @@ test.describe('Phase 3 Step 13 — COURSE-scope material on a radionica', () => 
     const page = await browser.newPage()
     await loginAsAdmin(page)
 
-    // 1) Create the radionica (Course.isCustom = true) via the admin UI.
+    // 1) Create the radionica (ProgramKind.RADIONICA) via the admin UI.
     await page.goto(`${BASE}/admin/programi`)
     await page.getByRole('button', { name: 'Nova radionica' }).click()
     const cDialog = page.locator('[role="dialog"]')

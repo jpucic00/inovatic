@@ -45,7 +45,7 @@ describe('kids see only the active module for their group', () => {
     const schoolYear = computeSchoolYear()
     const admin = await createAdmin()
     const student = await createStudent()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const m1 = await createModule(course.id, { title: 'Modul 1', sortOrder: 0 })
     const m2 = await createModule(course.id, { title: 'Modul 2', sortOrder: 1 })
 
@@ -87,7 +87,7 @@ describe('kids see only the active module for their group', () => {
     const admin = await createAdmin()
     const studentMon = await createStudent()
     const studentTue = await createStudent()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const m1 = await createModule(course.id, { title: 'Modul 1', sortOrder: 0 })
     const m2 = await createModule(course.id, { title: 'Modul 2', sortOrder: 1 })
     await db.moduleSchedule.create({

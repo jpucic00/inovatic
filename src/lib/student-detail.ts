@@ -12,7 +12,7 @@ const courseSelect = {
   id: true,
   title: true,
   level: true,
-  isCustom: true,
+  kind: true,
   modules: {
     orderBy: { sortOrder: 'asc' as const },
     select: {
@@ -24,6 +24,11 @@ const courseSelect = {
       },
     },
   },
+} as const
+
+const enrollmentMonthSelect = {
+  id: true,
+  periodStart: true,
 } as const
 
 const moduleEnrollmentSelect = {
@@ -99,6 +104,10 @@ const baseEnrollmentSelect = {
     orderBy: { moduleSchedule: { module: { sortOrder: 'asc' as const } } },
     select: moduleEnrollmentSelect,
   },
+  enrollmentMonths: {
+    orderBy: { periodStart: 'asc' as const },
+    select: enrollmentMonthSelect,
+  },
 } as const
 
 const userBaseSelect = {
@@ -128,8 +137,9 @@ type TeacherStudentResult = Awaited<ReturnType<typeof fetchForTeacher>>
 
 export type StudentDetail = NonNullable<AdminStudentResult>
 
-// Teacher result has the same shape but fullYearPaidAt / paidAt are absent from
-// the Prisma select; the builder replaces them with null to keep one shared type.
+// Teacher result has the same shape but every paid mark (fullYearPaidAt, the
+// per-module paidAt and the monthly-fee paidAt) is absent from the Prisma
+// select; the builder replaces them with null to keep one shared type.
 type TeacherRaw = NonNullable<TeacherStudentResult>
 
 // ── Private fetchers ─────────────────────────────────────────────────────────
@@ -149,6 +159,10 @@ function fetchForAdmin(id: string, city?: City) {
           moduleEnrollments: {
             orderBy: { moduleSchedule: { module: { sortOrder: 'asc' } } },
             select: { ...moduleEnrollmentSelect, paidAt: true },
+          },
+          enrollmentMonths: {
+            orderBy: { periodStart: 'asc' },
+            select: { ...enrollmentMonthSelect, paidAt: true },
           },
         },
       },
@@ -207,6 +221,7 @@ export async function buildStudentDetailForTeacher(id: string): Promise<StudentD
       ...e,
       fullYearPaidAt: null,
       moduleEnrollments: e.moduleEnrollments.map((me) => ({ ...me, paidAt: null })),
+      enrollmentMonths: e.enrollmentMonths.map((m) => ({ ...m, paidAt: null })),
     })),
   }
 }
@@ -218,7 +233,7 @@ export async function buildStudentDetailForTeacher(id: string): Promise<StudentD
  */
 export async function getRecommendationOptions(): Promise<RecommendationOption[]> {
   const courses = await db.course.findMany({
-    where: { isCustom: false, level: { not: null } },
+    where: { kind: 'STANDARD', level: { not: null } },
     orderBy: { level: 'asc' },
     select: { id: true, title: true },
   })

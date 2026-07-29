@@ -46,7 +46,7 @@ test.beforeAll(async () => {
         slug: `planner-course-${RUN_ID}-${c}`,
         title: `Planner Course ${RUN_ID}-${c}`,
         description: 'Test program za planiranje godine',
-        isCustom: false,
+        kind: 'STANDARD',
         ageMin: 6,
         ageMax: 14,
       },

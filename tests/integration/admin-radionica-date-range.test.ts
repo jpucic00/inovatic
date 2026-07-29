@@ -61,7 +61,7 @@ const { getGroupAttendance } = await import('@/actions/teacher/attendance')
 describe('createGroup — radionica date range', () => {
   it('persists dateStart + dateEnd and leaves dayOfWeek null when admin creates a radionica', async () => {
     const admin = await createAdmin()
-    const radionica = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const radionica = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const location = await fx.location()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
@@ -90,7 +90,7 @@ describe('createGroup — radionica date range', () => {
 
   it('rejects a radionica when only dateStart is provided', async () => {
     const admin = await createAdmin()
-    const radionica = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const radionica = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const location = await fx.location()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
@@ -110,7 +110,7 @@ describe('createGroup — radionica date range', () => {
 
   it('rejects a radionica when dateEnd is before dateStart', async () => {
     const admin = await createAdmin()
-    const radionica = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const radionica = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const location = await fx.location()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
@@ -130,7 +130,7 @@ describe('createGroup — radionica date range', () => {
 
   it('allows updateGroup to widen the date range', async () => {
     const admin = await createAdmin()
-    const radionica = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const radionica = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     const group = await fx.group({
       courseId: radionica.id,
       schoolYear: '2026/2027',
@@ -155,7 +155,7 @@ describe('createGroup — radionica date range', () => {
 describe('getGroupAttendance — radionica session enumeration', () => {
   it('returns one expected session per day in the radionica range (skipping holidays + Sundays)', async () => {
     const teacher = await createTeacher()
-    const radionica = await fx.course({ isCustom: true, schoolYear: '2026/2027' })
+    const radionica = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
     // 2026-07-15..19: Wed Thu Fri Sat Sun. Sunday (19th) drops out automatically;
     // we also mark the 17th as a holiday — only Wed/Thu/Sat remain.
     const group = await fx.group({
@@ -191,7 +191,7 @@ describe('getGroupAttendance — radionica session enumeration', () => {
 
   it('standard programs keep their dayOfWeek-driven weekly enumeration', async () => {
     const teacher = await createTeacher()
-    const standard = await fx.course({ isCustom: false })
+    const standard = await fx.course({ kind: 'STANDARD' })
     const group = await fx.group({
       courseId: standard.id,
       schoolYear: '2026/2027',

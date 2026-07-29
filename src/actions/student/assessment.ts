@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { requireStudent } from '@/lib/auth-guard'
 import { formatRecommendationLabel } from '@/lib/assessment-rubric'
 import { formatDate } from '@/lib/format'
+import { isGradable } from '@/lib/program-kind'
 
 /**
  * The report card as the parent/polaznik sees it. Ids are resolved to display
@@ -60,14 +61,14 @@ export async function getMyAssessmentForGroup(
     select: {
       id: true,
       name: true,
-      course: { select: { title: true, isCustom: true } },
+      course: { select: { title: true, kind: true } },
     },
   })
   if (!group) notFound()
 
   const view: StudentAssessmentView = {
     group: { id: group.id, name: group.name, courseTitle: group.course.title },
-    gradable: !group.course.isCustom,
+    gradable: isGradable(group.course.kind),
     assessment: null,
   }
   if (!view.gradable) return view

@@ -7,6 +7,7 @@ import { GalleryGrid } from './gallery-grid'
 import { GalleryUploadZone } from './gallery-upload-zone'
 import { GalleryLightbox } from './gallery-lightbox'
 import { tabClass } from '@/lib/ui-classes'
+import { isRadionica } from '@/lib/program-kind'
 
 interface Props {
   view: GalleryView
@@ -16,18 +17,19 @@ interface Props {
 export function GalleryTabsAndGrid({ view, canManage }: Readonly<Props>) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const isCustom = view.group.course.isCustom
+  // Radionice have no modules, so no tabs; every other kind files images per module.
+  const flatLayout = isRadionica(view.group.course.kind)
 
   const tabs = useMemo(
     () =>
-      isCustom
+      flatLayout
         ? []
         : view.modules.map((m) => ({ id: m.id, label: m.title })),
-    [view.modules, isCustom],
+    [view.modules, flatLayout],
   )
 
   const initialTab = (() => {
-    if (isCustom) return null
+    if (flatLayout) return null
     const fromUrl = searchParams.get('tab')
     if (fromUrl && tabs.some((t) => t.id === fromUrl)) return fromUrl
     if (view.activeModuleId) return view.activeModuleId
@@ -40,28 +42,28 @@ export function GalleryTabsAndGrid({ view, canManage }: Readonly<Props>) {
   const [lightboxIndex, setLightboxIndex] = useState(-1)
 
   useEffect(() => {
-    if (isCustom) return
+    if (flatLayout) return
     if (!activeModuleId) return
     const current = searchParams.get('tab')
     if (current === activeModuleId) return
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', activeModuleId)
     router.replace(`?${params.toString()}`, { scroll: false })
-  }, [activeModuleId, isCustom, router, searchParams])
+  }, [activeModuleId, flatLayout, router, searchParams])
 
   const filteredImages = useMemo(() => {
-    if (isCustom) {
+    if (flatLayout) {
       return view.images.filter((img) => img.moduleId === null)
     }
     return view.images.filter((img) => img.moduleId === activeModuleId)
-  }, [view.images, activeModuleId, isCustom])
+  }, [view.images, activeModuleId, flatLayout])
 
   const countForTab = (moduleId: string) =>
     view.images.filter((img) => img.moduleId === moduleId).length
 
-  const uploadModuleId = isCustom ? null : activeModuleId
+  const uploadModuleId = flatLayout ? null : activeModuleId
   const canUpload =
-    canManage && (isCustom || activeModuleId !== null)
+    canManage && (flatLayout || activeModuleId !== null)
 
   const emptyLabel = canManage
     ? 'Galerija je prazna. Učitajte prvu sliku iznad.'
@@ -69,7 +71,7 @@ export function GalleryTabsAndGrid({ view, canManage }: Readonly<Props>) {
 
   return (
     <div className="space-y-4">
-      {!isCustom && tabs.length > 0 && (
+      {!flatLayout && tabs.length > 0 && (
         <div className="flex flex-nowrap gap-1 border-b border-gray-200 overflow-x-auto overflow-y-hidden sm:overflow-visible">
           {tabs.map((tab) => {
             const isActive = tab.id === activeModuleId

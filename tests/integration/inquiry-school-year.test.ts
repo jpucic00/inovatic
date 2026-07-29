@@ -69,7 +69,7 @@ function validForm(overrides: Partial<InquiryFormData> = {}): InquiryFormData {
 
 describe('submitInquiry — school year stamping', () => {
   it('stamps the chosen group\'s year (future-year group → that year, not "now")', async () => {
-    const radionica = await createCourse({ isCustom: true })
+    const radionica = await createCourse({ kind: 'RADIONICA' })
     const futureYear = getNextSchoolYear(computeSchoolYear())
     const group = await createGroup({
       courseId: radionica.id,
@@ -162,9 +162,9 @@ describe('getInquiryCourses — radionica year-scoping', () => {
 
     // Standard courses are year-agnostic (schoolYear: null); radionice are
     // stamped with a school year, mirroring getCourses' OR predicate.
-    const standard = await createCourse({ isCustom: false })
-    const radioCurrent = await createCourse({ isCustom: true, schoolYear: currentYear })
-    const radioFuture = await createCourse({ isCustom: true, schoolYear: futureYear })
+    const standard = await createCourse({ kind: 'STANDARD' })
+    const radioCurrent = await createCourse({ kind: 'RADIONICA', schoolYear: currentYear })
+    const radioFuture = await createCourse({ kind: 'RADIONICA', schoolYear: futureYear })
 
     mockSession({ id: admin.id, role: 'ADMIN' })
 

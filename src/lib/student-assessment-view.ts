@@ -1,4 +1,5 @@
 import type { RecommendationKind, SkillLevel } from '@prisma/client'
+import { isGradable } from '@/lib/program-kind'
 import type { StudentDetail } from '@/lib/student-detail'
 import type { CommentListItem } from '@/components/shared/comment-list'
 
@@ -53,7 +54,7 @@ export type GradebookYearTab = {
 type SectionMeta = {
   groupId: string
   schoolYear: string
-  isCustom: boolean
+  gradable: boolean
   hasEnrollment: boolean
   program: string
   groupLabel: string
@@ -65,7 +66,8 @@ type SectionMeta = {
  * the union of the student's enrollments and any group that still carries a
  * comment (enrollment removed) so nothing silently disappears. Year is taken
  * from the group. A report card is editable only for a standard program with a
- * live enrollment; radionice (isCustom) never show a card but keep comments.
+ * live enrollment or a competition one; radionice never show a card but keep
+ * comments.
  */
 export function buildGradebookTabs(
   student: StudentDetail,
@@ -78,7 +80,7 @@ export function buildGradebookTabs(
     meta.set(sg.id, {
       groupId: sg.id,
       schoolYear: e.schoolYear,
-      isCustom: sg.course.isCustom,
+      gradable: isGradable(sg.course.kind),
       hasEnrollment: true,
       program: sg.course.title,
       groupLabel: sg.name ?? sg.dayOfWeek ?? '—',
@@ -93,7 +95,7 @@ export function buildGradebookTabs(
     meta.set(c.group.id, {
       groupId: c.group.id,
       schoolYear: c.group.schoolYear,
-      isCustom: false, // unknown without an enrollment; irrelevant (hasEnrollment=false gates the card)
+      gradable: false, // unknown without an enrollment; irrelevant (hasEnrollment=false gates the card)
       hasEnrollment: false,
       program: c.group.course.title,
       groupLabel: c.group.name ?? '—',
@@ -137,7 +139,7 @@ export function buildGradebookTabs(
 
   const byYear = new Map<string, GradebookSection[]>()
   for (const m of meta.values()) {
-    const canGrade = m.hasEnrollment && !m.isCustom
+    const canGrade = m.hasEnrollment && m.gradable
     const section: GradebookSection = {
       groupId: m.groupId,
       schoolYear: m.schoolYear,
@@ -147,7 +149,7 @@ export function buildGradebookTabs(
       canGrade,
       canComment: m.hasEnrollment,
       // Radionice never carry a card, even if a stray row somehow exists.
-      assessment: m.isCustom ? null : (assessmentByGroup.get(m.groupId) ?? null),
+      assessment: m.gradable ? (assessmentByGroup.get(m.groupId) ?? null) : null,
       comments: commentsByGroup.get(m.groupId) ?? [],
     }
     const bucket = byYear.get(m.schoolYear) ?? []

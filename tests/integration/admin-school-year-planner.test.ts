@@ -47,7 +47,7 @@ async function seedFourStandardCourses() {
   // exist — admin's workflow is "plan first, create groups later". Groups
   // are not part of the calendar/planner pipeline.
   const courses = await Promise.all(
-    [0, 1, 2, 3].map(() => createCourse({ isCustom: false })),
+    [0, 1, 2, 3].map(() => createCourse({ kind: 'STANDARD' })),
   )
   for (const c of courses) {
     for (let i = 0; i < 4; i++) {
@@ -188,7 +188,7 @@ describe('completeSchoolYearPlan', () => {
     await seedFourStandardCourses()
     // Inject a drifted course with only 3 modules. Groups irrelevant — every
     // standard course is in scope.
-    const drift = await createCourse({ isCustom: false, title: 'Drift program' })
+    const drift = await createCourse({ kind: 'STANDARD', title: 'Drift program' })
     for (let i = 0; i < 3; i++) {
       await createModule(drift.id, { sortOrder: i, title: `Modul ${i + 1}` })
     }
@@ -209,7 +209,7 @@ describe('completeSchoolYearPlan', () => {
     // Seed uses sortOrder 1..4 (see prisma/seed.ts). The action must order by
     // sortOrder ASC and use position-in-list, NOT raw sortOrder, to index
     // into plan.modules (length 4, 0..3).
-    const course = await createCourse({ isCustom: false, title: 'Seed-style SLR' })
+    const course = await createCourse({ kind: 'STANDARD', title: 'Seed-style SLR' })
     const modules: Array<{ id: string }> = []
     for (let i = 1; i <= 4; i++) {
       modules.push(await createModule(course.id, { sortOrder: i, title: `Modul ${i}` }))
@@ -243,7 +243,7 @@ describe('completeSchoolYearPlan', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
     await seedFourStandardCourses()
-    const radionica = await createCourse({ isCustom: true, title: 'Radionica' })
+    const radionica = await createCourse({ kind: 'RADIONICA', title: 'Radionica' })
     const radionicaModule = await createModule(radionica.id, {
       sortOrder: 0,
       title: 'Sastavi auto',

@@ -9,6 +9,8 @@ import { requireAdminCtx } from '@/lib/auth-guard'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
 import { formatGroupSchedule } from '@/lib/format'
+import { isRadionica } from '@/lib/program-kind'
+import { signupPathForSlug } from '@/lib/signup-links'
 import { decodeRecommendation, formatRecommendationLabel } from '@/lib/assessment-rubric'
 import {
   buildEmailRecipients,
@@ -47,23 +49,24 @@ function sleep(ms: number) {
 /**
  * Feed for the step-2 grouped multi-select: every course that actually had
  * groups in `sourceYear` in the admin's city, with those groups nested.
- * `standardOnly` mirrors the campaign kind (REENROLLMENT never offers
- * radionice) — a business rule, not a security boundary; the send re-enforces
- * it in resolveCohort.
+ * `graduatingOnly` mirrors the campaign kind (a REENROLLMENT invitation is sent
+ * to a cohort finishing a curriculum program, never to a one-off radionica) — a
+ * business rule, not a security boundary; the send re-enforces it in
+ * resolveCohort.
  */
-export async function getEmailGroupTree(sourceYear: string, standardOnly: boolean) {
+export async function getEmailGroupTree(sourceYear: string, graduatingOnly: boolean) {
   const { city } = await requireAdminCtx()
   if (!SCHOOL_YEAR_RE.test(sourceYear)) return []
 
   return db.course.findMany({
     where: {
-      ...(standardOnly ? { isCustom: false } : {}),
+      ...(graduatingOnly ? { kind: { not: 'RADIONICA' } } : {}),
       scheduledGroups: { some: { schoolYear: sourceYear, city } },
     },
     select: {
       id: true,
       title: true,
-      isCustom: true,
+      kind: true,
       scheduledGroups: {
         where: { schoolYear: sourceYear, city },
         select: {
@@ -80,7 +83,7 @@ export async function getEmailGroupTree(sourceYear: string, standardOnly: boolea
         orderBy: { createdAt: 'asc' },
       },
     },
-    orderBy: [{ isCustom: 'asc' }, { sortOrder: 'asc' }, { title: 'asc' }],
+    orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
   })
 }
 
@@ -185,9 +188,9 @@ async function resolveRecommendationCohort(
       group: {
         city,
         schoolYear: sourceSchoolYear,
-        // Assessments exist only on standard programs, but keep the invitation
-        // rule structural rather than assumed.
-        ...(kind === 'REENROLLMENT' ? { course: { isCustom: false } } : {}),
+        // Radionice are never graded, but keep the invitation rule structural
+        // rather than assumed.
+        ...(kind === 'REENROLLMENT' ? { course: { kind: { not: 'RADIONICA' } } } : {}),
       },
       student: { role: 'STUDENT', deletedAt: null },
     },
@@ -232,7 +235,7 @@ async function resolveGroupCohort(
       id: { in: uniqueIds },
       city,
       schoolYear: filters.sourceSchoolYear,
-      ...(kind === 'REENROLLMENT' ? { course: { isCustom: false } } : {}),
+      ...(kind === 'REENROLLMENT' ? { course: { kind: { not: 'RADIONICA' } } } : {}),
     },
     select: { id: true },
   })
@@ -327,26 +330,41 @@ async function loadAlreadyInvited(
   return new Set(rows.map((r) => r.parentEmail))
 }
 
+/**
+ * The termini an invitation offers, plus the signup path its CTA links to.
+ *
+ * The path is derived from the target course's slug rather than persisted on
+ * the campaign — same reasoning as the options themselves, which a resumed send
+ * also rebuilds: the campaign stores ids, not rendered content.
+ */
 async function buildTargetOptions(
   city: City,
   targetYear: string,
   targetCourseId: string,
   targetGroupIds: string[],
-): Promise<{ ok: true; options: GroupOption[] } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; options: GroupOption[]; signupPath: string } | { ok: false; error: string }
+> {
   const uniqueIds = [...new Set(targetGroupIds)]
   const groups = await db.scheduledGroup.findMany({
     where: { id: { in: uniqueIds }, city, schoolYear: targetYear, courseId: targetCourseId },
-    include: { location: true, course: { select: { isCustom: true } } },
+    include: { location: true, course: { select: { kind: true, slug: true } } },
     orderBy: { createdAt: 'asc' },
   })
   if (groups.length !== uniqueIds.length) return { ok: false, error: INVALID_DATA }
 
+  // Every selected group belongs to targetCourseId (the where clause says so),
+  // so any of them names the target program.
+  const targetSlug = groups[0]?.course.slug
+  if (!targetSlug) return { ok: false, error: INVALID_DATA }
+
   return {
     ok: true,
+    signupPath: signupPathForSlug(targetSlug),
     options: groups.map((g) => ({
       groupName: g.name ?? 'Grupa',
       schedule: formatGroupSchedule({
-        isCustom: g.course.isCustom,
+        dateRange: isRadionica(g.course.kind),
         dayOfWeek: g.dayOfWeek,
         dateStart: g.dateStart,
         dateEnd: g.dateEnd,
@@ -417,6 +435,7 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
 
   try {
     let options: GroupOption[] | undefined
+    let signupPath: string | undefined
     if (parsed.data.kind === 'REENROLLMENT') {
       const targetYear = await getSelectedSchoolYear()
       const built = await buildTargetOptions(
@@ -427,13 +446,14 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
       )
       if (!built.ok) return { success: false, error: built.error }
       options = built.options
+      signupPath = built.signupPath
     }
 
     const html = await renderBulkMessageHtml({
       subject: parsed.data.subject,
       bodyText: parsed.data.bodyText,
       options,
-      includeSignupCta: parsed.data.kind === 'REENROLLMENT',
+      signupPath,
     })
     return { success: true, html }
   } catch (err) {
@@ -470,6 +490,7 @@ export async function sendEmailCampaign(
     const targetYear = await getSelectedSchoolYear()
 
     let options: GroupOption[] | undefined
+    let signupPath: string | undefined
     let invited = new Set<string>()
     if (data.kind === 'REENROLLMENT') {
       if (isArchivedYear(targetYear)) {
@@ -481,6 +502,7 @@ export async function sendEmailCampaign(
       const built = await buildTargetOptions(city, targetYear, data.targetCourseId, data.targetGroupIds)
       if (!built.ok) return { success: false, error: built.error }
       options = built.options
+      signupPath = built.signupPath
       invited = await loadAlreadyInvited(city, data.targetCourseId, targetYear)
     }
 
@@ -563,7 +585,7 @@ export async function sendEmailCampaign(
       subject: data.subject,
       bodyText: data.bodyText,
       options,
-      includeSignupCta: data.kind === 'REENROLLMENT',
+      signupPath,
       sentKey,
     })
 
@@ -607,7 +629,8 @@ type SendJob = {
   subject: string
   bodyText: string
   options: GroupOption[] | undefined
-  includeSignupCta: boolean
+  /** Where the invitation's CTA points — `/upisi/<target-slug>`. */
+  signupPath: string | undefined
   sentKey: string | null
 }
 
@@ -660,7 +683,7 @@ async function runSendJob(job: SendJob): Promise<void> {
         bodyText: job.bodyText,
         city: job.city,
         options: job.options,
-        includeSignupCta: job.includeSignupCta,
+        signupPath: job.signupPath,
       })
       // Counts increment per recipient so progress polling is live and an
       // interrupted campaign still reports exactly what went out.
@@ -759,6 +782,7 @@ export async function resumeEmailCampaign(
   }
 
   let options: GroupOption[] | undefined
+  let signupPath: string | undefined
   let sentKey: string | null = null
   if (campaign.kind === 'REENROLLMENT' && campaign.targetCourseId && campaign.targetSchoolYear) {
     const built = await buildTargetOptions(
@@ -769,6 +793,7 @@ export async function resumeEmailCampaign(
     )
     if (!built.ok) return { success: false, error: built.error }
     options = built.options
+    signupPath = built.signupPath
     sentKey = invitationSentKey(city, campaign.targetCourseId, campaign.targetSchoolYear)
   }
 
@@ -780,7 +805,7 @@ export async function resumeEmailCampaign(
     subject: campaign.subject,
     bodyText: campaign.bodyText,
     options,
-    includeSignupCta: campaign.kind === 'REENROLLMENT',
+    signupPath,
     sentKey,
   })
 

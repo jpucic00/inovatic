@@ -18,6 +18,8 @@ import { getGroupsForCourseInSelectedYear } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { toast } from 'sonner'
 import { formatModuleDateRange } from '@/lib/format'
+import { hasDatedModules } from '@/lib/program-kind'
+import type { ProgramKind } from '@prisma/client'
 
 type ModuleOption = {
   id: string
@@ -36,7 +38,7 @@ type GroupOption = {
   availableSpots: number
   isFull: boolean
   location: { name: string }
-  course: { title: string; isCustom?: boolean; modules?: ModuleOption[] }
+  course: { title: string; kind: ProgramKind; modules?: ModuleOption[] }
 }
 
 type CourseOption = {
@@ -82,7 +84,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
 
   const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null
   const courseModules = selectedGroup?.course.modules ?? []
-  const isStandardCourse = selectedGroup ? !selectedGroup.course.isCustom : false
+  const isStandardCourse = selectedGroup ? hasDatedModules(selectedGroup.course.kind) : false
   const allScheduleIds = courseModules
     .map(getScheduleId)
     .filter((id): id is string => id !== null)
@@ -129,7 +131,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
           location: { name: g.location.name },
           course: {
             title: g.course.title,
-            isCustom: g.course.isCustom,
+            kind: g.course.kind,
             modules: g.course.modules,
           },
         })),

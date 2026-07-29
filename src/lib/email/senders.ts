@@ -198,8 +198,14 @@ type BulkMessageParams = {
   /** The campaign's city — decides which inbox a parent's reply lands in. */
   city: City
   options?: GroupOption[]
-  /** REENROLLMENT invitations link to the public signup form. */
-  includeSignupCta?: boolean
+  /**
+   * Site-relative path the "Ispunite prijavu" button links to, e.g.
+   * `/upisi/slr-3`. Set on REENROLLMENT invitations only — an invitation links
+   * to the program it invited the child to, not to the generic catalog, so the
+   * parent lands on a form already narrowed to the right termini. Absent = no
+   * button.
+   */
+  signupPath?: string
 }
 
 /** Šibenik parents reply to Šibenik; Split keeps the default association inbox. */
@@ -211,7 +217,7 @@ function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>)
     subject: params.subject,
     bodyText: params.bodyText,
     options: params.options,
-    signupUrl: params.includeSignupCta ? `${publicBaseUrl()}/upisi` : undefined,
+    signupUrl: params.signupPath ? `${publicBaseUrl()}${params.signupPath}` : undefined,
   })
 }
 

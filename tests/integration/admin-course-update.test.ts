@@ -35,7 +35,7 @@ function loginAdmin() {
 
 async function radionica(overrides: Parameters<typeof createCourse>[0] = {}) {
   const course = await createCourse({
-    isCustom: true,
+    kind: 'RADIONICA',
     schoolYear: SY,
     city: 'SPLIT',
     ...overrides,
@@ -123,7 +123,7 @@ describe('updateCourse — radionica edit', () => {
     expect(after.price).toBeNull()
   })
 
-  it('leaves city, schoolYear and isCustom untouched', async () => {
+  it('leaves city, schoolYear and kind untouched', async () => {
     loginAdmin()
 
     const course = await radionica()
@@ -132,7 +132,7 @@ describe('updateCourse — radionica edit', () => {
     const after = await db.course.findUniqueOrThrow({ where: { id: course.id } })
     expect(after.city).toBe('SPLIT')
     expect(after.schoolYear).toBe(SY)
-    expect(after.isCustom).toBe(true)
+    expect(after.kind).toBe('RADIONICA')
   })
 
   it('rejects an invalid payload without writing', async () => {
@@ -153,7 +153,7 @@ describe('updateCourse — guards', () => {
   it('refuses a standard SLR program', async () => {
     loginAdmin()
 
-    const course = await createCourse({ isCustom: false, title: 'SLR 1' })
+    const course = await createCourse({ kind: 'STANDARD', title: 'SLR 1' })
     createdCourseIds.push(course.id)
 
     const res = await updateCourse(payload(course.id))

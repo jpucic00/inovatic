@@ -12,13 +12,15 @@ import { updateGroup } from '@/actions/admin/group'
 import { DAYS_HR, formatDate, formatDateKey } from '@/lib/format'
 import { adminInputClass, adminSelectClass } from '@/lib/admin-styles'
 import { DateInput } from '@/components/ui/date-input'
+import type { ProgramKind } from '@prisma/client'
+import { isRadionica } from '@/lib/program-kind'
 import {
   getEnrollmentWindowState,
   ENROLLMENT_WINDOW_LABEL,
   ENROLLMENT_WINDOW_COLOR,
 } from '@/lib/enrollment-window'
 
-type CourseOption = { id: string; title: string; isCustom: boolean }
+type CourseOption = { id: string; title: string; kind: ProgramKind }
 type LocationOption = { id: string; name: string }
 
 type GroupForEdit = {
@@ -35,7 +37,7 @@ type GroupForEdit = {
   maxStudents: number
   enrollmentStart: Date | null
   enrollmentEnd: Date | null
-  course: { id: string; title: string; level: string | null; isCustom: boolean }
+  course: { id: string; title: string; level: string | null; kind: ProgramKind }
   location: { id: string; name: string }
   enrolledCount: number
 }
@@ -189,7 +191,7 @@ function TimeSlot({ startTime, endTime }: Readonly<{ startTime: string | null; e
 }
 
 function TerminValue({ group }: Readonly<{ group: GroupForEdit }>) {
-  if (group.course.isCustom && group.dateStart && group.dateEnd) {
+  if (isRadionica(group.course.kind) && group.dateStart && group.dateEnd) {
     const rangeLabel =
       group.dateStart === group.dateEnd
         ? formatDateKey(group.dateStart)
@@ -251,7 +253,9 @@ function GroupInfoEdit({
   })
 
   const selectedCourseId = useWatch({ control, name: 'courseId' })
-  const isRadionica = courses.find((c) => c.id === selectedCourseId)?.isCustom ?? false
+  const isDateRangeGroup = isRadionica(
+    courses.find((c) => c.id === selectedCourseId)?.kind ?? 'STANDARD',
+  )
 
   function onSubmit(data: CreateGroupInput) {
     startTransition(async () => {
@@ -297,7 +301,7 @@ function GroupInfoEdit({
           <input id="info-name" {...register('name')} className={adminInputClass} placeholder="npr. Grupa A, Ujutro" />
           {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
         </div>
-        {isRadionica ? (
+        {isDateRangeGroup ? (
           <>
             <div className="grid grid-cols-2 gap-3">
               <div>

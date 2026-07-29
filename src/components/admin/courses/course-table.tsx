@@ -3,7 +3,8 @@
 import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Wrench, Copy, Check, Trash2, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Wrench, Trash2, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CopyLinkButton } from './copy-link-button'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,6 @@ type Course = {
   title: string
   description: string
   level: string | null
-  isCustom: boolean
   ageMin: number
   ageMax: number
   equipment: string | null
@@ -35,29 +35,6 @@ interface CourseTableProps {
 }
 
 const PAGE_SIZE = 10
-
-function CopyUrlButton({ slug }: Readonly<{ slug: string }>) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = () => {
-    const url = `${globalThis.location.origin}/radionice/${slug}`
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
-
-  return (
-    <button
-      onClick={handleCopy}
-      title="Kopiraj URL prijave"
-      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded-md hover:bg-cyan-100 transition-colors"
-    >
-      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-      {copied ? 'Kopirano' : 'Kopiraj URL'}
-    </button>
-  )
-}
 
 function DeleteCourseButton({ course }: Readonly<{ course: Course }>) {
   const [open, setOpen] = useState(false)
@@ -149,7 +126,7 @@ function CourseCard({ course, editable }: Readonly<{ course: Course; editable: b
           </div>
         </div>
         <div className="relative z-10 flex items-center gap-2 flex-wrap justify-end shrink-0">
-          <CopyUrlButton slug={course.slug} />
+          <CopyLinkButton path={`/radionice/${course.slug}`} />
           {groupCount > 0 && (
             <Link
               href="/admin/grupe?tab=__radionice__"

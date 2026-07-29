@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import type { Mock } from 'vitest'
-import type { City } from '@prisma/client'
+import type { City, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
 import {
@@ -92,10 +92,10 @@ const CONTENT = {
   bodyText: 'Ovo je testna poruka roditeljima naših polaznika.',
 }
 
-async function makeSourceGroup(opts: { city?: City; isCustom?: boolean } = {}) {
+async function makeSourceGroup(opts: { city?: City; kind?: ProgramKind } = {}) {
   const city = opts.city ?? 'SPLIT'
   const location = await createLocation({ city })
-  const course = await createCourse({ isCustom: opts.isCustom ?? false })
+  const course = await createCourse({ kind: opts.kind ?? 'STANDARD' })
   const group = await createGroup({
     courseId: course.id,
     locationId: location.id,
@@ -230,7 +230,7 @@ describe('sendEmailCampaign — CUSTOM', () => {
 
   it('accepts radionica groups in the custom kind', async () => {
     await loginAdmin()
-    const { group } = await makeSourceGroup({ isCustom: true })
+    const { group } = await makeSourceGroup({ kind: 'RADIONICA' })
     await enrollStudent(group.id, { parentEmail: uniqEmail('radionica') })
 
     const res = await sendAndSettle({
@@ -344,7 +344,7 @@ describe('sendEmailCampaign — REENROLLMENT', () => {
   it('rejects a radionica group smuggled into the source selection', async () => {
     await loginAdmin()
     const standard = await makeSourceGroup()
-    const radionica = await makeSourceGroup({ isCustom: true })
+    const radionica = await makeSourceGroup({ kind: 'RADIONICA' })
     await enrollStudent(standard.group.id, { parentEmail: uniqEmail('std') })
     const target = await makeTarget()
 
@@ -923,7 +923,7 @@ describe('preporuka selection mode', () => {
     const source = await makeSourceGroup()
     const foreign = await createCourse({
       title: 'Šibenska radionica – tajni naziv',
-      isCustom: true,
+      kind: 'RADIONICA',
       city: 'SIBENIK',
     })
     const student = await enrollStudent(source.group.id, {
@@ -999,6 +999,43 @@ describe('previewEmailHtml', () => {
     }
   })
 
+  it('points the CTA at the invited program, not the generic catalog', async () => {
+    await loginAdmin()
+    const target = await makeTarget()
+
+    const res = await previewEmailHtml({
+      kind: 'REENROLLMENT',
+      targetCourseId: target.course.id,
+      targetGroupIds: [target.group.id],
+      ...CONTENT,
+    })
+    expect(res.success).toBe(true)
+    // A parent invited to a specific program lands on that program's own form,
+    // which offers its termini regardless of the child's razred.
+    if (res.success) expect(res.html).toContain(`/upisi/${target.course.slug}`)
+  })
+
+  it('points a competition invitation at the unlisted competition link', async () => {
+    await loginAdmin()
+    const location = await createLocation({ city: 'SPLIT' })
+    const course = await createCourse({ kind: 'COMPETITION' })
+    const group = await createGroup({
+      courseId: course.id,
+      locationId: location.id,
+      schoolYear: TARGET_YEAR,
+      city: 'SPLIT',
+    })
+
+    const res = await previewEmailHtml({
+      kind: 'REENROLLMENT',
+      targetCourseId: course.id,
+      targetGroupIds: [group.id],
+      ...CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (res.success) expect(res.html).toContain(`/upisi/${course.slug}`)
+  })
+
   it('renders neither schedules nor CTA for the custom kind', async () => {
     await loginAdmin()
     const res = await previewEmailHtml({ kind: 'CUSTOM', ...CONTENT })
@@ -1026,7 +1063,7 @@ describe('city scoping', () => {
   it('getEmailGroupTree only lists own-city courses and honours standardOnly', async () => {
     const split = await makeSourceGroup({ city: 'SPLIT' })
     const sibenikStandard = await makeSourceGroup({ city: 'SIBENIK' })
-    const sibenikRadionica = await makeSourceGroup({ city: 'SIBENIK', isCustom: true })
+    const sibenikRadionica = await makeSourceGroup({ city: 'SIBENIK', kind: 'RADIONICA' })
 
     await loginAdmin('SIBENIK')
     const all = await getEmailGroupTree(SOURCE_YEAR, false)

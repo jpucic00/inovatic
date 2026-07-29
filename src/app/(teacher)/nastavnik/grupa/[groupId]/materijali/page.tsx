@@ -42,7 +42,7 @@ export default async function TeacherGroupMaterijaliPage({
         rows={rows}
         modules={targets.modules}
         inGroupId={targets.groupId}
-        isCustom={targets.isCustom}
+        kind={targets.kind}
       />
     </div>
   )

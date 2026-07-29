@@ -5,10 +5,12 @@ import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
 import {
   computeRadionicaSessions,
+  computeSeasonSessions,
   fromDateKey,
   todayUtc,
   toDateKey,
 } from '@/lib/session-dates'
+import { isCompetition, isRadionica } from '@/lib/program-kind'
 import {
   getActiveModuleForGroup,
   getGroupModuleArc,
@@ -92,7 +94,9 @@ type GroupAttendanceBase = {
 
 export type GroupAttendance =
   | (GroupAttendanceBase & {
-      kind: 'custom'
+      /** 'custom' = radionica (daily over a range); 'season' = competition
+       *  (one session a week across the program's season). Same flat shape. */
+      kind: 'custom' | 'season'
       expectedSessions: string[]
       extraSessions: string[]
     })
@@ -120,7 +124,13 @@ function loadAttendanceGroup(groupId: string) {
       courseId: true,
       course: {
         select: {
-          isCustom: true,
+          kind: true,
+          // Seasons for the competitive program. Narrowed to this group's
+          // (schoolYear, city) at the call site — Prisma sub-selects cannot
+          // correlate against the parent row's own columns.
+          seasons: {
+            select: { schoolYear: true, city: true, startDate: true, endDate: true },
+          },
           modules: {
             select: {
               id: true,
@@ -249,15 +259,18 @@ function flattenAttendanceRecords(
   return records
 }
 
-/** Radionica branch: flat holiday-aware expected list plus any extra recorded dates. */
-function buildCustomAttendance(
+/**
+ * Flat branch: a precomputed expected-session list plus any extra recorded
+ * dates. Shared by the two kinds that aren't paced by modules — a radionica
+ * (every day of its range) and a competition group (one session a week across
+ * the season) — since the UI shape is identical either way.
+ */
+function buildFlatAttendance(
   base: GroupAttendanceBase,
-  dateStart: string | null,
-  dateEnd: string | null,
-  holidayDates: HolidayDateKeys,
+  kind: 'custom' | 'season',
+  expectedDates: Date[],
   records: AttendanceRecord[],
 ): GroupAttendance {
-  const expectedDates = computeRadionicaSessions({ dateStart, dateEnd, holidayDates })
   const expectedSessions = expectedDates.map(toDateKey)
   const expectedSet = new Set(expectedSessions)
   const extraSet = new Set<string>()
@@ -266,7 +279,7 @@ function buildCustomAttendance(
   }
   return {
     ...base,
-    kind: 'custom',
+    kind,
     expectedSessions,
     extraSessions: Array.from(extraSet).sort((a, b) => a.localeCompare(b)),
   }
@@ -361,9 +374,12 @@ function buildStandardAttendance(
 }
 
 /**
- * Returns everything the Dolazak tab needs. For standard programs the dates
- * are sliced into 4 race-ahead module sections (per-group, holiday-aware via
- * `loadHolidayDateKeys`); for radionice the flat list is preserved.
+ * Returns everything the Dolazak tab needs.
+ *   STANDARD    dates sliced into 4 race-ahead module sections (per-group,
+ *               holiday-aware via `loadHolidayDateKeys`).
+ *   RADIONICA   flat list: every day of the group's [dateStart, dateEnd].
+ *   COMPETITION flat list: one session a week on the group's weekday across the
+ *               program's season, with holiday weeks dropped entirely.
  */
 export async function getGroupAttendance(
   groupId: string,
@@ -372,7 +388,6 @@ export async function getGroupAttendance(
 
   const group = await loadAttendanceGroup(groupId)
   const schoolYear = group.schoolYear
-  const isCustom = group.course.isCustom
   const holidayDates = await loadHolidayDateKeys(schoolYear, group.city)
 
   const [enrollments, teacherData] = await Promise.all([
@@ -406,9 +421,38 @@ export async function getGroupAttendance(
     markingWindow: session.user.role === 'TEACHER' ? teacherMarkingWindow(new Date()) : null,
   }
 
-  return isCustom
-    ? buildCustomAttendance(base, group.dateStart, group.dateEnd, holidayDates, records)
-    : buildStandardAttendance(base, group, schoolYear, holidayDates, enrollments, records)
+  if (isRadionica(group.course.kind)) {
+    return buildFlatAttendance(
+      base,
+      'custom',
+      computeRadionicaSessions({
+        dateStart: group.dateStart,
+        dateEnd: group.dateEnd,
+        holidayDates,
+      }),
+      records,
+    )
+  }
+
+  if (isCompetition(group.course.kind)) {
+    const season =
+      group.course.seasons.find(
+        (x) => x.schoolYear === schoolYear && x.city === group.city,
+      ) ?? null
+    return buildFlatAttendance(
+      base,
+      'season',
+      computeSeasonSessions({
+        dayOfWeek: group.dayOfWeek,
+        startDate: season?.startDate ?? null,
+        endDate: season?.endDate ?? null,
+        holidayDates,
+      }),
+      records,
+    )
+  }
+
+  return buildStandardAttendance(base, group, schoolYear, holidayDates, enrollments, records)
 }
 
 /**

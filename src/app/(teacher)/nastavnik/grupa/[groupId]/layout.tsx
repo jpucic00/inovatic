@@ -4,6 +4,7 @@ import { getTeacherGroupDetail } from '@/actions/teacher/group'
 import { GroupTabs } from '@/components/teacher/group-tabs'
 import { GroupHeader } from '@/components/shared/group-header'
 import { formatGroupSchedule } from '@/lib/format'
+import { isRadionica } from '@/lib/program-kind'
 
 interface LayoutProps {
   params: Promise<{ groupId: string }>
@@ -13,7 +14,7 @@ interface LayoutProps {
 export default async function TeacherGroupLayout({ params, children }: Readonly<LayoutProps>) {
   const { groupId } = await params
   const group = await getTeacherGroupDetail(groupId)
-  const schedule = formatGroupSchedule({ isCustom: group.course.isCustom, dayOfWeek: group.dayOfWeek, startTime: group.startTime, endTime: group.endTime })
+  const schedule = formatGroupSchedule({ dateRange: isRadionica(group.course.kind), dayOfWeek: group.dayOfWeek, startTime: group.startTime, endTime: group.endTime })
 
   return (
     <div>

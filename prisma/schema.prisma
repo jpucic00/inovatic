@@ -31,6 +31,24 @@ enum CourseLevel {
   SLR_4
 }
 
+/// What kind of program a Course is — the discriminator every behavioural
+/// branch switches on. Supersedes the older `isCustom` boolean, which could
+/// only say "radionica or not" and so silently lumped the competitive track in
+/// with the SLR curriculum. Every arm differs in how it is scheduled, what a
+/// student sees, and how it is paid for:
+///
+///   STANDARD    4 dated modules (ModuleSchedule), kids see the ACTIVE module
+///               only, paid per module or per year.
+///   RADIONICA   no modules, one closed [dateStart, dateEnd] range on the
+///               group, flat material list, a single payment.
+///   COMPETITION undated "modules" (the natjecanja), all visible at once, one
+///               weekly session across a CourseSeason, paid monthly.
+enum ProgramKind {
+  STANDARD
+  RADIONICA
+  COMPETITION
+}
+
 enum InquiryStatus {
   NEW
   ACCOUNT_CREATED
@@ -145,6 +163,12 @@ model Course {
   price       Float?
   imageUrl    String?
   sortOrder   Int          @default(0)
+  // The authoritative program-kind discriminator — branch on this, not on
+  // `isCustom`.
+  kind        ProgramKind  @default(STANDARD)
+  // Legacy mirror of `kind == RADIONICA`, kept in sync on write. No
+  // application code reads it; retained because the column is live in
+  // production and dropping it would make a rollback lossy.
   isCustom    Boolean      @default(false)
   // Set on custom radionice (year-scoped); null on standard SLR (global).
   schoolYear  String?
@@ -159,6 +183,7 @@ model Course {
   inquiries         Inquiry[]
   materials         Material[]
   enrollmentWindows CourseEnrollmentWindow[]
+  seasons           CourseSeason[]
 
   recommendedInAssessments StudentAssessment[]
   emailCampaignsAsTarget   EmailCampaign[]     @relation("EmailCampaignTarget")
@@ -178,6 +203,32 @@ model CourseEnrollmentWindow {
   enrollmentEnd   DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, schoolYear, city])
+  @@index([schoolYear])
+}
+
+/// How long a COMPETITION program runs in one school year. Standard programs
+/// are paced by their four ModuleSchedule windows; the competitive track has no
+/// dated modules, so its groups derive sessions from this single range instead:
+/// one session per week on the group's `dayOfWeek` inside [startDate, endDate],
+/// with a week dropped outright when a holiday lands on it. There is
+/// deliberately no session-count target — two groups on different weekdays may
+/// legitimately finish the year with different totals.
+///
+/// Per city, like ModuleSchedule and CourseEnrollmentWindow: Split and Šibenik
+/// run the same program on their own dates.
+model CourseSeason {
+  id         String    @id @default(cuid())
+  courseId   String
+  schoolYear String
+  city       City
+  startDate  DateTime? @db.Date
+  endDate    DateTime? @db.Date
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
@@ -376,9 +427,34 @@ model Enrollment {
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   scheduledGroup    ScheduledGroup     @relation(fields: [scheduledGroupId], references: [id])
   moduleEnrollments ModuleEnrollment[]
+  enrollmentMonths  EnrollmentMonth[]
   attendances       Attendance[]
 
   @@unique([userId, scheduledGroupId, schoolYear])
+}
+
+/// One payable month of a monthly-fee enrollment (COMPETITION programs). Rows
+/// are written up front for the rest of the season the same way ModuleEnrollment
+/// rows are, so "not paid yet" is a stored fact rather than something derived at
+/// read time — and the 1st-of-the-month flip needs no scheduled job: a month
+/// starts counting as owed the moment `periodStart <= now`.
+///
+/// A child enrolling mid-season is only charged from their own join month; the
+/// months before it are never created.
+model EnrollmentMonth {
+  id           String    @id @default(cuid())
+  enrollmentId String
+  /// First day of the billed calendar month (YYYY-MM-01).
+  periodStart  DateTime  @db.Date
+  /// Null = owed (once periodStart has passed). Set = paid.
+  paidAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, periodStart])
+  @@index([periodStart])
 }
 
 model ModuleEnrollment {

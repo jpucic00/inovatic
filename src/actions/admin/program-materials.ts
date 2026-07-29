@@ -1,10 +1,12 @@
 'use server'
 
+import type { ProgramKind } from '@prisma/client'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import type { StaffMaterialRow } from '@/components/material/staff-material-list'
+import { signupPathForSlug } from '@/lib/signup-links'
 
 type ProgramModuleSection = {
   module: { id: string; title: string }
@@ -28,7 +30,7 @@ type ProgramDetail = {
     /** Radionica copy — editable from this page's Uredi dialog. */
     description: string
     level: string | null
-    isCustom: boolean
+    kind: ProgramKind
     ageMin: number
     ageMax: number
     price: number | null
@@ -37,7 +39,11 @@ type ProgramDetail = {
     /** Selected-year public signup window (null when unset). */
     enrollmentStart: Date | null
     enrollmentEnd: Date | null
+    /** Public signup link for this program, e.g. `/upisi/slr-2`. */
+    signupPath: string
   }
+  /** Selected-year season bounds — COMPETITION only, null elsewhere. */
+  season: { startDate: Date | null; endDate: Date | null }
   selectedYear: string
   /** Module date rows for ModuleDatesTable (standard programs only). */
   moduleDates: ProgramModuleDate[]
@@ -60,10 +66,11 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
     where: { id: courseId },
     select: {
       id: true,
+      slug: true,
       title: true,
       description: true,
       level: true,
-      isCustom: true,
+      kind: true,
       city: true,
       ageMin: true,
       ageMax: true,
@@ -75,6 +82,10 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       enrollmentWindows: {
         where: { schoolYear: year, city },
         select: { enrollmentStart: true, enrollmentEnd: true },
+      },
+      seasons: {
+        where: { schoolYear: year, city },
+        select: { startDate: true, endDate: true },
       },
       modules: {
         orderBy: { sortOrder: 'asc' },
@@ -159,7 +170,7 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       title: course.title,
       description: course.description,
       level: course.level,
-      isCustom: course.isCustom,
+      kind: course.kind,
       ageMin: course.ageMin,
       ageMax: course.ageMax,
       price: course.price,
@@ -167,6 +178,11 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       groupCount: course._count.scheduledGroups,
       enrollmentStart: course.enrollmentWindows[0]?.enrollmentStart ?? null,
       enrollmentEnd: course.enrollmentWindows[0]?.enrollmentEnd ?? null,
+      signupPath: signupPathForSlug(course.slug),
+    },
+    season: {
+      startDate: course.seasons[0]?.startDate ?? null,
+      endDate: course.seasons[0]?.endDate ?? null,
     },
     selectedYear: year,
     moduleDates,

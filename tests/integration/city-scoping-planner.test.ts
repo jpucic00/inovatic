@@ -156,7 +156,7 @@ describe('holiday CRUD — per-city rows', () => {
 
 describe('completeSchoolYearPlan — per-city one-shot', () => {
   async function seedFourStandardCourses() {
-    const courses = await Promise.all([0, 1, 2, 3].map(() => createCourse({ isCustom: false })))
+    const courses = await Promise.all([0, 1, 2, 3].map(() => createCourse({ kind: 'STANDARD' })))
     for (const c of courses) {
       for (let i = 0; i < 4; i++) {
         await createModule(c.id, { sortOrder: i, title: `Modul ${i + 1}` })

@@ -40,7 +40,7 @@ function linkInputGroup(scheduledGroupId: string, title = 'Grupa link') {
 describe('createMaterial — teacher is GROUP-only', () => {
   it('lets a teacher add a GROUP material to their own group', async () => {
     const teacher = await createTeacher()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id })
     await createTeacherAssignment(teacher.id, group.id)
     mockSession({ id: teacher.id, role: 'TEACHER' })
@@ -55,7 +55,7 @@ describe('createMaterial — teacher is GROUP-only', () => {
 
   it('rejects a teacher creating a MODULE material', async () => {
     const teacher = await createTeacher()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const courseModule = await createModule(course.id)
     const group = await createGroup({ courseId: course.id })
     await createTeacherAssignment(teacher.id, group.id)
@@ -79,7 +79,7 @@ describe('createMaterial — teacher is GROUP-only', () => {
 
   it('rejects a teacher creating a COURSE (whole-program) material', async () => {
     const teacher = await createTeacher()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id })
     await createTeacherAssignment(teacher.id, group.id)
     mockSession({ id: teacher.id, role: 'TEACHER' })
@@ -102,7 +102,7 @@ describe('createMaterial — teacher is GROUP-only', () => {
 
   it('rejects a teacher creating a GROUP material on a group they do not own', async () => {
     const teacher = await createTeacher()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id })
     // teacher NOT assigned to this group
     mockSession({ id: teacher.id, role: 'TEACHER' })
@@ -115,7 +115,7 @@ describe('createMaterial — teacher is GROUP-only', () => {
 describe('createMaterial — admin authority over the curriculum', () => {
   it('lets an admin add a MODULE material on a standard program', async () => {
     const admin = await createAdmin()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const courseModule = await createModule(course.id)
     mockSession({ id: admin.id, role: 'ADMIN' })
 
@@ -136,7 +136,7 @@ describe('createMaterial — admin authority over the curriculum', () => {
 
   it('lets an admin add a COURSE (whole-program) material on a STANDARD program', async () => {
     const admin = await createAdmin()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     mockSession({ id: admin.id, role: 'ADMIN' })
 
     const res = await createMaterial({
@@ -158,7 +158,7 @@ describe('createMaterial — admin authority over the curriculum', () => {
 
   it('accepts a ROBOCAMP material with an elearning.robocamp.eu URL', async () => {
     const admin = await createAdmin()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const courseModule = await createModule(course.id)
     mockSession({ id: admin.id, role: 'ADMIN' })
 
@@ -218,7 +218,7 @@ describe('updateMaterial / deleteMaterial — teacher ownership', () => {
   it('blocks a teacher from deleting an admin MODULE (curriculum) material', async () => {
     const admin = await createAdmin()
     const teacher = await createTeacher()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const courseModule = await createModule(course.id)
     const group = await createGroup({ courseId: course.id })
     await createTeacherAssignment(teacher.id, group.id)
@@ -257,7 +257,7 @@ describe('COURSE-on-standard visibility, propagation and per-group hide', () => 
   it('shows a whole-program material in every group and respects per-group hide', async () => {
     const admin = await createAdmin()
     const student = await createStudent()
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     await createModule(course.id)
     const groupA = await createGroup({ courseId: course.id })
     const groupB = await createGroup({ courseId: course.id })

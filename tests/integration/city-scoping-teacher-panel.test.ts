@@ -107,7 +107,7 @@ describe('teacher-guard ADMIN bypasses — city-bound', () => {
 
 describe('per-city module arc divergence', () => {
   it('the same shared course paces each city group by its own city schedule', async () => {
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const m1 = await createModule(course.id, { sortOrder: 0, title: 'Modul 1' })
     // Same module, same year — two per-city rows with different windows.
     await createModuleSchedule(m1.id, {
@@ -148,7 +148,7 @@ describe('canManageMaterial — ADMIN city bounds', () => {
   it('GROUP materials are per-city; MODULE/COURSE stay shared curriculum', async () => {
     const splitGroup = await createGroup({ city: 'SPLIT' })
     const sibenikGroup = await createGroup({ city: 'SIBENIK' })
-    const course = await createCourse({ isCustom: false })
+    const course = await createCourse({ kind: 'STANDARD' })
     const mod = await createModule(course.id)
     const slavica = await createAdmin({ city: 'SIBENIK' })
     const session = fakeSession(slavica.id, 'SIBENIK')

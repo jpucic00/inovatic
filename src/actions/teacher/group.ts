@@ -1,5 +1,6 @@
 'use server'
 
+import type { ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
 import { computeSchoolYear } from '@/lib/school-year'
@@ -14,7 +15,7 @@ type TeacherGroupDetail = {
   course: {
     id: string
     title: string
-    isCustom: boolean
+    kind: ProgramKind
     modules: {
       id: string
       title: string
@@ -70,7 +71,7 @@ export async function getTeacherGroupDetail(groupId: string): Promise<TeacherGro
     course: {
       id: group.course.id,
       title: group.course.title,
-      isCustom: group.course.isCustom,
+      kind: group.course.kind,
       modules: group.course.modules.map((m) => {
         // Schedules are per-city rows — pick the group's own city's, never
         // [0] of a two-city result.

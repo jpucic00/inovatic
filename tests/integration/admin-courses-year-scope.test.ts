@@ -39,15 +39,15 @@ describe('getCourses — school-year scoping', () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
-    const standard = await createCourse({ title: 'SLR 1', isCustom: false })
+    const standard = await createCourse({ title: 'SLR 1', kind: 'STANDARD' })
     const radioYearA = await createCourse({
       title: 'Radionica A',
-      isCustom: true,
+      kind: 'RADIONICA',
       schoolYear: '2025/2026',
     })
     const radioYearB = await createCourse({
       title: 'Radionica B',
-      isCustom: true,
+      kind: 'RADIONICA',
       schoolYear: '2026/2027',
     })
 
@@ -83,9 +83,9 @@ describe('createCourse — school-year stamping', () => {
     expect(res.success).toBe(true)
     const created = await db.course.findFirst({
       where: { title: 'Nova Radionica' },
-      select: { isCustom: true, schoolYear: true },
+      select: { kind: true, schoolYear: true },
     })
-    expect(created).toMatchObject({ isCustom: true, schoolYear: '2026/2027' })
+    expect(created).toMatchObject({ kind: 'RADIONICA', schoolYear: '2026/2027' })
   })
 
   it('refuses creation when the selected year is archived', async () => {

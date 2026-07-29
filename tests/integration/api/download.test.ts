@@ -66,7 +66,7 @@ beforeAll(async () => {
   const sEnrolled = await createStudent()
   const sNone = await createStudent()
 
-  const course = await createCourse({ isCustom: false })
+  const course = await createCourse({ kind: 'STANDARD' })
   const moduleRow = await createModule(course.id)
 
   const groupA = await createGroup({ courseId: course.id })
