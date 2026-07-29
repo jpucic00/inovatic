@@ -1,4 +1,4 @@
-type CourseLevel = 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
+type CourseLevel = 'UVOD' | 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
 
 interface CourseModule {
   title: string
@@ -15,6 +15,12 @@ interface HeroRobot {
 export interface Course {
   slug: string
   level: CourseLevel
+  /**
+   * One or two characters for the square badge on the program cards. Derived
+   * from the title everywhere until the intro program arrived, whose title does
+   * not end in its own number.
+   */
+  badge: string
   title: string
   subtitle: string
   description: string
@@ -41,19 +47,86 @@ export interface Course {
 
 export const courses: Course[] = [
   {
+    slug: 'uvod-u-svijet-lego-robotike',
+    level: 'UVOD',
+    badge: 'U',
+    title: 'Uvod u Svijet LEGO robotike',
+    subtitle: 'Početni program robotike za predškolce (5 – 6 godina)',
+    description:
+      'Uvod u Svijet LEGO robotike početni je stupanj našeg kurikuluma LEGO robotike i namijenjen je početnicima uzrasta od 5 do 6 godina (predškolci).\n\n' +
+      'Ovaj program, koristeći LEGO WeDo 2.0 edukacijske setove i LEGO® Education ikonsko programiranje, na zabavan i kreativan način uvodi početnike u čudesan svijet robotike koji nas okružuje.\n\n' +
+      'Koji su to najvažniji sustavi od kojih se sastoji naš svijet, ali i svijet iznad nas, možete saznati u ovoj živopisnoj seriji LEGO projekata — izgradnjom i programiranjem robota koji oduzimaju dah.\n\n' +
+      'Program sadrži ukupno šesnaest projekata koje polaznici samostalno izrađuju unutar četiri tematska modula: Zabavni sustavi, Prometni sustavi, Industrijski sustavi i Svemirski sustavi.\n\n' +
+      'Svaki projekt pruža priliku da se kroz praktično iskustvo lakše razumiju neki od najimpresivnijih znanstvenih principa koji se danas koriste. Gradite, programirajte i učite uz naše LEGO projekte!\n\n' +
+      'Unutar ovog programa možete upisati sva četiri modula odjednom ili pojedini modul po želji.\n\n' +
+      'Po završetku programa polaznici ostvaruju pravo upisa u sljedeći stupanj — program Svijet LEGO robotike 1.',
+    ageMin: 5,
+    ageMax: 6,
+    equipment: 'LEGO WeDo 2.0',
+    tools: 'LEGO Education ikonsko programiranje',
+    priceYear: 400,
+    priceModule: 110,
+    hours: 28,
+    sessionDuration: 60,
+    sessionFrequency: 'Jednom tjedno',
+    season: 'Listopad – Svibanj',
+    groupSize: 12,
+    coverImage: '/images/courses/uvod-u-svijet-lego-robotike/cover.webp',
+    heroBg: '/images/courses/uvod-u-svijet-lego-robotike/hero-bg.webp',
+    heroRobot: {
+      src: '/images/courses/uvod-u-svijet-lego-robotike/hero-robot.webp',
+      width: 1400,
+      height: 875,
+    },
+    modules: [
+      {
+        title: 'Zabavni sustavi',
+        description:
+          'Na koji način koristiti robotiku i moderne tehnologije u zabavne svrhe? Što čini razliku između krajnjeg korisnika i tvorca zabavne tehnologije? Možemo li kroz svijet robotike postati izumitelji koji će samostalno izgraditi zabavne sustave i naučiti njima upravljati?\n\n' +
+          'To su teme ove cjeline, koja se obrađuje kroz četiri projekta: Vrtuljak, Leptir, Humanoid i projekt po slobodnom izboru.',
+        image: '/images/courses/uvod-u-svijet-lego-robotike/module-1.jpg',
+      },
+      {
+        title: 'Prometni sustavi',
+        description:
+          'Promet se od davnina koristi za prijevoz robe i ljudi. Tehnologija je znatno unaprijedila kopneni i zračni promet koji se danas odvija u svijetu, a brza, kvalitetna i sigurna prometna povezanost presudna je za kvalitetu života u modernim gradovima.\n\n' +
+          'Kako izgraditi prometna vozila i naučiti njima upravljati teme su ove cjeline, koja se obrađuje kroz četiri projekta: Automobilska utrka, Motocikl, Vatrogasno vozilo i projekt po slobodnom izboru.',
+        image: '/images/courses/uvod-u-svijet-lego-robotike/module-2.jpg',
+      },
+      {
+        title: 'Industrijski sustavi',
+        description:
+          'Razvoj industrije pospješuje rast i razvoj modernih država i gradova svijeta. Sve je veći broj industrijskih i poduzetničkih zona smještenih u blizini većih gradova, a svaka od njih za svoj rad koristi razne industrijske sustave i strojeve kojima unapređuje i ubrzava proizvodnju.\n\n' +
+          'Kako izgraditi sve te tehnički besprijekorne konstrukcije i naučiti njima upravljati teme su ove cjeline, koja se obrađuje kroz četiri projekta: Dizalo, Viličar, Manipulator i projekt po slobodnom izboru.',
+        image: '/images/courses/uvod-u-svijet-lego-robotike/module-3.jpg',
+      },
+      {
+        title: 'Svemirski sustavi',
+        description:
+          'Krenite na putovanje ispunjeno astronomijom, inženjerstvom, fizikom i robotima. Svemirski sustavi, zahvaljujući razvoju tehnologije, čine najveće tehnološke izume čovječanstva i daju nam priliku da bolje razumijemo svemir i stvari iznad nas.\n\n' +
+          'Kako izgraditi sve te konstrukcije koje oduzimaju dah i naučiti njima upravljati teme su ove cjeline, koja se obrađuje kroz četiri projekta: Svemirski top, Mars rover, Svemirska letjelica i projekt po slobodnom izboru.',
+        image: '/images/courses/uvod-u-svijet-lego-robotike/module-4.jpg',
+      },
+    ],
+    color: 'text-emerald-600',
+    gradient: 'from-emerald-400 to-teal-500',
+    highlightColor: 'bg-emerald-50 border-emerald-200',
+  },
+  {
     slug: 'slr-1',
     level: 'SLR_1',
+    badge: '1',
     title: 'Svijet LEGO Robotike 1',
-    subtitle: 'Početni program robotike za djecu (6 – 8 godina, uključujući predškolce)',
+    subtitle: 'Početni program robotike za djecu (7 – 8 godina)',
     description:
-      'Program Svijet LEGO robotike 1 prvi je stupanj našeg edukacijskog kurikuluma robotike i namijenjen je djeci koja tek ulaze u svijet tehnologije, robotike i programiranja. Program je prilagođen uzrastu od 6 do 8 godina, uključujući i predškolce koji pokazuju interes za tehniku i kreativno stvaranje.\n\n' +
+      'Program Svijet LEGO robotike 1 prvi je stupanj našeg edukacijskog kurikuluma robotike i namijenjen je djeci koja tek ulaze u svijet tehnologije, robotike i programiranja. Program je prilagođen uzrastu od 7 do 8 godina (1. i 2. razred), kao i polaznicima koji su završili program Uvod u Svijet LEGO robotike.\n\n' +
       'Kroz igru, kreativne projekte i praktičan rad polaznici otkrivaju kako nastaju roboti te kako ih samostalno izgraditi i programirati.\n\n' +
       'Korištenjem LEGO SPIKE Essential edukacijskih setova i LEGO Education SPIKE programskog okruženja, djeca razvijaju osnovne STEM vještine poput logičkog razmišljanja, rješavanja problema, kreativnosti i timskog rada. Vizualno programsko okruženje temeljeno na blokovima omogućuje djeci da na jednostavan i intuitivan način razumiju osnovne principe programiranja.\n\n' +
       'Svaki projekt potiče djecu na istraživanje i eksperimentiranje te im pomaže razumjeti kako tehnologija funkcionira u stvarnom svijetu.\n\n' +
       'Program se sastoji od 16 zanimljivih robotičkih projekata raspoređenih u četiri tematska modula. Kroz njih djeca uče kako izgraditi robota, kako ga programirati te kako povezati robotiku s pojavama i sustavima koji nas svakodnevno okružuju.\n\n' +
       'Radionice su osmišljene tako da djeca uče kroz praksu i zabavu, a svaki završeni projekt donosi osjećaj uspjeha i dodatnu motivaciju za daljnje istraživanje tehnologije.\n\n' +
       'Po završetku programa polaznici mogu nastaviti svoje učenje u naprednijem programu Svijet LEGO robotike 2.',
-    ageMin: 6,
+    ageMin: 7,
     ageMax: 8,
     equipment: 'LEGO SPIKE Essential',
     tools: 'SPIKE Essential ikone',
@@ -112,6 +185,7 @@ export const courses: Course[] = [
   {
     slug: 'slr-2',
     level: 'SLR_2',
+    badge: '2',
     title: 'Svijet LEGO Robotike 2',
     subtitle: 'Napredniji program robotike za djecu (9 – 10 godina)',
     description:
@@ -182,6 +256,7 @@ export const courses: Course[] = [
   {
     slug: 'slr-3',
     level: 'SLR_3',
+    badge: '3',
     title: 'Svijet LEGO Robotike 3',
     subtitle: 'Napredni program robotike za djecu (11 – 12 godina)',
     description:
@@ -252,10 +327,11 @@ export const courses: Course[] = [
   {
     slug: 'slr-4',
     level: 'SLR_4',
+    badge: '4',
     title: 'Svijet LEGO Robotike 4',
-    subtitle: 'Napredni program robotike za djecu (12 – 14 godina)',
+    subtitle: 'Napredni program robotike za djecu (13 – 14 godina)',
     description:
-      'Program Svijet LEGO robotike 4 predstavlja završni stupanj našeg edukacijskog kurikuluma robotike i namijenjen je djeci uzrasta od 12 do 14 godina (7. i 8. razred), kao i polaznicima koji su prethodno pohađali program Svijet LEGO robotike 3.\n\n' +
+      'Program Svijet LEGO robotike 4 predstavlja završni stupanj našeg edukacijskog kurikuluma robotike i namijenjen je djeci uzrasta od 13 do 14 godina (7. i 8. razred), kao i polaznicima koji su prethodno pohađali program Svijet LEGO robotike 3.\n\n' +
       'U ovom programu polaznici rade na najzahtjevnijim projektima unutar kurikuluma te dodatno razvijaju tehničke, logičke i inženjerske vještine kroz primjenu robotike u stvarnim situacijama.\n\n' +
       'Korištenjem Spike Prime edukacijskih setova i Scratch programskog okruženja, djeca izrađuju složene robotičke sustave koji zahtijevaju precizno planiranje, testiranje i optimizaciju. Naglasak je na razumijevanju kako različiti dijelovi sustava međusobno surađuju i kako se mogu unaprijediti.\n\n' +
       'Radionice su strukturirane tako da i polaznici bez prethodnog iskustva mogu postupno usvojiti gradivo, dok oni s već razvijenim znanjem dobivaju dodatne izazove kroz kompleksnije zadatke i samostalne projekte.\n\n' +
@@ -322,4 +398,17 @@ export const courses: Course[] = [
 
 export function getCourseBySlug(slug: string): Course | undefined {
   return courses.find((c) => c.slug === slug)
+}
+
+/**
+ * Badge copy for the program hero and its JSON-LD `educationalLevel`.
+ *
+ * The intro program sits *before* the ladder rather than on it — it is what a
+ * predškolac does the year before SLR 1 — so it is deliberately not numbered.
+ * Calling it "Razina 1 od 5" would renumber four programs whose names are their
+ * level ("Svijet LEGO Robotike 2" is, and must stay, razina 2).
+ */
+export function courseLevelLabel(course: Course): string {
+  if (course.level === 'UVOD') return 'Pripremna razina'
+  return `Razina ${course.level.slice(-1)} od 4`
 }

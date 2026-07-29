@@ -11,7 +11,7 @@ import {
   LogIn,
   Sparkles,
 } from 'lucide-react'
-import { courses, getCourseBySlug } from '@/lib/courses-data'
+import { courses, courseLevelLabel, getCourseBySlug } from '@/lib/courses-data'
 import { CourseModuleAccordion } from '@/components/public/course-module-accordion'
 import { CourseStickyCta } from '@/components/public/course-sticky-cta'
 import { CourseHero } from '@/components/public/course-hero'
@@ -123,6 +123,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
 
   const courseIndex = courses.findIndex((c) => c.slug === slug)
   const nextCourse = courses[courseIndex + 1]
+  const levelLabel = courseLevelLabel(course)
 
   const includedItems = [
     `Nastava jednom tjedno, ${course.sessionDuration} minuta`,
@@ -146,7 +147,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
       name: 'Udruga za robotiku "Inovatic"',
       url: 'https://udruga-inovatic.hr',
     },
-    educationalLevel: `Razina ${courseIndex + 1} od 4`,
+    educationalLevel: levelLabel,
     typicalAgeRange: `${course.ageMin}-${course.ageMax}`,
     teaches: course.equipment,
     courseMode: 'onsite',
@@ -167,7 +168,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(courseJsonLd) }}
       />
 
-      <CourseHero course={course} level={courseIndex + 1} />
+      <CourseHero course={course} levelLabel={levelLabel} />
 
       {/* Single reading column */}
       <div className="mx-auto max-w-[768px] px-5 pb-12 pt-5 md:px-6 md:pb-14 md:pt-10">

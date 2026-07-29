@@ -13,10 +13,10 @@ export function CoursesPreview() {
             Svijet <span className="text-cyan-500">LEGO</span> Robotike
           </h2>
           <p className="text-gray-500 max-w-xl mx-auto text-base lg:text-lg leading-[1.6]">
-            Naš jedinstveni kurikulum strukturiran je u četiri razine – od prvih koraka u mehanici do simulacije industrijskih sustava. Svaka razina prilagođena je dobi i predznanju djeteta.
+            Naš jedinstveni kurikulum kreće od pripremnog programa za predškolce i nastavlja se kroz četiri razine – od prvih koraka u mehanici do simulacije industrijskih sustava. Svaka razina prilagođena je dobi i predznanju djeteta.
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 lg:gap-6">
           {courses.map((course) => (
             <Link
               key={course.slug}
@@ -34,7 +34,7 @@ export function CoursesPreview() {
               </div>
               <div className="flex items-start gap-3.5 px-5 py-[18px] lg:p-4">
                 <div className="flex-none flex items-center justify-center w-10 h-10 lg:w-9 lg:h-9 rounded-xl bg-yellow-400 text-gray-900 text-xl lg:text-lg font-extrabold">
-                  {course.title.split(' ').pop()}
+                  {course.badge}
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 mb-0.5 text-[15px] lg:text-sm">{course.title}</h3>

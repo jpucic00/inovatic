@@ -22,6 +22,7 @@ vi.mock('next/link', () => ({
 const course: Course = {
   slug: 'slr-1',
   level: 'SLR_1',
+  badge: '1',
   title: 'Svijet LEGO Robotike 1',
   subtitle: 'Početni program robotike za djecu (6 – 8 godina)',
   description: 'Opis programa.',
@@ -47,7 +48,7 @@ const course: Course = {
 
 describe('CourseHero', () => {
   it('renders the level badge, title and subtitle', () => {
-    render(<CourseHero course={course} level={1} />)
+    render(<CourseHero course={course} levelLabel="Razina 1 od 4" />)
 
     expect(screen.getByText('Razina 1 od 4')).toBeTruthy()
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Svijet LEGO Robotike 1')
@@ -55,7 +56,7 @@ describe('CourseHero', () => {
   })
 
   it('derives the key-fact chips from course data', () => {
-    render(<CourseHero course={course} level={1} />)
+    render(<CourseHero course={course} levelLabel="Razina 1 od 4" />)
 
     expect(screen.getByText('6–8 godina')).toBeTruthy()
     expect(screen.getByText('90 min · 1× tjedno')).toBeTruthy()
@@ -64,7 +65,7 @@ describe('CourseHero', () => {
   })
 
   it('renders the secondary facts row (equipment, tools, hours, season)', () => {
-    render(<CourseHero course={course} level={1} />)
+    render(<CourseHero course={course} levelLabel="Razina 1 od 4" />)
 
     expect(screen.getByText('LEGO SPIKE Essential')).toBeTruthy()
     expect(screen.getByText('SPIKE Essential ikone')).toBeTruthy()
@@ -73,7 +74,7 @@ describe('CourseHero', () => {
   })
 
   it('wires the back link and both CTAs to their existing targets', () => {
-    render(<CourseHero course={course} level={1} />)
+    render(<CourseHero course={course} levelLabel="Razina 1 od 4" />)
 
     expect(screen.getByRole('link', { name: /Svi programi/ }).getAttribute('href')).toBe('/programi')
     expect(screen.getByRole('link', { name: 'Pošalji prijavu za upis' }).getAttribute('href')).toBe('/upisi')

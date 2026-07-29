@@ -17,10 +17,11 @@ const BODY_PAD = 10
 const COLLAPSE_FROM_HOURS = 2
 const COLLAPSED_BAND_HEIGHT = 30
 
-type FilterKey = 'all' | 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
+type FilterKey = 'all' | 'UVOD' | 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'Sve grupe' },
+  { key: 'UVOD', label: 'Uvod' },
   { key: 'SLR_1', label: 'SLR 1' },
   { key: 'SLR_2', label: 'SLR 2' },
   { key: 'SLR_3', label: 'SLR 3' },
@@ -40,6 +41,7 @@ function formatTime(minutes: number): string {
 
 function courseColor(level: string | null) {
   switch (level) {
+    case 'UVOD': return { bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-800', dot: 'bg-emerald-500', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-50 text-emerald-700 border border-emerald-200' }
     case 'SLR_1': return { bg: 'bg-cyan-100', border: 'border-cyan-300', text: 'text-cyan-800', dot: 'bg-cyan-500', active: 'bg-cyan-500 text-white', inactive: 'bg-cyan-50 text-cyan-700 border border-cyan-200' }
     case 'SLR_2': return { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-800', dot: 'bg-green-500', active: 'bg-green-500 text-white', inactive: 'bg-green-50 text-green-700 border border-green-200' }
     case 'SLR_3': return { bg: 'bg-amber-100', border: 'border-amber-300', text: 'text-amber-800', dot: 'bg-amber-500', active: 'bg-amber-500 text-white', inactive: 'bg-amber-50 text-amber-700 border border-amber-200' }
@@ -50,6 +52,7 @@ function courseColor(level: string | null) {
 
 function filterColor(key: FilterKey) {
   switch (key) {
+    case 'UVOD': return courseColor('UVOD')
     case 'SLR_1': return courseColor('SLR_1')
     case 'SLR_2': return courseColor('SLR_2')
     case 'SLR_3': return courseColor('SLR_3')

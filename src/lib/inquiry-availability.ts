@@ -2,15 +2,16 @@ import type { ActiveProgram } from '@/actions/public/programs'
 import type { Grade } from '@/lib/inquiry-status'
 import { hasDatedModules } from '@/lib/program-kind'
 
-// Child grade → standard SLR level. Preschool + grades 1–2 share SLR 1, then
-// two grades per level up to SLR 4. Used to narrow the open programs to the
-// ones a given child's grade can actually enrol into.
+// Child grade → standard program level. Predškolci have their own program
+// (UVOD, WeDo 2.0) since 2026-07-29 — before that they shared SLR 1 — and from
+// 1. razred it is two grades per level up to SLR 4. Used to narrow the open
+// programs to the ones a given child's grade can actually enrol into.
 //
 // The srednja škola grades map to null: no SLR level is right for them. They
 // exist only for the competitive program, which is reached through its own
 // signup link and bypasses this narrowing entirely.
 const GRADE_TO_LEVEL: Record<Grade, string | null> = {
-  predskolci: 'SLR_1',
+  predskolci: 'UVOD',
   '1': 'SLR_1',
   '2': 'SLR_1',
   '3': 'SLR_2',

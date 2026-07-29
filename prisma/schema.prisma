@@ -24,7 +24,12 @@ enum City {
   SIBENIK
 }
 
+/// Rung on the standard SLR ladder. `UVOD` sits *before* SLR 1 rather than on
+/// the ladder: it is the WeDo 2.0 program predškolci do the year before SLR 1,
+/// split out of SLR 1 on 2026-07-29. The four SLR levels are deliberately not
+/// renumbered — each one's name is its level.
 enum CourseLevel {
+  UVOD
   SLR_1
   SLR_2
   SLR_3

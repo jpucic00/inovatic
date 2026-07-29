@@ -8,11 +8,11 @@ import { courses } from '@/lib/courses-data'
 export const metadata: Metadata = {
   title: 'Programi',
   description:
-    'Sva 4 razine tečajeva LEGO robotike – Svijet LEGO Robotike 1–4. Programi za djecu od 6 do 14 godina u Splitu i Šibeniku.',
+    'Svi programi LEGO robotike – Uvod u Svijet LEGO robotike za predškolce i Svijet LEGO Robotike 1–4. Za djecu od 5 do 14 godina u Splitu i Šibeniku.',
   openGraph: {
     ...OG_DEFAULTS,
     title: 'Programi – Svijet LEGO Robotike | Inovatic',
-    description: 'Sva 4 razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu i Šibeniku.',
+    description: 'Svi programi LEGO robotike za djecu od 5 do 14 godina u Splitu i Šibeniku.',
     url: 'https://udruga-inovatic.hr/programi',
     images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
@@ -23,9 +23,10 @@ const coursesJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'ItemList',
   name: 'Tečajevi LEGO robotike – Inovatic',
-  description: 'Četiri razine tečajeva LEGO robotike za djecu od 6 do 14 godina u Splitu i Šibeniku.',
+  description:
+    'Pripremni program za predškolce i četiri razine tečajeva LEGO robotike za djecu od 5 do 14 godina u Splitu i Šibeniku.',
   url: 'https://udruga-inovatic.hr/programi',
-  numberOfItems: 4,
+  numberOfItems: courses.length,
   itemListElement: courses.map((c, i) => ({
     '@type': 'ListItem',
     position: i + 1,
@@ -92,13 +93,13 @@ export default function ProgramiPage() {
       <section className="bg-white">
         <div className="mx-auto max-w-7xl px-6 pt-2 pb-12 md:px-10 md:pt-12 md:pb-18 lg:px-24">
           <div className="divide-y divide-gray-200">
-            {courses.map((course, i) => (
+            {courses.map((course) => (
               <article
                 key={course.slug}
                 className="grid grid-cols-[auto_1fr] gap-x-3.5 py-9 last:pb-0 md:grid-cols-[110px_1fr_240px] md:gap-x-10 md:py-10 lg:grid-cols-[110px_1fr_300px]"
               >
                 <div className="col-start-1 row-start-1 mb-3.5 self-baseline text-[38px] font-extrabold leading-none text-cyan-200 md:row-span-6 md:mb-0 md:self-center md:text-[56px]">
-                  {String(i + 1).padStart(2, '0')}
+                  {/^\d+$/.test(course.badge) ? course.badge.padStart(2, '0') : course.badge}
                 </div>
                 <h2 className="col-start-2 row-start-1 mb-3.5 self-baseline text-[21px] font-extrabold text-gray-900 md:row-start-2 md:mb-2.5 md:self-auto md:text-2xl">
                   {course.title}
@@ -158,10 +159,10 @@ export default function ProgramiPage() {
             Cijena ovisi o razini programa.
           </p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
-            {/* Početne razine — SLR 1–2 */}
+            {/* Početne razine — Uvod + SLR 1–2 */}
             <div className="rounded-[12px] border border-gray-200 bg-white p-7 md:px-9 md:py-8">
               <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-cyan-600 md:text-[13px]">
-                Početne razine · SLR 1 – 2
+                Početne razine · Uvod i SLR 1 – 2
               </div>
               <div className="flex items-baseline gap-2">
                 <div className="text-[30px] font-extrabold text-cyan-600 md:text-4xl">400 EUR</div>

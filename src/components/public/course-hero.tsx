@@ -25,7 +25,7 @@ function Sep() {
  * < 480px: text centered on top, robot centered at the banner bottom, CTAs stacked.
  * ≥ 480px: text left-aligned, robot vertically centered on the right, CTAs inline.
  */
-export function CourseHero({ course, level }: { readonly course: Course; readonly level: number }) {
+export function CourseHero({ course, levelLabel }: { readonly course: Course; readonly levelLabel: string }) {
   const age = `${course.ageMin}–${course.ageMax} godina`
   const duration = `${course.sessionDuration} min · 1× tjedno`
   const groupSize = `do ${course.groupSize} polaznika`
@@ -67,7 +67,7 @@ export function CourseHero({ course, level }: { readonly course: Course; readonl
           />
           <div className="relative w-full px-5 pt-[26px] text-center min-[480px]:w-auto min-[480px]:max-w-[400px] min-[480px]:px-[30px] min-[480px]:pb-8 min-[480px]:pt-[34px] min-[480px]:text-left">
             <span className="inline-block rounded-full bg-yellow-400 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-900 min-[480px]:text-[10.5px]">
-              Razina {level} od 4
+              {levelLabel}
             </span>
             <h1 className="mt-2.5 text-2xl font-extrabold leading-[1.15] text-white [text-shadow:0_2px_12px_rgba(10,10,30,0.45)] min-[480px]:mt-3 min-[480px]:text-[28px]">
               {course.title}

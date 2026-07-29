@@ -38,6 +38,7 @@ function program(
   }
 }
 
+const uvodOpen = program('uvod', { level: 'UVOD', groups: [group()] })
 const slr1Open = program('slr1', { level: 'SLR_1', groups: [group()] })
 const slr1Full = program('slr1-full', { level: 'SLR_1', groups: [group(true)] })
 const slr2Open = program('slr2', { level: 'SLR_2', groups: [group()] })
@@ -51,8 +52,15 @@ describe('programsForSelection', () => {
   })
 
   it('returns every standard program when no grade is chosen yet', () => {
-    const result = programsForSelection([slr1Open, slr2Open, radionicaOpen], '')
-    expect(result.map((p) => p.id)).toEqual(['slr1', 'slr2'])
+    const result = programsForSelection([uvodOpen, slr1Open, slr2Open, radionicaOpen], '')
+    expect(result.map((p) => p.id)).toEqual(['uvod', 'slr1', 'slr2'])
+  })
+
+  it('sends predškolci to the intro program, not to SLR 1', () => {
+    const programs = [uvodOpen, slr1Open, slr2Open]
+    expect(programsForSelection(programs, 'predskolci').map((p) => p.id)).toEqual(['uvod'])
+    // …and 1. razred stays on SLR 1 rather than following them down.
+    expect(programsForSelection(programs, '1').map((p) => p.id)).toEqual(['slr1'])
   })
 
   it('returns only the preselected course regardless of grade', () => {
@@ -78,7 +86,11 @@ describe('isTerminRequired', () => {
 
   it('is true when the chosen grade maps to a program with an open group', () => {
     expect(isTerminRequired([slr1Open], '1')).toBe(true)
-    expect(isTerminRequired([slr1Open], 'predskolci')).toBe(true)
+    expect(isTerminRequired([uvodOpen], 'predskolci')).toBe(true)
+  })
+
+  it('is false for predškolci when only SLR 1 is open', () => {
+    expect(isTerminRequired([slr1Open], 'predskolci')).toBe(false)
   })
 
   it('is false when every group for the grade is full', () => {

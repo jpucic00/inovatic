@@ -61,6 +61,7 @@ export const WP_REDIRECTS: Readonly<Record<string, string>> = {
   'stem-edukacija-za-mentore': '/stem-edukacija',
 
   // ── Standard SLR course pages ─────────────────────────────────────────────
+  'svijet-lego-robotike-predskolski-uzrast': '/programi/uvod-u-svijet-lego-robotike',
   'svijet-lego-robotike-1': '/programi/slr-1',
   'svijet-lego-robotike-2': '/programi/slr-2',
   'svijet-lego-robotike-3': '/programi/slr-3',

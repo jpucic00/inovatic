@@ -1621,6 +1621,69 @@ export async function seedCompetitionProgram() {
   return course
 }
 
+/**
+ * The standard SLR catalog — the intro program for predškolci plus SLR 1–4.
+ * Idempotent (upsert by slug, modules upserted by title), so `db:seed:programs`
+ * can introduce a new program or refresh the copy of the existing ones against a
+ * live database without touching groups, enrollments or materials.
+ *
+ * `courses-data.ts` is the source of truth, and unlike the competition seeder
+ * this one DOES overwrite existing rows: standard programs are shared catalog
+ * content that `updateCourse` refuses to edit (`isEditableCourse`), so there is
+ * never admin-authored copy here to clobber. That is what carries a correction
+ * like "SLR 1 is 7–8, not 6–8" through to production.
+ *
+ * `sortOrder` is the array position, which keeps SLR 1–4 on the 1–4 they already
+ * hold and puts the intro program at 0, ahead of them — clear of the competition
+ * program (5) and radionice (99).
+ */
+export async function seedStandardPrograms() {
+  const seeded: { id: string }[] = []
+
+  for (const [index, c] of coursesData.entries()) {
+    const content = {
+      level: c.level as CourseLevel,
+      kind: 'STANDARD' as const,
+      title: c.title,
+      subtitle: c.subtitle,
+      description: c.description,
+      ageMin: c.ageMin,
+      ageMax: c.ageMax,
+      equipment: c.equipment,
+      sortOrder: index,
+      // Shared catalog: one canonical program per level, never duplicated per city.
+      city: null,
+    }
+
+    const course = await prisma.course.upsert({
+      where: { slug: c.slug },
+      update: content,
+      create: { slug: c.slug, ...content },
+      select: { id: true },
+    })
+
+    for (const [moduleIndex, m] of c.modules.entries()) {
+      const existing = await prisma.courseModule.findFirst({
+        where: { courseId: course.id, title: m.title },
+        select: { id: true },
+      })
+      const moduleContent = { description: m.description, sortOrder: moduleIndex + 1 }
+      if (existing) {
+        await prisma.courseModule.update({ where: { id: existing.id }, data: moduleContent })
+      } else {
+        await prisma.courseModule.create({
+          data: { courseId: course.id, title: m.title, ...moduleContent },
+        })
+      }
+    }
+
+    seeded.push(course)
+  }
+
+  console.log(`✅ Standard programs (${seeded.length}) and modules seeded`)
+  return seeded
+}
+
 async function main() {
   console.log('🌱 Starting seed...')
 
@@ -1715,31 +1778,7 @@ async function main() {
 
   // ── Courses ──────────────────────────────────────────────────────────────────
   // courses-data.ts is the source of truth; seed derives DB rows from it.
-  const seededCourses = await Promise.all(
-    coursesData.map((c, i) =>
-      prisma.course.create({
-        data: {
-          slug: c.slug,
-          level: c.level as CourseLevel,
-          title: c.title,
-          subtitle: c.subtitle,
-          description: c.description,
-          ageMin: c.ageMin,
-          ageMax: c.ageMax,
-          equipment: c.equipment,
-          sortOrder: i + 1,
-          modules: {
-            create: c.modules.map((m, j) => ({
-              title: m.title,
-              description: m.description,
-              sortOrder: j + 1,
-            })),
-          },
-        },
-      }),
-    ),
-  )
-  console.log('✅ Courses and modules created')
+  const seededCourses = await seedStandardPrograms()
 
   const competitionCourse = await seedCompetitionProgram()
 
