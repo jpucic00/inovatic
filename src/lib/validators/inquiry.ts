@@ -28,6 +28,11 @@ const step3Schema = z.object({
   }),
   courseId: z.string().optional(),
   scheduledGroupId: z.string().optional(),
+  // "Ne odgovara mi predloženi termin" — the other half of the same dropdown, so
+  // it is an answer to the termin question rather than a missing answer. Offered
+  // on the competitive program's signup link only; `submitInquiry` is what
+  // enforces that, since a payload can claim it anywhere.
+  noSuitableTermin: z.boolean().optional(),
   message: z.string().max(1000, 'Poruka može imati najviše 1000 znakova').optional(),
   referralSource: z.string().max(200).optional(),
   consent: z.literal(true, {
@@ -35,7 +40,22 @@ const step3Schema = z.object({
   }),
 })
 
-export const inquirySchema = step1Schema.merge(step2Schema).merge(step3Schema)
+export const inquirySchema = step1Schema
+  .merge(step2Schema)
+  .merge(step3Schema)
+  // One dropdown produces both termin fields, so a chosen group and "nijedan
+  // termin mi ne odgovara" are mutually exclusive by construction — a payload
+  // carrying both is tampered, and rejecting it keeps the stored inquiry from
+  // ever contradicting itself.
+  .superRefine((data, ctx) => {
+    if (data.noSuitableTermin && data.scheduledGroupId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['scheduledGroupId'],
+        message: 'Odaberite termin ili označite da vam predloženi termin ne odgovara.',
+      })
+    }
+  })
 
 export type InquiryFormData = z.infer<typeof inquirySchema>
 

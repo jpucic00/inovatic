@@ -145,4 +145,40 @@ describe('inquirySchema', () => {
       expect(issue).toBeDefined()
     }
   })
+
+  // The termin question has two possible answers, and the dropdown can only
+  // produce one of them at a time.
+  it('accepts the "predloženi termin ne odgovara" answer with no group', () => {
+    const result = inquirySchema.safeParse({
+      ...baseInquiry,
+      courseId: 'c1',
+      noSuitableTermin: true,
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.noSuitableTermin).toBe(true)
+      expect(result.data.scheduledGroupId).toBeUndefined()
+    }
+  })
+
+  it('rejects a payload claiming both a chosen termin and that none suits', () => {
+    const result = inquirySchema.safeParse({
+      ...baseInquiry,
+      courseId: 'c1',
+      scheduledGroupId: 'g1',
+      noSuitableTermin: true,
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === 'scheduledGroupId')
+      expect(issue?.message).toBe(
+        'Odaberite termin ili označite da vam predloženi termin ne odgovara.',
+      )
+    }
+  })
+
+  it('leaves the flag unset on an ordinary inquiry', () => {
+    const result = inquirySchema.parse({ ...baseInquiry, scheduledGroupId: 'g1' })
+    expect(result.noSuitableTermin).toBeUndefined()
+  })
 })

@@ -11,11 +11,16 @@ import type {
 } from 'react-hook-form'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import type { ActiveProgram } from '@/actions/public/programs'
-import { ELEMENTARY_GRADE_VALUES, GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
+import {
+  ELEMENTARY_GRADE_VALUES,
+  GRADE_LABELS,
+  NO_SUITABLE_TERMIN_LABEL,
+  type Grade,
+} from '@/lib/inquiry-status'
 import { programsForSelection } from '@/lib/inquiry-availability'
 import { formatGroupSchedule } from '@/lib/format'
 import { FieldError } from './FieldError'
-import { hasModules, isRadionica } from '@/lib/program-kind'
+import { hasModules, isCompetition, isRadionica } from '@/lib/program-kind'
 import type { ProgramKind } from '@prisma/client'
 
 interface Props {
@@ -39,6 +44,10 @@ interface Props {
 const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition'
 const selectClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition'
 const selectDisabledClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed transition'
+
+// Sentinel <option> value for the "no proposed termin suits me" answer. Free of
+// '|' so it can never collide with a real `${courseId}|${groupId}` key.
+const NO_SUITABLE_TERMIN_VALUE = 'no-suitable-termin'
 
 function formatGroupLabel(g: ActiveProgram['groups'][number], kind: ProgramKind): string {
   const parts: string[] = []
@@ -72,23 +81,14 @@ export function InquiryStep3({
   terminRequired,
 }: Readonly<Props>) {
   const [selectedGroupKey, setSelectedGroupKey] = useState(() => {
+    // Step 3 unmounts when the parent steps back, so restore whichever of the
+    // two answers the dropdown produces.
+    if (getValues('noSuitableTermin')) return NO_SUITABLE_TERMIN_VALUE
     const courseId = getValues('courseId')
     const groupId = getValues('scheduledGroupId')
     return courseId && groupId ? `${courseId}|${groupId}` : ''
   })
   const [selectedGrade, setSelectedGrade] = useState<Grade | ''>(() => getValues('grade') ?? '')
-
-  useEffect(() => {
-    if (!selectedGroupKey) return
-    const [courseId, groupId] = selectedGroupKey.split('|')
-    const program = programs.find((p) => p.id === courseId)
-    const group = program?.groups.find((g) => g.id === groupId)
-    if (!group || group.isFull) {
-      setSelectedGroupKey('')
-      setValue('scheduledGroupId', undefined)
-      setValue('courseId', preselectedCourseId || undefined)
-    }
-  }, [programs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const gradeReg = register('grade')
   const gradeSelected = preselectedCourseId || !!selectedGrade
@@ -100,11 +100,42 @@ export function InquiryStep3({
 
   const hasAnyGroups = filteredPrograms.some((p) => p.groups.length > 0)
 
+  // "Ne odgovara mi predloženi termin" is offered on the competitive program
+  // only: its termini are few, sent by invitation and negotiable, so a parent
+  // who can make none of them must still be able to answer. The SLR ladder and
+  // the radionice keep the termin a hard choice — there the parent either takes
+  // an offered slot or sends a general, termin-less inquiry.
+  // Tied to `hasAnyGroups`, not merely to the program: the refusal only means
+  // something while the dropdown is actually offering termini.
+  const offersNoSuitableTermin =
+    hasAnyGroups && filteredPrograms.every((p) => isCompetition(p.kind))
+
+  useEffect(() => {
+    // The escape hatch went away with the program that offered it (a city
+    // switch, or a poll that closed the last termin) — drop the answer too, so
+    // the inquiry cannot claim a termin was refused where none was proposed.
+    if (!offersNoSuitableTermin && getValues('noSuitableTermin')) {
+      setValue('noSuitableTermin', false)
+      setSelectedGroupKey('')
+      return
+    }
+    if (!selectedGroupKey || selectedGroupKey === NO_SUITABLE_TERMIN_VALUE) return
+    const [courseId, groupId] = selectedGroupKey.split('|')
+    const program = programs.find((p) => p.id === courseId)
+    const group = program?.groups.find((g) => g.id === groupId)
+    if (!group || group.isFull) {
+      setSelectedGroupKey('')
+      setValue('scheduledGroupId', undefined)
+      setValue('courseId', preselectedCourseId || undefined)
+    }
+  }, [programs]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleGradeChange(e: React.ChangeEvent<HTMLSelectElement>) {
     setSelectedGrade(e.target.value as Grade | '')
     // Reset group selection when grade changes
     setSelectedGroupKey('')
     setValue('scheduledGroupId', undefined)
+    setValue('noSuitableTermin', false)
     setValue('courseId', preselectedCourseId || undefined)
     // A stale "pick a termin" error from a prior grade no longer applies.
     clearErrors('scheduledGroupId')
@@ -114,7 +145,11 @@ export function InquiryStep3({
     const val = e.target.value
     setSelectedGroupKey(val)
     clearErrors('scheduledGroupId')
-    if (val) {
+    // The refusal is an answer, not a group: it satisfies the termin
+    // requirement while leaving the inquiry group-less for the admin to follow
+    // up on. Selecting a real termin (or clearing) always takes it back off.
+    setValue('noSuitableTermin', val === NO_SUITABLE_TERMIN_VALUE)
+    if (val && val !== NO_SUITABLE_TERMIN_VALUE) {
       const [courseId, groupId] = val.split('|')
       setValue('scheduledGroupId', groupId)
       setValue('courseId', courseId)
@@ -157,6 +192,9 @@ export function InquiryStep3({
               </optgroup>
             )
           })}
+          {offersNoSuitableTermin && (
+            <option value={NO_SUITABLE_TERMIN_VALUE}>{NO_SUITABLE_TERMIN_LABEL}</option>
+          )}
         </select>
       )
     }
@@ -214,6 +252,12 @@ export function InquiryStep3({
         </label>
         {renderGroupSelect()}
         <FieldError message={errors.scheduledGroupId?.message} />
+        {selectedGroupKey === NO_SUITABLE_TERMIN_VALUE && (
+          <p className="mt-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Javit ćemo vam se i pokušati dogovoriti termin koji vam odgovara. Ako imate željeni dan
+            ili sat, upišite ga u poruku.
+          </p>
+        )}
       </div>
 
       <div>

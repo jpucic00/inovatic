@@ -98,6 +98,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     grade,
     courseId,
     scheduledGroupId,
+    noSuitableTermin,
     message,
     referralSource,
   } = parsed.data
@@ -119,12 +120,25 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     }
   }
 
+  // "Ne odgovara mi predloženi termin" is offered on the competitive program's
+  // signup link only — its termini are few and negotiable. Enforced here rather
+  // than trusting which <option>s rendered, because the flag also satisfies the
+  // termin requirement: without this guard it would be the way to skip the
+  // termin choice on any program.
+  if (noSuitableTermin && (!targetCourse || !isCompetition(targetCourse.kind))) {
+    return {
+      success: false,
+      error: 'Za odabrani program potrebno je odabrati jedan od dostupnih termina.',
+    }
+  }
+
   // Server-side mirror of the client's conditional requirement: when no termin
   // was sent but the grade/course still has an open, non-full group, reject with
   // the fresh programs so a stale or tampered payload can't skip the choice. The
   // client passes `courseId` only in the radionica/preselected flow, so it maps
-  // to the same "preselected course" argument the client uses.
-  if (!scheduledGroupId) {
+  // to the same "preselected course" argument the client uses. The refusal
+  // answers the question, so it stands in for a chosen termin here.
+  if (!scheduledGroupId && !noSuitableTermin) {
     // Per-program links resolve against their own feed: the competitive program
     // is deliberately absent from getActivePrograms, so checking against the
     // public catalog would silently make its termin optional.
@@ -183,6 +197,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
           childGrade: grade || null,
           courseId: courseId || null,
           scheduledGroupId: scheduledGroupId || null,
+          noSuitableTermin: noSuitableTermin ?? false,
           schoolYear,
           message: message || null,
           referralSource: referralSource || null,

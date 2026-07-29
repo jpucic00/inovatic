@@ -571,6 +571,121 @@ describe('high-school grades reach only the competitive program', () => {
   })
 })
 
+// ─── "Ne odgovara mi predloženi termin" ──────────────────────────────────────
+
+describe('the competitive program accepts a refusal of its proposed termini', () => {
+  const parentForm = {
+    city: 'SPLIT' as const,
+    parentName: 'Test Roditelj',
+    parentEmail: 'termin-refusal@test.local',
+    parentPhone: '+385912345678',
+    childFirstName: 'Iva',
+    childLastName: 'Ivić',
+    childDateOfBirth: '2012-03-12',
+    grade: '7' as const,
+    consent: true as const,
+  }
+
+  let mailCounter = 0
+  const email = (tag: string) => `refusal-${tag}-${Date.now()}-${++mailCounter}@test.local`
+
+  // An open window plus a non-full group — the state that makes a termin
+  // mandatory, so a refusal that gets through is provably standing in for one.
+  async function openProgram(kind: 'COMPETITION' | 'RADIONICA') {
+    const course =
+      kind === 'COMPETITION'
+        ? await competitionCourse()
+        : await fx.course({ kind: 'RADIONICA', schoolYear: SY, city: 'SPLIT' })
+    await createEnrollmentWindow(course.id, {
+      schoolYear: SY,
+      city: 'SPLIT',
+      enrollmentStart: d('2020-01-01'),
+      enrollmentEnd: d('2099-12-31'),
+    })
+    const group = await fx.group({ courseId: course.id, schoolYear: SY, city: 'SPLIT' })
+    return { course, group }
+  }
+
+  it('files the refusal as the answer, with no group attached', async () => {
+    const { course } = await openProgram('COMPETITION')
+    const parentEmail = email('ok')
+
+    const res = await submitInquiry({
+      ...parentForm,
+      parentEmail,
+      courseId: course.id,
+      noSuitableTermin: true,
+    })
+
+    expect(res.success).toBe(true)
+    const inquiry = await db.inquiry.findFirstOrThrow({ where: { parentEmail } })
+    expect(inquiry.noSuitableTermin).toBe(true)
+    expect(inquiry.scheduledGroupId).toBeNull()
+    // The program is still recorded — the admin knows what to offer a termin for.
+    expect(inquiry.courseId).toBe(course.id)
+  })
+
+  it('still refuses a group-less competition inquiry that answers nothing', async () => {
+    // Same fixture as above: proves the refusal bypassed a live requirement
+    // rather than an already-optional termin.
+    const { course } = await openProgram('COMPETITION')
+    const parentEmail = email('none')
+
+    const res = await submitInquiry({ ...parentForm, parentEmail, courseId: course.id })
+
+    expect(res.success).toBe(false)
+    if (!res.success && 'code' in res) expect(res.code).toBe('TERMIN_REQUIRED')
+    else throw new Error('expected a TERMIN_REQUIRED result')
+    expect(await db.inquiry.count({ where: { parentEmail } })).toBe(0)
+  })
+
+  it('refuses the flag on any other program, even bypassing the form', async () => {
+    // The <option> renders on the competition link only, so this is exactly the
+    // tampered-payload case: without the guard the flag would be a way to skip
+    // the termin choice on a radionica or an SLR program.
+    const { course } = await openProgram('RADIONICA')
+    const parentEmail = email('radionica')
+
+    const res = await submitInquiry({
+      ...parentForm,
+      parentEmail,
+      courseId: course.id,
+      noSuitableTermin: true,
+    })
+
+    expect(res).toEqual({
+      success: false,
+      error: 'Za odabrani program potrebno je odabrati jedan od dostupnih termina.',
+    })
+    expect(await db.inquiry.count({ where: { parentEmail } })).toBe(0)
+  })
+
+  it('refuses the flag on a general inquiry that names no program', async () => {
+    const parentEmail = email('bare')
+
+    const res = await submitInquiry({ ...parentForm, parentEmail, noSuitableTermin: true })
+
+    expect(res.success).toBe(false)
+    expect(await db.inquiry.count({ where: { parentEmail } })).toBe(0)
+  })
+
+  it('rejects a payload claiming both a termin and that none suits', async () => {
+    const { course, group } = await openProgram('COMPETITION')
+    const parentEmail = email('both')
+
+    const res = await submitInquiry({
+      ...parentForm,
+      parentEmail,
+      courseId: course.id,
+      scheduledGroupId: group.id,
+      noSuitableTermin: true,
+    })
+
+    expect(res).toEqual({ success: false, error: 'Podaci nisu valjani.' })
+    expect(await db.inquiry.count({ where: { parentEmail } })).toBe(0)
+  })
+})
+
 // ─── Report card rubric ──────────────────────────────────────────────────────
 
 describe('the competition report card grades a different practical rubric', () => {

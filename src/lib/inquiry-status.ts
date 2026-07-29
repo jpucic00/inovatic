@@ -29,6 +29,11 @@ export const INQUIRY_TYPE_COLORS: Record<string, string> = {
 // lifecycle status, since it is orthogonal to NEW / ACCOUNT_CREATED / DECLINED.
 export const RETURNING_INQUIRY_LABEL = 'Ponovni upis'
 
+// The parent's answer when none of a program's proposed termini work for them.
+// One string for both the public dropdown option and the admin "Željeni termin"
+// row, so the admin reads back verbatim what the parent picked.
+export const NO_SUITABLE_TERMIN_LABEL = 'Ne odgovara mi predloženi termin'
+
 
 export const STATUS_FLOW = [
   'NEW',

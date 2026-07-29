@@ -161,7 +161,9 @@ export function InquiryForm({
     // Termin is mandatory when the selection still has an open, non-full group.
     // Zod keeps scheduledGroupId optional (the requirement is availability-driven,
     // not static), so enforce it here once the schema has otherwise passed.
-    if (terminRequired && !data.scheduledGroupId) {
+    // "Predloženi termin mi ne odgovara" answers the same question, so it
+    // satisfies the requirement without a group.
+    if (terminRequired && !data.scheduledGroupId && !data.noSuitableTermin) {
       setError('scheduledGroupId', {
         type: 'manual',
         message: 'Za odabrani razred dostupni su termini – odaberite jedan.',

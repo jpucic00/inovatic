@@ -392,6 +392,11 @@ model Inquiry {
   childGrade         String?
   courseId           String?
   scheduledGroupId   String?
+  // The parent's answer when none of the proposed termini work for them — the
+  // second half of the "Željeni termin" dropdown, mutually exclusive with
+  // scheduledGroupId. Offered on the competitive program's invitation link only
+  // (its few weekly slots are negotiable), so it stays false everywhere else.
+  noSuitableTermin   Boolean       @default(false)
   message            String?       @db.Text
   referralSource     String?
   // PARTY only: parent's optional preferred date from the public form.

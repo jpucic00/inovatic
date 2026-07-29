@@ -21,6 +21,7 @@ import {
   INQUIRY_STATUS_LABELS,
   STATUS_FLOW,
   GRADE_LABELS,
+  NO_SUITABLE_TERMIN_LABEL,
 } from '@/lib/inquiry-status'
 import { formatChildName, formatDate } from '@/lib/format'
 import { toDateKey } from '@/lib/session-dates'
@@ -538,6 +539,17 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
               />
             )
           })()}
+          {/* The parent's other possible answer to the same question, rendered
+              in the same row: none of the offered termini worked for them, so
+              this upit needs a termin agreed before an account is created. */}
+          {!inquiry.scheduledGroup && inquiry.noSuitableTermin && (
+            <DetailRow
+              label="Željeni termin"
+              value={
+                <span className="font-medium text-amber-700">{NO_SUITABLE_TERMIN_LABEL}</span>
+              }
+            />
+          )}
           <DetailRow
             label="Poruka"
             value={
