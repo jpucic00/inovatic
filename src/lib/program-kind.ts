@@ -20,6 +20,11 @@ export function isCompetition(kind: ProgramKind): boolean {
   return kind === 'COMPETITION'
 }
 
+/** The SLR ladder — Uvod + SLR 1–4, the year-long core programs. */
+export function isStandard(kind: ProgramKind): boolean {
+  return kind === 'STANDARD'
+}
+
 /**
  * Planned as four dated modules (ModuleSchedule) — the school-year planner's
  * domain, and the only kind whose students are paced through one module at a

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { SlidersHorizontal, X } from 'lucide-react'
 import { assignLanes } from '@/lib/calendar-lanes'
 import type { ProgramKind } from '@prisma/client'
-import { isRadionica } from '@/lib/program-kind'
+import { isCompetition, isRadionica, isStandard } from '@/lib/program-kind'
 
 const DAYS = ['Ponedjeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota', 'Nedjelja']
 const DAY_SHORT = ['Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub', 'Ned']
@@ -17,10 +18,14 @@ const BODY_PAD = 10
 const COLLAPSE_FROM_HOURS = 2
 const COLLAPSED_BAND_HEIGHT = 30
 
-type FilterKey = 'all' | 'UVOD' | 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
+/**
+ * A level key narrows to one program; `standard`/`competition` group a whole
+ * kind — `standard` is the "cijela SLR ljestvica" shortcut (Uvod + SLR 1–4),
+ * which no level key can express on its own.
+ */
+type FilterKey = 'all' | 'standard' | 'competition' | 'UVOD' | 'SLR_1' | 'SLR_2' | 'SLR_3' | 'SLR_4'
 
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'Sve grupe' },
+const LEVEL_FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'UVOD', label: 'Uvod' },
   { key: 'SLR_1', label: 'SLR 1' },
   { key: 'SLR_2', label: 'SLR 2' },
@@ -39,31 +44,81 @@ function formatTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-function courseColor(level: string | null) {
-  switch (level) {
-    case 'UVOD': return { bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-800', dot: 'bg-emerald-500', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-50 text-emerald-700 border border-emerald-200' }
-    case 'SLR_1': return { bg: 'bg-cyan-100', border: 'border-cyan-300', text: 'text-cyan-800', dot: 'bg-cyan-500', active: 'bg-cyan-500 text-white', inactive: 'bg-cyan-50 text-cyan-700 border border-cyan-200' }
-    case 'SLR_2': return { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-800', dot: 'bg-green-500', active: 'bg-green-500 text-white', inactive: 'bg-green-50 text-green-700 border border-green-200' }
-    case 'SLR_3': return { bg: 'bg-amber-100', border: 'border-amber-300', text: 'text-amber-800', dot: 'bg-amber-500', active: 'bg-amber-500 text-white', inactive: 'bg-amber-50 text-amber-700 border border-amber-200' }
-    case 'SLR_4': return { bg: 'bg-purple-100', border: 'border-purple-300', text: 'text-purple-800', dot: 'bg-purple-500', active: 'bg-purple-500 text-white', inactive: 'bg-purple-50 text-purple-700 border border-purple-200' }
-    default: return { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700', dot: 'bg-gray-400', active: 'bg-gray-500 text-white', inactive: 'bg-gray-50 text-gray-600 border border-gray-200' }
-  }
+type Palette = {
+  /** Block on the grid. */
+  bg: string
+  border: string
+  text: string
+  /** Filter chip: colour swatch, and the filled state once the chip is on. */
+  dot: string
+  active: string
+  ring: string
 }
 
-function filterColor(key: FilterKey) {
+const NEUTRAL: Palette = {
+  bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700',
+  dot: 'bg-gray-400', active: 'border-gray-800 bg-gray-800 text-white', ring: 'focus-visible:ring-gray-400',
+}
+
+const PALETTES: Record<string, Palette> = {
+  UVOD: {
+    bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-800',
+    dot: 'bg-emerald-500', active: 'border-emerald-500 bg-emerald-500 text-white', ring: 'focus-visible:ring-emerald-400',
+  },
+  SLR_1: {
+    bg: 'bg-cyan-100', border: 'border-cyan-300', text: 'text-cyan-800',
+    dot: 'bg-cyan-500', active: 'border-cyan-500 bg-cyan-500 text-white', ring: 'focus-visible:ring-cyan-400',
+  },
+  SLR_2: {
+    bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-800',
+    dot: 'bg-green-500', active: 'border-green-500 bg-green-500 text-white', ring: 'focus-visible:ring-green-400',
+  },
+  SLR_3: {
+    bg: 'bg-amber-100', border: 'border-amber-300', text: 'text-amber-800',
+    dot: 'bg-amber-500', active: 'border-amber-500 bg-amber-500 text-white', ring: 'focus-visible:ring-amber-400',
+  },
+  SLR_4: {
+    bg: 'bg-purple-100', border: 'border-purple-300', text: 'text-purple-800',
+    dot: 'bg-purple-500', active: 'border-purple-500 bg-purple-500 text-white', ring: 'focus-visible:ring-purple-400',
+  },
+  // The competitive track carries no CourseLevel, so it is keyed by kind and
+  // gets a colour of its own — it used to fall through to neutral grey.
+  COMPETITION: {
+    bg: 'bg-rose-100', border: 'border-rose-300', text: 'text-rose-800',
+    dot: 'bg-rose-500', active: 'border-rose-500 bg-rose-500 text-white', ring: 'focus-visible:ring-rose-400',
+  },
+  // Chip-only: the whole SLR ladder at once. Its swatch blends the five level
+  // colours so the chip reads as "all of the above" rather than a sixth program.
+  STANDARD: {
+    bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700',
+    dot: 'bg-gradient-to-br from-emerald-500 via-cyan-500 to-purple-500',
+    active: 'border-gray-800 bg-gray-800 text-white', ring: 'focus-visible:ring-gray-400',
+  },
+}
+
+type ProgramRef = { level: string | null; kind: ProgramKind }
+
+function paletteFor(course: ProgramRef): Palette {
+  if (isCompetition(course.kind)) return PALETTES.COMPETITION
+  return PALETTES[course.level ?? ''] ?? NEUTRAL
+}
+
+function filterPalette(key: FilterKey): Palette {
   switch (key) {
-    case 'UVOD': return courseColor('UVOD')
-    case 'SLR_1': return courseColor('SLR_1')
-    case 'SLR_2': return courseColor('SLR_2')
-    case 'SLR_3': return courseColor('SLR_3')
-    case 'SLR_4': return courseColor('SLR_4')
-    default: return null
+    case 'all': return NEUTRAL
+    case 'standard': return PALETTES.STANDARD
+    case 'competition': return PALETTES.COMPETITION
+    default: return PALETTES[key] ?? NEUTRAL
   }
 }
 
-function matchesFilter(g: { course: { level: string | null } }, filter: FilterKey): boolean {
-  if (filter === 'all') return true
-  return g.course.level === filter
+function matchesFilter(g: { course: ProgramRef }, filter: FilterKey): boolean {
+  switch (filter) {
+    case 'all': return true
+    case 'standard': return isStandard(g.course.kind)
+    case 'competition': return isCompetition(g.course.kind)
+    default: return g.course.level === filter
+  }
 }
 
 type TimeBand = { start: number; end: number; collapsed: boolean; top: number; height: number }
@@ -123,6 +178,50 @@ interface WeeklyScheduleProps {
   groups: Group[]
 }
 
+interface FilterChipProps {
+  label: string
+  count: number
+  palette: Palette
+  isActive: boolean
+  onClick: () => void
+}
+
+/**
+ * Deliberately shaped like a control, not a legend: raised white pill, hover
+ * lift, filled + ringed when on, and a live count so it is obvious the chip
+ * does something to the grid below.
+ */
+function FilterChip({ label, count, palette, isActive, onClick }: Readonly<FilterChipProps>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={isActive}
+      className={[
+        'inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+        palette.ring,
+        isActive
+          ? `${palette.active} shadow`
+          : 'border-gray-300 bg-white text-gray-700 shadow-sm hover:-translate-y-px hover:border-gray-400 hover:shadow',
+      ].join(' ')}
+    >
+      <span
+        aria-hidden
+        className={`h-2 w-2 rounded-full ${isActive ? 'bg-white/90' : palette.dot}`}
+      />
+      {label}
+      <span
+        className={`rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
+          isActive ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-500'
+        }`}
+      >
+        {count}
+      </span>
+    </button>
+  )
+}
+
 export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
 
@@ -140,12 +239,22 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
   if (allScheduled.length === 0) {
     return (
       <div className="text-xs text-gray-400 text-center py-6">
-        Nema zakazanih grupa standardnih programa s određenim terminima.
+        Nema zakazanih grupa s određenim terminima.
       </div>
     )
   }
 
   const scheduled = allScheduled.filter((g) => matchesFilter(g, activeFilter))
+
+  const countOf = (key: FilterKey) => allScheduled.filter((g) => matchesFilter(g, key)).length
+  const standardCount = countOf('standard')
+  const competitionCount = countOf('competition')
+  // The kind split is only worth offering when both kinds are on the grid —
+  // with no competition groups, "Svi SLR" would just be "Sve grupe" again.
+  const showKindFilters = standardCount > 0 && competitionCount > 0
+  // A chip nothing matches is a dead end, not a legend entry: the colour it
+  // would explain isn't on the grid either.
+  const levelChips = LEVEL_FILTERS.map((f) => ({ ...f, count: countOf(f.key) })).filter((f) => f.count > 0)
 
   // Time range and band layout always based on all groups so the grid doesn't jump when filtering
   const allBounds = allScheduled.map((g) => {
@@ -172,41 +281,68 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
 
   return (
     <div>
-      {/* Legend / filter — outside scroll container */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {FILTERS.map(({ key, label }) => {
-          const color = filterColor(key)
-          const isActive = activeFilter === key
-          if (key === 'all') {
-            return (
-              <button
-                key={key}
-                onClick={() => setActiveFilter(key)}
-                className={[
-                  'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                  isActive
-                    ? 'bg-gray-700 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-                ].join(' ')}
-              >
-                {label}
-              </button>
-            )
-          }
-          return (
-            <button
+      {/* Filter toolbar — outside scroll container */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+          Prikaži
+        </span>
+
+        <div
+          role="group"
+          aria-label="Filtriraj raspored po programu"
+          className="flex flex-wrap items-center gap-1.5"
+        >
+          <FilterChip
+            label="Sve grupe"
+            count={allScheduled.length}
+            palette={filterPalette('all')}
+            isActive={activeFilter === 'all'}
+            onClick={() => setActiveFilter('all')}
+          />
+          {showKindFilters && (
+            <FilterChip
+              label="Svi SLR"
+              count={standardCount}
+              palette={filterPalette('standard')}
+              isActive={activeFilter === 'standard'}
+              onClick={() => setActiveFilter('standard')}
+            />
+          )}
+          {levelChips.map(({ key, label, count }) => (
+            <FilterChip
               key={key}
+              label={label}
+              count={count}
+              palette={filterPalette(key)}
+              isActive={activeFilter === key}
               onClick={() => setActiveFilter(key)}
-              className={[
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                isActive ? color!.active : `${color!.inactive} hover:opacity-80`,
-              ].join(' ')}
-            >
-              {!isActive && <span className={`w-2 h-2 rounded-full ${color!.dot}`} />}
-              {label}
-            </button>
-          )
-        })}
+            />
+          ))}
+          {showKindFilters && (
+            <>
+              <span className="mx-0.5 h-5 w-px bg-gray-300" aria-hidden />
+              <FilterChip
+                label="Natjecateljski"
+                count={competitionCount}
+                palette={filterPalette('competition')}
+                isActive={activeFilter === 'competition'}
+                onClick={() => setActiveFilter('competition')}
+              />
+            </>
+          )}
+        </div>
+
+        {activeFilter !== 'all' && (
+          <button
+            type="button"
+            onClick={() => setActiveFilter('all')}
+            className="ml-auto inline-flex cursor-pointer items-center gap-1 text-[11px] font-medium text-gray-500 transition-colors hover:text-gray-800"
+          >
+            <X className="h-3 w-3" aria-hidden />
+            Poništi filter
+          </button>
+        )}
       </div>
 
       {/* Schedule grid — overflow-x-auto wraps header + body so they scroll together horizontally */}
@@ -313,7 +449,7 @@ export function WeeklySchedule({ groups }: Readonly<WeeklyScheduleProps>) {
                           const { laneIndex, laneCount } = layouts[idx]
                           const widthPct = 100 / laneCount
                           const leftPct = laneIndex * widthPct
-                          const color = courseColor(g.course.level)
+                          const color = paletteFor(g.course)
                           const label = g.name ?? g.course.title
                           const timeRange = g.endTime ? g.startTime + '–' + g.endTime : g.startTime
                           const titleText = [
