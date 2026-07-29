@@ -7,6 +7,11 @@ import { Eye, Send } from 'lucide-react'
 import { formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
 import type { RecommendationOption } from '@/lib/assessment-rubric'
+import { SKIP_REASON_SHORT } from '@/lib/bulk-email-recipients'
+import {
+  EMAIL_CAMPAIGN_KINDS,
+  EMAIL_CAMPAIGN_KIND_ORDER,
+} from '@/lib/email-campaign-kind'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import {
@@ -14,6 +19,7 @@ import {
   getEmailGroupTree,
   previewEmailHtml,
   previewEmailRecipients,
+  previewEvaluationEmailForRecipient,
   sendEmailCampaign,
   type PreviewRecipientsResult,
   type SendEmailCampaignResult,
@@ -81,7 +87,7 @@ function SendProgressPanel({ result }: Readonly<{ result: StartedSend }>) {
       )}
       <p>
         Poslano: {progress.sentCount} / {result.total} · Neuspješno: {progress.failedCount} · Već
-        poslano ranije: {result.alreadySent} · Isključeno: {result.excluded} · Bez e-maila:{' '}
+        poslano ranije: {result.alreadySent} · Isključeno: {result.excluded} · Preskočeno:{' '}
         {result.skipped.length}
       </p>
       <a
@@ -94,7 +100,7 @@ function SendProgressPanel({ result }: Readonly<{ result: StartedSend }>) {
   )
 }
 
-type Kind = 'CUSTOM' | 'REENROLLMENT'
+type Kind = 'CUSTOM' | 'REENROLLMENT' | 'EVALUATION'
 type SelectionMode = 'GROUPS' | 'RECOMMENDATION'
 type GroupTree = Awaited<ReturnType<typeof getEmailGroupTree>>
 type RecipientData = Extract<PreviewRecipientsResult, { success: true }>
@@ -122,6 +128,12 @@ const DEFAULT_INVITATION_BODY = [
   'Vaše je dijete prošle školske godine pohađalo program LEGO robotike u našoj udruzi i nadamo se da ćemo se družiti i ove godine.',
   'Upisi u novu školsku godinu su otvoreni. U nastavku se nalaze termini grupa — prijavu ispunite putem poveznice na dnu ove poruke, a mi ćemo vam se javiti s potvrdom termina.',
   'Broj mjesta po grupi je ograničen, stoga preporučujemo što raniju prijavu.',
+].join('\n')
+
+const DEFAULT_EVALUATION_BODY = [
+  'Poštovani,',
+  'U nastavku se nalazi evaluacija Vašeg djeteta po završetku programa. Opisuje napredak kroz praktične i timske vještine te preporuku mentora za nastavak.',
+  'Evaluacija je uvijek dostupna i u učeničkom portalu. Za sva pitanja slobodno nam odgovorite na ovu poruku.',
 ].join('\n')
 
 const SELECT_CLASS =
@@ -188,10 +200,18 @@ export function EmailWizard({
     setTargetCourseId('')
     setTargetGroups([])
     setTargetGroupIds([])
+    // An evaluation is always about a year already taught, so it never uses the
+    // preporuka cohort (the server rejects it too).
+    if (next === 'EVALUATION') setSelectionMode('GROUPS')
     if (next === 'REENROLLMENT') {
       setSubject(`Upisi u školsku godinu ${selectedYear} – Inovatic`)
       setBodyText(DEFAULT_INVITATION_BODY)
       setSourceYear(previousYear)
+    } else if (next === 'EVALUATION') {
+      // No child name here — the send appends it per recipient.
+      setSubject('Evaluacija po završetku programa – Inovatic')
+      setBodyText(DEFAULT_EVALUATION_BODY)
+      setSourceYear(selectedYear)
     } else {
       setSubject('')
       setBodyText('')
@@ -203,14 +223,15 @@ export function EmailWizard({
   // CUSTOM + selected-year tree comes preloaded from the server).
   const treeKeyRef = useRef(`${selectedYear}:false`)
   useEffect(() => {
-    const graduatingOnly = kind === 'REENROLLMENT'
-    const key = `${sourceYear}:${graduatingOnly}`
+    // Radionice are never graded and are not a re-enrolment cohort either.
+    const excludeRadionice = kind !== 'CUSTOM'
+    const key = `${sourceYear}:${excludeRadionice}`
     if (treeKeyRef.current === key) return
     treeKeyRef.current = key
     let cancelled = false
     setLoadingTree(true)
     setTree([])
-    getEmailGroupTree(sourceYear, graduatingOnly)
+    getEmailGroupTree(sourceYear, excludeRadionice)
       .then((next) => {
         if (!cancelled) setTree(next)
       })
@@ -306,6 +327,23 @@ export function EmailWizard({
     setConfirming(false)
   }
 
+  const allTreeGroupIds = useMemo(
+    () => tree.flatMap((c) => c.scheduledGroups.map((g) => g.id)),
+    [tree],
+  )
+  /**
+   * "Every group" is submitted as real ids rather than as a server-side flag, so
+   * the campaign's audit snapshot stays a complete list and the existence check
+   * (city + year + kind) applies to each one exactly as it does to a hand-picked
+   * selection.
+   */
+  const allGroupsSelected =
+    allTreeGroupIds.length > 0 && allTreeGroupIds.every((id) => sourceGroupIds.includes(id))
+  const toggleAllGroups = () => {
+    setSourceGroupIds(allGroupsSelected ? [] : allTreeGroupIds)
+    setConfirming(false)
+  }
+
   const handleTargetCourseChange = async (courseId: string) => {
     setTargetCourseId(courseId)
     setTargetGroupIds([])
@@ -360,7 +398,7 @@ export function EmailWizard({
   const recipients = useMemo(() => recipientData?.recipients ?? [], [recipientData])
   const skipped = recipientData?.skipped ?? []
   const checkedCount = recipients.filter(
-    (r) => !excluded.has(r.parentEmail) && !alreadySentSet.has(r.parentEmail),
+    (r) => !excluded.has(r.rowKey) && !alreadySentSet.has(r.parentEmail),
   ).length
 
   const filteredRecipients = useMemo(() => {
@@ -369,24 +407,71 @@ export function EmailWizard({
     return recipients.filter(
       (r) =>
         r.parentEmail.includes(q) ||
-        r.children.some((c) => c.name.toLowerCase().includes(q)),
+        r.children.some(
+          (c) =>
+            c.name.toLowerCase().includes(q) ||
+            (c.groupLabel ?? '').toLowerCase().includes(q),
+        ),
     )
   }, [recipients, search])
 
-  const toggleRecipient = (email: string) => {
+  /**
+   * Keyed on `rowKey`, not on the e-mail address: an evaluation row is one child,
+   * so siblings share an address and excluding by address would silently drop the
+   * sibling of every child the admin unchecked.
+   */
+  const toggleRecipient = (rowKey: string) => {
     setExcluded((prev) => {
       const next = new Set(prev)
-      if (next.has(email)) next.delete(email)
-      else next.add(email)
+      if (next.has(rowKey)) next.delete(rowKey)
+      else next.add(rowKey)
       return next
     })
     setConfirming(false)
   }
 
+  const [rowPreviewKey, setRowPreviewKey] = useState<string | null>(null)
+  /** Names the child and inbox being previewed — the whole point of a row preview. */
+  const rowPreviewDescription = useMemo(() => {
+    if (!rowPreviewKey) return undefined
+    const row = recipients.find((r) => r.rowKey === rowPreviewKey)
+    if (!row) return undefined
+    return `Poruka za ${row.parentEmail} — sadrži isključivo evaluaciju za ${row.children
+      .map((c) => c.name)
+      .join(', ')}.`
+  }, [rowPreviewKey, recipients])
+
+  /** "Show me exactly what this parent gets" — runs the real send-path guard. */
+  const handleRowPreview = (rowKey: string) => {
+    setPreviewHtml(null)
+    setPreviewOpen(true)
+    setRowPreviewKey(rowKey)
+    previewEvaluationEmailForRecipient({
+      kind: 'EVALUATION',
+      subject,
+      bodyText,
+      sourceSchoolYear: sourceYear,
+      sourceGroupIds,
+      assessmentId: rowKey,
+    })
+      .then((res) => {
+        if (res.success) {
+          setPreviewHtml(res.html)
+        } else {
+          setPreviewOpen(false)
+          toast.error(res.error)
+        }
+      })
+      .catch(() => {
+        setPreviewOpen(false)
+        toast.error('Greška pri izradi pregleda.')
+      })
+  }
+
   const contentValid =
     subject.trim().length >= 3 &&
     bodyText.trim().length >= 10 &&
-    (kind === 'CUSTOM' || (targetCourseId !== '' && targetGroupIds.length > 0))
+    (kind !== 'REENROLLMENT' || (targetCourseId !== '' && targetGroupIds.length > 0))
 
   const handlePreview = () => {
     if (!contentValid) {
@@ -399,10 +484,15 @@ export function EmailWizard({
     }
     setPreviewHtml(null)
     setPreviewOpen(true)
-    const input =
-      kind === 'CUSTOM'
-        ? { kind: 'CUSTOM' as const, subject, bodyText }
-        : { kind: 'REENROLLMENT' as const, subject, bodyText, targetCourseId, targetGroupIds }
+    setRowPreviewKey(null)
+    let input
+    if (kind === 'REENROLLMENT') {
+      input = { kind: 'REENROLLMENT' as const, subject, bodyText, targetCourseId, targetGroupIds }
+    } else if (kind === 'EVALUATION') {
+      input = { kind: 'EVALUATION' as const, subject, bodyText }
+    } else {
+      input = { kind: 'CUSTOM' as const, subject, bodyText }
+    }
     previewEmailHtml(input)
       .then((res) => {
         if (res.success) {
@@ -431,12 +521,22 @@ export function EmailWizard({
         recommendations: selectionMode === 'RECOMMENDATION' ? recommendations : undefined,
         subject,
         bodyText,
-        excludedParentEmails: [...excluded],
       }
-      const input =
-        kind === 'CUSTOM'
-          ? { kind: 'CUSTOM' as const, ...base }
-          : { kind: 'REENROLLMENT' as const, ...base, targetCourseId, targetGroupIds }
+      let input
+      if (kind === 'REENROLLMENT') {
+        input = {
+          kind: 'REENROLLMENT' as const,
+          ...base,
+          targetCourseId,
+          targetGroupIds,
+          excludedParentEmails: [...excluded],
+        }
+      } else if (kind === 'EVALUATION') {
+        // Excluded rows are report cards here, not inboxes — see toggleRecipient.
+        input = { kind: 'EVALUATION' as const, ...base, excludedAssessmentIds: [...excluded] }
+      } else {
+        input = { kind: 'CUSTOM' as const, ...base, excludedParentEmails: [...excluded] }
+      }
       try {
         const res = await sendEmailCampaign(input)
         setConfirming(false)
@@ -483,33 +583,33 @@ export function EmailWizard({
         <div className="space-y-4">
           <section className="rounded-xl border border-gray-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-gray-900 mb-3">Vrsta poruke</h2>
-            <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
-              {(
-                [
-                  { value: 'CUSTOM', label: 'Prilagođena poruka' },
-                  { value: 'REENROLLMENT', label: 'Pozivnica za ponovni upis' },
-                ] as const
-              ).map((option) => (
+            <div className="inline-flex flex-wrap rounded-lg border border-gray-200 bg-gray-50 p-1">
+              {EMAIL_CAMPAIGN_KIND_ORDER.map((value) => (
                 <button
-                  key={option.value}
+                  key={value}
                   type="button"
-                  onClick={() => applyKind(option.value)}
+                  onClick={() => applyKind(value)}
                   className={[
                     'px-3 py-1.5 text-sm rounded-md transition-colors',
-                    kind === option.value
+                    kind === value
                       ? 'bg-white shadow-sm text-gray-900 font-medium'
                       : 'text-gray-500 hover:text-gray-700',
                   ].join(' ')}
                 >
-                  {option.label}
+                  {EMAIL_CAMPAIGN_KINDS[value].label}
                 </button>
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              {kind === 'CUSTOM'
-                ? 'Slobodna poruka u standardnom Inovatic predlošku (logo i podnožje dodaju se automatski).'
-                : `Pozivnica prošlogodišnjim polaznicima s terminima grupa za ${selectedYear} i poveznicom na prijavnicu.`}
+              {EMAIL_CAMPAIGN_KINDS[kind].description}
             </p>
+            {kind === 'EVALUATION' && (
+              <p className="mt-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
+                Jedno dijete = jedan e-mail. Braća i sestre na istoj adresi dobivaju dvije
+                odvojene poruke, svaka samo sa svojom karticom — nijedan roditelj ne može
+                primiti evaluaciju tuđeg djeteta.
+              </p>
+            )}
           </section>
 
           {kind === 'REENROLLMENT' && (
@@ -611,6 +711,8 @@ export function EmailWizard({
                 Poruka se šalje točno kako je napisana — uključite i pozdrav po želji
                 {kind === 'REENROLLMENT' &&
                   '; ispod teksta automatski slijede termini odabranih grupa i gumb za prijavu'}
+                {kind === 'EVALUATION' &&
+                  '; ispod teksta automatski slijedi kartica djeteta, a njegovo se ime dodaje u predmet poruke'}
                 . <span className="text-gray-400">{bodyText.trim().length}/5000</span>
               </p>
             </div>
@@ -639,9 +741,15 @@ export function EmailWizard({
           <section className="rounded-xl border border-gray-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-gray-900 mb-1">Primatelji</h2>
             <p className="text-xs text-gray-500 mb-3">
-              {kind === 'REENROLLMENT'
-                ? 'Roditelji polaznika standardnih programa iz odabrane (prošle) godine.'
-                : 'Roditelji polaznika odabranih grupa iz odabrane školske godine.'}
+              {(() => {
+                if (kind === 'REENROLLMENT') {
+                  return 'Roditelji polaznika standardnih programa iz odabrane (prošle) godine.'
+                }
+                if (kind === 'EVALUATION') {
+                  return 'Jedan red = jedno dijete i njegova kartica. Radionice se ne ocjenjuju pa nisu na popisu.'
+                }
+                return 'Roditelji polaznika odabranih grupa iz odabrane školske godine.'
+              })()}
             </p>
             <div className="max-w-xs">
               <label htmlFor="source-year" className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -663,33 +771,37 @@ export function EmailWizard({
               </select>
             </div>
 
-            <div className="mt-4">
-              <span className="block text-sm font-medium text-gray-700 mb-1.5">
-                Način odabira
-              </span>
-              <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
-                {(
-                  [
-                    { value: 'GROUPS', label: 'Po grupama' },
-                    { value: 'RECOMMENDATION', label: 'Po preporuci' },
-                  ] as const
-                ).map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => applySelectionMode(option.value)}
-                    className={[
-                      'px-3 py-1.5 text-sm rounded-md transition-colors',
-                      selectionMode === option.value
-                        ? 'bg-white shadow-sm text-gray-900 font-medium'
-                        : 'text-gray-500 hover:text-gray-700',
-                    ].join(' ')}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+            {/* An evaluation is always a group's own report cards, so there is no
+                mode to pick — a preporuka cohort names children, not cards. */}
+            {kind !== 'EVALUATION' && (
+              <div className="mt-4">
+                <span className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Način odabira
+                </span>
+                <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+                  {(
+                    [
+                      { value: 'GROUPS', label: 'Po grupama' },
+                      { value: 'RECOMMENDATION', label: 'Po preporuci' },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => applySelectionMode(option.value)}
+                      className={[
+                        'px-3 py-1.5 text-sm rounded-md transition-colors',
+                        selectionMode === option.value
+                          ? 'bg-white shadow-sm text-gray-900 font-medium'
+                          : 'text-gray-500 hover:text-gray-700',
+                      ].join(' ')}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {selectionMode === 'RECOMMENDATION' && (
               <div className="mt-4 space-y-1 rounded-lg border border-gray-100 p-3">
@@ -711,8 +823,25 @@ export function EmailWizard({
               </div>
             )}
 
+            {selectionMode === 'GROUPS' && !loadingTree && tree.length > 0 && (
+              <label className="mt-4 flex w-fit cursor-pointer items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={allGroupsSelected}
+                  onChange={toggleAllGroups}
+                  className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                />
+                <span className="text-sm font-medium text-gray-800">
+                  Odaberi sve grupe
+                  <span className="ml-1.5 font-normal text-gray-500">
+                    ({allTreeGroupIds.length} u {sourceYear})
+                  </span>
+                </span>
+              </label>
+            )}
+
             {selectionMode === 'GROUPS' && (
-            <div className="mt-4 space-y-3 max-h-96 overflow-y-auto rounded-lg border border-gray-100 p-3">
+            <div className="mt-3 space-y-3 max-h-96 overflow-y-auto rounded-lg border border-gray-100 p-3">
               {loadingTree && (
                 <p className="text-sm text-gray-400 italic py-3 text-center">Učitavam grupe...</p>
               )}
@@ -775,10 +904,27 @@ export function EmailWizard({
                                 className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
                               />
                               <span className="flex-1 text-sm text-gray-700">{label}</span>
-                              <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                {g._count.enrollments}{' '}
-                                {g._count.enrollments === 1 ? 'učenik' : 'učenika'}
-                              </span>
+                              {kind === 'EVALUATION' ? (
+                                // The number that decides whether this group is
+                                // ready to send: ungraded kids are skipped, so an
+                                // incomplete group needs grading first.
+                                <span
+                                  className={[
+                                    'text-[10px] whitespace-nowrap rounded px-1.5 py-0.5 border',
+                                    g.gradedCount === g._count.enrollments
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : 'bg-amber-50 text-amber-800 border-amber-200',
+                                  ].join(' ')}
+                                  title="Polaznici s ispunjenom evaluacijom / ukupno u grupi"
+                                >
+                                  {g.gradedCount}/{g._count.enrollments} ocijenjeno
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                  {g._count.enrollments}{' '}
+                                  {g._count.enrollments === 1 ? 'učenik' : 'učenika'}
+                                </span>
+                              )}
                             </label>
                           )
                         })}
@@ -821,6 +967,14 @@ export function EmailWizard({
               </p>
             )}
 
+            {kind === 'EVALUATION' && recipients.length > 0 && (
+              <p className="mb-3 text-xs text-gray-500">
+                Šalje se {checkedCount} {checkedCount === 1 ? 'poruka' : 'poruka'} —
+                po jedna za svako dijete. Kliknite <strong>Pregled</strong> na bilo kojem redu
+                da vidite točno onaj e-mail koji taj roditelj prima.
+              </p>
+            )}
+
             {hasSelection && recipientData && (
               <>
                 {filteredRecipients.length === 0 && (
@@ -831,69 +985,103 @@ export function EmailWizard({
                 <div className="space-y-1 max-h-96 overflow-y-auto">
                   {filteredRecipients.map((r) => {
                     const wasSent = alreadySentSet.has(r.parentEmail)
-                    const checked = !wasSent && !excluded.has(r.parentEmail)
+                    const checked = !wasSent && !excluded.has(r.rowKey)
+                    const incomplete =
+                      kind === 'EVALUATION' && r.children.some((c) => c.complete === false)
                     return (
-                      <label
-                        key={r.parentEmail}
+                      <div
+                        key={r.rowKey}
                         className={[
                           'flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors',
-                          wasSent
-                            ? 'bg-gray-50 border-gray-100 cursor-not-allowed opacity-70'
-                            : 'cursor-pointer',
+                          wasSent ? 'bg-gray-50 border-gray-100 opacity-70' : '',
                           !wasSent && checked
                             ? 'bg-white border-gray-200 hover:border-gray-300'
                             : '',
                           !wasSent && !checked ? 'bg-gray-50 border-gray-200' : '',
                         ].join(' ')}
                       >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={wasSent || isPending}
-                          onChange={() => toggleRecipient(r.parentEmail)}
-                          className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
-                        />
-                        <span className="flex-1 text-sm">
-                          <span className={checked ? 'text-gray-800' : 'text-gray-400 line-through'}>
-                            {r.children.map((c, i) => (
-                              <span key={`${r.parentEmail}-${i}`}>
-                                {i > 0 && ', '}
-                                {c.name}
-                                {c.recommendation && (
-                                  <span
-                                    className="ml-1.5 inline-block align-middle text-[10px] font-medium rounded px-1.5 py-0.5 border bg-violet-50 text-violet-700 border-violet-200 whitespace-nowrap"
-                                    title={`Preporuka iz prošle godine: ${c.recommendation}`}
-                                  >
-                                    Preporuka: {c.recommendation}
-                                  </span>
-                                )}
-                              </span>
-                            ))}
+                        <label className="flex flex-1 items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={wasSent || isPending}
+                            onChange={() => toggleRecipient(r.rowKey)}
+                            className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                          />
+                          <span className="flex-1 text-sm">
+                            <span
+                              className={checked ? 'text-gray-800' : 'text-gray-400 line-through'}
+                            >
+                              {r.children.map((c, i) => (
+                                <span key={`${r.rowKey}-${i}`}>
+                                  {i > 0 && ', '}
+                                  {c.name}
+                                  {c.groupLabel && (
+                                    <span className="text-gray-400"> · {c.groupLabel}</span>
+                                  )}
+                                  {c.recommendation && (
+                                    <span
+                                      className="ml-1.5 inline-block align-middle text-[10px] font-medium rounded px-1.5 py-0.5 border bg-violet-50 text-violet-700 border-violet-200 whitespace-nowrap"
+                                      title={`Preporuka iz prošle godine: ${c.recommendation}`}
+                                    >
+                                      Preporuka: {c.recommendation}
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+                            </span>
+                            <span className="text-gray-400"> — {r.parentEmail}</span>
                           </span>
-                          <span className="text-gray-400"> — {r.parentEmail}</span>
-                        </span>
+                        </label>
+                        {incomplete && (
+                          <span
+                            className="text-[10px] font-medium rounded px-1.5 py-0.5 border bg-amber-50 text-amber-800 border-amber-200 whitespace-nowrap"
+                            title="Neke vještine u rubrici nisu ocijenjene — kartica će se poslati s oznakom „Nije ocijenjeno”."
+                          >
+                            nepotpuna
+                          </span>
+                        )}
+                        {kind === 'EVALUATION' && (
+                          <button
+                            type="button"
+                            onClick={() => handleRowPreview(r.rowKey)}
+                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800"
+                            title="Prikaži točno onaj e-mail koji ovaj roditelj prima"
+                          >
+                            <Eye className="h-3 w-3" />
+                            Pregled
+                          </button>
+                        )}
                         {wasSent && (
                           <span className="text-[10px] font-medium rounded px-1.5 py-0.5 border bg-gray-100 text-gray-500 border-gray-200 whitespace-nowrap">
                             već poslano
                           </span>
                         )}
-                      </label>
+                      </div>
                     )
                   })}
                 </div>
 
                 {skipped.length > 0 && (
-                  <details className="mt-3 text-sm">
+                  <details className="mt-3 text-sm" open={kind === 'EVALUATION'}>
                     <summary className="cursor-pointer text-amber-700">
-                      Preskočeno: {skipped.length} (bez valjane e-mail adrese)
+                      Preskočeno: {skipped.length}{' '}
+                      {kind === 'EVALUATION'
+                        ? '(bez evaluacije ili bez valjane e-mail adrese)'
+                        : '(bez valjane e-mail adrese)'}
                     </summary>
+                    {kind === 'EVALUATION' && (
+                      <p className="mt-1.5 ml-4 text-xs text-gray-500">
+                        Ova djeca neće primiti ništa. Ispunite im evaluaciju (ili e-mail
+                        roditelja) i ponovno pokrenite slanje — već poslane poruke se ne
+                        ponavljaju jer se šalju samo odabrani redovi.
+                      </p>
+                    )}
                     <ul className="mt-2 ml-4 list-disc text-gray-600 space-y-0.5">
                       {skipped.map((s) => (
-                        <li key={s.studentId}>
+                        <li key={`${s.studentId}-${s.reason}`}>
                           {s.studentName}{' '}
-                          <span className="text-gray-400">
-                            ({s.reason === 'MISSING_EMAIL' ? 'nema e-mail' : 'neispravan e-mail'})
-                          </span>
+                          <span className="text-gray-400">({SKIP_REASON_SHORT[s.reason]})</span>
                         </li>
                       ))}
                     </ul>
@@ -950,7 +1138,12 @@ export function EmailWizard({
         </div>
       )}
 
-      <EmailPreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} html={previewHtml} />
+      <EmailPreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        html={previewHtml}
+        description={rowPreviewDescription}
+      />
     </div>
   )
 }

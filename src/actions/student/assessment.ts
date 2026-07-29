@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import type { ProgramKind, SkillLevel } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireStudent } from '@/lib/auth-guard'
-import { formatRecommendationLabel } from '@/lib/assessment-rubric'
+import { formatRecommendationLabel, isBlankAssessment } from '@/lib/assessment-rubric'
 import { formatDate } from '@/lib/format'
 import { isGradable } from '@/lib/program-kind'
 
@@ -100,21 +100,7 @@ export async function getMyAssessmentForGroup(
   })
   if (!row) return view
 
-  const skills = [
-    row.slaganje,
-    row.razradaIdeja,
-    row.izvedivost,
-    row.programiranje,
-    row.inovacije,
-    row.suradnja,
-    row.komunikacija,
-    row.zabava,
-  ]
-  const isBlank =
-    skills.every((s) => s === null) &&
-    !row.opisnaOcjena?.trim() &&
-    row.recommendationKind === null
-  if (isBlank) return view
+  if (isBlankAssessment(row)) return view
 
   return {
     ...view,

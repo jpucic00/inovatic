@@ -16,7 +16,10 @@ const schoolYearField = z
 //    regardless of group or program
 const selectionFields = {
   sourceSchoolYear: schoolYearField,
-  sourceGroupIds: z.array(z.string().min(1)).max(100, 'Najviše 100 grupa.').optional(),
+  // The cap bounds the query, it is not a business rule: "Odaberi sve grupe"
+  // legitimately submits every group a city ran in a year, which is well under
+  // this but far over the old limit of 100.
+  sourceGroupIds: z.array(z.string().min(1)).max(400, 'Najviše 400 grupa.').optional(),
   recommendations: z
     .array(
       z
@@ -33,7 +36,7 @@ const selectionFields = {
 }
 
 function requireExactlyOneSelection(
-  value: { sourceGroupIds?: string[]; recommendations?: unknown[] },
+  value: { kind?: string; sourceGroupIds?: string[]; recommendations?: unknown[] },
   ctx: z.RefinementCtx,
 ) {
   const hasGroups = (value.sourceGroupIds?.length ?? 0) > 0
@@ -42,6 +45,16 @@ function requireExactlyOneSelection(
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Odaberite grupe ili preporuku.',
+    })
+    return
+  }
+  // A preporuka cohort is every child of the year matching that recommendation,
+  // across groups and programs — it names children, not report cards, so it
+  // cannot say WHICH card to send. Groups can.
+  if (value.kind === 'EVALUATION' && hasRecommendations) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Evaluacije se šalju odabirom grupa.',
     })
   }
 }
@@ -66,8 +79,31 @@ const excludedParentEmailsField = z
   .max(500, 'Previše isključenih primatelja.')
   .optional()
 
+/**
+ * EVALUATION's exclusion key. It cannot be the parent's e-mail like the other
+ * kinds: an evaluation row is one child, so two siblings share an address, and
+ * excluding by address would silently drop the sibling of every child the admin
+ * unchecked. The report card is the only identifier that names exactly one row.
+ */
+const excludedAssessmentIdsField = z
+  .array(z.string().min(1).max(50))
+  .max(1000, 'Previše isključenih primatelja.')
+  .optional()
+
 const customContent = {
   kind: z.literal('CUSTOM'),
+  subject: subjectField,
+  bodyText: bodyTextField,
+}
+
+/**
+ * The evaluation send carries no target program and no CTA — the content is the
+ * child's own report card, resolved per recipient at send time. Only groups can
+ * select this cohort (a preporuka filter would select children across years and
+ * groups whose card is not the one being sent), enforced below.
+ */
+const evaluationContent = {
+  kind: z.literal('EVALUATION'),
   subject: subjectField,
   bodyText: bodyTextField,
 }
@@ -95,6 +131,11 @@ export const sendEmailCampaignSchema = z
       ...selectionFields,
       excludedParentEmails: excludedParentEmailsField,
     }),
+    z.object({
+      ...evaluationContent,
+      ...selectionFields,
+      excludedAssessmentIds: excludedAssessmentIdsField,
+    }),
   ])
   .superRefine(requireExactlyOneSelection)
 
@@ -102,7 +143,7 @@ export const sendEmailCampaignSchema = z
 // kind compute its "već poslano" skip-set alongside the cohort.
 export const previewRecipientsSchema = z
   .object({
-    kind: z.enum(['CUSTOM', 'REENROLLMENT']),
+    kind: z.enum(['CUSTOM', 'REENROLLMENT', 'EVALUATION']),
     ...selectionFields,
     targetCourseId: z.string().min(1).optional(),
   })
@@ -112,8 +153,26 @@ export const previewRecipientsSchema = z
 export const previewEmailSchema = z.discriminatedUnion('kind', [
   z.object(customContent),
   z.object(reenrollmentContent),
+  z.object(evaluationContent),
 ])
+
+/**
+ * "Show me exactly what THIS parent will receive" — the cohort filters plus the
+ * composed message plus which row to render. The cohort is re-resolved
+ * server-side and `assessmentId` must appear in it, so an id the admin is not
+ * entitled to cannot be previewed.
+ */
+export const previewEvaluationRecipientSchema = z
+  .object({
+    ...evaluationContent,
+    ...selectionFields,
+    assessmentId: z.string().min(1).max(50),
+  })
+  .superRefine(requireExactlyOneSelection)
 
 export type SendEmailCampaignInput = z.infer<typeof sendEmailCampaignSchema>
 export type PreviewRecipientsInput = z.infer<typeof previewRecipientsSchema>
 export type PreviewEmailInput = z.infer<typeof previewEmailSchema>
+export type PreviewEvaluationRecipientInput = z.infer<
+  typeof previewEvaluationRecipientSchema
+>

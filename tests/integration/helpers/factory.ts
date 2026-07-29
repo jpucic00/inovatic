@@ -20,7 +20,10 @@ import {
   MaterialType,
   type ModuleEnrollment,
   type ModuleSchedule,
+  type RecommendationKind,
   type ScheduledGroup,
+  type SkillLevel,
+  type StudentAssessment,
   type TeacherAssignment,
   type TeacherAttendance,
   type User,
@@ -242,6 +245,53 @@ export async function createEnrollment(
       scheduledGroupId,
       schoolYear: overrides.schoolYear ?? '2026/2027',
       fullYearPaidAt: overrides.fullYearPaidAt ?? null,
+    },
+  })
+}
+
+/**
+ * A report card for (student, group). Defaults to a fully graded STANDARD rubric
+ * so a caller who only cares that a card EXISTS gets a non-blank one; pass
+ * explicit nulls for the partial and blank cases.
+ */
+export async function createAssessment(
+  studentId: string,
+  groupId: string,
+  authorId: string,
+  overrides: Partial<{
+    slaganje: SkillLevel | null
+    programiranje: SkillLevel | null
+    razradaIdeja: SkillLevel | null
+    izvedivost: SkillLevel | null
+    inovacije: SkillLevel | null
+    suradnja: SkillLevel | null
+    komunikacija: SkillLevel | null
+    zabava: SkillLevel | null
+    opisnaOcjena: string | null
+    recommendationKind: RecommendationKind | null
+    recommendedCourseId: string | null
+  }> = {},
+): Promise<StudentAssessment> {
+  const level = (value: SkillLevel | null | undefined, fallback: SkillLevel | null) =>
+    value === undefined ? fallback : value
+  return db.studentAssessment.create({
+    data: {
+      studentId,
+      groupId,
+      authorId,
+      slaganje: level(overrides.slaganje, 'OSTVARENO'),
+      programiranje: level(overrides.programiranje, 'U_RAZVOJU'),
+      // Null by default: these belong to the COMPETITION rubric, and
+      // `upsertStudentAssessment` never writes them on a standard group.
+      razradaIdeja: level(overrides.razradaIdeja, null),
+      izvedivost: level(overrides.izvedivost, null),
+      inovacije: level(overrides.inovacije, 'OSTVARENO'),
+      suradnja: level(overrides.suradnja, 'OSTVARENO'),
+      komunikacija: level(overrides.komunikacija, 'U_RAZVOJU'),
+      zabava: level(overrides.zabava, 'OSTVARENO'),
+      opisnaOcjena: overrides.opisnaOcjena === undefined ? 'Napredovao je kroz godinu.' : overrides.opisnaOcjena,
+      recommendationKind: overrides.recommendationKind ?? null,
+      recommendedCourseId: overrides.recommendedCourseId ?? null,
     },
   })
 }

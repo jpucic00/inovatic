@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { getCampaignDetail } from '@/actions/admin/email-campaign'
 import { CampaignRecipients } from '@/components/admin/email/campaign-recipients'
+import { EMAIL_CAMPAIGN_KINDS } from '@/lib/email-campaign-kind'
 import { formatDate } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Admin – Detalji kampanje' }
@@ -16,7 +17,7 @@ export default async function CampaignDetailPage({
   const campaign = await getCampaignDetail(campaignId)
 
   const sender = `${campaign.sentBy.firstName} ${campaign.sentBy.lastName}`
-  const kindLabel = campaign.kind === 'REENROLLMENT' ? 'Pozivnica na upis' : 'Obična poruka'
+  const kindLabel = EMAIL_CAMPAIGN_KINDS[campaign.kind].label
 
   return (
     <div>

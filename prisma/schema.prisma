@@ -101,6 +101,12 @@ enum MaterialScope {
 enum EmailCampaignKind {
   CUSTOM
   REENROLLMENT
+  /// One report card per e-mail. Unlike the other two kinds, an EVALUATION
+  /// recipient row is ONE CHILD rather than one parent inbox: two siblings on
+  /// the same address get two separate mails, each carrying exactly one card.
+  /// That makes "someone else's evaluation in my inbox" structurally
+  /// impossible instead of merely checked.
+  EVALUATION
 }
 
 enum EmailRecipientStatus {
@@ -113,7 +119,8 @@ enum EmailRecipientStatus {
   /// The parent was already invited to this program for this year, so this send
   /// deliberately skipped them.
   ALREADY_SENT
-  /// The child could not be mailed at all — the parent has no usable address.
+  /// The child could not be mailed at all — the parent has no usable address,
+  /// or (EVALUATION) the child has no filled-in report card to send.
   /// Persisted as a row (not just a count) so the admin can see WHICH child
   /// was missed and fix the record.
   SKIPPED
@@ -774,6 +781,13 @@ model EmailCampaignRecipient {
   /// Snapshot of the children this address was mailed for, taken at send time
   /// so the detail view survives later renames, transfers or deletions.
   childNames String[] @default([])
+  /// EVALUATION only: the exact report card(s) this row is mailed — normally a
+  /// single one, since an EVALUATION row is one child. Stored on the ROW rather
+  /// than on the campaign so per-recipient content can never be shared, and
+  /// re-verified against the student's current parentEmail immediately before
+  /// each send (`assertCardsBelongTo`), so a card cannot reach another inbox
+  /// even if cohort resolution were wrong. Empty for CUSTOM/REENROLLMENT.
+  assessmentIds String[] @default([])
   /// Why a FAILED send failed, or why a SKIPPED child had no usable address.
   failureReason String?
 

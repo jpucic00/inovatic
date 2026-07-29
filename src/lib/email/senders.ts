@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import { render } from '@react-email/components'
 import type { City } from '@prisma/client'
+import type { EvaluationCard } from '@/lib/evaluation-email-cards'
 import { ASSOCIATION_EMAIL, sendTransactionalEmail } from './client'
 import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
 import PartyInquiryConfirmationEmail from '../../../emails/party-inquiry-confirmation'
@@ -206,6 +207,13 @@ type BulkMessageParams = {
    * button.
    */
   signupPath?: string
+  /**
+   * The report card(s) to render — EVALUATION campaigns only, and in a real send
+   * always exactly one, belonging to the child named in `subject`. Passed per
+   * call rather than held on the campaign, because this is the one piece of
+   * campaign content that differs for every recipient.
+   */
+  cards?: EvaluationCard[]
 }
 
 /** Šibenik parents reply to Šibenik; Split keeps the default association inbox. */
@@ -217,6 +225,7 @@ function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>)
     subject: params.subject,
     bodyText: params.bodyText,
     options: params.options,
+    cards: params.cards,
     signupUrl: params.signupPath ? `${publicBaseUrl()}${params.signupPath}` : undefined,
   })
 }

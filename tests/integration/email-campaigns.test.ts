@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { mockSession } from './setup'
 import {
   createAdmin,
+  createAssessment,
   createCourse,
   createEnrollment,
   createGroup,
@@ -46,6 +47,7 @@ const {
   getEmailGroupTree,
   previewEmailHtml,
   previewEmailRecipients,
+  previewEvaluationEmailForRecipient,
   sendEmailCampaign,
   getCampaignDetail,
   getCampaignProgress,
@@ -1139,5 +1141,466 @@ describe('city scoping', () => {
     await loginAdmin('SIBENIK')
     const sibenikList = await getEmailCampaigns()
     expect(sibenikList.some((c) => c.sourceGroupIds.includes(group.id))).toBe(false)
+  })
+})
+
+// ── EVALUATION ───────────────────────────────────────────────────────────────
+// The point of this kind is that a parent can only ever receive their own
+// child's report card, so most of these tests assert exactly that. The e-mails
+// are inspected through the React element the Resend mock received —
+// `react.props.cards` IS the card array the template renders, so an assertion on
+// it is an assertion on what the parent sees.
+
+/** The cards each send call carried, paired with the address it went to. */
+function sentCardPairs(): { to: string; subject: string; children: string[] }[] {
+  return sendMock.mock.calls.map((c) => ({
+    to: c[0].to,
+    subject: c[0].subject,
+    children: (c[0].react.props.cards ?? []).map(
+      (card: { childName: string }) => card.childName,
+    ),
+  }))
+}
+
+const EVAL_CONTENT = {
+  subject: 'Evaluacija po završetku programa – Inovatic',
+  bodyText: 'U nastavku se nalazi evaluacija Vašeg djeteta po završetku programa.',
+}
+
+describe('sendEmailCampaign — EVALUATION', () => {
+  it('sends one e-mail per child and never mixes two children into one message', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+
+    // Three unrelated families, one child each.
+    const families = []
+    for (const name of ['Ana', 'Borna', 'Cvita']) {
+      const parentEmail = uniqEmail(`eval-${name.toLowerCase()}`)
+      const student = await enrollStudent(group.id, {
+        parentEmail,
+        firstName: name,
+        lastName: `${name}ić`,
+      })
+      await createAssessment(student.id, group.id, admin.id)
+      families.push({ parentEmail, childName: `${name} ${name}ić` })
+    }
+
+    const res = await sendAndSettle({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...EVAL_CONTENT,
+    })
+    expect(res.success).toBe(true)
+
+    const pairs = sentCardPairs()
+    expect(pairs).toHaveLength(3)
+    // Every message carries exactly one card...
+    for (const pair of pairs) expect(pair.children).toHaveLength(1)
+    // ...and it is that address's own child, never another family's.
+    for (const family of families) {
+      const mine = pairs.filter((p) => p.to === family.parentEmail)
+      expect(mine).toHaveLength(1)
+      expect(mine[0].children).toEqual([family.childName])
+      expect(mine[0].subject).toBe(`${EVAL_CONTENT.subject} – ${family.childName}`)
+    }
+    // No card reached anyone it does not belong to.
+    const allChildren = pairs.flatMap((p) => p.children)
+    expect(new Set(allChildren).size).toBe(allChildren.length)
+  })
+
+  it('siblings on one address get two separate mails, each with only its own card', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const shared = uniqEmail('eval-siblings')
+
+    const one = await enrollStudent(group.id, {
+      parentEmail: shared,
+      firstName: 'Iva',
+      lastName: 'Horvat',
+    })
+    const two = await enrollStudent(group.id, {
+      parentEmail: shared,
+      firstName: 'Luka',
+      lastName: 'Horvat',
+    })
+    await createAssessment(one.id, group.id, admin.id)
+    await createAssessment(two.id, group.id, admin.id)
+
+    const res = await sendAndSettle({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...EVAL_CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (res.success) expect(res.total).toBe(2)
+
+    const pairs = sentCardPairs()
+    expect(pairs).toHaveLength(2)
+    expect(pairs.every((p) => p.to === shared)).toBe(true)
+    expect(pairs.map((p) => p.children).sort()).toEqual([['Iva Horvat'], ['Luka Horvat']])
+    // The child's name in the subject is what keeps the two apart in the inbox.
+    expect(pairs.map((p) => p.subject).sort()).toEqual([
+      `${EVAL_CONTENT.subject} – Iva Horvat`,
+      `${EVAL_CONTENT.subject} – Luka Horvat`,
+    ])
+  })
+
+  it('a card from an unselected group is never sent, even for the same parent', async () => {
+    const admin = await loginAdmin()
+    const selected = await makeSourceGroup()
+    const other = await makeSourceGroup()
+    const shared = uniqEmail('eval-partial')
+
+    const inSelected = await enrollStudent(selected.group.id, {
+      parentEmail: shared,
+      firstName: 'Mia',
+      lastName: 'Perić',
+    })
+    const inOther = await enrollStudent(other.group.id, {
+      parentEmail: shared,
+      firstName: 'Nikola',
+      lastName: 'Perić',
+    })
+    await createAssessment(inSelected.id, selected.group.id, admin.id)
+    await createAssessment(inOther.id, other.group.id, admin.id)
+
+    const res = await sendAndSettle({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [selected.group.id],
+      ...EVAL_CONTENT,
+    })
+    expect(res.success).toBe(true)
+
+    const pairs = sentCardPairs()
+    expect(pairs).toHaveLength(1)
+    expect(pairs[0].children).toEqual(['Mia Perić'])
+  })
+
+  it('refuses to send when the card no longer belongs to the row’s address', async () => {
+    // The guard runs immediately before each send, so it has to be exercised
+    // through a row that was already queued — which is exactly the state a
+    // deploy mid-send leaves behind, and what `resumeEmailCampaign` picks up.
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const student = await enrollStudent(group.id, {
+      parentEmail: uniqEmail('eval-guard'),
+      firstName: 'Petra',
+      lastName: 'Kovač',
+    })
+    const card = await createAssessment(student.id, group.id, admin.id)
+
+    const campaign = await db.emailCampaign.create({
+      data: {
+        city: 'SPLIT',
+        kind: 'EVALUATION',
+        sourceSchoolYear: SOURCE_YEAR,
+        sourceGroupIds: [group.id],
+        sentById: admin.id,
+        totalCount: 1,
+        ...EVAL_CONTENT,
+      },
+    })
+    // A row naming this child's card but SOMEONE ELSE's inbox.
+    const wrongInbox = uniqEmail('eval-not-my-child')
+    const row = await db.emailCampaignRecipient.create({
+      data: {
+        campaignId: campaign.id,
+        parentEmail: wrongInbox,
+        status: 'PENDING',
+        childNames: ['Petra Kovač'],
+        assessmentIds: [card.id],
+      },
+    })
+
+    const resumed = await resumeEmailCampaign(campaign.id)
+    expect(resumed.success).toBe(true)
+    await settle(campaign.id)
+
+    const after = await db.emailCampaignRecipient.findUnique({ where: { id: row.id } })
+    expect(after?.status).toBe('FAILED')
+    expect(after?.failureReason).toContain('promijenila')
+    // The whole point: nothing went out.
+    expect(sendMock.mock.calls.map((c) => c[0].to)).not.toContain(wrongInbox)
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses to send a card that was deleted after the cohort was queued', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const student = await enrollStudent(group.id, { parentEmail: uniqEmail('eval-deleted') })
+    const card = await createAssessment(student.id, group.id, admin.id)
+    const parentEmail = (await db.user.findUniqueOrThrow({
+      where: { id: student.id },
+      select: { parentEmail: true },
+    })).parentEmail!
+
+    const campaign = await db.emailCampaign.create({
+      data: {
+        city: 'SPLIT',
+        kind: 'EVALUATION',
+        sourceSchoolYear: SOURCE_YEAR,
+        sourceGroupIds: [group.id],
+        sentById: admin.id,
+        totalCount: 1,
+        ...EVAL_CONTENT,
+      },
+    })
+    const row = await db.emailCampaignRecipient.create({
+      data: {
+        campaignId: campaign.id,
+        parentEmail,
+        status: 'PENDING',
+        childNames: ['Marko Anić'],
+        assessmentIds: [card.id],
+      },
+    })
+    await db.studentAssessment.delete({ where: { id: card.id } })
+
+    await resumeEmailCampaign(campaign.id)
+    await settle(campaign.id)
+
+    const after = await db.emailCampaignRecipient.findUnique({ where: { id: row.id } })
+    expect(after?.status).toBe('FAILED')
+    expect(after?.failureReason).toContain('izbrisana')
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
+  it('names ungraded and blank-carded children as SKIPPED instead of mailing them', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+
+    const graded = await enrollStudent(group.id, {
+      parentEmail: uniqEmail('eval-graded'),
+      firstName: 'Dora',
+      lastName: 'Novak',
+    })
+    await createAssessment(graded.id, group.id, admin.id)
+
+    // No report card at all.
+    await enrollStudent(group.id, {
+      parentEmail: uniqEmail('eval-nocard'),
+      firstName: 'Emil',
+      lastName: 'Novak',
+    })
+    // A row that exists but says nothing — same thing as far as parents go.
+    const blank = await enrollStudent(group.id, {
+      parentEmail: uniqEmail('eval-blank'),
+      firstName: 'Filip',
+      lastName: 'Novak',
+    })
+    await createAssessment(blank.id, group.id, admin.id, {
+      slaganje: null,
+      programiranje: null,
+      inovacije: null,
+      suradnja: null,
+      komunikacija: null,
+      zabava: null,
+      opisnaOcjena: null,
+    })
+
+    const res = await sendAndSettle({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...EVAL_CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+
+    expect(res.total).toBe(1)
+    expect(res.skipped.map((s) => s.studentName).sort()).toEqual(['Emil Novak', 'Filip Novak'])
+    expect(res.skipped.every((s) => s.reason === 'NOT_GRADED')).toBe(true)
+    expect(sentCardPairs().map((p) => p.children)).toEqual([['Dora Novak']])
+
+    // ...and the reason is persisted by name, so the record survives the session.
+    const detail = await getCampaignDetail(res.campaignId)
+    const skippedRows = detail.recipients.filter((r) => r.status === 'SKIPPED')
+    expect(skippedRows.map((r) => r.childNames[0]).sort()).toEqual(['Emil Novak', 'Filip Novak'])
+    expect(skippedRows.every((r) => r.failureReason === 'Dijete nema ispunjenu evaluaciju.')).toBe(
+      true,
+    )
+  })
+
+  it('renders the COMPETITION rubric for a competition group', async () => {
+    const admin = await loginAdmin()
+    const competition = await makeSourceGroup({ kind: 'COMPETITION' })
+    const student = await enrollStudent(competition.group.id, {
+      parentEmail: uniqEmail('eval-competition'),
+      firstName: 'Grga',
+      lastName: 'Marić',
+    })
+    await createAssessment(student.id, competition.group.id, admin.id, {
+      // Mirrors upsertStudentAssessment: a competition card writes its own
+      // practical skills and nulls the standard ones.
+      slaganje: null,
+      programiranje: null,
+      razradaIdeja: 'OSTVARENO',
+      izvedivost: 'U_RAZVOJU',
+    })
+
+    const res = await sendAndSettle({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [competition.group.id],
+      ...EVAL_CONTENT,
+    })
+    expect(res.success).toBe(true)
+
+    expect(sendMock).toHaveBeenCalledTimes(1)
+    const card = sendMock.mock.calls[0][0].react.props.cards[0]
+    expect(card.kind).toBe('COMPETITION')
+    expect(card.skills.razradaIdeja).toBe('OSTVARENO')
+    expect(card.skills.izvedivost).toBe('U_RAZVOJU')
+    expect(card.skills.slaganje).toBeNull()
+  })
+
+  it('excludes by report card, so unchecking one child leaves the sibling alone', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const shared = uniqEmail('eval-exclude')
+    const keep = await enrollStudent(group.id, {
+      parentEmail: shared,
+      firstName: 'Jakov',
+      lastName: 'Babić',
+    })
+    const drop = await enrollStudent(group.id, {
+      parentEmail: shared,
+      firstName: 'Klara',
+      lastName: 'Babić',
+    })
+    await createAssessment(keep.id, group.id, admin.id)
+    const dropCard = await createAssessment(drop.id, group.id, admin.id)
+
+    const res = await sendAndSettle({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      excludedAssessmentIds: [dropCard.id],
+      ...EVAL_CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (res.success) expect(res.excluded).toBe(1)
+
+    const pairs = sentCardPairs()
+    expect(pairs).toHaveLength(1)
+    expect(pairs[0].children).toEqual(['Jakov Babić'])
+  })
+
+  it('rejects radionica groups, another city’s groups, and a preporuka cohort', async () => {
+    await loginAdmin('SPLIT')
+    const radionica = await makeSourceGroup({ kind: 'RADIONICA' })
+    const sibenik = await makeSourceGroup({ city: 'SIBENIK' })
+
+    for (const groupIds of [[radionica.group.id], [sibenik.group.id]]) {
+      const res = await sendEmailCampaign({
+        kind: 'EVALUATION',
+        sourceSchoolYear: SOURCE_YEAR,
+        sourceGroupIds: groupIds,
+        ...EVAL_CONTENT,
+      })
+      expect(res).toEqual({ success: false, error: 'Nevaljani podaci.' })
+    }
+
+    const byRecommendation = await sendEmailCampaign({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      recommendations: ['COMPETITION_PREP'],
+      ...EVAL_CONTENT,
+    })
+    expect(byRecommendation).toEqual({
+      success: false,
+      error: 'Evaluacije se šalju odabirom grupa.',
+    })
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
+  it('previews exactly one recipient’s own e-mail', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const shared = uniqEmail('eval-preview')
+    const mine = await enrollStudent(group.id, {
+      parentEmail: shared,
+      firstName: 'Lea',
+      lastName: 'Tomić',
+    })
+    const sibling = await enrollStudent(group.id, {
+      parentEmail: shared,
+      firstName: 'Matej',
+      lastName: 'Tomić',
+    })
+    const myCard = await createAssessment(mine.id, group.id, admin.id)
+    await createAssessment(sibling.id, group.id, admin.id)
+
+    const preview = await previewEvaluationEmailForRecipient({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      assessmentId: myCard.id,
+      ...EVAL_CONTENT,
+    })
+    expect(preview.success).toBe(true)
+    if (!preview.success) return
+    expect(preview.html).toContain('Lea Tomić')
+    expect(preview.html).not.toContain('Matej Tomić')
+  })
+
+  it('previewEmailRecipients returns one row per card, keyed by the card', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const shared = uniqEmail('eval-rows')
+    const a = await enrollStudent(group.id, {
+      parentEmail: shared,
+      firstName: 'Nina',
+      lastName: 'Vuković',
+    })
+    const b = await enrollStudent(group.id, {
+      parentEmail: shared,
+      firstName: 'Oliver',
+      lastName: 'Vuković',
+    })
+    const cardA = await createAssessment(a.id, group.id, admin.id)
+    // Deliberately partial — the composer flags it rather than withholding it.
+    const cardB = await createAssessment(b.id, group.id, admin.id, { zabava: null })
+
+    const res = await previewEmailRecipients({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+
+    expect(res.recipients.map((r) => r.rowKey).sort()).toEqual([cardA.id, cardB.id].sort())
+    expect(res.recipients.every((r) => r.children.length === 1)).toBe(true)
+    const complete = res.recipients.find((r) => r.rowKey === cardA.id)
+    const partial = res.recipients.find((r) => r.rowKey === cardB.id)
+    expect(complete?.children[0].complete).toBe(true)
+    expect(partial?.children[0].complete).toBe(false)
+  })
+
+  it('getEmailGroupTree counts only non-blank cards as graded', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const graded = await enrollStudent(group.id, { parentEmail: uniqEmail('tree-graded') })
+    const blanked = await enrollStudent(group.id, { parentEmail: uniqEmail('tree-blank') })
+    await enrollStudent(group.id, { parentEmail: uniqEmail('tree-none') })
+    await createAssessment(graded.id, group.id, admin.id)
+    await createAssessment(blanked.id, group.id, admin.id, {
+      slaganje: null,
+      programiranje: null,
+      inovacije: null,
+      suradnja: null,
+      komunikacija: null,
+      zabava: null,
+      opisnaOcjena: null,
+    })
+
+    const tree = await getEmailGroupTree(SOURCE_YEAR, true)
+    const row = tree.flatMap((c) => c.scheduledGroups).find((g) => g.id === group.id)
+    expect(row?._count.enrollments).toBe(3)
+    expect(row?.gradedCount).toBe(1)
   })
 })

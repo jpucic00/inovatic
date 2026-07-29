@@ -1,5 +1,7 @@
 import type { ProgramKind, RecommendationKind, SkillLevel } from '@prisma/client'
-import { isCompetition } from '@/lib/program-kind'
+// Relative on purpose: the evaluation e-mail template imports this module for
+// its rubric, and `emails/` is outside the `@/*` alias root.
+import { isCompetition } from './program-kind'
 
 // ── Skill levels (POČETNO / U RAZVOJU / OSTVARENO) ───────────────────────────
 
@@ -28,6 +30,22 @@ export const SKILL_LEVEL_BADGE_CLASS: Record<SkillLevel, string> = {
   POCETNO: 'bg-amber-500 text-white',
   U_RAZVOJU: 'bg-sky-500 text-white',
   OSTVARENO: 'bg-emerald-500 text-white',
+}
+
+/**
+ * The same three chips as literal colors, for the report card rendered inside an
+ * e-mail — mail clients have no Tailwind, so the classes above cannot be reused
+ * there. Hexes are the Tailwind v4 values of amber-500 / sky-500 / emerald-500;
+ * a unit test asserts both maps cover every level, so a new level cannot land
+ * styled in the app and unstyled in the inbox.
+ */
+export const SKILL_LEVEL_BADGE_STYLE: Record<
+  SkillLevel,
+  { backgroundColor: string; color: string }
+> = {
+  POCETNO: { backgroundColor: '#f59e0b', color: '#ffffff' },
+  U_RAZVOJU: { backgroundColor: '#0ea5e9', color: '#ffffff' },
+  OSTVARENO: { backgroundColor: '#10b981', color: '#ffffff' },
 }
 
 // ── Skills, grouped into the two rubric categories ───────────────────────────
@@ -163,6 +181,47 @@ export function skillCategories(kind: ProgramKind): readonly SkillCategory[] {
 /** The skills that rubric actually holds — what a form or a diff iterates. */
 export function skillKeysFor(kind: ProgramKind): readonly SkillKey[] {
   return skillCategories(kind).flatMap((c) => c.skills.map((s) => s.key))
+}
+
+// ── Is this card actually filled in? ─────────────────────────────────────────
+
+/** Every column the two predicates below read. */
+type AssessmentState = Record<SkillKey, SkillLevel | null> & {
+  opisnaOcjena: string | null
+  recommendationKind: RecommendationKind | null
+}
+
+/**
+ * A row that exists but says nothing — every skill null, no opisna ocjena, no
+ * preporuka. `upsertStudentAssessment` will happily save one (a mentor opening
+ * and saving the card without grading), so "has a row" is not the same as
+ * "graded".
+ *
+ * This is the app-wide definition of ungraded: the portal shows "not graded
+ * yet" rather than an empty card, and an evaluation e-mail campaign skips the
+ * child by name instead of mailing a blank card to their parent. One rule, so
+ * the two can never disagree about who has been graded.
+ */
+export function isBlankAssessment(row: AssessmentState): boolean {
+  return (
+    SKILL_KEYS.every((key) => row[key] === null) &&
+    !row.opisnaOcjena?.trim() &&
+    row.recommendationKind === null
+  )
+}
+
+/**
+ * Every skill this group's rubric holds has a level. Opisna ocjena and preporuka
+ * are deliberately not required — both are nullable on the staff card, and a
+ * mentor may legitimately leave them off.
+ *
+ * Only advisory: a partially graded card is still sent (it carries real
+ * information, and the missing skills render as "Nije ocijenjeno" exactly as
+ * they do in the portal), but the composer flags it so the admin can finish it
+ * first. Blankness above is the only hard rule.
+ */
+export function isCompleteAssessment(kind: ProgramKind, row: AssessmentState): boolean {
+  return skillKeysFor(kind).every((key) => row[key] !== null)
 }
 
 // ── Recommendation (PREPORUKA) ───────────────────────────────────────────────

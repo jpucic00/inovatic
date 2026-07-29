@@ -1,13 +1,9 @@
 import Link from 'next/link'
 import { formatDate } from '@/lib/format'
+import { EMAIL_CAMPAIGN_KINDS } from '@/lib/email-campaign-kind'
 import type { getEmailCampaigns } from '@/actions/admin/email-campaign'
 
 type Campaigns = Awaited<ReturnType<typeof getEmailCampaigns>>
-
-const KIND_BADGE: Record<Campaigns[number]['kind'], { label: string; className: string }> = {
-  CUSTOM: { label: 'Prilagođena', className: 'bg-gray-100 text-gray-700 border-gray-200' },
-  REENROLLMENT: { label: 'Pozivnica za upis', className: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-}
 
 export function CampaignHistory({ campaigns }: Readonly<{ campaigns: Campaigns }>) {
   return (
@@ -31,7 +27,7 @@ export function CampaignHistory({ campaigns }: Readonly<{ campaigns: Campaigns }
             </thead>
             <tbody>
               {campaigns.map((c) => {
-                const badge = KIND_BADGE[c.kind]
+                const badge = EMAIL_CAMPAIGN_KINDS[c.kind]
                 const groupCount = c.sourceGroupIds.length
                 const groupNoun = groupCount === 1 ? 'grupa' : 'grupe'
                 const cohort =
@@ -45,9 +41,9 @@ export function CampaignHistory({ campaigns }: Readonly<{ campaigns: Campaigns }
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span
-                        className={`text-[11px] font-medium rounded px-1.5 py-0.5 border ${badge.className}`}
+                        className={`text-[11px] font-medium rounded px-1.5 py-0.5 border ${badge.badgeClass}`}
                       >
-                        {badge.label}
+                        {badge.badgeLabel}
                       </span>
                     </td>
                     <td className="px-4 py-3 max-w-[18rem] truncate" title={c.subject}>

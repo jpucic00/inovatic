@@ -11,19 +11,34 @@ import { isArchivedYear } from '@/lib/school-year'
 import { formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
 import { signupPathForSlug } from '@/lib/signup-links'
-import { decodeRecommendation, formatRecommendationLabel } from '@/lib/assessment-rubric'
+import {
+  decodeRecommendation,
+  formatRecommendationLabel,
+  isBlankAssessment,
+  isCompleteAssessment,
+} from '@/lib/assessment-rubric'
 import {
   buildEmailRecipients,
+  buildEvaluationRecipients,
   normalizeParentEmail,
+  SKIP_REASON_TEXT,
   type EmailRecipient,
+  type EvaluationCandidate,
   type SkippedStudent,
 } from '@/lib/bulk-email-recipients'
+import {
+  assertCardsBelongTo,
+  toEvaluationCard,
+  type EvaluationCard,
+} from '@/lib/evaluation-email-cards'
 import { renderBulkMessageHtml, sendBulkMessageEmail } from '@/lib/email'
 import {
   previewEmailSchema,
+  previewEvaluationRecipientSchema,
   previewRecipientsSchema,
   sendEmailCampaignSchema,
   type PreviewEmailInput,
+  type PreviewEvaluationRecipientInput,
   type PreviewRecipientsInput,
   type SendEmailCampaignInput,
 } from '@/lib/validators/admin/email-campaign'
@@ -47,20 +62,31 @@ function sleep(ms: number) {
 }
 
 /**
+ * DB mirror of `isGradable` / "not a one-off workshop". Radionice are excluded
+ * from a REENROLLMENT cohort (you do not invite a workshop's parents to
+ * re-enrol in it) and from an EVALUATION cohort (they are never graded, so they
+ * have no cards) — one predicate, two reasons.
+ *
+ * Two forms because the filter is applied from both sides of the relation:
+ * {@link NOT_RADIONICA} in a `course` query, {@link GROUP_NOT_RADIONICA} in a
+ * `scheduledGroup` one.
+ */
+const NOT_RADIONICA = { kind: { not: 'RADIONICA' } } as const
+const GROUP_NOT_RADIONICA = { course: NOT_RADIONICA } as const
+
+/**
  * Feed for the step-2 grouped multi-select: every course that actually had
  * groups in `sourceYear` in the admin's city, with those groups nested.
- * `graduatingOnly` mirrors the campaign kind (a REENROLLMENT invitation is sent
- * to a cohort finishing a curriculum program, never to a one-off radionica) — a
- * business rule, not a security boundary; the send re-enforces it in
- * resolveCohort.
+ * `excludeRadionice` mirrors the campaign kind — a business rule, not a security
+ * boundary; the send re-enforces it in resolveCohort.
  */
-export async function getEmailGroupTree(sourceYear: string, graduatingOnly: boolean) {
+export async function getEmailGroupTree(sourceYear: string, excludeRadionice: boolean) {
   const { city } = await requireAdminCtx()
   if (!SCHOOL_YEAR_RE.test(sourceYear)) return []
 
-  return db.course.findMany({
+  const courses = await db.course.findMany({
     where: {
-      ...(graduatingOnly ? { kind: { not: 'RADIONICA' } } : {}),
+      ...(excludeRadionice ? NOT_RADIONICA : {}),
       scheduledGroups: { some: { schoolYear: sourceYear, city } },
     },
     select: {
@@ -85,7 +111,58 @@ export async function getEmailGroupTree(sourceYear: string, graduatingOnly: bool
     },
     orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
   })
+
+  const gradedByGroup = await countGradedByGroup(
+    courses.flatMap((c) => c.scheduledGroups.map((g) => g.id)),
+  )
+
+  return courses.map((course) => ({
+    ...course,
+    scheduledGroups: course.scheduledGroups.map((group) => ({
+      ...group,
+      /** How many of this group's students have a filled-in report card. */
+      gradedCount: gradedByGroup.get(group.id) ?? 0,
+    })),
+  }))
 }
+
+/**
+ * Non-blank report cards per group — what the composer shows as "12/14
+ * ocijenjeno" so an admin can see which groups are not ready to send before
+ * selecting them.
+ *
+ * Counted in JS rather than with `_count` on purpose: blankness spans ten
+ * columns, so the database cannot express it, and counting rows instead would
+ * inflate exactly the groups the number exists to warn about.
+ */
+async function countGradedByGroup(groupIds: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>()
+  if (groupIds.length === 0) return counts
+
+  const rows = await db.studentAssessment.findMany({
+    where: { groupId: { in: groupIds }, student: { role: 'STUDENT', deletedAt: null } },
+    select: { groupId: true, ...ASSESSMENT_BLANK_SELECT },
+  })
+  for (const row of rows) {
+    if (isBlankAssessment(row)) continue
+    counts.set(row.groupId, (counts.get(row.groupId) ?? 0) + 1)
+  }
+  return counts
+}
+
+/** The columns `isBlankAssessment` reads — all eight skills plus the two free fields. */
+const ASSESSMENT_BLANK_SELECT = {
+  slaganje: true,
+  programiranje: true,
+  razradaIdeja: true,
+  izvedivost: true,
+  inovacije: true,
+  suradnja: true,
+  komunikacija: true,
+  zabava: true,
+  opisnaOcjena: true,
+  recommendationKind: true,
+} as const
 
 type ResolvedCohort =
   | { ok: true; recipients: EmailRecipient[]; skipped: SkippedStudent[] }
@@ -107,12 +184,129 @@ async function resolveCohort(
   kind: EmailCampaignKind,
   filters: CohortFilters,
 ): Promise<ResolvedCohort> {
+  if (kind === 'EVALUATION') {
+    // Groups only — the validator rejects a preporuka selection for this kind,
+    // since a preporuka names children rather than the cards being sent.
+    return resolveEvaluationCohort(city, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
+  }
   if (filters.recommendations?.length) {
     return resolveRecommendationCohort(city, kind, filters.sourceSchoolYear, [
       ...new Set(filters.recommendations),
     ])
   }
   return resolveGroupCohort(city, kind, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
+}
+
+/**
+ * Every group the admin selected must exist in their city and the given year —
+ * a smuggled id invalidates the whole request rather than being silently
+ * dropped, same as sendScheduleOptions.
+ */
+async function validateSourceGroups(
+  city: City,
+  kind: EmailCampaignKind,
+  sourceSchoolYear: string,
+  sourceGroupIds: string[],
+): Promise<{ ok: true; ids: string[] } | { ok: false; error: string }> {
+  if (sourceGroupIds.length === 0) return { ok: false, error: INVALID_DATA }
+  const ids = [...new Set(sourceGroupIds)]
+  const groups = await db.scheduledGroup.findMany({
+    where: {
+      id: { in: ids },
+      city,
+      schoolYear: sourceSchoolYear,
+      ...(kind === 'CUSTOM' ? {} : GROUP_NOT_RADIONICA),
+    },
+    select: { id: true },
+  })
+  if (groups.length !== ids.length) return { ok: false, error: INVALID_DATA }
+  return { ok: true, ids }
+}
+
+/**
+ * Evaluation mode: one recipient per REPORT CARD in the selected groups.
+ *
+ * Two queries rather than one, because the roster and the cards answer different
+ * questions. The cards decide what gets mailed; the roster is what lets an
+ * ungraded child be reported BY NAME instead of quietly not appearing — that is
+ * the whole point of the skipped list, and the reason an admin can tell "nobody
+ * was missed" from "four kids still need grading".
+ */
+async function resolveEvaluationCohort(
+  city: City,
+  sourceSchoolYear: string,
+  sourceGroupIds: string[],
+): Promise<ResolvedCohort> {
+  const validated = await validateSourceGroups(city, 'EVALUATION', sourceSchoolYear, sourceGroupIds)
+  if (!validated.ok) return validated
+  const groupIds = validated.ids
+
+  const [roster, assessments] = await Promise.all([
+    db.enrollment.findMany({
+      where: {
+        schoolYear: sourceSchoolYear,
+        scheduledGroupId: { in: groupIds },
+        user: { role: 'STUDENT', deletedAt: null },
+      },
+      select: {
+        scheduledGroupId: true,
+        user: { select: { id: true, firstName: true, lastName: true } },
+      },
+    }),
+    db.studentAssessment.findMany({
+      where: {
+        groupId: { in: groupIds },
+        student: { role: 'STUDENT', deletedAt: null },
+      },
+      select: {
+        id: true,
+        studentId: true,
+        groupId: true,
+        ...ASSESSMENT_BLANK_SELECT,
+        student: { select: { firstName: true, lastName: true, parentEmail: true } },
+        group: { select: { name: true, course: { select: { title: true, kind: true } } } },
+      },
+    }),
+  ])
+
+  const candidates: EvaluationCandidate[] = []
+  // Keyed by (student, group): a child in two selected groups has two cards, and
+  // each is its own mail — nothing here collapses them.
+  const graded = new Set<string>()
+  for (const row of assessments) {
+    if (isBlankAssessment(row)) continue
+    graded.add(`${row.studentId}:${row.groupId}`)
+    candidates.push({
+      assessmentId: row.id,
+      studentId: row.studentId,
+      firstName: row.student.firstName,
+      lastName: row.student.lastName,
+      parentEmail: row.student.parentEmail,
+      groupLabel: [row.group.name, row.group.course.title].filter(Boolean).join(' · '),
+      complete: isCompleteAssessment(row.group.course.kind, row),
+    })
+  }
+
+  const built = buildEvaluationRecipients(candidates)
+
+  // Enrolled but with nothing to send. Deduped by student: a child ungraded in
+  // two selected groups is one problem to fix, not two.
+  const ungraded = new Map<string, SkippedStudent>()
+  for (const entry of roster) {
+    if (graded.has(`${entry.user.id}:${entry.scheduledGroupId}`)) continue
+    if (ungraded.has(entry.user.id)) continue
+    ungraded.set(entry.user.id, {
+      studentId: entry.user.id,
+      studentName: `${entry.user.firstName} ${entry.user.lastName}`.trim(),
+      reason: 'NOT_GRADED',
+    })
+  }
+
+  return {
+    ok: true,
+    recipients: built.recipients,
+    skipped: [...built.skipped, ...ungraded.values()],
+  }
 }
 
 /** Encoded PREPORUKA values → assessment where-conditions (invalid entries drop). */
@@ -190,7 +384,7 @@ async function resolveRecommendationCohort(
         schoolYear: sourceSchoolYear,
         // Radionice are never graded, but keep the invitation rule structural
         // rather than assumed.
-        ...(kind === 'REENROLLMENT' ? { course: { kind: { not: 'RADIONICA' } } } : {}),
+        ...(kind === 'REENROLLMENT' ? GROUP_NOT_RADIONICA : {}),
       },
       student: { role: 'STUDENT', deletedAt: null },
     },
@@ -227,23 +421,13 @@ async function resolveGroupCohort(
   sourceSchoolYear: string,
   sourceGroupIds: string[],
 ): Promise<ResolvedCohort> {
-  if (sourceGroupIds.length === 0) return { ok: false, error: INVALID_DATA }
-  const filters = { sourceSchoolYear, sourceGroupIds }
-  const uniqueIds = [...new Set(filters.sourceGroupIds)]
-  const groups = await db.scheduledGroup.findMany({
-    where: {
-      id: { in: uniqueIds },
-      city,
-      schoolYear: filters.sourceSchoolYear,
-      ...(kind === 'REENROLLMENT' ? { course: { kind: { not: 'RADIONICA' } } } : {}),
-    },
-    select: { id: true },
-  })
-  if (groups.length !== uniqueIds.length) return { ok: false, error: INVALID_DATA }
+  const validated = await validateSourceGroups(city, kind, sourceSchoolYear, sourceGroupIds)
+  if (!validated.ok) return validated
+  const uniqueIds = validated.ids
 
   const enrollments = await db.enrollment.findMany({
     where: {
-      schoolYear: filters.sourceSchoolYear,
+      schoolYear: sourceSchoolYear,
       scheduledGroupId: { in: uniqueIds },
       user: { role: 'STUDENT', deletedAt: null },
     },
@@ -420,9 +604,82 @@ export async function previewEmailRecipients(
   }
 }
 
+/**
+ * Render the e-mail one specific recipient row would receive, from the composer's
+ * recipient list.
+ *
+ * Worth its own action rather than reusing the step-1 sample preview: this is how
+ * an admin satisfies themselves that a real parent gets their own child's card
+ * and nobody else's, before committing to a send. It runs the same
+ * `buildCardsForRecipient` the send does — ownership guard included — so what is
+ * previewed is what would go out, refusal included.
+ *
+ * `assessmentId` is re-resolved through the cohort rather than trusted: an id
+ * from another city or another year is not in the resolved recipient list, so it
+ * cannot be previewed.
+ */
+export async function previewEvaluationEmailForRecipient(
+  input: PreviewEvaluationRecipientInput,
+): Promise<PreviewEmailHtmlResult> {
+  const { city } = await requireAdminCtx()
+
+  const parsed = previewEvaluationRecipientSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? INVALID_DATA }
+  }
+
+  try {
+    const cohort = await resolveCohort(city, 'EVALUATION', parsed.data)
+    if (!cohort.ok) return { success: false, error: cohort.error }
+
+    const recipient = cohort.recipients.find((r) => r.rowKey === parsed.data.assessmentId)
+    if (!recipient) return { success: false, error: INVALID_DATA }
+
+    const built = await buildCardsForRecipient(recipient, city)
+    if (!built.ok) return { success: false, error: built.reason }
+
+    const html = await renderBulkMessageHtml({
+      subject: `${parsed.data.subject} – ${built.childName}`,
+      bodyText: parsed.data.bodyText,
+      cards: built.cards,
+    })
+    return { success: true, html }
+  } catch (err) {
+    console.error('previewEvaluationEmailForRecipient failed:', err)
+    return { success: false, error: 'Greška pri izradi pregleda.' }
+  }
+}
+
 type PreviewEmailHtmlResult =
   | { success: true; html: string }
   | { success: false; error: string }
+
+/**
+ * Stand-in card for the step-1 layout preview. Invented rather than borrowed
+ * from a real child: the preview is about the template, and picking a real card
+ * would mean answering "whose?" for no benefit. Deliberately partial (`zabava`
+ * ungraded) so the "Nije ocijenjeno" state is visible too.
+ */
+const SAMPLE_EVALUATION_CARD: EvaluationCard = {
+  childName: 'Ana Anić (primjer)',
+  groupLabel: 'SLR 2 – utorkom · Svijet LEGO robotike 2',
+  kind: 'STANDARD',
+  skills: {
+    slaganje: 'OSTVARENO',
+    programiranje: 'U_RAZVOJU',
+    razradaIdeja: null,
+    izvedivost: null,
+    inovacije: 'OSTVARENO',
+    suradnja: 'OSTVARENO',
+    komunikacija: 'U_RAZVOJU',
+    zabava: null,
+  },
+  opisnaOcjena:
+    'Ana je kroz godinu pokazala veliki napredak u samostalnom slaganju modela i rado pomaže drugima u timu.',
+  recommendationLabel: 'Svijet LEGO robotike 3',
+  authorName: 'Ime Nastavnika',
+  updatedAtLabel: '30.06.2026.',
+}
 
 /** Renders the exact email (fixed sample parent name) for the step-1 preview iframe. */
 export async function previewEmailHtml(input: PreviewEmailInput): Promise<PreviewEmailHtmlResult> {
@@ -436,6 +693,8 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
   try {
     let options: GroupOption[] | undefined
     let signupPath: string | undefined
+    const cards =
+      parsed.data.kind === 'EVALUATION' ? [SAMPLE_EVALUATION_CARD] : undefined
     if (parsed.data.kind === 'REENROLLMENT') {
       const targetYear = await getSelectedSchoolYear()
       const built = await buildTargetOptions(
@@ -450,10 +709,14 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
     }
 
     const html = await renderBulkMessageHtml({
-      subject: parsed.data.subject,
+      subject:
+        parsed.data.kind === 'EVALUATION'
+          ? `${parsed.data.subject} – ${SAMPLE_EVALUATION_CARD.childName}`
+          : parsed.data.subject,
       bodyText: parsed.data.bodyText,
       options,
       signupPath,
+      cards,
     })
     return { success: true, html }
   } catch (err) {
@@ -509,17 +772,23 @@ export async function sendEmailCampaign(
     const cohort = await resolveCohort(city, data.kind, data)
     if (!cohort.ok) return { success: false, error: cohort.error }
 
-    const excludedSet = new Set(
-      (data.excludedParentEmails ?? [])
-        .map((e) => normalizeParentEmail(e))
-        .filter((e): e is string => e !== null),
-    )
+    // Matched against `rowKey`, which is the parent inbox for CUSTOM/REENROLLMENT
+    // and the individual report card for EVALUATION — unchecking one child there
+    // must not drop their sibling on the same address.
+    const excludedSet =
+      data.kind === 'EVALUATION'
+        ? new Set(data.excludedAssessmentIds ?? [])
+        : new Set(
+            (data.excludedParentEmails ?? [])
+              .map((e) => normalizeParentEmail(e))
+              .filter((e): e is string => e !== null),
+          )
 
     const toSend: EmailRecipient[] = []
     let excluded = 0
     let alreadySent = 0
     for (const recipient of cohort.recipients) {
-      if (excludedSet.has(recipient.parentEmail)) excluded++
+      if (excludedSet.has(recipient.rowKey)) excluded++
       else if (invited.has(recipient.parentEmail)) alreadySent++
       else toSend.push(recipient)
     }
@@ -554,10 +823,7 @@ export async function sendEmailCampaign(
           parentEmail: '',
           status: 'SKIPPED' as const,
           childNames: [s.studentName],
-          failureReason:
-            s.reason === 'MISSING_EMAIL'
-              ? 'Roditelj nema upisanu e-mail adresu.'
-              : 'E-mail adresa roditelja nije ispravna.',
+          failureReason: SKIP_REASON_TEXT[s.reason],
         })),
       })
     }
@@ -575,12 +841,19 @@ export async function sendEmailCampaign(
         campaignId: campaign.id,
         parentEmail: r.parentEmail,
         status: 'PENDING' as const,
-        childNames: r.children.map((c) => c.name),
+        // The group rides along on an evaluation row: one child can hold a card
+        // in two selected groups, and those are two separate mails, so the name
+        // alone would show as two identical rows on the detail page.
+        childNames: r.children.map((c) =>
+          c.groupLabel ? `${c.name} · ${c.groupLabel}` : c.name,
+        ),
+        assessmentIds: r.assessmentIds,
       })),
     })
 
     await startSendJob({
       campaignId: campaign.id,
+      kind: data.kind,
       city,
       subject: data.subject,
       bodyText: data.bodyText,
@@ -622,8 +895,18 @@ async function startSendJob(job: SendJob): Promise<void> {
   })
 }
 
+/**
+ * Everything a send needs that is the SAME for every recipient.
+ *
+ * Note what is absent: there is no field here that could hold one recipient's
+ * report card. That is deliberate and load-bearing — per-recipient content is
+ * built inside the send loop from the recipient's own row and goes out of scope
+ * with that iteration, so the classic mail-merge bug (recipient N+1 receiving
+ * recipient N's content) has nowhere to live. Do not add one.
+ */
 type SendJob = {
   campaignId: string
+  kind: EmailCampaignKind
   /** Decides the reply-to inbox — a Šibenik parent must not reply into Split. */
   city: City
   subject: string
@@ -632,6 +915,72 @@ type SendJob = {
   /** Where the invitation's CTA points — `/upisi/<target-slug>`. */
   signupPath: string | undefined
   sentKey: string | null
+}
+
+/** Everything `toEvaluationCard` and the ownership guard read off a card row. */
+const EVALUATION_CARD_SELECT = {
+  id: true,
+  ...ASSESSMENT_BLANK_SELECT,
+  recommendedCourse: { select: { title: true } },
+  updatedAt: true,
+  author: { select: { firstName: true, lastName: true } },
+  student: { select: { firstName: true, lastName: true, parentEmail: true } },
+  group: {
+    select: { city: true, name: true, course: { select: { title: true, kind: true } } },
+  },
+} as const
+
+type BuiltCards =
+  | { ok: true; cards: EvaluationCard[]; childName: string }
+  | { ok: false; reason: string }
+
+/**
+ * Load the report card(s) a single recipient row is owed, and prove they may go
+ * to that address before returning them.
+ *
+ * The row's `assessmentIds` were written when the cohort was resolved; this
+ * re-derives ownership from the students' CURRENT `parentEmail` and refuses on
+ * any disagreement (see `assertCardsBelongTo`). Called once per recipient from
+ * inside the send loop — never hoisted.
+ */
+async function buildCardsForRecipient(
+  recipient: { parentEmail: string; assessmentIds: string[] },
+  city: City,
+): Promise<BuiltCards> {
+  const rows = await db.studentAssessment.findMany({
+    where: { id: { in: recipient.assessmentIds } },
+    select: EVALUATION_CARD_SELECT,
+  })
+
+  const verdict = assertCardsBelongTo(
+    { parentEmail: recipient.parentEmail, city, assessmentIds: recipient.assessmentIds },
+    rows,
+  )
+  if (!verdict.ok) return { ok: false, reason: verdict.reason }
+
+  const cards = rows.map(toEvaluationCard)
+  return { ok: true, cards, childName: cards[0].childName }
+}
+
+/**
+ * Mark one recipient row failed and bump the campaign's counter. Used where the
+ * send is refused before it is attempted — an unprovable evaluation card — so
+ * `failedCount` still matches the rows and the progress bar can finish.
+ */
+async function markRecipientFailed(
+  recipientId: string,
+  campaignId: string,
+  reason: string,
+): Promise<void> {
+  await db.emailCampaignRecipient
+    .update({
+      where: { id: recipientId },
+      data: { status: 'FAILED', sentKey: null, failureReason: reason.slice(0, 300) },
+    })
+    .catch(() => {})
+  await db.emailCampaign
+    .update({ where: { id: campaignId }, data: { failedCount: { increment: 1 } } })
+    .catch(() => {})
 }
 
 /**
@@ -644,12 +993,30 @@ async function runSendJob(job: SendJob): Promise<void> {
   // run left behind; on a first run it is the whole cohort.
   const pending = await db.emailCampaignRecipient.findMany({
     where: { campaignId: job.campaignId, status: 'PENDING' },
-    select: { id: true, parentEmail: true },
+    select: { id: true, parentEmail: true, assessmentIds: true },
   })
 
   for (let i = 0; i < pending.length; i++) {
     const recipient = pending[i]
     const claimId = recipient.id
+
+    // Declared INSIDE the loop: an evaluation card belongs to one recipient and
+    // must not be able to survive into the next iteration. See SendJob.
+    let cards: EvaluationCard[] | undefined
+    let subject = job.subject
+    if (job.kind === 'EVALUATION') {
+      const built = await buildCardsForRecipient(recipient, job.city)
+      if (!built.ok) {
+        // Fail closed: the card could not be proven to belong to this address,
+        // so nothing is sent and the admin sees why.
+        await markRecipientFailed(claimId, job.campaignId, built.reason)
+        continue
+      }
+      cards = built.cards
+      // Naming the child in the subject keeps two mails to one inbox apart, and
+      // makes a misdirected card obvious to the person best placed to notice.
+      subject = `${job.subject} – ${built.childName}`
+    }
 
     // Claim the parent BEFORE sending, by taking the unique (sentKey, email)
     // slot. A concurrent send loses this write and skips, so an invitation
@@ -679,11 +1046,12 @@ async function runSendJob(job: SendJob): Promise<void> {
       // no-op also "succeeds", so dev sends still write SENT log rows).
       await sendBulkMessageEmail({
         to: recipient.parentEmail,
-        subject: job.subject,
+        subject,
         bodyText: job.bodyText,
         city: job.city,
         options: job.options,
         signupPath: job.signupPath,
+        cards,
       })
       // Counts increment per recipient so progress polling is live and an
       // interrupted campaign still reports exactly what went out.
@@ -800,6 +1168,7 @@ export async function resumeEmailCampaign(
   await db.emailCampaign.update({ where: { id: campaignId }, data: { finishedAt: null } })
   await startSendJob({
     campaignId: campaign.id,
+    kind: campaign.kind,
     // The lookup above is `where: { id, city }`, so this IS the campaign's city.
     city,
     subject: campaign.subject,

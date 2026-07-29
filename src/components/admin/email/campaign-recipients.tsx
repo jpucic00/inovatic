@@ -14,7 +14,9 @@ import { formatDate } from '@/lib/format'
 const STATUS_LABEL: Record<string, string> = {
   SENT: 'Poslano',
   FAILED: 'Neuspješno',
-  SKIPPED: 'Bez e-maila',
+  // Covers both skip causes — the per-row `failureReason` says which one, and on
+  // an evaluation campaign it is as often "nema evaluaciju" as a missing address.
+  SKIPPED: 'Preskočeno',
   ALREADY_SENT: 'Već pozvan ranije',
   PENDING: 'Na čekanju',
 }
@@ -80,7 +82,7 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
           <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <Stat label="Poslano" value={campaign.sentCount} tone="text-emerald-700" />
             <Stat label="Neuspješno" value={campaign.failedCount} tone="text-red-700" />
-            <Stat label="Bez e-maila" value={campaign.skippedCount} tone="text-amber-800" />
+            <Stat label="Preskočeno" value={campaign.skippedCount} tone="text-amber-800" />
             <Stat label="Isključeno" value={campaign.excludedCount} tone="text-gray-600" />
             <Stat label="Ukupno za slanje" value={campaign.totalCount} tone="text-gray-900" />
           </dl>
