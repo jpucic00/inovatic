@@ -6,7 +6,7 @@ import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import type { StaffMaterialRow } from '@/components/material/staff-material-list'
-import { signupPathForSlug } from '@/lib/signup-links'
+import { publicSignupPath } from '@/lib/signup-links'
 
 type ProgramModuleSection = {
   module: { id: string; title: string }
@@ -39,7 +39,10 @@ type ProgramDetail = {
     /** Selected-year public signup window (null when unset). */
     enrollmentStart: Date | null
     enrollmentEnd: Date | null
-    /** Public signup link for this program, e.g. `/upisi/slr-2`. */
+    /**
+     * Public signup link for this program, e.g. `/upisi/slr-2` — or
+     * `/radionice/<slug>` for a radionica, which has no `/upisi` page.
+     */
     signupPath: string
   }
   /** Selected-year season bounds — COMPETITION only, null elsewhere. */
@@ -178,7 +181,7 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       groupCount: course._count.scheduledGroups,
       enrollmentStart: course.enrollmentWindows[0]?.enrollmentStart ?? null,
       enrollmentEnd: course.enrollmentWindows[0]?.enrollmentEnd ?? null,
-      signupPath: signupPathForSlug(course.slug),
+      signupPath: publicSignupPath(course.kind, course.slug),
     },
     season: {
       startDate: course.seasons[0]?.startDate ?? null,

@@ -11,10 +11,31 @@
  * be thin duplicates of `/upisi` and `/programi/<slug>`.
  */
 
+import type { ProgramKind } from '@prisma/client'
+import { isRadionica } from './program-kind'
+
 /** Slug of the competitive program — the one signup link that is never public. */
 export const COMPETITION_PROGRAM_SLUG = 'natjecateljski-program'
 
 /** Signup path for a program, e.g. `slr-2` → `/upisi/slr-2`. */
 export function signupPathForSlug(slug: string): string {
   return `/upisi/${slug}`
+}
+
+/**
+ * The public page an admin sends a parent for this program — what every
+ * "Kopiraj URL za upise" button copies.
+ *
+ * A radionica is deliberately absent from `/upisi/<slug>` (that route answers
+ * `notFound()` for RADIONICA): its own `/radionice/<slug>` page already carries
+ * the marketing copy and the signup form, and routing its signups through a
+ * second URL would split them. Everything else — the SLR ladder and the
+ * competitive program — signs up at `/upisi/<slug>`.
+ *
+ * The rule lives here because both the program list and the program detail
+ * header copy this link, and a detail page that built `/upisi/<slug>` for a
+ * radionica handed the admin a 404.
+ */
+export function publicSignupPath(kind: ProgramKind, slug: string): string {
+  return isRadionica(kind) ? `/radionice/${slug}` : signupPathForSlug(slug)
 }

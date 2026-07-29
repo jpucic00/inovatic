@@ -36,6 +36,17 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
   const radionica = isRadionica(course.kind)
   const editable = !isArchivedYear(selectedYear)
 
+  // What the copied link actually is. A radionica's link is its own public page
+  // — it has no /upisi entry, so the grade/termin wording below would be wrong.
+  let signupHint: string
+  if (radionica) {
+    signupHint = 'Javna stranica radionice s prijavnicom.'
+  } else if (competition) {
+    signupHint = 'Prijava samo putem ove poveznice — program nije na javnim upisima.'
+  } else {
+    signupHint = 'Prikazuje samo termine ovog programa, bez obzira na razred djeteta.'
+  }
+
   return (
     <div>
       <Link
@@ -102,11 +113,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
         </div>
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           <CopyLinkButton path={course.signupPath} />
-          <span className="text-xs text-gray-400">
-            {competition
-              ? 'Prijava samo putem ove poveznice — program nije na javnim upisima.'
-              : 'Prikazuje samo termine ovog programa, bez obzira na razred djeteta.'}
-          </span>
+          <span className="text-xs text-gray-400">{signupHint}</span>
         </div>
         {/* The public /radionice page renders this copy — show it here so the
             admin sees what the Uredi dialog changes. */}

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useMemo, useTransition } from 'react'
+import type { ProgramKind } from '@prisma/client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Wrench, Trash2, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { CopyLinkButton } from './copy-link-button'
+import { publicSignupPath } from '@/lib/signup-links'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +24,7 @@ type Course = {
   title: string
   description: string
   level: string | null
+  kind: ProgramKind
   ageMin: number
   ageMax: number
   equipment: string | null
@@ -126,7 +129,7 @@ function CourseCard({ course, editable }: Readonly<{ course: Course; editable: b
           </div>
         </div>
         <div className="relative z-10 flex items-center gap-2 flex-wrap justify-end shrink-0">
-          <CopyLinkButton path={`/radionice/${course.slug}`} />
+          <CopyLinkButton path={publicSignupPath(course.kind, course.slug)} />
           {groupCount > 0 && (
             <Link
               href="/admin/grupe?tab=__radionice__"
