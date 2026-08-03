@@ -1,9 +1,10 @@
 # Attendance — Session Dates and Marking Flow
 
-There is no `ClassSession` model. Expected session dates are derived on the fly and Attendance rows are keyed by `(enrollmentId, sessionDate)` (`@db.Date`, UTC midnight). There are two derivations, both holiday-aware via `loadHolidayDateKeys(schoolYear, city)` — holiday calendars are **per-city**, and each group resolves against its own city's set (a Šibenik closure never moves a Split group's sessions, and a holiday's attendance-cascade delete is city-filtered for the same reason):
+There is no `ClassSession` model. Expected session dates are derived on the fly and Attendance rows are keyed by `(enrollmentId, sessionDate)` (`@db.Date`, UTC midnight). There are three derivations — one per `ProgramKind`, branched via the `src/lib/program-kind.ts` predicates — all holiday-aware via `loadHolidayDateKeys(schoolYear, city)` — holiday calendars are **per-city**, and each group resolves against its own city's set (a Šibenik closure never moves a Split group's sessions, and a holiday's attendance-cascade delete is city-filtered for the same reason):
 
-- **Standard programs** — dates come from the per-group **race-ahead module arc** (`getGroupModuleArc`): up to 4 modules × 7 weekday sessions, anchored at the school-year kickoff (M1 `startDate`), skipping holidays. `getGroupAttendance` slices these into per-module sections.
-- **Radionice** (`course.isCustom`) — `computeRadionicaSessions` enumerates every day in the `[dateStart, dateEnd]` range, skipping Sundays and holidays. The flat list is preserved (no module sections).
+- **Standard programs** (`isStandard`) — dates come from the per-group **race-ahead module arc** (`getGroupModuleArc`): up to 4 modules × 7 weekday sessions, anchored at the school-year kickoff (M1 `startDate`), skipping holidays. `getGroupAttendance` slices these into per-module sections.
+- **Radionice** (`isRadionica`) — `computeRadionicaSessions` enumerates every day in the `[dateStart, dateEnd]` range, skipping Sundays and holidays. The flat list is preserved (no module sections).
+- **Natjecateljski program** (`isCompetition`) — `computeSeasonSessions({ dayOfWeek, startDate, endDate, holidayDates })` yields one session a week on the group's weekday inside the program's `CourseSeason` `[startDate, endDate]` for this `(schoolYear, city)`. Holiday weeks are dropped outright — **no session-count target, no make-up** — and an unplanned season (or missing weekday) yields `[]`. Flat list, like radionice.
 
 > A holiday is pre-filtered out of the expected set so attendance never shows a slot for it. Any further cancellation (snow day, ad-hoc) is the teacher's call — they leave the row unmarked or write a note.
 
@@ -79,6 +80,42 @@ flowchart TD
 
 > Source: `computeRadionicaSessions()` in `src/lib/session-dates.ts`. Each non-Sunday, non-holiday day in the closed range is one expected session. Sundays are excluded because the association never schedules on Nedjelja (matches `ACTIVE_WEEKDAYS`, which lists only Pon–Sub). `getGroupAttendance` (radionica branch) returns this flat list with no module sections.
 
+## Natjecateljski program — `computeSeasonSessions`
+
+```mermaid
+flowchart TD
+    A["Input: dayOfWeek + CourseSeason startDate/endDate + holidayDates set"] --> B{"Weekday parseable AND both season dates set?"}
+    B -->|No| EMPTY["Return empty list — season unplanned"]
+    B -->|Yes| C["Advance to first weekday occurrence on/after startDate, step +7 days until past endDate"]
+    C --> D{"Date in holidayDates set?"}
+    D -->|Yes| SKIP["Skip — holiday week dropped outright, no make-up"]
+    D -->|No| KEEP[Add to session list]
+
+    style EMPTY fill:#fee2e2
+    style SKIP fill:#fef3c7
+    style KEEP fill:#d1fae5
+    style D fill:#e0f2fe
+```
+
+> Source: `computeSeasonSessions()` in `src/lib/session-dates.ts` — a thin wrapper that hands `computeExpectedSessions` the season as its single window. There is **no session-count target**: two groups on different weekdays legitimately finish the season with different totals, because the competitive track is paced by the calendar, not by a fixed curriculum length. The season row comes from `CourseSeason` keyed `(courseId, schoolYear, city)`.
+
+## Which branch a group takes — `getGroupAttendance`
+
+```mermaid
+flowchart TD
+    A["getGroupAttendance(groupId)"] --> B["assertTeacherOwnsGroup, then load group + holidays + roster + records + teacher hours + markingWindow"]
+    B --> C{group.course.kind}
+    C -->|"RADIONICA (isRadionica)"| R["buildFlatAttendance(base, 'custom', computeRadionicaSessions(dateStart, dateEnd, holidays))"]
+    C -->|"COMPETITION (isCompetition)"| S["season = course.seasons row for this (schoolYear, city)<br/>buildFlatAttendance(base, 'season', computeSeasonSessions(dayOfWeek, season dates, holidays))"]
+    C -->|STANDARD| ST["buildStandardAttendance — race-ahead arc sliced into per-module sections"]
+
+    style R fill:#fef3c7
+    style S fill:#fef3c7
+    style ST fill:#dbeafe
+```
+
+> The return type is a union on `kind`: the two flat branches share one shape — `{ kind: 'custom' | 'season', expectedSessions[], extraSessions[] }` (`'custom'` = radionica, `'season'` = competition) — while standard returns `{ kind: 'standard', sections[], otherDates[], defaultSelectedDate }`. On the client, `AttendanceMarker` routes `kind === 'standard'` to `StandardAttendanceMarker` and both flat kinds to one `FlatAttendanceMarker`, whose default date comes from `pickFlatDefault` (today if expected, else nearest past, else first). The header line is `scheduleHint(dateRange = kind === 'custom', …)` — a radionica reads as its date range, while a competition group reads as its weekday, exactly like a standard group.
+
 ## Extra / ad-hoc sessions
 
 A recorded Attendance date that isn't an expected session is surfaced, never dropped.
@@ -88,14 +125,14 @@ flowchart LR
     A["For each Attendance record, key = YYYY-MM-DD"] --> B{"Key in an expected-session set?"}
     B -->|Yes| NORMAL[Normal session]
     B -->|No - standard| ADHOC["Bucket into the matching module's adhocSessions, else 'Ostali termini' (otherDates)"]
-    B -->|No - radionica| EXTRA["extraSessions — makeup or ad-hoc class"]
+    B -->|No - radionica or competition| EXTRA["extraSessions — makeup or ad-hoc class"]
 
     style NORMAL fill:#d1fae5
     style ADHOC fill:#fef3c7
     style EXTRA fill:#fef3c7
 ```
 
-> Extra sessions appear when a teacher records attendance for a date outside the expected set — typically a makeup class, or a session held on what was pre-filtered as a holiday. Standard groups route it to the nearest module section (or "Ostali termini"); radionice collect it in `extraSessions`.
+> Extra sessions appear when a teacher records attendance for a date outside the expected set — typically a makeup class, or a session held on what was pre-filtered as a holiday. Standard groups route it to the nearest module section (or "Ostali termini"); the flat kinds (radionica and competition) collect it in `extraSessions`.
 
 ## Teacher Bulk-Mark Flow
 
@@ -172,7 +209,7 @@ Hours are money, so a **TEACHER** may only record the current calendar month, up
 | Tomorrow / later | rejected — *"Ne možete evidentirati dolazak za budući termin."* | markable |
 | Any earlier month | rejected — *"Možete evidentirati samo termine tekućeg mjeseca…"* | markable |
 
-**Admins are deliberately unrestricted** — `src/actions/admin/attendance.ts` is the correction path, so a genuinely missed Friday never becomes permanently unrecordable. `getGroupAttendance` returns `markingWindow` (null for admins) so the UI degrades honestly: out-of-window dates stay clickable for viewing, but the Save button is replaced by the reason and the roster goes read-only. Past sessions remain visible; only writing is gated.
+**Admins are deliberately unrestricted** — the correction path is `bulkMarkSession` itself: the `teacherMarkingError` check runs only for `role === 'TEACHER'`, so an admin marking through the same Dolazak tab can record any date and a genuinely missed Friday never becomes permanently unrecordable. (`src/actions/admin/attendance.ts` only exposes the read side, `getStudentAttendance`, for the admin student page.) `getGroupAttendance` returns `markingWindow` (null for admins) so the UI degrades honestly: out-of-window dates stay clickable for viewing, but the Save button is replaced by the reason and the roster goes read-only. Past sessions remain visible; only writing is gated.
 
 ## Retroactive holidays
 
@@ -196,7 +233,7 @@ flowchart LR
 
 ## Default Session Selection (standard groups)
 
-`pickDefaultSelectedDate` picks the most relevant date from the arc state — standard branch only; the radionica branch returns no `defaultSelectedDate`.
+`pickDefaultSelectedDate` picks the most relevant date from the arc state — standard branch only; the flat branches (radionica and competition) return no `defaultSelectedDate`, and `FlatAttendanceMarker` picks its own client-side via `pickFlatDefault`.
 
 ```mermaid
 flowchart TD

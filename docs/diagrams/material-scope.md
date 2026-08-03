@@ -48,7 +48,9 @@ flowchart TD
     C --> Z
     G --> Z
 
-    Z --> DB[("Prisma write")]
+    Z --> SC{"validateScopeConsistency (action layer):<br/>MODULE scope whose module belongs<br/>to a RADIONICA course?"}
+    SC -->|Yes| SCE["error: 'Radionica nema module — koristite COURSE razinu.'<br/>STANDARD and COMPETITION both accept MODULE<br/>(a natjecanje is a CourseModule)"]
+    SC -->|No| DB[("Prisma write")]
     DB --> CHK{"DB CHECK<br/>Material_scope_fk_check"}
 
     CHK -->|"scope=MODULE AND moduleId IS NOT NULL"| OK[Row inserted]
@@ -60,10 +62,11 @@ flowchart TD
     style C fill:#fde68a
     style G fill:#d1fae5
     style OK fill:#d1fae5
+    style SCE fill:#fee2e2
     style ERR fill:#fee2e2
 ```
 
-> Sources: Zod variants in `src/lib/validators/material.ts:23-49`; DB `CHECK` in `prisma/migrations/20260423123802_phase3_materials_attendance/migration.sql:36-41`. Belt-and-braces by design — Zod prevents typed callers from getting it wrong; the CHECK prevents drift via raw SQL or forgotten migrations.
+> Sources: Zod variants in `src/lib/validators/material.ts:23-49`; `validateScopeConsistency` in `src/actions/material/crud.ts` (refuses MODULE scope when the module's course is a radionica — `isRadionica(kind)`; STANDARD and COMPETITION both pass); DB `CHECK` in `prisma/migrations/20260423123802_phase3_materials_attendance/migration.sql:36-41`. Belt-and-braces by design — Zod prevents typed callers from getting it wrong; the CHECK prevents drift via raw SQL or forgotten migrations.
 
 ## Effective materials for a student
 
@@ -92,11 +95,29 @@ flowchart LR
 
 > Source: `buildEffectiveMaterialsWhere(ctx)` in `src/lib/material-query.ts:24-43`. COURSE branch is always included — both standard programs (program-wide materials) and radionice (course-wide materials). MODULE branch only added when `moduleIds.length > 0`. Returns a `Prisma.MaterialWhereInput` with `NOT hiddenInGroups.some(...)` applied uniformly across all branches.
 
+## Who fills `MaterialScopeContext.moduleIds` — kind-driven visibility
+
+`buildGroupMaterialsView` (`src/lib/group-materials-view.ts`) is the caller that turns `Course.kind` into the `moduleIds` the query above filters on:
+
+```mermaid
+flowchart TD
+    A["buildGroupMaterialsView(groupId)"] --> B{"visibleModuleIds ="}
+    B -->|"showsAllModules(kind) — COMPETITION"| ALL["Every CourseModule id — all natjecanja, all season.<br/>Every moduleSection has isActive: false (none is current)<br/>and featuredRobocamp = union of all sections"]
+    B -->|"else, activeModule found — STANDARD"| ONE["[activeModule.id] via getCurrentActiveModuleForGroup —<br/>one section, isActive: true"]
+    B -->|"else — RADIONICA, or standard with no active module"| NONE["[] — MODULE branch skipped entirely"]
+
+    style ALL fill:#dbeafe
+    style ONE fill:#d1fae5
+    style NONE fill:#fef3c7
+```
+
+> The **same MODULE-scoped row** is therefore visible: on STANDARD only while its module is the group's active one; on COMPETITION all season (which natjecanje a group attends lives in the group NAME, not the data, so the app must never narrow for them); on RADIONICA never (the write path already refuses it). Downstream, `partitionMaterials(materials, kind)` folds COURSE + GROUP into one flat `radionicaMaterials` bucket for radionice, while programs with modules keep separate program/group buckets; `MaterialFilterTabs` renders module tabs only when `hasModules(kind)`.
+
 ## Summary
 
 | Scope | Required FK | What students see | City posture | Hide-per-group? |
 |---|---|---|---|---|
-| `MODULE` | `moduleId → CourseModule` | Every `ScheduledGroup` whose course owns that module | Shared curriculum — both cities | Yes — `MaterialGroupHide` on a specific group hides this row for that group only |
+| `MODULE` | `moduleId → CourseModule` | Every `ScheduledGroup` whose course owns that module — STANDARD: only while it is the group's active module · COMPETITION: every natjecanje, all season · RADIONICA: n/a (scope refused on write) | Shared curriculum — both cities | Yes — `MaterialGroupHide` on a specific group hides this row for that group only |
 | `COURSE` | `courseId → Course` | Every `ScheduledGroup` of that course (standard and radionice). On standard programs = "whole program" materials visible across all modules. | Shared curriculum — both cities | Yes — same mechanism |
 | `GROUP` | `scheduledGroupId → ScheduledGroup` | Only the one `ScheduledGroup` it points at | Per-city — ADMIN writes/downloads bound to `group.city === admin.city` | N/A — already group-scoped |
 

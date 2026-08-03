@@ -33,6 +33,8 @@ stateDiagram-v2
         consentGivenAt set to now
         Email: InquiryConfirmationEmail to parent
         Spot reserved if scheduledGroupId provided
+        noSuitableTermin = true answers the termin question
+        without reserving anything (COMPETITION link only)
         Admin can send schedule-options email without changing status
     end note
 
@@ -77,7 +79,7 @@ stateDiagram-v2
 
 | From | To | Action | Guard | Side effects |
 |------|-----|--------|-------|-------------|
-| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation; COURSE: `group.city === submitted city`; COURSE **without** `scheduledGroupId`: `!isTerminRequired(programs, grade, courseId)` | Inquiry created with `city`; confirmation email; spot reserved if group selected (COURSE) |
+| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation (`inquirySchema` rejects `scheduledGroupId` + `noSuitableTermin` together); COURSE: high-school grade / `noSuitableTermin` only on a COMPETITION target (`competitionOnlyAnswerError`); with group: `group.city === submitted city`, radionica termin not yet started; **without** group **and** without `noSuitableTermin`: `!isTerminRequired(programs, grade, courseId)` against `loadProgramsForCheck` | Inquiry created with `city`; confirmation email; spot reserved if group selected (COURSE) |
 | `NEW` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED && status !== DECLINED`; `type === COURSE` | User + Enrollment + ModuleEnrollments; credentials email; `studentId` + `assignedGroupId` set |
 | `NEW` | `PARTY_SCHEDULED` | `schedulePartyInquiry` | `type === PARTY` | `partyConfirmedDate` + `partyStartTime` set; appears on Kalendar |
 | `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000) | `declineReason` persisted; spot freed |
@@ -98,7 +100,7 @@ stateDiagram-v2
 
 ## 2. Spot Reservation and Availability
 
-Spot math differs between standard courses (module-scoped) and radionice (group-scoped).
+Spot math differs between standard courses (module-scoped) and everything without dated modules — radionice and competition groups (group-scoped). The branch is `hasDatedModules(course.kind)` (`src/lib/program-kind.ts`), never `course.isCustom`.
 
 ### Standard course (module-scoped)
 
@@ -122,19 +124,24 @@ flowchart TD
     style G fill:#e0f2fe
 ```
 
-### Radionica (group-scoped, `course.isCustom`)
+### Radionica and competition groups (group-scoped, no dated modules)
+
+The same math serves both kinds without dated modules: `computeGroupCapacity` counts lifetime enrollments whenever `hasDatedModules(kind)` is false. The one difference is the feed — competition groups never appear in `getActivePrograms` (its filter is `kind: { not: 'COMPETITION' }`); their invitation link `/upisi/natjecateljski-program` is fed by `getSignupProgram(city, slug)`, which shares the same internal `loadPrograms`.
 
 ```mermaid
 flowchart TD
-    A["getActivePrograms(city) called"] --> A2["Resolve OPEN windows first: CourseEnrollmentWindow rows for THIS city where enrollmentStart &lt;= now &lt;= enrollmentEnd → Set of (courseId, schoolYear, city) keys"]
+    A["getActivePrograms(city) — radionice · getSignupProgram(city, slug) — competition"] --> A2["Resolve OPEN windows first: CourseEnrollmentWindow rows for THIS city where enrollmentStart &lt;= now &lt;= enrollmentEnd → Set of (courseId, schoolYear, city) keys"]
     A2 --> B["For each ScheduledGroup of this city whose own (courseId, schoolYear, city) is in the open-window Set"]
-    B --> C[enrolledCount = all enrollments in group, presence only]
+    B --> R0{"Radionica whose dateStart has arrived? (isRadionicaOpenForSignup false)"}
+    R0 -->|Yes| HIDE["Group hidden — workshop already started (from midnight of dateStart, Europe/Zagreb). Competition groups run a whole season and never expire this way"]
+    R0 -->|No| C[enrolledCount = all enrollments in group, presence only]
     C --> D[preferredCount = inquiries where status = NEW]
     D --> E["available = maxStudents - enrolledCount - preferredCount"]
     E --> F{available > 0?}
     F -->|Yes| SHOW[Group shown as available]
     F -->|No| FULL[Group shown as full]
 
+    style HIDE fill:#fee2e2
     style SHOW fill:#d1fae5
     style FULL fill:#fee2e2
     style E fill:#e0f2fe
@@ -150,7 +157,7 @@ flowchart LR
         R3[createStudentManually with group + modules]
         R4[addEnrollment on existing student]
         R5[addModuleEnrollment - standard course only]
-        R1_TX["$transaction Serializable<br/>P2034 retried once<br/>second P2034 returns 'Pokusajte ponovno.'<br/>GroupFullError returns GROUP_FULL"]
+        R1_TX["$transaction Serializable<br/>P2034 retried once<br/>second P2034 returns 'Pokusajte ponovno.'<br/>GroupFullError returns GROUP_FULL<br/>RadionicaStartedError returns TERMIN_CLOSED"]
         R1 -.-> R1_TX
     end
 
@@ -186,7 +193,7 @@ flowchart TD
     A["Enrollment write actions:<br/>submitInquiry · createStudentFromInquiry ·<br/>createStudentManually · addEnrollment"] --> B["runWithGroupCapacityGuard(fn)<br/>db.$transaction(fn, isolationLevel: Serializable)"]
 
     B --> C["assertGroupHasAvailableSpot(tx, groupId)<br/>loads group + holidays inside the tx"]
-    C --> D["computeGroupCapacity<br/>standard: enrollments on the per-group<br/>next-enrolling module (weekday + holiday arc)<br/>radionica: enrollments.length"]
+    C --> D["computeGroupCapacity<br/>hasDatedModules (standard): enrollments on the per-group<br/>next-enrolling module (weekday + holiday arc)<br/>radionica + competition: enrollments.length"]
     D --> E{"Spot free?<br/>enrolled + reservedInquiries(NEW) &lt; maxStudents"}
 
     E -->|Yes| F["Run the mutation, commit, return result"]
@@ -209,15 +216,20 @@ flowchart TD
 ```
 
 > `GroupFullError` is a domain signal, **not** a serialization failure — it propagates straight to the caller and is never retried. Only Prisma `P2034` (Serializable write-write conflict) triggers the single re-run; a second `P2034` is rethrown for the caller to surface as a generic retry message.
+>
+> `submitInquiry`'s own transaction callback throws two more domain signals from inside the same guard: `GroupCityMismatchError` (the chosen group does not belong to the submitted city — plain error, no code) and `RadionicaStartedError` (`isRadionica(kind) && !isRadionicaOpenForSignup(dateStart, now)` — a tab left open across the workshop's start date posted a termin the form no longer renders). `submitInquiryErrorResult` maps them onto the public result union.
 
-### Termin is conditionally mandatory (pre-transaction gate)
+### Termin is conditionally mandatory (pre-transaction gates)
 
 ```mermaid
 flowchart TD
-    A["submitInquiry(data) — Zod passed"] --> B{scheduledGroupId provided?}
-    B -->|Yes| TX["Capacity guard transaction (above)"]
-    B -->|No| C["programs = getActivePrograms(city)"]
-    C --> D["programsForSelection(programs, grade, courseId)<br/>radionica flow → only that course<br/>standard flow → radionice excluded, grade → SLR level"]
+    A["submitInquiry(data) — Zod passed<br/>(inquirySchema rejects scheduledGroupId + noSuitableTermin together)"] --> RT["resolveTargetCourse: the chosen group's course wins;<br/>the submitted courseId is the fallback for group-less inquiries"]
+    RT --> G1{"competitionOnlyAnswerError:<br/>high-school grade OR noSuitableTermin<br/>on a non-COMPETITION target?"}
+    G1 -->|Yes| GERR["Reject (plain error, no code):<br/>'Za odabrani program nije moguće odabrati srednjoškolski razred.'<br/>or 'Za odabrani program potrebno je odabrati jedan od dostupnih termina.'"]
+    G1 -->|No| B{"scheduledGroupId provided,<br/>OR noSuitableTermin = true?"}
+    B -->|Yes| TX["Capacity guard transaction (above) —<br/>the refusal answer skips it (no group, nothing to reserve)"]
+    B -->|No| C["programs = loadProgramsForCheck(city, targetCourse):<br/>getSignupProgram for a per-program link's target,<br/>else getActivePrograms(city)"]
+    C --> D["isTerminRequired → programsForSelection(programs, grade, courseId)<br/>radionica/preselected flow → only that course<br/>standard flow → only hasDatedModules programs, grade → level"]
     D --> E{"Selection chosen?<br/>grade OR preselected course"}
     E -->|No| TX
     E -->|Yes| F{"hasOpenTermin — any matching group with isFull = false?"}
@@ -225,13 +237,25 @@ flowchart TD
     F -->|Yes| ERR["Reject: code TERMIN_REQUIRED<br/>'Za odabrani razred dostupni su termini – odaberite jedan.'<br/>+ fresh programs payload, no Inquiry row written"]
 
     style ERR fill:#fee2e2
+    style GERR fill:#fee2e2
     style TX fill:#d1fae5
     style F fill:#e0f2fe
 ```
 
-> Source: `isTerminRequired` / `programsForSelection` / `hasOpenTermin` in `src/lib/inquiry-availability.ts`, called from `submitInquiry` **before** `runWithGroupCapacityGuard`. It is the server mirror of the client's conditional requirement, so a stale or tampered payload can't skip the choice. When no enrolment window is open, or every matching group is full, the termin stays **optional** — a general "leave your details" inquiry still goes through. `courseId` is only sent in the radionica/preselected flow, so it maps to the same `preselectedCourseId` argument the client uses.
+> Source: `isTerminRequired` / `programsForSelection` / `hasOpenTermin` in `src/lib/inquiry-availability.ts`, plus `resolveTargetCourse` / `competitionOnlyAnswerError` / `loadProgramsForCheck` in `src/actions/inquiry.ts`, all run **before** `runWithGroupCapacityGuard`. It is the server mirror of the client's conditional requirement, so a stale or tampered payload can't skip the choice. When no enrolment window is open, or every matching group is full, the termin stays **optional** — a general "leave your details" inquiry still goes through. `courseId` is only sent in the radionica/preselected flow, so it maps to the same `preselectedCourseId` argument the client uses.
 >
-> The public result union therefore carries **two** codes — `code: 'GROUP_FULL' | 'TERMIN_REQUIRED'` — and both ship a fresh `programs[]` so the form re-renders live availability rather than acting on the stale list the visitor submitted against.
+> `loadProgramsForCheck` is load-bearing: the competitive program is deliberately absent from `getActivePrograms`, so re-checking a competition inquiry against the public catalog would find no matching program and silently make its termin optional. A per-program link therefore re-checks against its own single-program feed (`getSignupProgram`).
+>
+> The public result union carries **three** codes — `code: 'GROUP_FULL' | 'TERMIN_REQUIRED' | 'TERMIN_CLOSED'` — and every arm ships a fresh `programs[]` so the form re-renders live availability rather than acting on the stale list the visitor submitted against (`GROUP_FULL` and `TERMIN_REQUIRED` refresh from the relevant feed via `getActivePrograms` / `loadProgramsForCheck`; `TERMIN_CLOSED` — a radionica that started while the tab sat open — always via `loadProgramsForCheck`).
+
+### The refusal answer — `noSuitableTermin`
+
+One dropdown, two fields: on the competitive program's invitation link the "Željeni termin" select carries `NO_SUITABLE_TERMIN_LABEL` ("Ne odgovara mi predloženi termin", `src/lib/inquiry-status.ts`) as its last option. Picking it writes `Inquiry.noSuitableTermin = true` **instead of** a `scheduledGroupId` — competition termini are few, sent by invitation and negotiable, so a parent who can make none of them must still be able to reply.
+
+- The two are **mutually exclusive by construction**: `inquirySchema.superRefine` rejects a payload carrying both.
+- The refusal **satisfies the termin requirement** (the `B` gate above) — it is an answer, not a skipped question — but reserves **no spot** (no group, nothing in the `preferredInquiries` count).
+- **Competition-only, enforced server-side** on the resolved target course (`competitionOnlyAnswerError`), not on which `<option>`s rendered — otherwise the flag would be the way to skip the termin choice on an SLR program or radionica, where the offered slot is the only thing on the table.
+- The admin reads it back in the same "Željeni termin" row on `/admin/upiti/[id]` where a chosen group would show, rendered as `NO_SUITABLE_TERMIN_LABEL`.
 
 ---
 
@@ -280,8 +304,8 @@ flowchart TD
 flowchart TD
     A[Parent selects grade in Step 3 dropdown] --> B{Grade value}
 
-    B -->|predskolci| C[SLR_1]
-    B -->|1. razred| C
+    B -->|predskolci| U[UVOD]
+    B -->|1. razred| C[SLR_1]
     B -->|2. razred| C
     B -->|3. razred| D[SLR_2]
     B -->|4. razred| D
@@ -289,27 +313,32 @@ flowchart TD
     B -->|6. razred| E
     B -->|7. razred| F[SLR_4]
     B -->|8. razred| F
-    B -->|"Srednja škola 1–4 (ss1–ss4)"| SS[No SLR level]
+    B -->|"Srednja škola 1–4 (ss1–ss4)"| SS["null — no SLR level"]
 
-    SS --> SSX["No match — never offered on the public /upisi form"]
+    SS --> SSX["No match — those grades exist only for the competitive program's own signup link, never the public /upisi form"]
 
+    U --> G0[Filter programs where level = UVOD]
     C --> G[Filter programs where level = SLR_1]
     D --> G2[Filter programs where level = SLR_2]
     E --> G3[Filter programs where level = SLR_3]
     F --> G4[Filter programs where level = SLR_4]
 
-    G --> H[Show available groups for matched courses]
+    G0 --> H[Show available groups for matched courses]
+    G --> H
     G2 --> H
     G3 --> H
     G4 --> H
 
-    H --> I["Exclude everything without dated modules: radionice enrol via /radionice/slug, the Natjecateljski program only via its invitation link"]
+    H --> I["Programs where !hasDatedModules(p.kind) are excluded up front: radionice enrol via /radionice/slug, the Natjecateljski program only via its invitation link"]
 
+    style U fill:#cffafe
     style C fill:#dbeafe
     style D fill:#e0e7ff
     style E fill:#ede9fe
     style F fill:#f3e8ff
 ```
+
+> Since the Uvod split (2026-07-29), predškolci map to their own program (`UVOD`, WeDo 2.0) rather than SLR 1, and SLR 1 starts at 1. razred. `GRADE_VALUES` = `ELEMENTARY_GRADE_VALUES` (predškolci–8) + `ss1`–`ss4`; the high-school grades map to `null` — no SLR level fits them.
 
 ### Grade changes reset group selection
 
@@ -361,6 +390,8 @@ flowchart TD
     style J fill:#fee2e2
 ```
 
+> The competition link's termin dropdown additionally offers the `noSuitableTermin` refusal answer — see §2. Admin copy buttons always build these links with `publicSignupPath(kind, slug)` (`src/lib/signup-links.ts`): a radionica's signup link is its own `/radionice/<slug>` page — `/upisi/<slug>` answers `notFound()` for RADIONICA — while the SLR ladder and the competitive program sign up at `/upisi/<slug>` (`signupPathForSlug`). Building `/upisi/<slug>` unconditionally is exactly the bug that once handed admins a 404 link for workshops.
+
 ---
 
 ## 5. Enrollment Window Logic
@@ -369,16 +400,19 @@ The signup window lives on `CourseEnrollmentWindow(courseId, schoolYear, city)` 
 
 ```mermaid
 flowchart TD
-    A["getActivePrograms(city)"] --> B["Load OPEN windows for THIS city: CourseEnrollmentWindow where city = caller city AND enrollmentStart &lt;= now AND enrollmentEnd &gt;= now"]
+    A["getActivePrograms(city) / getSignupProgram(city, slug) — one shared loadPrograms"] --> B["Load OPEN windows for THIS city: CourseEnrollmentWindow where city = caller city AND enrollmentStart &lt;= now AND enrollmentEnd &gt;= now"]
     B --> B0{Any open window?}
     B0 -->|No| EMPTY[Return empty - nothing enrollable]
     B0 -->|Yes| B1["openKeys = Set of (courseId, schoolYear, city); fetch this city's groups for those courseIds"]
     B1 --> C{"Group's own (courseId, schoolYear, city) in openKeys?"}
     C -->|No| EXCLUDE[Excluded - program has no open window for THIS group's year]
-    C -->|Yes| D{course.isCustom?}
+    C -->|Yes| D{"hasDatedModules(course.kind)?"}
 
-    D -->|Yes - radionica| INCLUDE[Group included in results]
-    D -->|No - standard| E{"nextEnrollingModule from getGroupModuleArc exists?"}
+    D -->|Yes - standard| E{"nextEnrollingModule from getGroupModuleArc exists?"}
+    D -->|No - radionica or competition| R{"Radionica whose dateStart has arrived?<br/>isRadionicaOpenForSignup false"}
+
+    R -->|Yes| EXCLUDE3["Excluded - workshop already started (midnight of dateStart, Europe/Zagreb)"]
+    R -->|No| INCLUDE[Group included in results]
 
     E -->|Yes| INCLUDE
     E -->|No| EXCLUDE2[Excluded - graduated past M4 or schedule incomplete]
@@ -388,12 +422,15 @@ flowchart TD
     style EMPTY fill:#fee2e2
     style EXCLUDE fill:#fee2e2
     style EXCLUDE2 fill:#fee2e2
+    style EXCLUDE3 fill:#fee2e2
     style INCLUDE fill:#d1fae5
 ```
 
 > A window counts as open only when **both** `enrollmentStart` and `enrollmentEnd` are set and `now` falls inside the range. No `CourseEnrollmentWindow` row for a `(course, year, city)` — or one outside the range — hides every group of that program/year in that city; a Split window never exposes Šibenik groups or vice versa. There is no "always open" shortcut.
 >
-> The standard-course second gate is the per-group race-ahead arc (`getGroupModuleArc` → next-enrolling module), not a raw `ModuleSchedule.startDate > now` check. Closing the running module early (`closeModuleSchedule` sets `endDate = today`) reshapes the arc so a later module becomes the next-enrolling one.
+> The standard-course second gate is the per-group race-ahead arc (`getGroupModuleArc` → next-enrolling module), not a raw `ModuleSchedule.startDate > now` check. Closing the running module early (`closeModuleSchedule` sets `endDate = today`) reshapes the arc so a later module becomes the next-enrolling one. The radionica second gate is the start-day cutoff (`isRadionicaOpenForSignup` in `toActiveGroup`) — a workshop with both date bounds blank has no start to compare against and stays bookable. Competition groups have no second gate: they run a whole season.
+>
+> **The feed split is only the course filter**: `getActivePrograms(city)` calls the shared `loadPrograms` with `kind: { not: 'COMPETITION' }`; `getSignupProgram(city, slug)` calls it with `{ slug }` (competition included), and `getSignupProgramById` with `{ id }` for the per-program link's live availability poll. Window, capacity, holiday and cutoff logic are identical across all three, so the feeds can never drift.
 
 ---
 
@@ -453,13 +490,16 @@ sequenceDiagram
     Web->>Server: submitInquiry(formData)
 
     Server->>Server: Validate with Zod inquirySchema
+    Server->>Server: resolveTargetCourse (chosen group's course wins, courseId fallback)
+    Server->>Server: competitionOnlyAnswerError guard (high-school grade / noSuitableTermin only on COMPETITION)
+    Server->>Server: Termin gate when no group AND no refusal - isTerminRequired against loadProgramsForCheck
     Server->>Server: Create Inquiry type COURSE status NEW consentGivenAt now
 
     alt scheduledGroupId provided
         rect rgb(255, 243, 199)
             Note over Server: $transaction (isolationLevel Serializable)
             Server->>Server: assertGroupHasAvailableSpot then create Inquiry
-            Note right of Server: P2034 serialization failure retried once. Second P2034 returns "Pokusajte ponovno.". GroupFullError returns code GROUP_FULL with fresh programs.
+            Note right of Server: P2034 serialization failure retried once. Second P2034 returns "Pokusajte ponovno.". GroupFullError returns code GROUP_FULL with fresh programs. A radionica already past its dateStart throws RadionicaStartedError and returns code TERMIN_CLOSED with fresh programs.
         end
         Server->>Server: Spot reserved via preferredInquiries count
     end
@@ -502,6 +542,7 @@ sequenceDiagram
     end
 
     Server->>Server: Create Enrollment (and ModuleEnrollments for standard courses)
+    Note right of Server: Monthly-billed COMPETITION groups instead get EnrollmentMonth rows (createSeasonMonths in ensureEnrollment) - join month through season end, skipDuplicates. An unplanned season writes nothing. Setting dates later backfills via upsertCourseSeason, whose same-transaction syncSeasonMonths adds newly covered months and deletes only unpaid out-of-range ones.
     Server->>Server: Update Inquiry status ACCOUNT_CREATED, studentId, assignedGroupId
     Server->>Email: Send AccountCredentialsEmail
     Email-->>Parent: Pristupni podaci za childName
