@@ -4,6 +4,7 @@ import { ArrowLeft, Wrench, BookOpen, Trophy, Users } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getProgramDetail } from '@/actions/admin/program-materials'
 import { isArchivedYear } from '@/lib/school-year'
+import { croatianPlural } from '@/lib/format'
 import {
   hasDatedModules,
   hasModules,
@@ -47,6 +48,35 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
     signupHint = 'Prikazuje samo termine ovog programa, bez obzira na razred djeteta.'
   }
 
+  // Header badge, one per kind — standard programs show their SLR level.
+  let kindBadge: React.ReactNode = null
+  if (radionica) {
+    kindBadge = (
+      <span className="rounded-full bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 text-xs font-medium">
+        Radionica
+      </span>
+    )
+  } else if (competition) {
+    kindBadge = (
+      <span className="rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-xs font-medium">
+        Natjecateljski program
+      </span>
+    )
+  } else if (course.level) {
+    kindBadge = (
+      <span className="rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-0.5 text-xs font-medium">
+        {course.level.replace('_', ' ')}
+      </span>
+    )
+  }
+
+  // The COURSE-scope hint names what the scope ignores: modules for standard
+  // programs, natjecanja for the competitive one, nothing for radionice.
+  let materialsScopeSuffix = '.'
+  if (hasModules(course.kind)) {
+    materialsScopeSuffix = competition ? ', bez obzira na natjecanje.' : ', bez obzira na modul.'
+  }
+
   return (
     <div>
       <Link
@@ -84,19 +114,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
           )}
         </div>
         <div className="flex items-center gap-2 mt-1.5 flex-wrap text-sm text-gray-500">
-          {radionica ? (
-            <span className="rounded-full bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 text-xs font-medium">
-              Radionica
-            </span>
-          ) : competition ? (
-            <span className="rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-xs font-medium">
-              Natjecateljski program
-            </span>
-          ) : course.level ? (
-            <span className="rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-0.5 text-xs font-medium">
-              {course.level.replace('_', ' ')}
-            </span>
-          ) : null}
+          {kindBadge}
           <span>{course.ageMin}–{course.ageMax} god.</span>
           {course.price != null && (
             <span>
@@ -108,7 +126,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
             className="inline-flex items-center gap-1 text-cyan-700 hover:underline"
           >
             <Users className="w-3.5 h-3.5" />
-            {course.groupCount} {course.groupCount >= 2 && course.groupCount <= 4 ? 'grupe' : 'grupa'}
+            {course.groupCount} {croatianPlural(course.groupCount, 'grupa', 'grupe', 'grupa')}
           </Link>
         </div>
         <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -179,11 +197,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
               Vidljivo u svim grupama ovog programa
-              {hasModules(course.kind)
-                ? competition
-                  ? ', bez obzira na natjecanje.'
-                  : ', bez obzira na modul.'
-                : '.'}
+              {materialsScopeSuffix}
             </p>
           </div>
           <UploadMaterialDialog

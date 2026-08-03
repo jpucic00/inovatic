@@ -9,7 +9,7 @@ import type { AdminActionResult } from '@/lib/action-types'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { archivedYearError } from '@/lib/school-year-guard'
 import { adminAction } from '@/lib/admin-action'
-import { isEditableCourse } from '@/lib/program-kind'
+import { isCompetition, isEditableCourse, isStandard } from '@/lib/program-kind'
 
 export async function getCourses() {
   const { city } = await requireAdminCtx()
@@ -228,10 +228,10 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
     }
     // Only radionice are deletable: standard SLR is shared catalog content, and
     // the competitive program is a fixture with live monthly billing behind it.
-    if (course.kind === 'STANDARD') {
+    if (isStandard(course.kind)) {
       return { success: false, error: 'Standardni SLR programi se ne mogu brisati.' }
     }
-    if (course.kind === 'COMPETITION') {
+    if (isCompetition(course.kind)) {
       return { success: false, error: 'Natjecateljski program se ne može brisati.' }
     }
 

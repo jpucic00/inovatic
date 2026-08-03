@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Eye, Send } from 'lucide-react'
-import { formatGroupSchedule } from '@/lib/format'
+import { croatianPlural, formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
 import type { RecommendationOption } from '@/lib/assessment-rubric'
 import { SKIP_REASON_SHORT } from '@/lib/bulk-email-recipients'
@@ -563,12 +563,12 @@ export function EmailWizard({
           <button
             key={s}
             type="button"
-            onClick={() => {
-              if (s === 2 && !contentValid) return
-              setStep(s)
-            }}
+            // Disabled, not a silent no-op: keyboard and screen-reader users
+            // must be told the step is unavailable until the content is valid.
+            disabled={s === 2 && !contentValid}
+            onClick={() => setStep(s)}
             className={[
-              'px-3 py-1.5 rounded-full border transition-colors',
+              'px-3 py-1.5 rounded-full border transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
               step === s
                 ? 'bg-cyan-600 border-cyan-600 text-white'
                 : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300',
@@ -832,7 +832,7 @@ export function EmailWizard({
                   className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
                 />
                 <span className="text-sm font-medium text-gray-800">
-                  Odaberi sve grupe
+                  {'Odaberi sve grupe'}
                   <span className="ml-1.5 font-normal text-gray-500">
                     ({allTreeGroupIds.length} u {sourceYear})
                   </span>
@@ -969,7 +969,7 @@ export function EmailWizard({
 
             {kind === 'EVALUATION' && recipients.length > 0 && (
               <p className="mb-3 text-xs text-gray-500">
-                Šalje se {checkedCount} {checkedCount === 1 ? 'poruka' : 'poruka'} —
+                Ukupno {checkedCount} {croatianPlural(checkedCount, 'poruka', 'poruke', 'poruka')} —
                 po jedna za svako dijete. Kliknite <strong>Pregled</strong> na bilo kojem redu
                 da vidite točno onaj e-mail koji taj roditelj prima.
               </p>
@@ -1000,7 +1000,10 @@ export function EmailWizard({
                           !wasSent && !checked ? 'bg-gray-50 border-gray-200' : '',
                         ].join(' ')}
                       >
-                        <label className="flex flex-1 items-center gap-3 cursor-pointer">
+                        <label
+                          aria-label={`Primatelj ${r.parentEmail}`}
+                          className="flex flex-1 items-center gap-3 cursor-pointer"
+                        >
                           <input
                             type="checkbox"
                             checked={checked}

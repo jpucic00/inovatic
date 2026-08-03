@@ -1,5 +1,5 @@
 import { cellText, isBlankRow, normalizeKey, type CellValue, type Grid } from '../import-common/grid'
-import { KNOWN_CAPTIONS, parseGroupTabName } from './parse'
+import { KNOWN_CAPTIONS, KNOWN_LABEL_HEADS, parseGroupTabName } from './parse'
 
 /**
  * Structure-only report for a workbook that cannot be shared.
@@ -60,10 +60,14 @@ function labelOf(row: CellValue[]): string | null {
   if (colon === -1) return null
   const head = normalizeKey(first.slice(0, colon))
   if (!head || head.length > 40) return null
+  // Only heads the importer already knows are quoted: any free-text cell that
+  // happens to contain a colon ("Ana Perić: ispisana 3. mj.") would otherwise
+  // print a child's name into output that is declared safe to share.
+  const shownHead = KNOWN_LABEL_HEADS.has(head) ? head : maskShape(head)
   const inline = first.slice(colon + 1).trim()
   const rest = row.slice(firstIdx + 1).find((c) => cellText(c) !== '')
   const value = inline || (rest === undefined ? '' : cellText(rest))
-  return `${head}: ${value ? describeValue(value) : '(empty)'}`
+  return `${shownHead}: ${value ? describeValue(value) : '(empty)'}`
 }
 
 /**
@@ -77,7 +81,10 @@ function labelOf(row: CellValue[]): string | null {
 function classifyRow(row: CellValue[]): 'recognized' | 'candidate' | null {
   const filled = row.filter((c) => cellText(c) !== '')
   if (filled.length < 3) return null
-  if (!filled.every((c) => cellText(c).length <= 30 && typeof c !== 'number')) return null
+  // Date cells are data by definition (a DOB), never captions — treat them
+  // like numbers so a roster row with a Date can't read as a header.
+  if (!filled.every((c) => cellText(c).length <= 30 && typeof c !== 'number' && !(c instanceof Date)))
+    return null
   return filled.some((c) => KNOWN_CAPTIONS.has(normalizeKey(c))) ? 'recognized' : 'candidate'
 }
 
@@ -87,9 +94,9 @@ export function inspectCompetitionWorkbook(sheets: { name: string; grid: Grid }[
   for (const sheet of sheets) {
     const slot = parseGroupTabName(sheet.name)
     const rows = sheet.grid.filter((r) => !isBlankRow(r))
-    lines.push('')
-    lines.push(`━━ sheet "${sheet.name}"  (${rows.length} non-empty rows)`)
     lines.push(
+      '',
+      `━━ sheet "${sheet.name}"  (${rows.length} non-empty rows)`,
       slot
         ? `   reads as a GROUP TAB → ${slot.dayOfWeek} ${slot.startTime ?? '?'}–${slot.endTime ?? '?'}`
         : '   does NOT read as a group tab → treated as the izvješće sheet',
@@ -110,13 +117,21 @@ export function inspectCompetitionWorkbook(sheets: { name: string; grid: Grid }[
       headers.push({
         index: idx + 1,
         recognized: kind === 'recognized',
-        captions: cells.map((c) => (kind === 'recognized' ? normalizeKey(c) : describeValue(c))),
+        // Even on a recognized row, only captions the importer already knows
+        // are quoted. Caption vocabulary overlaps value vocabulary —
+        // 'Inovacije' is both a rubric caption and a preporuka value — so a
+        // data row with one caption-word must not print its other cells
+        // (names, dates) verbatim. Unknown captions still surface as shapes.
+        captions: cells.map((c) =>
+          kind === 'recognized' && KNOWN_CAPTIONS.has(normalizeKey(c))
+            ? normalizeKey(c)
+            : describeValue(c),
+        ),
       })
     }
 
     if (labels.length > 0) {
-      lines.push('   label rows:')
-      lines.push(...labels.slice(0, 60))
+      lines.push('   label rows:', ...labels.slice(0, 60))
     } else {
       lines.push('   label rows: none found')
     }

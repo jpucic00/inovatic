@@ -93,6 +93,13 @@ export function CourseFormDialog({ course, compact = false }: Readonly<Props>) {
     })
   }
 
+  let submitLabel: string
+  if (isEdit) {
+    submitLabel = isPending ? 'Spremam...' : 'Spremi'
+  } else {
+    submitLabel = isPending ? 'Kreiram...' : 'Kreiraj radionicu'
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -171,7 +178,7 @@ export function CourseFormDialog({ course, compact = false }: Readonly<Props>) {
               disabled={isPending}
               className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
             >
-              {isEdit ? (isPending ? 'Spremam...' : 'Spremi') : (isPending ? 'Kreiram...' : 'Kreiraj radionicu')}
+              {submitLabel}
             </button>
           </div>
         </form>

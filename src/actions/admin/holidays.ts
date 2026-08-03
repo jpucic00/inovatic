@@ -163,22 +163,24 @@ export async function upsertHolidayRange(
   const dateValues = dateKeys.map(fromDateKey)
   const name = data.name?.trim() ? data.name.trim() : null
 
-  if (!data.confirmDeleteAttendance) {
-    const attendanceCount = await countAffectedAttendance(
-      db,
-      dateValues,
-      data.schoolYear,
-      city,
-    )
-    if (attendanceCount > 0) {
-      return { success: true, requiresConfirmation: true, attendanceCount }
-    }
-  }
-
   try {
     await db.$transaction(async (tx) => {
       if (data.confirmDeleteAttendance) {
         await deleteAffectedAttendance(tx, dateValues, data.schoolYear, city)
+      } else {
+        // Same transaction as the upserts below — mirrors bulkImportHolidays:
+        // with a separate pre-check, an attendance row written in the gap
+        // would be neither surfaced for confirmation nor deleted, stranding a
+        // billed teaching hour behind the new holiday.
+        const attendanceCount = await countAffectedAttendance(
+          tx,
+          dateValues,
+          data.schoolYear,
+          city,
+        )
+        if (attendanceCount > 0) {
+          throw new AttendanceConfirmationRequired(attendanceCount, [])
+        }
       }
       for (const dateUtc of dateValues) {
         await tx.schoolYearHoliday.upsert({
@@ -195,6 +197,13 @@ export async function upsertHolidayRange(
       }
     })
   } catch (err) {
+    if (err instanceof AttendanceConfirmationRequired) {
+      return {
+        success: true,
+        requiresConfirmation: true,
+        attendanceCount: err.attendanceCount,
+      }
+    }
     console.error('upsertHolidayRange failed:', err)
     return { success: false, error: 'Greška pri spremanju raspona praznika.' }
   }

@@ -111,7 +111,7 @@ export function AssessmentCard({
     if (opisna !== baseline.opisna) return true
     if (rec !== baseline.rec) return true
     return skillKeysFor(kind).some((k) => skills[k] !== baseline.skills[k])
-  }, [skills, opisna, rec, baseline])
+  }, [skills, opisna, rec, baseline, kind])
 
   const setSkill = (key: SkillKey, value: SkillLevel | null) =>
     setSkills((prev) => ({ ...prev, [key]: value }))

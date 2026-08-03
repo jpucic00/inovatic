@@ -172,7 +172,7 @@ export function parseContactCell(raw: string): ParsedContact {
 
 /** `"Perić, Marija"` → `Marija Perić`; drops quotes and collapses whitespace. */
 function cleanDisplayName(raw: string): string | null {
-  const text = raw.trim().replaceAll(/^["']|["']$/g, '').replaceAll(/\s+/g, ' ').trim()
+  const text = raw.trim().replaceAll(/(?:^["'])|(?:["']$)/g, '').replaceAll(/\s+/g, ' ').trim()
   if (!text) return null
   const commaFlip = /^([^,]+),\s*(.+)$/.exec(text)
   const ordered = commaFlip ? `${commaFlip[2]} ${commaFlip[1]}` : text
@@ -475,6 +475,18 @@ export const KNOWN_CAPTIONS: ReadonlySet<string> = new Set([
 const STAFF_LABELS = [
   ...MENTOR_1_LABELS, ...MENTOR_2_LABELS, ...ASSISTANT_LABELS, 'PREDAVAC', 'TRENER',
 ]
+
+/**
+ * Every `LABEL:` head this importer understands — the only heads `--inspect`
+ * may quote verbatim. A head outside this set could be anything, including a
+ * child's name at the start of a free-text note, so it is shown as a shape.
+ */
+export const KNOWN_LABEL_HEADS: ReadonlySet<string> = new Set([
+  ...TEAM_LABELS,
+  ...STAFF_LABELS,
+  ...KNOWN_CAPTIONS,
+  'GRUPA',
+])
 
 function parseEvaluationRow(
   row: CellValue[],

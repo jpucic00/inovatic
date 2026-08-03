@@ -108,8 +108,8 @@ export function parseRecommendation(value: CellValue): ParsedRecommendation | nu
   }
   // The per-team tracks: a mentor recommending FLL or WRO is naming the team a
   // child should join, so they are read before the program-level track.
-  if (/(^|\s)FLL$/.test(norm) || norm === 'FLL') return { kind: 'COMPETITION_FLL' }
-  if (/(^|\s)WRO$/.test(norm) || norm === 'WRO') return { kind: 'COMPETITION_WRO' }
+  if (/(^|\s)FLL$/.test(norm)) return { kind: 'COMPETITION_FLL' }
+  if (/(^|\s)WRO$/.test(norm)) return { kind: 'COMPETITION_WRO' }
   // Mentors write the program-level track as a sentence as often as bare —
   // "PRIJELAZ NA NATJECATELJSKI PROGRAM" is the commonest spelling in the
   // 2025/2026 competition archive.

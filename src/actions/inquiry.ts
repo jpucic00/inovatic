@@ -80,6 +80,70 @@ type InquiryActionResult =
       programs: ActiveProgram[]
     }
 
+/**
+ * The two answers only the competitive program's signup link offers: a
+ * srednjoškolski razred, and "Ne odgovara mi predloženi termin" (which also
+ * satisfies the termin requirement). Both are enforced against the
+ * server-resolved course rather than trusting which <option>s rendered, so a
+ * tampered payload cannot file a srednjoškolac into an SLR group or use the
+ * refusal flag to skip the termin choice on any other program.
+ */
+function competitionOnlyAnswerError(
+  grade: string,
+  noSuitableTermin: boolean | undefined,
+  targetCourse: { kind: ProgramKind } | null,
+): string | null {
+  const competition = targetCourse !== null && isCompetition(targetCourse.kind)
+  if (isHighSchoolGrade(grade) && !competition) {
+    return 'Za odabrani program nije moguće odabrati srednjoškolski razred.'
+  }
+  if (noSuitableTermin && !competition) {
+    return 'Za odabrani program potrebno je odabrati jedan od dostupnih termina.'
+  }
+  return null
+}
+
+/**
+ * Maps a submitInquiry transaction failure onto the public result union. The
+ * business refusals ship a refreshed program feed so the stale option
+ * disappears from the form immediately.
+ */
+async function submitInquiryErrorResult(
+  err: unknown,
+  city: City,
+  targetCourse: { slug: string } | null,
+): Promise<InquiryActionResult> {
+  if (err instanceof GroupCityMismatchError) {
+    return {
+      success: false,
+      error: 'Odabrani termin nije dostupan za odabrani grad. Osvježite stranicu i pokušajte ponovno.',
+    }
+  }
+  if (err instanceof RadionicaStartedError) {
+    // Hand back the same feed the page renders from, so the expired termin
+    // disappears from the dropdown instead of waiting for the 30s poll.
+    return {
+      success: false,
+      error: 'Odabrana radionica je u međuvremenu započela. Molimo odaberite drugi termin.',
+      code: 'TERMIN_CLOSED' as const,
+      programs: await loadProgramsForCheck(city, targetCourse),
+    }
+  }
+  if (err instanceof GroupFullError) {
+    return {
+      success: false,
+      error: 'Odabrani termin je u međuvremenu popunjen. Molimo odaberite drugi termin.',
+      code: 'GROUP_FULL' as const,
+      programs: await getActivePrograms(city),
+    }
+  }
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {
+    return { success: false, error: 'Pokušajte ponovno.' }
+  }
+  console.error('submitInquiry failed:', err)
+  return { success: false, error: 'Greška pri slanju upita. Pokušajte ponovo.' }
+}
+
 export async function submitInquiry(data: InquiryFormData): Promise<InquiryActionResult> {
   const parsed = inquirySchema.safeParse(data)
   if (!parsed.success) {
@@ -109,27 +173,9 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
   // termin-less "leave your details" inquiry.
   const targetCourse = await resolveTargetCourse(scheduledGroupId, courseId)
 
-  // Srednja škola razredi exist only for the competitive program, whose signup
-  // link is the only form that offers them. Enforced here rather than trusting
-  // which <option>s rendered, so a tampered payload cannot file a srednjoškolac
-  // into an SLR group.
-  if (isHighSchoolGrade(grade) && (!targetCourse || !isCompetition(targetCourse.kind))) {
-    return {
-      success: false,
-      error: 'Za odabrani program nije moguće odabrati srednjoškolski razred.',
-    }
-  }
-
-  // "Ne odgovara mi predloženi termin" is offered on the competitive program's
-  // signup link only — its termini are few and negotiable. Enforced here rather
-  // than trusting which <option>s rendered, because the flag also satisfies the
-  // termin requirement: without this guard it would be the way to skip the
-  // termin choice on any program.
-  if (noSuitableTermin && (!targetCourse || !isCompetition(targetCourse.kind))) {
-    return {
-      success: false,
-      error: 'Za odabrani program potrebno je odabrati jedan od dostupnih termina.',
-    }
+  const guardError = competitionOnlyAnswerError(grade, noSuitableTermin, targetCourse)
+  if (guardError) {
+    return { success: false, error: guardError }
   }
 
   // Server-side mirror of the client's conditional requirement: when no termin
@@ -207,36 +253,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       })
     })
   } catch (err) {
-    if (err instanceof GroupCityMismatchError) {
-      return {
-        success: false,
-        error: 'Odabrani termin nije dostupan za odabrani grad. Osvježite stranicu i pokušajte ponovno.',
-      }
-    }
-    if (err instanceof RadionicaStartedError) {
-      // Hand back the same feed the page renders from, so the expired termin
-      // disappears from the dropdown instead of waiting for the 30s poll.
-      return {
-        success: false,
-        error: 'Odabrana radionica je u međuvremenu započela. Molimo odaberite drugi termin.',
-        code: 'TERMIN_CLOSED' as const,
-        programs: await loadProgramsForCheck(city, targetCourse),
-      }
-    }
-    if (err instanceof GroupFullError) {
-      const freshPrograms = await getActivePrograms(city)
-      return {
-        success: false,
-        error: 'Odabrani termin je u međuvremenu popunjen. Molimo odaberite drugi termin.',
-        code: 'GROUP_FULL' as const,
-        programs: freshPrograms,
-      }
-    }
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {
-      return { success: false, error: 'Pokušajte ponovno.' }
-    }
-    console.error('submitInquiry failed:', err)
-    return { success: false, error: 'Greška pri slanju upita. Pokušajte ponovo.' }
+    return submitInquiryErrorResult(err, city, targetCourse)
   }
 
   try {

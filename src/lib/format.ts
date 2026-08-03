@@ -53,6 +53,19 @@ export function formatModuleDateRange(start: Date, end: Date): string {
   return ` (${dd(start)}.${mm(start)}. – ${dd(end)}.${mm(end)}.${end.getFullYear()}.)`
 }
 
+/**
+ * Croatian plural agreement for a counted noun: 1 grupa, 2–4 grupe, 5+ grupa.
+ * Decided by the last digit so 22 is "grupe" and 111 is "grupa", with the
+ * 12–14 exception ("12 grupa").
+ */
+export function croatianPlural(n: number, one: string, few: string, many: string): string {
+  const lastTwo = Math.abs(n) % 100
+  const last = lastTwo % 10
+  if (last === 1 && lastTwo !== 11) return one
+  if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return few
+  return many
+}
+
 /** Minutes as Croatian hours, e.g. 90 → "1,5 h". */
 export function formatHours(minutes: number): string {
   const value = new Intl.NumberFormat('hr-HR', { maximumFractionDigits: 2 }).format(

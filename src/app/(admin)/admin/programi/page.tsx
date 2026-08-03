@@ -6,7 +6,8 @@ import { getCourses } from '@/actions/admin/course'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
-import { signupPathForSlug } from '@/lib/signup-links'
+import { publicSignupPath } from '@/lib/signup-links'
+import { croatianPlural } from '@/lib/format'
 import { CourseTable } from '@/components/admin/courses/course-table'
 import { CourseFormDialog } from '@/components/admin/courses/course-form-dialog'
 import { CopyLinkButton } from '@/components/admin/courses/copy-link-button'
@@ -44,13 +45,13 @@ function ProgramRow({
           </span>
         </div>
       </Link>
-      <CopyLinkButton path={signupPathForSlug(course.slug)} />
+      <CopyLinkButton path={publicSignupPath(course.kind, course.slug)} />
       <Link
         href={`/admin/programi/${course.id}`}
         className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-1.5 rounded-full shrink-0"
       >
         <Users className="w-3.5 h-3.5" />
-        {groupCount} {groupCount >= 2 && groupCount <= 4 ? 'grupe' : 'grupa'}
+        {groupCount} {croatianPlural(groupCount, 'grupa', 'grupe', 'grupa')}
       </Link>
       <Link href={`/admin/programi/${course.id}`} aria-label={course.title}>
         <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-cyan-500 transition-colors shrink-0" />

@@ -94,9 +94,7 @@ export function computeGroupCapacity(
   let enrolledCount: number
   let nextEnrollingModule: GroupCapacityInfo['nextEnrollingModule'] = null
 
-  if (!hasDatedModules(group.course.kind)) {
-    enrolledCount = group.enrollments.length
-  } else {
+  if (hasDatedModules(group.course.kind)) {
     const arc = getGroupModuleArc({
       dayOfWeek: group.dayOfWeek,
       modules: group.course.modules.map((m) => {
@@ -134,6 +132,8 @@ export function computeGroupCapacity(
     } else {
       enrolledCount = group.enrollments.length
     }
+  } else {
+    enrolledCount = group.enrollments.length
   }
 
   const reservedInquiriesCount = group._count.preferredInquiries

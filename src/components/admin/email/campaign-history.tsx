@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { formatDate } from '@/lib/format'
+import { croatianPlural, formatDate } from '@/lib/format'
 import { EMAIL_CAMPAIGN_KINDS } from '@/lib/email-campaign-kind'
 import type { getEmailCampaigns } from '@/actions/admin/email-campaign'
 
@@ -29,7 +29,7 @@ export function CampaignHistory({ campaigns }: Readonly<{ campaigns: Campaigns }
               {campaigns.map((c) => {
                 const badge = EMAIL_CAMPAIGN_KINDS[c.kind]
                 const groupCount = c.sourceGroupIds.length
-                const groupNoun = groupCount === 1 ? 'grupa' : 'grupe'
+                const groupNoun = croatianPlural(groupCount, 'grupa', 'grupe', 'grupa')
                 const cohort =
                   groupCount > 0
                     ? `${groupCount} ${groupNoun}`

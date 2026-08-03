@@ -10,6 +10,7 @@ import {
   matchesGroupFilter,
   type GroupFilterKey,
 } from '@/lib/group-filter'
+import { croatianPlural } from '@/lib/format'
 
 type Group = ComponentProps<typeof GroupTable>['data'][number]
 
@@ -50,7 +51,7 @@ export function GroupsBoard({ groups, editable, initialFilter }: Readonly<Groups
           {FILTER_LABEL[activeFilter]}
         </h2>
         <span className="text-xs text-gray-400 tabular-nums">
-          {visible.length} {visible.length >= 2 && visible.length <= 4 ? 'grupe' : 'grupa'}
+          {visible.length} {croatianPlural(visible.length, 'grupa', 'grupe', 'grupa')}
         </span>
       </div>
 

@@ -738,6 +738,61 @@ export type SendEmailCampaignResult =
     }
   | { success: false; error: string }
 
+type ReenrollmentPrep =
+  | {
+      ok: true
+      options: GroupOption[] | undefined
+      signupPath: string | undefined
+      invited: Set<string>
+    }
+  | { ok: false; error: string }
+
+/**
+ * REENROLLMENT-only setup: the invitation's termin boxes, its CTA path and the
+ * already-invited parent set. Every other kind passes through with empty
+ * defaults so the caller reads one shape.
+ */
+async function prepareReenrollment(
+  city: City,
+  targetYear: string,
+  data: SendEmailCampaignInput,
+): Promise<ReenrollmentPrep> {
+  if (data.kind !== 'REENROLLMENT') {
+    return { ok: true, options: undefined, signupPath: undefined, invited: new Set() }
+  }
+  if (isArchivedYear(targetYear)) {
+    return {
+      ok: false,
+      error: 'Pozivnice se šalju u tekuću školsku godinu — promijenite odabranu godinu.',
+    }
+  }
+  const built = await buildTargetOptions(city, targetYear, data.targetCourseId, data.targetGroupIds)
+  if (!built.ok) return { ok: false, error: built.error }
+  return {
+    ok: true,
+    options: built.options,
+    signupPath: built.signupPath,
+    invited: await loadAlreadyInvited(city, data.targetCourseId, targetYear),
+  }
+}
+
+/** Split the resolved cohort into who gets mail now, and count why the rest don't. */
+function partitionRecipients(
+  recipients: EmailRecipient[],
+  excludedSet: Set<string>,
+  invited: Set<string>,
+): { toSend: EmailRecipient[]; excluded: number; alreadySent: number } {
+  const toSend: EmailRecipient[] = []
+  let excluded = 0
+  let alreadySent = 0
+  for (const recipient of recipients) {
+    if (excludedSet.has(recipient.rowKey)) excluded++
+    else if (invited.has(recipient.parentEmail)) alreadySent++
+    else toSend.push(recipient)
+  }
+  return { toSend, excluded, alreadySent }
+}
+
 export async function sendEmailCampaign(
   input: SendEmailCampaignInput,
 ): Promise<SendEmailCampaignResult> {
@@ -752,22 +807,9 @@ export async function sendEmailCampaign(
   try {
     const targetYear = await getSelectedSchoolYear()
 
-    let options: GroupOption[] | undefined
-    let signupPath: string | undefined
-    let invited = new Set<string>()
-    if (data.kind === 'REENROLLMENT') {
-      if (isArchivedYear(targetYear)) {
-        return {
-          success: false,
-          error: 'Pozivnice se šalju u tekuću školsku godinu — promijenite odabranu godinu.',
-        }
-      }
-      const built = await buildTargetOptions(city, targetYear, data.targetCourseId, data.targetGroupIds)
-      if (!built.ok) return { success: false, error: built.error }
-      options = built.options
-      signupPath = built.signupPath
-      invited = await loadAlreadyInvited(city, data.targetCourseId, targetYear)
-    }
+    const prep = await prepareReenrollment(city, targetYear, data)
+    if (!prep.ok) return { success: false, error: prep.error }
+    const { options, signupPath, invited } = prep
 
     const cohort = await resolveCohort(city, data.kind, data)
     if (!cohort.ok) return { success: false, error: cohort.error }
@@ -784,72 +826,79 @@ export async function sendEmailCampaign(
               .filter((e): e is string => e !== null),
           )
 
-    const toSend: EmailRecipient[] = []
-    let excluded = 0
-    let alreadySent = 0
-    for (const recipient of cohort.recipients) {
-      if (excludedSet.has(recipient.rowKey)) excluded++
-      else if (invited.has(recipient.parentEmail)) alreadySent++
-      else toSend.push(recipient)
-    }
+    const { toSend, excluded, alreadySent } = partitionRecipients(
+      cohort.recipients,
+      excludedSet,
+      invited,
+    )
 
-    const campaign = await db.emailCampaign.create({
-      data: {
-        city,
-        kind: data.kind,
-        sourceSchoolYear: data.sourceSchoolYear,
-        sourceGroupIds: data.sourceGroupIds ?? [],
-        sourceRecommendations: data.recommendations?.length
-          ? await labelRecommendations(data.recommendations, city)
-          : [],
-        targetSchoolYear: data.kind === 'REENROLLMENT' ? targetYear : null,
-        targetCourseId: data.kind === 'REENROLLMENT' ? data.targetCourseId : null,
-        targetGroupIds: data.kind === 'REENROLLMENT' ? data.targetGroupIds : [],
-        subject: data.subject,
-        bodyText: data.bodyText,
-        sentById: session.user.id,
-        skippedCount: cohort.skipped.length,
-        excludedCount: excluded,
-        totalCount: toSend.length,
-      },
-    })
+    const sourceRecommendations = data.recommendations?.length
+      ? await labelRecommendations(data.recommendations, city)
+      : []
 
-    // Persist the children nobody could be mailed for, so the detail view can
-    // name them instead of showing an anonymous "skipped: 3".
-    if (cohort.skipped.length > 0) {
-      await db.emailCampaignRecipient.createMany({
-        data: cohort.skipped.map((s) => ({
-          campaignId: campaign.id,
-          parentEmail: '',
-          status: 'SKIPPED' as const,
-          childNames: [s.studentName],
-          failureReason: SKIP_REASON_TEXT[s.reason],
+    // One transaction: the campaign row and its intended-recipient rows commit
+    // together, so a crash here can't leave a campaign whose counters promise a
+    // cohort that has no rows (preporuka cohorts can't be re-resolved later —
+    // only display labels are stored).
+    const campaign = await db.$transaction(async (tx) => {
+      const created = await tx.emailCampaign.create({
+        data: {
+          city,
+          kind: data.kind,
+          sourceSchoolYear: data.sourceSchoolYear,
+          sourceGroupIds: data.sourceGroupIds ?? [],
+          sourceRecommendations,
+          targetSchoolYear: data.kind === 'REENROLLMENT' ? targetYear : null,
+          targetCourseId: data.kind === 'REENROLLMENT' ? data.targetCourseId : null,
+          targetGroupIds: data.kind === 'REENROLLMENT' ? data.targetGroupIds : [],
+          subject: data.subject,
+          bodyText: data.bodyText,
+          sentById: session.user.id,
+          skippedCount: cohort.skipped.length,
+          excludedCount: excluded,
+          totalCount: toSend.length,
+        },
+      })
+
+      // Persist the children nobody could be mailed for, so the detail view can
+      // name them instead of showing an anonymous "skipped: 3".
+      if (cohort.skipped.length > 0) {
+        await tx.emailCampaignRecipient.createMany({
+          data: cohort.skipped.map((s) => ({
+            campaignId: created.id,
+            parentEmail: '',
+            status: 'SKIPPED' as const,
+            childNames: [s.studentName],
+            failureReason: SKIP_REASON_TEXT[s.reason],
+          })),
+        })
+      }
+
+      // Write the whole intended cohort upfront so the detail view is complete
+      // from the first second and a resumed run knows exactly who is still owed
+      // an e-mail — the cohort itself can't always be re-resolved later.
+      await tx.emailCampaignRecipient.createMany({
+        data: toSend.map((r) => ({
+          campaignId: created.id,
+          parentEmail: r.parentEmail,
+          status: 'PENDING' as const,
+          // The group rides along on an evaluation row: one child can hold a card
+          // in two selected groups, and those are two separate mails, so the name
+          // alone would show as two identical rows on the detail page.
+          childNames: r.children.map((c) =>
+            c.groupLabel ? `${c.name} · ${c.groupLabel}` : c.name,
+          ),
+          assessmentIds: r.assessmentIds,
         })),
       })
-    }
+
+      return created
+    })
 
     const sentKey =
       data.kind === 'REENROLLMENT'
         ? invitationSentKey(city, data.targetCourseId, targetYear)
         : null
-
-    // Write the whole intended cohort upfront so the detail view is complete
-    // from the first second and a resumed run knows exactly who is still owed
-    // an e-mail — the cohort itself can't always be re-resolved later.
-    await db.emailCampaignRecipient.createMany({
-      data: toSend.map((r) => ({
-        campaignId: campaign.id,
-        parentEmail: r.parentEmail,
-        status: 'PENDING' as const,
-        // The group rides along on an evaluation row: one child can hold a card
-        // in two selected groups, and those are two separate mails, so the name
-        // alone would show as two identical rows on the detail page.
-        childNames: r.children.map((c) =>
-          c.groupLabel ? `${c.name} · ${c.groupLabel}` : c.name,
-        ),
-        assessmentIds: r.assessmentIds,
-      })),
-    })
 
     await startSendJob({
       campaignId: campaign.id,
@@ -983,10 +1032,109 @@ async function markRecipientFailed(
     .catch(() => {})
 }
 
+/** One PENDING row as the send loop reads it. */
+type PendingRecipient = { id: string; parentEmail: string; assessmentIds: string[] }
+
+/**
+ * One recipient, start to finish: prove the content (EVALUATION), claim the
+ * row, send, record the outcome. Every early return leaves the row in a state
+ * the detail page explains.
+ */
+async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promise<void> {
+  const claimId = recipient.id
+
+  // Declared INSIDE this per-recipient scope: an evaluation card belongs to one
+  // recipient and must not be able to survive into the next iteration. See
+  // SendJob.
+  let cards: EvaluationCard[] | undefined
+  let subject = job.subject
+  if (job.kind === 'EVALUATION') {
+    const built = await buildCardsForRecipient(recipient, job.city)
+    if (!built.ok) {
+      // Fail closed: the card could not be proven to belong to this address,
+      // so nothing is sent and the admin sees why.
+      await markRecipientFailed(claimId, job.campaignId, built.reason)
+      return
+    }
+    cards = built.cards
+    // Naming the child in the subject keeps two mails to one inbox apart, and
+    // makes a misdirected card obvious to the person best placed to notice.
+    subject = `${job.subject} – ${built.childName}`
+  }
+
+  // Claim the parent BEFORE sending. Two protections, for two different
+  // overlaps: conditioning on PENDING makes concurrent runs of THIS campaign
+  // per-row exclusive (a resume overlapping a still-live job — both read the
+  // same snapshot, only one flips each row), while the unique (sentKey,
+  // email) slot blocks a re-invite from an EARLIER campaign. Without the
+  // status condition the same-campaign overlap re-updated the row to the
+  // same values and mailed everyone in the window twice.
+  try {
+    const claimed = await db.emailCampaignRecipient.updateMany({
+      where: { id: claimId, status: 'PENDING' },
+      data: { status: 'SENT', sentKey: job.sentKey },
+    })
+    if (claimed.count === 0) {
+      // Another live run of this campaign already owns the row — its writer
+      // records the outcome; touching it here would clobber that.
+      return
+    }
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      // Already invited — by an overlapping send or an earlier campaign.
+      await db.emailCampaignRecipient
+        .update({
+          where: { id: claimId },
+          data: { status: 'ALREADY_SENT', failureReason: 'Roditelj je već primio pozivnicu.' },
+        })
+        .catch(() => {})
+      return
+    }
+    console.error('runSendJob: could not claim recipient:', err)
+    return
+  }
+
+  try {
+    // Non-throw counts as sent — matches app-wide semantics (the no-key
+    // no-op also "succeeds", so dev sends still write SENT log rows).
+    await sendBulkMessageEmail({
+      to: recipient.parentEmail,
+      subject,
+      bodyText: job.bodyText,
+      city: job.city,
+      options: job.options,
+      signupPath: job.signupPath,
+      cards,
+    })
+    // Counts increment per recipient so progress polling is live and an
+    // interrupted campaign still reports exactly what went out.
+    await db.emailCampaign
+      .update({ where: { id: job.campaignId }, data: { sentCount: { increment: 1 } } })
+      .catch(() => {})
+  } catch (err) {
+    console.error(`runSendJob: send to ${recipient.parentEmail} failed:`, err)
+    // Release the claim so a resume may invite this parent again.
+    await db.emailCampaignRecipient
+      .update({
+        where: { id: claimId },
+        data: {
+          status: 'FAILED',
+          sentKey: null,
+          failureReason: err instanceof Error ? err.message.slice(0, 300) : 'Nepoznata greška.',
+        },
+      })
+      .catch(() => {})
+    await db.emailCampaign
+      .update({ where: { id: job.campaignId }, data: { failedCount: { increment: 1 } } })
+      .catch(() => {})
+  }
+}
+
 /**
  * The actual send. Runs detached from the request, and is safe to run again on
- * the same campaign: every parent is claimed in the database before their mail
- * goes out, so a resumed run skips whoever already received it.
+ * the same campaign: every recipient row is claimed (PENDING-conditioned)
+ * before their mail goes out, so a resumed or overlapping run skips whoever is
+ * already handled.
  */
 async function runSendJob(job: SendJob): Promise<void> {
   // Only rows still owed an e-mail. On a resume this is exactly what a killed
@@ -997,84 +1145,7 @@ async function runSendJob(job: SendJob): Promise<void> {
   })
 
   for (let i = 0; i < pending.length; i++) {
-    const recipient = pending[i]
-    const claimId = recipient.id
-
-    // Declared INSIDE the loop: an evaluation card belongs to one recipient and
-    // must not be able to survive into the next iteration. See SendJob.
-    let cards: EvaluationCard[] | undefined
-    let subject = job.subject
-    if (job.kind === 'EVALUATION') {
-      const built = await buildCardsForRecipient(recipient, job.city)
-      if (!built.ok) {
-        // Fail closed: the card could not be proven to belong to this address,
-        // so nothing is sent and the admin sees why.
-        await markRecipientFailed(claimId, job.campaignId, built.reason)
-        continue
-      }
-      cards = built.cards
-      // Naming the child in the subject keeps two mails to one inbox apart, and
-      // makes a misdirected card obvious to the person best placed to notice.
-      subject = `${job.subject} – ${built.childName}`
-    }
-
-    // Claim the parent BEFORE sending, by taking the unique (sentKey, email)
-    // slot. A concurrent send loses this write and skips, so an invitation
-    // cannot go out twice even when two sends overlap.
-    try {
-      await db.emailCampaignRecipient.update({
-        where: { id: claimId },
-        data: { status: 'SENT', sentKey: job.sentKey },
-      })
-    } catch (err) {
-      if (isUniqueViolation(err)) {
-        // Already invited — by an overlapping send or an earlier campaign.
-        await db.emailCampaignRecipient
-          .update({
-            where: { id: claimId },
-            data: { status: 'ALREADY_SENT', failureReason: 'Roditelj je već primio pozivnicu.' },
-          })
-          .catch(() => {})
-        continue
-      }
-      console.error('runSendJob: could not claim recipient:', err)
-      continue
-    }
-
-    try {
-      // Non-throw counts as sent — matches app-wide semantics (the no-key
-      // no-op also "succeeds", so dev sends still write SENT log rows).
-      await sendBulkMessageEmail({
-        to: recipient.parentEmail,
-        subject,
-        bodyText: job.bodyText,
-        city: job.city,
-        options: job.options,
-        signupPath: job.signupPath,
-        cards,
-      })
-      // Counts increment per recipient so progress polling is live and an
-      // interrupted campaign still reports exactly what went out.
-      await db.emailCampaign
-        .update({ where: { id: job.campaignId }, data: { sentCount: { increment: 1 } } })
-        .catch(() => {})
-    } catch (err) {
-      console.error(`runSendJob: send to ${recipient.parentEmail} failed:`, err)
-      // Release the claim so a resume may invite this parent again.
-      await db.emailCampaignRecipient
-        .update({
-          where: { id: claimId },
-          data: {
-            status: 'FAILED',
-            sentKey: null,
-            failureReason: err instanceof Error ? err.message.slice(0, 300) : 'Nepoznata greška.',
-          },
-        })
-        .catch(() => {})
-      await db.emailCampaign
-        .update({ where: { id: job.campaignId }, data: { failedCount: { increment: 1 } } })
-        .catch(() => {})
-    }
+    await sendToRecipient(job, pending[i])
     const throttle = sendThrottleMs()
     if (throttle > 0 && process.env.RESEND_API_KEY && i < pending.length - 1) {
       await sleep(throttle)

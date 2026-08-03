@@ -17,8 +17,7 @@ import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { formatGroupSchedule, formatModuleDateRange as fmtModuleDateRange } from '@/lib/format'
 import { toast } from 'sonner'
-import { isRadionica } from '@/lib/program-kind'
-import { hasDatedModules } from '@/lib/program-kind'
+import { hasDatedModules, isRadionica } from '@/lib/program-kind'
 import type { ProgramKind } from '@prisma/client'
 
 type ModuleOption = {

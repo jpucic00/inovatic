@@ -10,7 +10,8 @@ import {
   type AddGalleryImagesInput,
 } from '@/lib/validators/gallery'
 import { destroyCloudinaryAssetsByPublicId } from '@/lib/cloudinary-cleanup'
-import { isRadionica } from '@/lib/program-kind'
+import type { ProgramKind } from '@prisma/client'
+import { isCompetition, isRadionica } from '@/lib/program-kind'
 import { archivedYearError } from '@/lib/school-year-guard'
 
 type CreatedGalleryImage = {
@@ -57,6 +58,31 @@ function revalidateGalleryPaths(groupId: string) {
   revalidatePath('/portal')
 }
 
+/**
+ * The kind-driven moduleId rule: a radionica's gallery is group-wide (module
+ * must be null), every other kind buckets per module — natjecanje for
+ * COMPETITION — and the module must belong to the program. Returns the refusal
+ * message, or null when the pairing is valid.
+ */
+function moduleScopeError(
+  course: { kind: ProgramKind; modules: { id: string }[] },
+  moduleId: string | null,
+): string | null {
+  if (isRadionica(course.kind)) {
+    return moduleId === null ? null : 'Radionica nema module — galerija je grupna.'
+  }
+  if (moduleId === null) {
+    // COMPETITION also lands here — its buckets are the natjecanja. The
+    // standard-program copy stays byte-identical (asserted in E2E spec 29).
+    return isCompetition(course.kind)
+      ? 'Natjecateljski program zahtijeva natjecanje (modul).'
+      : 'Standardni program zahtijeva modul.'
+  }
+  return course.modules.some((m) => m.id === moduleId)
+    ? null
+    : 'Modul ne pripada ovom programu.'
+}
+
 export async function addGalleryImages(
   input: AddGalleryImagesInput,
 ): Promise<AdminActionResult & { images?: CreatedGalleryImage[] }> {
@@ -93,22 +119,8 @@ export async function addGalleryImages(
   const blocked = archivedYearError(group.schoolYear)
   if (blocked) return blocked
 
-  if (isRadionica(group.course.kind)) {
-    if (data.moduleId !== null) {
-      return {
-        success: false,
-        error: 'Radionica nema module — galerija je grupna.',
-      }
-    }
-  } else {
-    if (data.moduleId === null) {
-      return { success: false, error: 'Standardni program zahtijeva modul.' }
-    }
-    const moduleIds = new Set(group.course.modules.map((m) => m.id))
-    if (!moduleIds.has(data.moduleId)) {
-      return { success: false, error: 'Modul ne pripada ovom programu.' }
-    }
-  }
+  const scopeError = moduleScopeError(group.course, data.moduleId)
+  if (scopeError) return { success: false, error: scopeError }
 
   try {
     const created = await db.$transaction(async (tx) => {

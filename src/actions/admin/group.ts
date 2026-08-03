@@ -283,6 +283,34 @@ async function syncTeacherAssignments(
   }
 }
 
+/**
+ * updateGroup's course-change guard: the course must exist, belong to the
+ * admin's city (shared standard programs pass), and a radionica must carry the
+ * group's own school year — the same trust boundary createGroup enforces on
+ * create.
+ */
+async function courseChangeError(
+  courseId: string,
+  groupId: string,
+  city: City,
+): Promise<{ success: false; error: string } | null> {
+  const course = await db.course.findUnique({
+    where: { id: courseId },
+    select: { kind: true, schoolYear: true, city: true },
+  })
+  if (!course || (course.city && course.city !== city)) {
+    return { success: false, error: 'Odabrani program ne pripada vašem gradu.' }
+  }
+  const group = await db.scheduledGroup.findUnique({
+    where: { id: groupId },
+    select: { schoolYear: true },
+  })
+  if (!group || (isRadionica(course.kind) && course.schoolYear !== group.schoolYear)) {
+    return { success: false, error: 'Odabrani program ne pripada ovoj školskoj godini.' }
+  }
+  return null
+}
+
 export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionResult> {
   const { city } = await requireAdminCtx()
 
@@ -309,13 +337,8 @@ export async function updateGroup(data: UpdateGroupInput): Promise<AdminActionRe
   }
 
   if (courseId !== undefined) {
-    const course = await db.course.findUnique({
-      where: { id: courseId },
-      select: { city: true },
-    })
-    if (!course || (course.city && course.city !== city)) {
-      return { success: false, error: 'Odabrani program ne pripada vašem gradu.' }
-    }
+    const invalidCourse = await courseChangeError(courseId, id, city)
+    if (invalidCourse) return invalidCourse
   }
 
   if (teacherIds !== undefined && teacherIds.length > 0) {

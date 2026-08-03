@@ -101,11 +101,8 @@ export function ProgramFilterBar({
         Prikaži
       </span>
 
-      <div
-        role="group"
-        aria-label="Filtriraj grupe po programu"
-        className="flex flex-wrap items-center gap-1.5"
-      >
+      <fieldset className="m-0 flex min-w-0 flex-wrap items-center gap-1.5 border-0 p-0">
+        <legend className="sr-only">Filtriraj grupe po programu</legend>
         {chip('all', groups.length)}
         {standard && chip('standard', standard.count)}
         {levelChips.map((f) => chip(f.key, f.count))}
@@ -113,7 +110,7 @@ export function ProgramFilterBar({
           <span className="mx-0.5 h-5 w-px bg-gray-300" aria-hidden />
         )}
         {otherKinds.map((c) => chip(c.key, c.count))}
-      </div>
+      </fieldset>
 
       {activeFilter !== 'all' && (
         <button

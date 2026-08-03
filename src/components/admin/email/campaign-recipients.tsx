@@ -36,14 +36,30 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [finished, setFinished] = useState(campaign.finished)
+  // A killed send (deploy, crash) never writes `finishedAt`, so `finished`
+  // alone would spin forever and hide the resume button in exactly the case it
+  // exists for. Five polls (~15 s) without a single sent/failed increment while
+  // rows are still owed means nothing is running — offer the resume.
+  const [stalled, setStalled] = useState(false)
 
   // While a send is in flight the rows change under us, so refresh the page
   // data until the campaign closes out.
   useEffect(() => {
     if (finished) return
+    let lastProgress = -1
+    let unchangedTicks = 0
     const timer = setInterval(async () => {
       try {
         const p = await getCampaignProgress(campaign.id)
+        const progress = p.sentCount + p.failedCount
+        if (progress === lastProgress) {
+          unchangedTicks++
+          if (unchangedTicks >= 5) setStalled(true)
+        } else {
+          lastProgress = progress
+          unchangedTicks = 0
+          setStalled(false)
+        }
         router.refresh()
         if (p.finished) setFinished(true)
       } catch {
@@ -65,6 +81,7 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
       const res = await resumeEmailCampaign(campaign.id)
       if (res.success) {
         setFinished(false)
+        setStalled(false)
         toast.success(
           res.remaining === 0 ? 'Nema preostalih primatelja.' : `Nastavljam — ${res.remaining} preostalo.`,
         )
@@ -87,13 +104,13 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
             <Stat label="Ukupno za slanje" value={campaign.totalCount} tone="text-gray-900" />
           </dl>
 
-          {!finished && (
+          {!finished && !stalled && (
             <span className="inline-flex items-center gap-1.5 text-xs text-cyan-700">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Slanje u tijeku…
             </span>
           )}
-          {finished && pendingCount > 0 && (
+          {(finished || stalled) && pendingCount > 0 && (
             <button
               type="button"
               onClick={handleResume}
@@ -106,7 +123,7 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
           )}
         </div>
 
-        {finished && pendingCount > 0 && (
+        {(finished || stalled) && pendingCount > 0 && (
           <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
             Slanje je prekinuto prije kraja (npr. novi deploy). Nastavak šalje samo preostalim
             roditeljima — nitko tko je već primio poruku neće je dobiti ponovno.

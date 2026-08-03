@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
 import { adminAction } from '@/lib/admin-action'
 import { archivedYearError } from '@/lib/school-year-guard'
@@ -50,24 +51,29 @@ export async function upsertCourseSeason(
     }
 
     try {
-      await db.courseSeason.upsert({
-        where: {
-          courseId_schoolYear_city: {
+      // One transaction: season dates and the monthly charges derived from them
+      // commit together — a crash between the two would otherwise leave
+      // children billed against the OLD season until someone re-edited it.
+      await db.$transaction(async (tx) => {
+        await tx.courseSeason.upsert({
+          where: {
+            courseId_schoolYear_city: {
+              courseId: input.courseId,
+              schoolYear: input.schoolYear,
+              city,
+            },
+          },
+          create: {
             courseId: input.courseId,
             schoolYear: input.schoolYear,
             city,
+            startDate,
+            endDate,
           },
-        },
-        create: {
-          courseId: input.courseId,
-          schoolYear: input.schoolYear,
-          city,
-          startDate,
-          endDate,
-        },
-        update: { startDate, endDate },
+          update: { startDate, endDate },
+        })
+        await syncSeasonMonths(tx, input.courseId, input.schoolYear, city, startDate, endDate)
       })
-      await syncSeasonMonths(input.courseId, input.schoolYear, city, startDate, endDate)
     } catch (err) {
       console.error('upsertCourseSeason failed:', err)
       return { success: false, error: 'Greška pri spremanju trajanja programa.' }
@@ -89,13 +95,14 @@ export async function upsertCourseSeason(
  * edit; correcting that is a deliberate admin action on the student's card.
  */
 async function syncSeasonMonths(
+  tx: Prisma.TransactionClient,
   courseId: string,
   schoolYear: string,
   city: import('@prisma/client').City,
   startDate: Date | null,
   endDate: Date | null,
 ): Promise<void> {
-  const enrollments = await db.enrollment.findMany({
+  const enrollments = await tx.enrollment.findMany({
     where: {
       schoolYear,
       scheduledGroup: { courseId, city, schoolYear },
@@ -129,9 +136,9 @@ async function syncSeasonMonths(
   }
 
   if (toCreate.length > 0) {
-    await db.enrollmentMonth.createMany({ data: toCreate, skipDuplicates: true })
+    await tx.enrollmentMonth.createMany({ data: toCreate, skipDuplicates: true })
   }
   if (toDelete.length > 0) {
-    await db.enrollmentMonth.deleteMany({ where: { id: { in: toDelete } } })
+    await tx.enrollmentMonth.deleteMany({ where: { id: { in: toDelete } } })
   }
 }

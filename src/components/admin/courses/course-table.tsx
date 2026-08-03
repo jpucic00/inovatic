@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Wrench, Trash2, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { CopyLinkButton } from './copy-link-button'
+import { croatianPlural } from '@/lib/format'
 import { publicSignupPath } from '@/lib/signup-links'
 import {
   Dialog,
@@ -136,7 +137,7 @@ function CourseCard({ course, editable }: Readonly<{ course: Course; editable: b
               className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-1.5 rounded-md hover:bg-cyan-100 transition-colors"
             >
               <Users className="w-3.5 h-3.5" />
-              {groupCount} {groupCount >= 2 && groupCount <= 4 ? 'grupe' : 'grupa'}
+              {groupCount} {croatianPlural(groupCount, 'grupa', 'grupe', 'grupa')}
             </Link>
           )}
           {editable && (

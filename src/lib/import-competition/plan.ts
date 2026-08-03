@@ -305,9 +305,25 @@ export function buildCompetitionPlan(
   const duplicated = duplicatedTeamLabels(groupSheets)
 
   // ── 1. Group tabs define the groups + rosters + staff ──────────────────────
+  const claimedSlots = new Map<string, string>()
   for (const sheet of groupSheets) {
     const where = `group tab "${sheet.tabName}"`
     const key = slotKey(sheet.slot)
+
+    // Two tabs normalizing to one slot ('SUB 900-1030' and 'SUB 9:00-10:30')
+    // would silently merge both rosters into whichever group is applied last —
+    // the same fail-loud rule as an ambiguous izvješće block: refuse, never
+    // guess.
+    const claimedBy = claimedSlots.get(key)
+    if (claimedBy) {
+      warnings.push({
+        level: 'error',
+        where,
+        message: `tab "${claimedBy}" already covers ${sheet.slot.dayOfWeek} ${sheet.slot.startTime ?? '(any time)'} — two tabs for one slot would merge their rosters into a single group, so this tab is skipped; rename or remove one of them first`,
+      })
+      continue
+    }
+    claimedSlots.set(key, sheet.tabName)
 
     const sameDay = snapshot.groups.filter((g) => g.dayOfWeek === sheet.slot.dayOfWeek)
     // A tab without a time can only be matched on its weekday.
