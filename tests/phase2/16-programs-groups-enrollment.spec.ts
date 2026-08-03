@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
+import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 import { fillInquiryStep1 } from '../helpers/upisi'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -21,8 +22,6 @@ import { fillInquiryStep1 } from '../helpers/upisi'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const BASE = 'http://localhost:3000'
-const ADMIN_EMAIL = 'jpucic00@gmail.com'
-const ADMIN_PASSWORD = 'admin123'
 
 // Unique per run so test data is identifiable and doesn't collide between runs
 const RUN_ID = Date.now().toString().slice(-6)
@@ -101,11 +100,12 @@ const RAD_PARENT_2 = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Delegates to the shared panel-aware helper: the seeded admin can hold a
+// TeacherAssignment, which turns login into the dual-role panel chooser —
+// driving the form here and waiting for /admin hangs on a login that
+// actually SUCCEEDED (see .claude/validate.md decisions log, 2026-07-27).
 async function loginAsAdmin(page: Page) {
-  await page.goto(`${BASE}/prijava`)
-  await page.locator('#identifier').fill(ADMIN_EMAIL)
-  await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
+  await sharedLoginAsAdmin(page)
   await page.waitForLoadState('networkidle')
 }
 
@@ -202,7 +202,9 @@ async function openProgramWindow(page: Page, groupName: string, isRadionica: boo
     /\/admin\/programi\//,
   )
 
-  await page.getByRole('button', { name: 'Uredi', exact: true }).first().click()
+  // The header's course-edit dialog is ALSO labelled "Uredi" on radionice
+  // (CourseFormDialog trigger) — target the window editor by its title.
+  await page.locator('button[title="Uredi prozor upisa"]').click()
   const start = page.locator('#window-start')
   await start.fill('01.01.2025')
   await start.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
@@ -307,7 +309,7 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     test('standard SLR programs offer no "Uredi" button', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
-      const slr1Card = page.locator('a.rounded-lg').filter({
+      const slr1Card = page.locator('div.rounded-lg').filter({
         has: page.getByRole('heading', { level: 3, name: /Robotike 1/ }),
       })
       await expect(slr1Card.getByRole('button', { name: 'Uredi' })).toHaveCount(0)
@@ -316,9 +318,9 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     test('standard SLR courses cannot be deleted (no delete button)', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/programi`)
-      // Standard SLR programs render as clickable <Link> rows (<a class="…rounded-lg">),
-      // not deletable cards — opening a program just navigates to its detail page.
-      const slr1Card = page.locator('a.rounded-lg').filter({
+      // Standard SLR programs render as <div class="…rounded-lg"> rows whose
+      // inner <Link> navigates to the detail page — not deletable cards.
+      const slr1Card = page.locator('div.rounded-lg').filter({
         has: page.getByRole('heading', { level: 3, name: /Robotike 1/ }),
       })
       await expect(slr1Card).toBeVisible()
@@ -441,7 +443,9 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await expect(page.locator('tr', { hasText: STD_GROUP_NAME }).first()).toBeVisible()
       await page.locator('button', { hasText: 'Radionice' }).last().click()
       await expect(page.locator(`text=${RADIONICA_GROUP_NAME}`).first()).toBeVisible()
-      await page.locator('button', { hasText: 'Robotike 1' }).first().click()
+      // The per-program tabs became filter chips (538b655) — standard programs
+      // filter by their SLR level chip, not by course title.
+      await page.locator('button', { hasText: 'SLR 1' }).first().click()
       // The program window opened above (2025-01-01 → 2027-12-31) is currently
       // open and inherited by every group, so the badge should read "Otvoreno".
       const stdRow = page.locator('tr', { hasText: STD_GROUP_NAME })

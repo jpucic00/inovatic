@@ -267,4 +267,21 @@ describe('getCurrentActiveModuleForGroup', () => {
       })?.id,
     ).toBe('M1')
   })
+
+  it('returns null for COMPETITION even with dated schedules — natjecanja are never narrowed', () => {
+    // Identical input picks M2 for STANDARD (asserted above); the kind guard
+    // alone must turn it off, otherwise the app would narrow a competition
+    // group's materials/gallery to one "active" natjecanje.
+    expect(
+      getCurrentActiveModuleForGroup({
+        kind: 'COMPETITION',
+        dayOfWeek: 'Srijeda',
+        modules: STD_MODULES,
+        schoolYear: SCHOOL_YEAR,
+        city: 'SPLIT' as const,
+        holidayDates: new Set(),
+        now: utc(2026, 11, 18),
+      }),
+    ).toBeNull()
+  })
 })

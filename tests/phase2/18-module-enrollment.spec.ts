@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
-import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
+import { clickUntilVisible } from '../helpers/hydration'
+import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 8 — Module Enrollment + School-Year Historization
@@ -21,8 +22,6 @@ import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const BASE = 'http://localhost:3000'
-const ADMIN_EMAIL = 'jpucic00@gmail.com'
-const ADMIN_PASSWORD = 'admin123'
 
 const RUN_ID = Date.now().toString().slice(-6)
 
@@ -50,11 +49,12 @@ const SHIFT_DATES = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// Delegates to the shared panel-aware helper: the seeded admin can hold a
+// TeacherAssignment, which turns login into the dual-role panel chooser —
+// driving the form here and waiting for /admin hangs on a login that
+// actually SUCCEEDED (see .claude/validate.md decisions log, 2026-07-27).
 async function loginAsAdmin(page: Page) {
-  await page.goto(`${BASE}/prijava`)
-  await page.locator('#identifier').fill(ADMIN_EMAIL)
-  await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
-  await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/admin`)
+  await sharedLoginAsAdmin(page)
   await page.waitForLoadState('networkidle')
 }
 

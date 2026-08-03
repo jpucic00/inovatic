@@ -393,4 +393,37 @@ describe('inspectCompetitionWorkbook', () => {
     expect(out).toContain('no known caption')
     expect(out).not.toContain('Horvatinčić')
   })
+
+  it('masks the other cells of a row recognized through a caption-word VALUE', () => {
+    // 'Inovacije' is a rubric caption AND a legitimate preporuka value, so a
+    // data row can be classified 'recognized' — its name cells must still be
+    // masked; only the known caption itself may print.
+    const grid: Grid = [
+      ['Marijana', 'Horvatinčić', 'Inovacije'],
+    ]
+    const out = inspectCompetitionWorkbook([{ name: 'Info', grid }]).join('\n')
+    expect(out).not.toContain('Marijana')
+    expect(out).not.toContain('Horvatinčić')
+    expect(out).toContain('INOVACIJE')
+  })
+
+  it('treats a Date cell as data — a roster row with a DOB never reads as a header', () => {
+    const grid: Grid = [
+      ['Marijana', 'Horvatinčić', 'Inovacije', new Date(Date.UTC(2014, 2, 12))],
+    ]
+    const out = inspectCompetitionWorkbook([{ name: 'Info', grid }]).join('\n')
+    expect(out).not.toContain('Marijana')
+    expect(out).not.toContain('2014')
+  })
+
+  it('masks an unknown label head — a note starting with a name must not print it', () => {
+    const grid: Grid = [
+      ['Marijana Horvatinčić: ispisana 3. mj.'],
+    ]
+    const out = inspectCompetitionWorkbook([{ name: 'Info', grid }]).join('\n')
+    expect(out).not.toContain('Marijana')
+    expect(out).not.toContain('MARIJANA')
+    expect(out).not.toContain('Horvatinčić')
+    expect(out).not.toContain('HORVATINCIC')
+  })
 })

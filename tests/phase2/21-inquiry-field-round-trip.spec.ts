@@ -148,3 +148,86 @@ test.describe.serial('Inquiry field round-trip — childGrade + referralSource',
     await expect(detailValue(page, 'Izvor saznanja')).toHaveText('Nije navedeno')
   })
 })
+
+// ─── Competition-only answers round-trip ─────────────────────────────────────
+// "Ne odgovara mi predloženi termin" is an ANSWER, not a skipped question: it
+// satisfies the termin requirement on the competition signup link and the admin
+// must read it back in the same Željeni termin row a chosen group would use.
+// Also round-trips a srednja-škola grade — the other competition-only answer.
+
+const COMPETITION_INQUIRY = {
+  parentName: `Round Natjecatelj ${RUN_ID}`,
+  parentEmail: `round.natjecatelj.${RUN_ID}@test.com`,
+  parentPhone: '0919887766',
+  childFirstName: 'Vito',
+  childLastName: `Round ${RUN_ID}`,
+  dobDay: '9',
+  dobMonth: '02',
+  dobYear: '2010',
+  grade: 'ss1',
+  referralSource: '',
+}
+
+test.describe.serial('noSuitableTermin round-trip — competition signup link', () => {
+  test('admin opens the competition enrollment window', async ({ page }) => {
+    test.setTimeout(120000)
+    await loginAsAdmin(page)
+    await page.goto(`${BASE}/admin/programi`)
+    await page
+      .locator('a[href^="/admin/programi/"]', { hasText: 'Natjecateljski program' })
+      .first()
+      .click()
+    await page.waitForURL(/\/admin\/programi\/[a-z0-9]+/)
+
+    // Same editor spec 16 drives — the header's course-edit "Uredi" doesn't
+    // exist here (COMPETITION isn't editable), but target by title anyway.
+    await page.locator('button[title="Uredi prozor upisa"]').click()
+    const start = page.locator('#window-start')
+    await start.fill('01.01.2025')
+    await start.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+    const end = page.locator('#window-end')
+    await end.fill('31.12.2027')
+    await end.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
+    await page.getByRole('button', { name: 'Spremi' }).click()
+    await expect(page.getByText('Prozor upisa spremljen.')).toBeVisible({ timeout: 10000 })
+  })
+
+  test('parent submits with "Ne odgovara mi predloženi termin" and a srednja-škola grade', async ({ page }) => {
+    test.setTimeout(120000)
+    await page.goto(`${BASE}/upisi/natjecateljski-program`)
+
+    await fillInquiryStep1(page, COMPETITION_INQUIRY)
+
+    await page.locator('#childFirstName').fill(COMPETITION_INQUIRY.childFirstName)
+    await page.locator('#childLastName').fill(COMPETITION_INQUIRY.childLastName)
+    await page.locator('#dob-day').selectOption(COMPETITION_INQUIRY.dobDay)
+    await page.locator('#dob-month').selectOption(COMPETITION_INQUIRY.dobMonth)
+    await page.locator('#dob-year').selectOption(COMPETITION_INQUIRY.dobYear)
+    await clickUntilVisible(
+      page.locator('button', { hasText: 'Dalje' }),
+      page.locator('input[name="consent"]'),
+    )
+
+    // Srednja škola exists only on this link's grade list.
+    await page.locator('select[name="grade"]').selectOption(COMPETITION_INQUIRY.grade)
+    // The one dropdown that answers two ways: pick the refusal, not a group.
+    const terminSelect = page.locator('select#scheduledGroupId')
+    await expect(terminSelect).toBeVisible({ timeout: 10000 })
+    await terminSelect.selectOption('no-suitable-termin')
+    await page.locator('input[name="consent"]').check()
+    await clickUntilVisible(
+      page.locator('button', { hasText: 'Pošalji upit' }),
+      page.locator('text=Upit je poslan!'),
+      { timeout: 30000 },
+    )
+  })
+
+  test('admin reads the refusal back in the Željeni termin row', async ({ page }) => {
+    await loginAsAdmin(page)
+    await openInquiryDetail(page, COMPETITION_INQUIRY.parentName)
+    await expect(detailValue(page, 'Željeni termin')).toContainText(
+      'Ne odgovara mi predloženi termin',
+    )
+    await expect(detailValue(page, 'Razred')).toHaveText('Srednja škola – 1. razred')
+  })
+})

@@ -209,3 +209,46 @@ describe('getGroupAttendance — radionica session enumeration', () => {
     expect(data.otherDates).toEqual([])
   })
 })
+
+describe('updateGroup — radionica school-year guard', () => {
+  it('rejects re-pointing a group at another year\'s radionica, same as createGroup', async () => {
+    const admin = await createAdmin()
+    const radionica = await fx.course({ kind: 'RADIONICA', schoolYear: SY })
+    const staleRadionica = await fx.course({ kind: 'RADIONICA', schoolYear: '2025/2026' })
+    const location = await fx.location()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const res = await createGroupAction({
+      courseId: radionica.id,
+      locationId: location.id,
+      name: 'Radionica za godišnji guard',
+      dateStart: '2026-07-15',
+      dateEnd: '2026-07-21',
+      dayOfWeek: '',
+      startTime: '09:00',
+      endTime: '11:00',
+      maxStudents: 12,
+    })
+    expect(res.success).toBe(true)
+    const group = fx.trackGroup(
+      await db.scheduledGroup.findFirstOrThrow({
+        where: { name: 'Radionica za godišnji guard' },
+      }),
+    )
+
+    // The dropdown only offers this year's radionice; a crafted update must be
+    // refused with the same message createGroup uses.
+    const crossYear = await updateGroup({ id: group.id, courseId: staleRadionica.id })
+    expect(crossYear.success).toBe(false)
+    if (!crossYear.success) {
+      expect(crossYear.error).toBe('Odabrani program ne pripada ovoj školskoj godini.')
+    }
+    const unchanged = await db.scheduledGroup.findUniqueOrThrow({ where: { id: group.id } })
+    expect(unchanged.courseId).toBe(radionica.id)
+
+    // A same-year radionica remains a legal retarget.
+    const sameYear = await fx.course({ kind: 'RADIONICA', schoolYear: SY })
+    const ok = await updateGroup({ id: group.id, courseId: sameYear.id })
+    expect(ok.success).toBe(true)
+  })
+})

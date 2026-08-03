@@ -64,6 +64,10 @@ const PARENT = {
  * data is untouchable — which is itself the property this journey guards.
  */
 async function wipeSibenikTenant() {
+  // TeacherAttendance is onDelete: Restrict (payout evidence) — a previous
+  // journey run books Slavica's hours, and scheduledGroup.deleteMany below
+  // would trip the FK without this.
+  await db.teacherAttendance.deleteMany({ where: { scheduledGroup: { city: 'SIBENIK' } } })
   await db.attendance.deleteMany({ where: { enrollment: { scheduledGroup: { city: 'SIBENIK' } } } })
   await db.moduleEnrollment.deleteMany({ where: { enrollment: { scheduledGroup: { city: 'SIBENIK' } } } })
   await db.studentComment.deleteMany({ where: { group: { city: 'SIBENIK' } } })
@@ -120,9 +124,10 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
     await expect(page.getByText(/Plan školske godine spremljen/)).toBeVisible({ timeout: 15000 })
     await expect(page.getByRole('heading', { name: /Planiraj školsku godinu/ })).toBeHidden()
 
-    // 4 shared SLR courses × 4 modules, stamped with HER city.
+    // 5 shared standard programs (Uvod + SLR 1–4) × 4 modules, stamped with
+    // HER city — the Uvod split (adb1635) grew the ladder from 4 to 5.
     const sibRows = await db.moduleSchedule.count({ where: { schoolYear: CY, city: 'SIBENIK' } })
-    expect(sibRows).toBe(16)
+    expect(sibRows).toBe(20)
   })
 
   await test.step('creates the Trokut group — dropdowns offer only her city', async () => {

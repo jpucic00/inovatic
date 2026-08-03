@@ -135,4 +135,27 @@ describe('previewEmailSchema', () => {
       }).success,
     ).toBe(true)
   })
+
+  it('rejects an EVALUATION campaign selected by preporuka — a preporuka names children, not cards', () => {
+    const parsed = sendEmailCampaignSchema.safeParse({
+      kind: 'EVALUATION',
+      sourceSchoolYear: '2025/2026',
+      recommendations: ['COMPETITION_PROGRAM'],
+      ...content,
+    })
+    expect(parsed.success).toBe(false)
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toBe('Evaluacije se šalju odabirom grupa.')
+    }
+  })
+
+  it('accepts an EVALUATION campaign by groups with per-card exclusions', () => {
+    const parsed = sendEmailCampaignSchema.safeParse({
+      kind: 'EVALUATION',
+      ...baseFilters,
+      ...content,
+      excludedAssessmentIds: ['assessment-1'],
+    })
+    expect(parsed.success).toBe(true)
+  })
 })

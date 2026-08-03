@@ -20,10 +20,12 @@ import {
   createCourseSeason,
   createEnrollment,
   createEnrollmentWindow,
+  createMaterial,
   createModule,
   createStudent,
   createTeacher,
 } from './helpers/factory'
+import { buildGroupMaterialsView } from '@/lib/group-materials-view'
 import { fixtureScope } from './helpers/cleanup'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -367,8 +369,10 @@ describe('monthly charges', () => {
     expect(await db.moduleEnrollment.count({ where: { enrollmentId: enrollment.id } })).toBe(0)
 
     // Charging starts at the join month, never at the (2020) season start.
+    // UTC accessors, because seasonMonths floors on the UTC month — the local
+    // month differs from it for ~2h around each month boundary on UTC+2.
     const now = new Date()
-    const firstOfThisMonth = Date.UTC(now.getFullYear(), now.getMonth(), 1)
+    const firstOfThisMonth = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
     expect(months[0].periodStart.getTime()).toBe(firstOfThisMonth)
   })
 
@@ -760,5 +764,55 @@ describe('the competition report card grades a different practical rubric', () =
     expect(row.programiranje).toBe('U_RAZVOJU')
     expect(row.razradaIdeja).toBeNull()
     expect(row.izvedivost).toBeNull()
+  })
+})
+
+// ─── Materials are never narrowed for a competition group ────────────────────
+
+describe('materials view shows every natjecanje at once', () => {
+  it('emits all module sections with their MODULE materials, none marked active', async () => {
+    const course = await competitionCourse()
+    const group = await fx.group({
+      courseId: course.id,
+      schoolYear: SY,
+      city: 'SPLIT',
+      dayOfWeek: 'Utorak',
+    })
+    const modules = await db.courseModule.findMany({
+      where: { courseId: course.id },
+      orderBy: { sortOrder: 'asc' },
+    })
+    const teacher = await createTeacher()
+    for (const m of modules) {
+      await createMaterial({
+        scope: 'MODULE',
+        courseId: course.id,
+        moduleId: m.id,
+        title: `Materijal ${m.title}`,
+        uploadedById: teacher.id,
+      })
+    }
+    await createMaterial({
+      scope: 'COURSE',
+      courseId: course.id,
+      title: 'Za cijeli program',
+      uploadedById: teacher.id,
+    })
+
+    const view = await buildGroupMaterialsView(group.id)
+
+    // Which natjecanje a team attends lives in the group NAME, not the data —
+    // so the view must never narrow to one "active" module for COMPETITION.
+    expect(view.activeModuleId).toBeNull()
+    expect(view.moduleSections.map((s) => s.title)).toEqual([
+      'World Robot Olympiad',
+      'Pripreme za natjecanja',
+    ])
+    expect(view.moduleSections.every((s) => s.isActive === false)).toBe(true)
+    // Every section still carries its own MODULE material.
+    for (const section of view.moduleSections) {
+      expect(section.buckets.links.map((i) => i.title)).toEqual([`Materijal ${section.title}`])
+    }
+    expect(view.programMaterials.links.map((i) => i.title)).toEqual(['Za cijeli program'])
   })
 })

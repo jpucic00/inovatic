@@ -251,4 +251,21 @@ describe('buildCompetitionPlan — students', () => {
     const plan = buildCompetitionPlan(sheets, [], snapshot({ seasonMonths: [], season: null }), warnings)
     expect(plan.warnings.some((w) => w.message.includes('No CourseSeason dates'))).toBe(true)
   })
+
+  it('refuses a second tab that normalizes to an already-claimed slot instead of merging rosters', () => {
+    const warnings: ImportWarning[] = []
+    // 'SUB 900-1030' and 'SUB 0900-1030' both normalize to Subota 9:00 — apply
+    // would silently pour both rosters into whichever group registers last.
+    const a = groupSheet('SUB 900-1030', 'PRIPREME ZA NATJECANJA', ['IVANO TABAK'], [['ANA', 'ANIĆ']], warnings)
+    const b = groupSheet('SUB 0900-1030', 'WRO TIM', ['PERO PERIĆ'], [['IVO', 'IVIĆ']], warnings)
+    const plan = buildCompetitionPlan([a, b], [], snapshot(), warnings)
+
+    expect(plan.groups).toHaveLength(1)
+    expect(plan.groups[0].name).toBe('PRIPREME ZA NATJECANJA')
+    // Only the first tab's child is enrolled — nothing from the skipped tab.
+    expect(plan.enrollments).toHaveLength(1)
+    expect(
+      plan.warnings.some((w) => w.level === 'error' && w.message.includes('already covers')),
+    ).toBe(true)
+  })
 })

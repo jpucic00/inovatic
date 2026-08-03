@@ -1604,3 +1604,64 @@ describe('sendEmailCampaign — EVALUATION', () => {
     expect(row?.gradedCount).toBe(1)
   })
 })
+
+describe('overlapping runs of one campaign', () => {
+  it('sends each recipient exactly once when two resumes race', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    setCookie(TARGET_YEAR)
+
+    // Hand-written cohort: a CUSTOM campaign (sentKey stays null, so the
+    // cross-campaign unique index protects nothing here) with PENDING rows —
+    // exactly what a deploy-killed send leaves behind.
+    const campaign = await db.emailCampaign.create({
+      data: {
+        city: 'SPLIT',
+        kind: 'CUSTOM',
+        sourceSchoolYear: SOURCE_YEAR,
+        sourceGroupIds: [],
+        sourceRecommendations: [],
+        subject: 'Obavijest',
+        bodyText: 'Tekst poruke.',
+        sentById: admin.id,
+        totalCount: 6,
+      },
+    })
+    const emails = Array.from({ length: 6 }, (_, i) => `overlap.${i}@test.hr`)
+    await db.emailCampaignRecipient.createMany({
+      data: emails.map((e, i) => ({
+        campaignId: campaign.id,
+        parentEmail: e,
+        status: 'PENDING' as const,
+        childNames: [`Dijete ${i}`],
+      })),
+    })
+
+    // Both runs load the same PENDING snapshot and race the per-row claims.
+    const [a, b] = await Promise.all([
+      resumeEmailCampaign(campaign.id),
+      resumeEmailCampaign(campaign.id),
+    ])
+    expect(a.success).toBe(true)
+    expect(b.success).toBe(true)
+
+    // The PENDING-conditioned claim makes the overlap per-row exclusive:
+    // nobody is mailed twice, nobody is left behind.
+    const tos = sendMock.mock.calls
+      .map((c) => c[0].to as string)
+      .sort((x, y) => x.localeCompare(y))
+    expect(tos).toEqual(emails)
+
+    const after = await db.emailCampaign.findUniqueOrThrow({
+      where: { id: campaign.id },
+      select: { sentCount: true, failedCount: true },
+    })
+    expect(after.sentCount).toBe(6)
+    expect(after.failedCount).toBe(0)
+    expect(
+      await db.emailCampaignRecipient.count({
+        where: { campaignId: campaign.id, status: 'PENDING' },
+      }),
+    ).toBe(0)
+  })
+})
