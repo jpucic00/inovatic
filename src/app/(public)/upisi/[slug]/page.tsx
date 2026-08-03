@@ -4,16 +4,18 @@ import type { City } from '@prisma/client'
 import { db } from '@/lib/db'
 import { CITY_VALUES } from '@/lib/city'
 import { GRADE_VALUES } from '@/lib/inquiry-status'
-import { isCompetition } from '@/lib/program-kind'
+import { isCompetition, isRadionica } from '@/lib/program-kind'
 import { getCourseBySlug } from '@/lib/courses-data'
 import { getSignupProgram, type ActiveProgram } from '@/actions/public/programs'
 import { InquiryForm } from '@/components/public/inquiry-form'
+import { SignupContactBox } from '@/components/public/signup-contact-box'
 
 export const dynamic = 'force-dynamic'
 
 interface Props {
   params: Promise<{ slug: string }>
 }
+
 
 /**
  * Per-program signup link.
@@ -70,7 +72,7 @@ export default async function ProgramSignupPage({ params }: Readonly<Props>) {
 
   // A radionica has its own /radionice/<slug> page with its marketing copy;
   // sending its signups through a second URL would fragment them.
-  if (course.kind === 'RADIONICA') notFound()
+  if (isRadionica(course.kind)) notFound()
 
   // A city-bound program is offered in that city only; shared ones (SLR and the
   // competitive program) let the parent pick, exactly like /upisi.
@@ -88,6 +90,15 @@ export default async function ProgramSignupPage({ params }: Readonly<Props>) {
   // competitive program and any other DB-authored program use their own row.
   const staticCourse = getCourseBySlug(slug)
   const subtitle = staticCourse?.subtitle ?? course.subtitle
+
+  const inquiryFormProps = {
+    programsByCity,
+    preselectedCourseId: course.id,
+    ...(course.city ? { preselectedCity: course.city } : {}),
+    // Competitors carry on past 8. razred; every other program keeps the
+    // osnovna-škola default.
+    ...(competition ? { gradeOptions: GRADE_VALUES } : {}),
+  }
 
   return (
     <>
@@ -130,31 +141,13 @@ export default async function ProgramSignupPage({ params }: Readonly<Props>) {
                 where the program is already decided — the selling points belong on
                 the public /upisi catalog, not on a link someone was sent. */}
             <div className="lg:col-span-2 space-y-6 order-1 lg:order-none">
-              <div className="bg-cyan-50 rounded-xl p-4 border border-cyan-100 text-sm text-gray-500 space-y-1">
-                <p className="font-medium text-gray-700">Imate pitanja?</p>
-                <a
-                  href="mailto:prijave@udruga-inovatic.hr"
-                  className="text-cyan-500 hover:underline block"
-                >
-                  prijave@udruga-inovatic.hr
-                </a>
-                <a href="tel:+385993936993" className="text-cyan-500 hover:underline block">
-                  +385 99 393 6993
-                </a>
-              </div>
+              <SignupContactBox />
             </div>
 
             <div className="lg:col-span-3 order-2 lg:order-none">
               <div className="bg-white rounded-2xl border border-cyan-100 ring-1 ring-cyan-50 shadow-sm p-7">
                 {anyOpen ? (
-                  <InquiryForm
-                    programsByCity={programsByCity}
-                    preselectedCourseId={course.id}
-                    {...(course.city ? { preselectedCity: course.city } : {})}
-                    // Competitors carry on past 8. razred; every other program
-                    // keeps the osnovna-škola default.
-                    {...(competition ? { gradeOptions: GRADE_VALUES } : {})}
-                  />
+                  <InquiryForm {...inquiryFormProps} />
                 ) : (
                   <div className="text-center py-8">
                     <h2 className="font-bold text-gray-900 mb-2">

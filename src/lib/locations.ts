@@ -37,6 +37,12 @@ interface CityContact {
   intro: string
   /** Per-city enrollment inbox (Šibenik uses prijave.sibenik@). */
   upisi: string
+  /**
+   * The city's enrollment phone, shown next to `upisi` in every signup-page
+   * contact box (Split: Jozo, Šibenik: Slavica — same numbers the footer
+   * lists). Display format; strip spaces for the tel: href.
+   */
+  phone: string
   venues: Venue[]
 }
 
@@ -58,6 +64,7 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
     intro:
       'Nastava u Splitu odvija se na dvije lokacije — redovni program u Velebitskoj i natjecateljski programi na Prirodoslovno-matematičkom fakultetu.',
     upisi: 'prijave@udruga-inovatic.hr',
+    phone: '+385 99 393 6993',
     venues: [
       {
         name: 'Velebitska 32',
@@ -105,6 +112,7 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
     intro:
       'Naša nova lokacija (2026.) — isti kurikulum Svijet LEGO Robotike.',
     upisi: 'prijave.sibenik@udruga-inovatic.hr',
+    phone: '+385 92 168 9987',
     venues: [
       {
         name: 'Trokut inkubator',

@@ -3,6 +3,7 @@ import { OG_DEFAULTS } from '@/lib/seo'
 import type { City } from '@prisma/client'
 import { CheckCircle } from 'lucide-react'
 import { InquiryForm } from '@/components/public/inquiry-form'
+import { SignupContactBox } from '@/components/public/signup-contact-box'
 import { getActivePrograms, type ActiveProgram } from '@/actions/public/programs'
 import { CITY_VALUES } from '@/lib/city'
 
@@ -103,18 +104,7 @@ export default async function InquiryPage() {
               </div>
 
               {/* Imate pitanja – desktop only */}
-              <div className="hidden lg:block bg-cyan-50 rounded-xl p-4 border border-cyan-100 text-sm text-gray-500 space-y-1">
-                <p className="font-medium text-gray-700">Imate pitanja?</p>
-                <a href="mailto:info@udruga-inovatic.hr" className="text-cyan-500 hover:underline block">
-                  info@udruga-inovatic.hr
-                </a>
-                <a href="tel:+385993936993" className="text-cyan-500 hover:underline block">
-                  +385 99 393 6993 <span className="text-gray-400">(Split)</span>
-                </a>
-                <a href="tel:+385921689987" className="text-cyan-500 hover:underline block">
-                  +385 92 168 9987 <span className="text-gray-400">(Šibenik)</span>
-                </a>
-              </div>
+              <SignupContactBox className="hidden lg:block" />
             </div>
 
             {/* Form */}
@@ -125,18 +115,7 @@ export default async function InquiryPage() {
             </div>
 
             {/* Imate pitanja – mobile only, below form */}
-            <div className="lg:hidden order-3 bg-cyan-50 rounded-xl p-4 border border-cyan-100 text-sm text-gray-500 space-y-1">
-              <p className="font-medium text-gray-700">Imate pitanja?</p>
-              <a href="mailto:info@udruga-inovatic.hr" className="text-cyan-500 hover:underline block">
-                info@udruga-inovatic.hr
-              </a>
-              <a href="tel:+385993936993" className="text-cyan-500 hover:underline block">
-                +385 99 393 6993 <span className="text-gray-400">(Split)</span>
-              </a>
-              <a href="tel:+385921689987" className="text-cyan-500 hover:underline block">
-                +385 92 168 9987 <span className="text-gray-400">(Šibenik)</span>
-              </a>
-            </div>
+            <SignupContactBox className="lg:hidden order-3" />
           </div>
         </div>
       </section>

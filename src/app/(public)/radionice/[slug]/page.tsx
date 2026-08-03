@@ -4,6 +4,7 @@ import { OG_DEFAULTS } from '@/lib/seo'
 import { db } from '@/lib/db'
 import { getActivePrograms } from '@/actions/public/programs'
 import { InquiryForm } from '@/components/public/inquiry-form'
+import { SignupContactBox } from '@/components/public/signup-contact-box'
 import { CITY_LABELS } from '@/lib/city'
 
 interface Props {
@@ -91,15 +92,7 @@ export default async function WorkshopPage({ params }: Readonly<Props>) {
           <div className="grid lg:grid-cols-5 gap-10">
             {/* Sidebar */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-cyan-50 rounded-xl p-4 border border-cyan-100 text-sm text-gray-500 space-y-1">
-                <p className="font-medium text-gray-700">Imate pitanja?</p>
-                <a href="mailto:prijave@udruga-inovatic.hr" className="text-cyan-500 hover:underline block">
-                  prijave@udruga-inovatic.hr
-                </a>
-                <a href="tel:+385993936993" className="text-cyan-500 hover:underline block">
-                  +385 99 393 6993
-                </a>
-              </div>
+              <SignupContactBox />
             </div>
 
             {/* Form */}
