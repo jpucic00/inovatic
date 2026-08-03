@@ -43,8 +43,10 @@ export async function getCourses() {
       kind: true,
       createdAt: true,
       updatedAt: true,
-      // Shared standard courses have groups in both cities — count own only.
-      _count: { select: { scheduledGroups: { where: { city } } } },
+      // Shared standard courses have groups in both cities and accumulate them
+      // year over year — count only this city's, this year's, so the badge
+      // matches the `/admin/grupe` list it links to.
+      _count: { select: { scheduledGroups: { where: { city, schoolYear: year } } } },
       modules: {
         orderBy: { sortOrder: 'asc' },
         select: {

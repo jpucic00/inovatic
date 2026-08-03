@@ -79,9 +79,10 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       ageMax: true,
       price: true,
       equipment: true,
-      // Shared course, city-scoped view: only the caller's city's groups,
-      // window, and module dates.
-      _count: { select: { scheduledGroups: { where: { city } } } },
+      // Shared course, city- and year-scoped view: only the caller's city's
+      // groups, window, and module dates for the selected year. The group count
+      // links straight to `/admin/grupe`, which lists exactly that set.
+      _count: { select: { scheduledGroups: { where: { city, schoolYear: year } } } },
       enrollmentWindows: {
         where: { schoolYear: year, city },
         select: { enrollmentStart: true, enrollmentEnd: true },
