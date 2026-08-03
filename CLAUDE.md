@@ -164,6 +164,7 @@ npx prisma migrate dev --name <description>
 ## Important
 - `preview_*` tools work — requires macOS Privacy & Security → Files and Folders → Documents Folder access granted to the terminal app. Dev server config is in `.claude/launch.json` (name: `inovatic-dev`, port 3000).
 - SonarQube available locally: `npm run sonar:start`, scan with `npm run sonar:scan`
+- **The favicon is `src/app/icon.svg` alone — never declare `metadata.icons` in `layout.tsx`.** The file convention emits a content-hashed `href` (`/icon.svg?a1484a9a…`), which is the only thing that busts the browser's favicon cache when the art changes; an explicit `metadata.icons` entry overrides it with a bare `/icon.svg` and a redrawn icon then silently never appears (browsers cache favicons in a store that ignores `Cache-Control`). The art mirrors `<RobotHeadSvg>` (`src/components/shared/robot-head-svg.tsx`) — the logo's robot mark — re-centred from its `0 -12 200 162` viewBox into a square `0 -29 200 200`. The full `logo_dark.png` lockup is **not** a favicon candidate: at 1.75:1 it letterboxes away ~43% of the square and the wordmark is unreadable by 16px.
 
 ## Flux task management
 

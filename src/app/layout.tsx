@@ -10,9 +10,6 @@ const inter = Inter({
 const siteUrl = 'https://udruga-inovatic.hr'
 
 export const metadata: Metadata = {
-  icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
-  },
   title: {
     default: 'Inovatic – LEGO Robotika za djecu',
     template: '%s | Inovatic',
