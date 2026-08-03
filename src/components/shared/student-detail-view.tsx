@@ -17,6 +17,17 @@ import { formatDate, formatDateKey } from '@/lib/format'
 
 type StudentWithRelations = StudentDetail
 
+/**
+ * The owed/future boundary for monthly fees, computed HERE — on the server —
+ * so it matches `seasonMonths`' UTC month flooring and hydrates identically in
+ * every viewer timezone. Computing it during client render disagreed with the
+ * SSR pass for ~2h around each month edge (UTC vs local month).
+ */
+function currentUtcMonthStartMs(): number {
+  const now = new Date()
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+}
+
 type CreateCommentAction = (input: {
   studentId: string
   groupId: string
@@ -223,6 +234,7 @@ export function StudentDetailView({
       {/* Year-dependent sections: one selector drives groups + attendance + notes */}
       <StudentYearSections
         studentId={student.id}
+        currentMonthStartMs={currentUtcMonthStartMs()}
         defaultYear={defaultYear}
         enrollments={student.enrollments}
         attendance={attendance}

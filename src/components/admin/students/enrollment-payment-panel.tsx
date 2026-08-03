@@ -28,6 +28,13 @@ type PaymentMonth = {
 
 interface Props {
   enrollmentId: string
+  /**
+   * Server-computed UTC month start (ms). Passed down rather than read from
+   * `new Date()` here: a client-render clock disagrees with the SSR pass for
+   * ~2h around each month edge (hydration mismatch) and anchors "owed" to the
+   * viewer's local month instead of the UTC months `seasonMonths` bills in.
+   */
+  currentMonthStartMs: number
   kind: ProgramKind
   fullYearPaidAt: Date | null
   modules: PaymentModule[]
@@ -49,6 +56,7 @@ function shortMonthLabel(periodStart: Date): string {
  */
 function MonthlyPaymentSection({
   months,
+  currentMonthStartMs,
   yearPaid,
   fullYearPaidAt,
   yearBusy,
@@ -58,6 +66,7 @@ function MonthlyPaymentSection({
   onToggleMonth,
 }: Readonly<{
   months: PaymentMonth[]
+  currentMonthStartMs: number
   yearPaid: boolean
   fullYearPaidAt: Date | null
   yearBusy: boolean
@@ -66,10 +75,6 @@ function MonthlyPaymentSection({
   onToggleYear: () => void
   onToggleMonth: (m: PaymentMonth) => void
 }>) {
-  // Compared against the first of the CURRENT month, so a month flips to owed
-  // on the 1st — the same boundary `isEnrollmentPending` uses.
-  const now = new Date()
-  const currentMonth = Date.UTC(now.getFullYear(), now.getMonth(), 1)
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-200">
@@ -113,7 +118,9 @@ function MonthlyPaymentSection({
           {months.map((m) => {
             const busy = isPending && pendingId === m.enrollmentMonthId
             const paid = m.paidAt !== null || yearPaid
-            const future = m.periodStart.getTime() > currentMonth
+            // A month flips to owed on the 1st — the same UTC boundary
+            // `isEnrollmentPending` and `seasonMonths` use.
+            const future = m.periodStart.getTime() > currentMonthStartMs
             const label = shortMonthLabel(m.periodStart)
 
             if (yearPaid) {
@@ -270,6 +277,7 @@ function ModulePaymentChip({
 
 export function EnrollmentPaymentPanel({
   enrollmentId,
+  currentMonthStartMs,
   kind,
   fullYearPaidAt,
   modules,
@@ -345,6 +353,7 @@ export function EnrollmentPaymentPanel({
     return (
       <MonthlyPaymentSection
         months={months}
+        currentMonthStartMs={currentMonthStartMs}
         yearPaid={yearPaid}
         fullYearPaidAt={fullYearPaidAt}
         yearBusy={yearBusy}

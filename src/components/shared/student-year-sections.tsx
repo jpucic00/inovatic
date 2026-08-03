@@ -38,6 +38,8 @@ type ClearAssessmentAction = (input: {
 
 interface Props {
   studentId: string
+  /** Server-computed UTC month start (ms) — the monthly-fee owed/future boundary. */
+  currentMonthStartMs: number
   /** Year the selector opens on — admin: nav-selected cookie year; teacher: computed current year. */
   defaultYear: string
   enrollments: StudentEnrollments
@@ -64,6 +66,7 @@ interface Props {
  */
 export function StudentYearSections({
   studentId,
+  currentMonthStartMs,
   defaultYear,
   enrollments,
   attendance,
@@ -199,6 +202,7 @@ export function StudentYearSections({
                   {isAdmin && (
                     <EnrollmentPaymentPanel
                       enrollmentId={enrollment.id}
+                      currentMonthStartMs={currentMonthStartMs}
                       kind={sg.course.kind}
                       fullYearPaidAt={enrollment.fullYearPaidAt}
                       modules={enrollment.moduleEnrollments.map((me) => ({

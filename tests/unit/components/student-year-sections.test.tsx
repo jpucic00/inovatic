@@ -151,6 +151,9 @@ function renderSections(
   return render(
     <StudentYearSections
       studentId="student-1"
+      // Deterministic boundary (2026-11-01 UTC) — what the server computes in
+      // prod; tests must not read the real clock.
+      currentMonthStartMs={Date.UTC(2026, 10, 1)}
       defaultYear="2026/2027"
       enrollments={[]}
       attendance={[]}
