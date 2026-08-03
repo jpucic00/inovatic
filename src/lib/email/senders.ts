@@ -3,7 +3,9 @@ import { render } from '@react-email/components'
 import type { City } from '@prisma/client'
 import type { EvaluationCard } from '@/lib/evaluation-email-cards'
 import { ASSOCIATION_EMAIL, sendTransactionalEmail } from './client'
-import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
+import InquiryConfirmationEmail, {
+  type InquiryNextStep,
+} from '../../../emails/inquiry-confirmation'
 import PartyInquiryConfirmationEmail from '../../../emails/party-inquiry-confirmation'
 import StemEducationInquiryEmail from '../../../emails/stem-education-inquiry'
 import StemEducationConfirmationEmail from '../../../emails/stem-education-confirmation'
@@ -37,6 +39,14 @@ export function sendInquiryConfirmationEmail(params: {
   childDateOfBirth: string
   cityLabel?: string
   courseLevelPref?: string
+  /** Which "what happens next" paragraph closes the body. */
+  nextStep?: InquiryNextStep
+  /**
+   * Already-formatted radionica deposit ("30,00 eura"), which adds the
+   * akontacija payment instruction to the body. Radionica sign-ups only — the
+   * caller decides, since only it knows which program the inquiry landed on.
+   */
+  depositAmount?: string
 }): Promise<boolean> {
   return sendTransactionalEmail({
     to: params.to,
@@ -47,6 +57,8 @@ export function sendInquiryConfirmationEmail(params: {
       childDateOfBirth: params.childDateOfBirth,
       cityLabel: params.cityLabel,
       courseLevelPref: params.courseLevelPref,
+      nextStep: params.nextStep,
+      depositAmount: params.depositAmount,
     }),
   })
 }

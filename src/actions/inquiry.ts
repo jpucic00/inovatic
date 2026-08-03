@@ -3,7 +3,11 @@
 import { Prisma } from '@prisma/client'
 import type { City, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
-import { sendInquiryConfirmationEmail, sendPartyInquiryConfirmationEmail } from '@/lib/email'
+import {
+  sendInquiryConfirmationEmail,
+  sendPartyInquiryConfirmationEmail,
+  type InquiryNextStep,
+} from '@/lib/email'
 import {
   inquirySchema,
   partyInquirySchema,
@@ -21,6 +25,7 @@ import { CITY_LABELS } from '@/lib/city'
 import { computeSchoolYear } from '@/lib/school-year'
 import { isHighSchoolGrade } from '@/lib/inquiry-status'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
+import { radionicaDepositAmount } from '@/lib/radionica-deposit'
 import { isRadionicaOpenForSignup } from '@/lib/session-dates'
 
 // Thrown when a submitted group does not belong to the submitted city — a
@@ -40,8 +45,8 @@ class RadionicaStartedError extends Error {}
 async function resolveTargetCourse(
   scheduledGroupId: string | undefined,
   courseId: string | undefined,
-): Promise<{ id: string; slug: string; kind: ProgramKind } | null> {
-  const select = { id: true, slug: true, kind: true } as const
+): Promise<{ id: string; slug: string; kind: ProgramKind; price: number | null } | null> {
+  const select = { id: true, slug: true, kind: true, price: true } as const
   if (scheduledGroupId) {
     const group = await db.scheduledGroup.findUnique({
       where: { id: scheduledGroupId },
@@ -68,6 +73,22 @@ async function loadProgramsForCheck(
     return program ? [program] : []
   }
   return getActivePrograms(city)
+}
+
+/**
+ * What the confirmation e-mail should promise the parent. Since the form gained
+ * its termin dropdown most parents book their own slot, so the blanket "we will
+ * contact you with available termini" is only true for the two cases where no
+ * slot was taken: none was on offer, or the competitive program's parent said
+ * none of the offered ones suit them.
+ */
+function inquiryNextStep(
+  scheduledGroupId: string | undefined,
+  noSuitableTermin: boolean | undefined,
+): InquiryNextStep {
+  if (scheduledGroupId) return 'TERMIN_CHOSEN'
+  if (noSuitableTermin) return 'TERMIN_TO_ARRANGE'
+  return 'TERMIN_TO_OFFER'
 }
 
 type InquiryActionResult =
@@ -256,6 +277,18 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     return submitInquiryErrorResult(err, city, targetCourse)
   }
 
+  // Radionice are confirmed by a booking deposit, so their confirmation e-mail
+  // carries the payment instruction; SLR and natjecateljski sign-ups are settled
+  // later and get the plain confirmation. Two things must both hold: a termin was
+  // actually booked (the deposit is "za odabrani ciklus" — a parent who left their
+  // details because every termin had passed has nothing to pay for yet), and the
+  // radionica has a price (a free workshop asks for nothing, so
+  // `radionicaDepositAmount` returns null and the whole block drops).
+  const depositAmount =
+    scheduledGroupId && targetCourse && isRadionica(targetCourse.kind)
+      ? radionicaDepositAmount(targetCourse.price)
+      : null
+
   try {
     await sendInquiryConfirmationEmail({
       to: parentEmail,
@@ -263,6 +296,8 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       childName: `${childFirstName} ${childLastName}`,
       childDateOfBirth,
       cityLabel: CITY_LABELS[city],
+      nextStep: inquiryNextStep(scheduledGroupId, noSuitableTermin),
+      depositAmount: depositAmount ?? undefined,
     })
   } catch (err) {
     console.error('Failed to send inquiry confirmation email:', err)

@@ -7,6 +7,12 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "inovatic-email-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "email"],
+      "port": 3001
     }
   ]
 }

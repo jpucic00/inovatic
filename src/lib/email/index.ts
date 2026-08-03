@@ -9,3 +9,4 @@ export {
   sendBulkMessageEmail,
   renderBulkMessageHtml,
 } from './senders'
+export type { InquiryNextStep } from '../../../emails/inquiry-confirmation'
