@@ -5,7 +5,14 @@ export const alt = 'Inovatic – LEGO Robotika za djecu'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-export default function Image() {
+export default async function Image() {
+  // Read the lockup out of public/ at build/render time. `new URL(…,
+  // import.meta.url)` is what keeps this working on the edge runtime, where
+  // there is no fs — Next traces the asset and inlines it.
+  const logo = await fetch(
+    new URL('../../public/images/logo_dark.png', import.meta.url),
+  ).then((res) => res.arrayBuffer())
+
   return new ImageResponse(
     (
       <div
@@ -46,6 +53,47 @@ export default function Image() {
           }}
         />
 
+        {/* Logo lockup — the share preview's primary identifier */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          // Satori accepts the raw ArrayBuffer here; the DOM typing does not.
+          src={logo as unknown as string}
+          alt=""
+          width={520}
+          height={297}
+          style={{ marginBottom: 28 }}
+        />
+
+        {/* Headline — the logo says who, this says what */}
+        <div
+          style={{
+            display: 'flex',
+            fontSize: 52,
+            fontWeight: 900,
+            color: '#111827',
+            textAlign: 'center',
+            letterSpacing: -1.5,
+            marginBottom: 16,
+          }}
+        >
+          <span style={{ color: '#4BBDCA' }}>LEGO Robotika&nbsp;</span>
+          <span>za djecu</span>
+        </div>
+
+        {/* Subtitle */}
+        <div
+          style={{
+            fontSize: 26,
+            color: '#6b7280',
+            textAlign: 'center',
+            maxWidth: 820,
+            lineHeight: 1.4,
+            marginBottom: 22,
+          }}
+        >
+          Učimo djecu od 6 do 14 godina programiranje i robotiku
+        </div>
+
         {/* Badge */}
         <div
           style={{
@@ -55,45 +103,11 @@ export default function Image() {
             border: '1px solid rgba(75, 189, 202, 0.3)',
             borderRadius: 100,
             padding: '8px 24px',
-            marginBottom: 32,
           }}
         >
           <span style={{ fontSize: 18, color: '#2A9EAD', fontWeight: 700, letterSpacing: 3 }}>
             SPLIT · ŠIBENIK · OD 2014.
           </span>
-        </div>
-
-        {/* Main title — flex column so Satori (@vercel/og) accepts the two
-            stacked lines; a multi-child div must declare display:flex. */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            fontSize: 72,
-            fontWeight: 900,
-            color: '#111827',
-            textAlign: 'center',
-            lineHeight: 1.1,
-            marginBottom: 20,
-            letterSpacing: -2,
-          }}
-        >
-          <span style={{ color: '#4BBDCA' }}>LEGO Robotika</span>
-          <span>za djecu</span>
-        </div>
-
-        {/* Subtitle */}
-        <div
-          style={{
-            fontSize: 28,
-            color: '#6b7280',
-            textAlign: 'center',
-            maxWidth: 800,
-            lineHeight: 1.4,
-          }}
-        >
-          Učimo djecu od 6 do 14 godina programiranje i robotiku
         </div>
 
         {/* Bottom bar */}
@@ -112,10 +126,9 @@ export default function Image() {
         <div
           style={{
             position: 'absolute',
-            bottom: 30,
+            bottom: 26,
             display: 'flex',
             alignItems: 'center',
-            gap: 12,
           }}
         >
           <span style={{ fontSize: 22, fontWeight: 800, color: '#2A9EAD' }}>udruga-inovatic.hr</span>
