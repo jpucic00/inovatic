@@ -247,7 +247,7 @@ test.describe('payment tracking — students list', () => {
 test.describe('payment tracking — teacher view', () => {
   test('teacher student page renders no payment UI', async ({ page }) => {
     test.setTimeout(60000)
-    await page.goto(`${BASE}/prijava`)
+    await page.goto(`${BASE}/portal`)
     await page.locator('#identifier').fill(seeded.teacherEmail)
     await page.locator('input[type="password"]').fill(seeded.teacherPassword)
     await submitUntilUrl(page, page.locator('button[type="submit"]'), `${BASE}/nastavnik`)

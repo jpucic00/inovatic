@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
-import { fillInquiryStep1 } from '../helpers/upisi'
+import { fillInquiryStep1 } from '../helpers/prijava'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 7 — Programs, Groups & Enrollment
@@ -11,7 +11,7 @@ import { fillInquiryStep1 } from '../helpers/upisi'
 // Scenarios covered:
 //   A) Admin creates a radionica (custom course) via UI
 //   B) Admin creates a standard (SLR 1) group + radionica group, both with 2 spots
-//   C) Public form at /upisi uses new split-name + DOB-dropdown fields
+//   C) Public form at /prijava uses new split-name + DOB-dropdown fields
 //   D) Submitting 2 inquiries fills a group → "(Popunjeno)" in dropdown
 //   E) Admin declines an inquiry → spot is freed in the dropdown
 //   F) Admin GDPR-deletes an inquiry → spot is freed in the dropdown
@@ -132,7 +132,7 @@ async function fillStep2(page: Page, data: ParentData) {
   )
 }
 
-async function reachStep3(page: Page, data: ParentData, url = `${BASE}/upisi`) {
+async function reachStep3(page: Page, data: ParentData, url = `${BASE}/prijava`) {
   await page.goto(url)
   await fillStep1(page, data)
   await fillStep2(page, data)
@@ -153,7 +153,7 @@ async function submitWithGroup(
   data: ParentData,
   gradeValue: string | null,
   groupName: string,
-  url = `${BASE}/upisi`,
+  url = `${BASE}/prijava`,
 ) {
   await reachStep3(page, data, url)
 
@@ -457,7 +457,7 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
 
   test.describe('C — Public Form: New Fields (Step 2)', () => {
     test('step 2 shows childFirstName and childLastName, not legacy childName', async ({ page }) => {
-      await page.goto(`${BASE}/upisi`)
+      await page.goto(`${BASE}/prijava`)
       await fillStep1(page, PARENT_1)
       await expect(page.locator('#childFirstName')).toBeVisible()
       await expect(page.locator('#childLastName')).toBeVisible()
@@ -466,7 +466,7 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     })
 
     test('step 2 shows three date-of-birth dropdowns (Dan/Mesec/Godina)', async ({ page }) => {
-      await page.goto(`${BASE}/upisi`)
+      await page.goto(`${BASE}/prijava`)
       await fillStep1(page, PARENT_1)
       const dobWrapper = page.locator('label', { hasText: 'Datum rođenja' }).locator('..')
       await expect(dobWrapper.locator('select').nth(0)).toBeVisible()
@@ -475,7 +475,7 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
     })
 
     test('step 2 validation blocks submission without first name', async ({ page }) => {
-      await page.goto(`${BASE}/upisi`)
+      await page.goto(`${BASE}/prijava`)
       await fillStep1(page, PARENT_1)
       await expect(page.locator('#childFirstName')).toBeVisible()
       // Leave firstName empty, fill lastName + DOB
@@ -489,7 +489,7 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       await expect(page.locator('#childFirstName')).toBeVisible()
     })
 
-    test('step 3 shows mandatory grade dropdown on /upisi', async ({ page }) => {
+    test('step 3 shows mandatory grade dropdown on /prijava', async ({ page }) => {
       await reachStep3(page, PARENT_1)
       await expect(page.locator('#grade')).toBeVisible()
       await expect(page.locator('label', { hasText: 'Razred djeteta' })).toBeVisible()

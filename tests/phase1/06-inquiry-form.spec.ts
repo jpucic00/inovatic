@@ -3,15 +3,15 @@ import { BASE } from './shared'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // INQUIRY FORM
-// The /upisi page has a multi-step form (3 steps) where parents submit
+// The /prijava page has a multi-step form (3 steps) where parents submit
 // an inquiry about enrolling their child. Validates the form renders,
 // has input fields, and shows validation errors on empty submission.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-test.describe('Inquiry Form — Multi-step enrollment inquiry at /upisi', () => {
+test.describe('Inquiry Form — Multi-step enrollment inquiry at /prijava', () => {
   test('Step 1 of the form renders with visible <form> element', async ({ page }) => {
-    await test.step('Navigate to /upisi', async () => {
-      await page.goto(`${BASE}/upisi`)
+    await test.step('Navigate to /prijava', async () => {
+      await page.goto(`${BASE}/prijava`)
     })
 
     await test.step('Verify a <form> element is visible on the page', async () => {
@@ -21,8 +21,8 @@ test.describe('Inquiry Form — Multi-step enrollment inquiry at /upisi', () => 
   })
 
   test('Step 1 contains input fields for parent information', async ({ page }) => {
-    await test.step('Navigate to /upisi', async () => {
-      await page.goto(`${BASE}/upisi`)
+    await test.step('Navigate to /prijava', async () => {
+      await page.goto(`${BASE}/prijava`)
     })
 
     await test.step('Count all <input>, <select>, and <textarea> fields', async () => {
@@ -33,8 +33,8 @@ test.describe('Inquiry Form — Multi-step enrollment inquiry at /upisi', () => 
   })
 
   test('Empty form submission triggers client-side validation errors', async ({ page }) => {
-    await test.step('Navigate to /upisi', async () => {
-      await page.goto(`${BASE}/upisi`)
+    await test.step('Navigate to /prijava', async () => {
+      await page.goto(`${BASE}/prijava`)
     })
 
     await test.step('Click the submit/next button without filling any fields', async () => {

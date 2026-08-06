@@ -42,8 +42,8 @@ export const WP_REDIRECTS: Readonly<Record<string, string>> = {
   sibenik: '/lokacije/sibenik',
 
   // ── Signup ────────────────────────────────────────────────────────────────
-  prijave: '/upisi',
-  'prijava-na-online-edukaciju': '/upisi',
+  prijave: '/prijava',
+  'prijava-na-online-edukaciju': '/prijava',
 
   // ── Direct equivalents ────────────────────────────────────────────────────
   donacija: '/donacije',

@@ -13,7 +13,7 @@ describe('bulk-message template', () => {
     const html = await renderBulkMessageHtml({
       subject: 'Upisi u školsku godinu 2026/2027 – Inovatic',
       bodyText: 'Pozivamo vas na upis.',
-      signupPath: '/upisi/slr-2',
+      signupPath: '/prijava/slr-2',
     })
 
     expect(html).toContain('prijave@udruga-inovatic.hr')
@@ -21,7 +21,7 @@ describe('bulk-message template', () => {
     // The removed body paragraph — a Šibenik parent must not be pointed at Split.
     expect(html).not.toContain('Za sva pitanja slobodno nas kontaktirajte')
     // The invitation CTA is unaffected by the removal.
-    expect(html).toContain('/upisi')
+    expect(html).toContain('/prijava')
   })
 
   it('renders no signup CTA for a plain custom campaign', async () => {
@@ -29,6 +29,6 @@ describe('bulk-message template', () => {
       subject: 'Obavijest – Inovatic',
       bodyText: 'Kratka obavijest.',
     })
-    expect(html).not.toContain('/upisi')
+    expect(html).not.toContain('/prijava')
   })
 })

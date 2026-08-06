@@ -8,9 +8,9 @@ import { BASE, loginAsAdmin, loginWithEmail, createTeacher, type TeacherData } f
 // the createTeacherComment / deleteTeacherComment server-action authz lives
 // at tests/integration/api/teacher-comment.test.ts. This file keeps the 5
 // tests that exercise the actual browser-side redirect + login-form rendering:
-//   1. unauth /portal redirects to /prijava (full DOM nav)
-//   2. unauth /admin redirects to /prijava (full DOM nav)
-//   3. unauth /nastavnik redirects to /prijava (full DOM nav)
+//   1. unauth /portal renders the login screen in place (it IS the sign-in URL)
+//   2. unauth /admin redirects to /portal (full DOM nav)
+//   3. unauth /nastavnik redirects to /portal (full DOM nav)
 //   4. login form shows Croatian error on invalid credentials (DOM toast)
 //   5. teacher login routing redirect to /nastavnik (DOM nav post-login)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -44,18 +44,26 @@ test.describe('Phase 3 — Access-control DOM redirect flows', () => {
   // Parametrized loop over the 3 role-gated routes (Flux cvyxnhq merge —
   // was 3 separate tests). Each route still gets its own assertion message
   // via `test.step()` so failures pinpoint which route stopped redirecting.
-  test('unauthenticated visitor is redirected from gated roots to /prijava', async ({ page }) => {
-    for (const route of ['/portal', '/admin', '/nastavnik']) {
-      await test.step(`Unauth GET ${route} → redirected to /prijava`, async () => {
+  // /portal itself is the sign-in URL: it renders the login screen in place
+  // instead of redirecting (bouncing it would loop).
+  test('unauthenticated visitor ends on the /portal login screen from every gated root', async ({ page }) => {
+    await test.step('Unauth GET /portal → login screen rendered in place', async () => {
+      await page.goto(`${BASE}/portal`)
+      await expect(page.locator('h1')).toHaveText('Prijava')
+      expect(page.url(), 'unauth visit to /portal stays on /portal').toContain('/portal')
+    })
+    for (const route of ['/admin', '/nastavnik']) {
+      await test.step(`Unauth GET ${route} → redirected to /portal`, async () => {
         await page.goto(`${BASE}${route}`)
-        await page.waitForURL(/\/prijava/, { timeout: 30000 })
-        expect(page.url(), `unauth visit to ${route} ended on /prijava`).toContain('/prijava')
+        await page.waitForURL(/\/portal/, { timeout: 30000 })
+        expect(page.url(), `unauth visit to ${route} ended on /portal`).toContain('/portal')
+        await expect(page.locator('h1')).toHaveText('Prijava')
       })
     }
   })
 
   test('login form shows Croatian error message on invalid credentials', async ({ page }) => {
-    await page.goto(`${BASE}/prijava`)
+    await page.goto(`${BASE}/portal`)
     await page.locator('#identifier').fill('nonexistent@test.com')
     await page.locator('input[type="password"]').fill('wrongpassword123')
     await page.locator('button[type="submit"]').click()

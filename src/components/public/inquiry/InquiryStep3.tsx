@@ -94,7 +94,7 @@ export function InquiryStep3({
   const gradeSelected = preselectedCourseId || !!selectedGrade
 
   // The open programs whose groups render in the dropdown — radionica page shows
-  // only its own course; standard /upisi excludes radionice and narrows to the
+  // only its own course; standard /prijava excludes radionice and narrows to the
   // selected grade's level (shared with the parent's terminRequired check).
   const filteredPrograms = programsForSelection(programs, selectedGrade, preselectedCourseId)
 

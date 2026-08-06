@@ -57,7 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
-      url: `${siteUrl}/upisi`,
+      url: `${siteUrl}/prijava`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.9,

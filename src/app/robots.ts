@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin/', '/portal/', '/nastavnik/', '/prijava/'],
+        disallow: ['/admin/', '/portal/', '/nastavnik/'],
       },
     ],
     sitemap: 'https://udruga-inovatic.hr/sitemap.xml',

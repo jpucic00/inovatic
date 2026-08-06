@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { loginWithEmail, BASE, addLinkMaterial, markSession, croatianDateRegex, expectNotFoundPage } from '../helpers/phase3'
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
-import { fillInquiryStep1 } from '../helpers/upisi'
+import { fillInquiryStep1 } from '../helpers/prijava'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PR9 — E2E Šibenik journey (launch gate for the two-city separation)
@@ -12,7 +12,7 @@ import { fillInquiryStep1 } from '../helpers/upisi'
 // up her tenant end-to-end through the real UI:
 //   plan the school year mid-cycle → create the Trokut group (city-scoped
 //   dropdowns) → assign herself → open the enrollment window → the public
-//   /upisi form under "Šibenik" offers exactly that one group → parent submits
+//   /prijava form under "Šibenik" offers exactly that one group → parent submits
 //   → Slavica accepts (creates the student account) → marks attendance via the
 //   teacher panel → the student's portal shows the group's material → the
 //   admin student profile shows the marked session.
@@ -216,7 +216,7 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
     // Now that Slavica teaches a group, logging in must offer the panel choice
     // instead of auto-redirecting to /admin.
     await page.context().clearCookies()
-    await page.goto(`${BASE}/prijava`)
+    await page.goto(`${BASE}/portal`)
     await page.locator('#identifier').fill(SLAVICA_EMAIL)
     await page.locator('input[type="password"]').fill(SLAVICA_PASSWORD)
     const teacherChoice = page.getByRole('button', { name: 'Nastavnički panel' })
@@ -229,8 +229,8 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
     await submitUntilUrl(page, page.getByRole('link', { name: 'Administracija' }), /\/admin/)
   })
 
-  await test.step('public /upisi under Šibenik offers exactly the one Trokut group', async () => {
-    await page.goto(`${BASE}/upisi`)
+  await test.step('public /prijava under Šibenik offers exactly the one Trokut group', async () => {
+    await page.goto(`${BASE}/prijava`)
     await fillInquiryStep1(page, {
       parentName: PARENT.parentName,
       parentEmail: PARENT.parentEmail,

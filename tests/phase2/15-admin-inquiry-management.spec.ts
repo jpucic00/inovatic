@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
-import { fillInquiryStep1 } from '../helpers/upisi'
+import { fillInquiryStep1 } from '../helpers/prijava'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 6 — Admin Dashboard + Inquiry Management
@@ -54,7 +54,7 @@ const INQUIRY_TO_DELETE = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function submitInquiry(page: Page, data: typeof INQUIRY_MAIN) {
-  await page.goto(`${BASE}/upisi`)
+  await page.goto(`${BASE}/prijava`)
 
   // Step 1 — city + parent info (shared helper owns the mandatory city dropdown)
   await fillInquiryStep1(page, data)
@@ -146,10 +146,10 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       await expect(page.locator('aside button[type="submit"]', { hasText: 'Odjava' })).toBeVisible()
     })
 
-    test('unauthenticated access to /admin redirects to /prijava', async ({ page }) => {
+    test('unauthenticated access to /admin redirects to /portal', async ({ page }) => {
       await page.goto(`${BASE}/admin`)
-      await page.waitForURL('**/prijava**')
-      expect(page.url()).toContain('/prijava')
+      await page.waitForURL('**/portal**')
+      expect(page.url()).toContain('/portal')
     })
   })
 

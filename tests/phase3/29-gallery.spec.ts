@@ -210,7 +210,7 @@ test.describe('Phase 3 — Gallery', () => {
   test('/api/upload/gallery rejects unauthenticated → 401', async ({ browser }) => {
     const ctx = await browser.newContext()
     const page = await ctx.newPage()
-    await page.goto(`${BASE}/prijava`)
+    await page.goto(`${BASE}/portal`)
     const status = await page.evaluate(async () => {
       const form = new FormData()
       form.append('file', new Blob(['x'], { type: 'image/png' }), 'x.png')

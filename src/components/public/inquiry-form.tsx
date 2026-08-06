@@ -32,7 +32,7 @@ const step2Fields = ['childFirstName', 'childLastName', 'childDateOfBirth', 'chi
 
 interface InquiryFormProps {
   /**
-   * Programs pre-rendered per city. /upisi passes both cities so switching the
+   * Programs pre-rendered per city. /prijava passes both cities so switching the
    * dropdown filters client-side with no loading state; /radionice passes just
    * the workshop's city. Missing keys resolve to an empty list.
    */

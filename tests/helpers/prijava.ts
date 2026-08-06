@@ -10,13 +10,13 @@ interface InquiryStep1Data {
 }
 
 /**
- * Select the city and fill the parent-contact fields of Step 1 of the /upisi
- * inquiry form, then advance to Step 2. Assumes the page is already on /upisi.
+ * Select the city and fill the parent-contact fields of Step 1 of the /prijava
+ * inquiry form, then advance to Step 2. Assumes the page is already on /prijava.
  * Extracted so the mandatory city dropdown lives in exactly one place across
  * the inquiry specs — the field is required, so every Step-1 flow must set it.
  */
 export async function fillInquiryStep1(page: Page, data: InquiryStep1Data): Promise<void> {
-  // The city dropdown is only on /upisi — radionica pages (/radionice/[slug])
+  // The city dropdown is only on /prijava — radionica pages (/radionice/[slug])
   // preselect the city and render no dropdown, so select it only when present.
   const citySelect = page.locator('#city')
   if ((await citySelect.count()) > 0) {

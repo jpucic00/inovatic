@@ -106,7 +106,7 @@ function OnlinePlatformSection() {
       </div>
 
       <Link
-        href="/prijava"
+        href="/portal"
         className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-600 transition-colors hover:text-cyan-700"
       >
         <LogIn className="h-4 w-4" />
@@ -241,7 +241,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
 
           <div className="flex flex-col gap-2.5 md:flex-row md:justify-center md:gap-3">
             <Link
-              href="/upisi"
+              href="/prijava"
               className="rounded-xl bg-cyan-500 px-8 py-3.5 text-center text-sm font-semibold text-white transition-colors hover:bg-cyan-600 md:text-[15px]"
             >
               Pošalji prijavu za upis

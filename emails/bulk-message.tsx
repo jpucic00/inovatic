@@ -146,7 +146,7 @@ BulkMessageEmail.PreviewProps = {
       locationAddress: 'Velebitska 32, 21000 Split',
     },
   ],
-  signupUrl: 'https://udruga-inovatic.hr/upisi',
+  signupUrl: 'https://udruga-inovatic.hr/prijava',
   cards: [
     {
       childName: 'Ana Anić',

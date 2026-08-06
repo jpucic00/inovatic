@@ -134,7 +134,7 @@ describe('InquiryStep3 — group dropdown scoping', () => {
     expect(screen.queryByRole('option', { name: /Termin Gamma/ })).not.toBeInTheDocument()
   })
 
-  it('the /upisi flow (no preselection) still excludes radionice', () => {
+  it('the /prijava flow (no preselection) still excludes radionice', () => {
     render(<Harness programs={[standardC, radionicaA]} />)
 
     fireEvent.change(screen.getByLabelText(/Razred djeteta/), {
@@ -207,7 +207,7 @@ describe('InquiryStep3 — "predloženi termin mi ne odgovara"', () => {
     expect(option()).not.toBeInTheDocument()
   })
 
-  it('is not offered in the grade-driven /upisi catalog', () => {
+  it('is not offered in the grade-driven /prijava catalog', () => {
     render(<Harness programs={[standardC, competition]} />)
     fireEvent.change(screen.getByLabelText(/Razred djeteta/), { target: { value: '1' } })
 

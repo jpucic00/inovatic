@@ -961,7 +961,7 @@ type SendJob = {
   subject: string
   bodyText: string
   options: GroupOption[] | undefined
-  /** Where the invitation's CTA points — `/upisi/<target-slug>`. */
+  /** Where the invitation's CTA points — `/prijava/<target-slug>`. */
   signupPath: string | undefined
   sentKey: string | null
 }

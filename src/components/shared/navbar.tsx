@@ -103,7 +103,7 @@ export function Navbar() {
             {/* Between md and lg the full nav sits alongside this cluster, and the
                 long label overflows the bar — drop to the icon alone in that band. */}
             <Link
-              href="/prijava"
+              href="/portal"
               aria-label="Polaznički portal"
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:text-cyan-600 hover:bg-gray-50 rounded-md transition-colors"
             >
@@ -111,7 +111,7 @@ export function Navbar() {
               <span className="md:hidden lg:inline">Polaznički portal</span>
             </Link>
             <Link
-              href="/upisi"
+              href="/prijava"
               className="hidden sm:inline-flex items-center px-4 py-2 bg-cyan-500 text-white text-sm font-semibold rounded-lg hover:bg-cyan-600 transition-colors shadow-sm"
             >
               Prijavi se
@@ -176,7 +176,7 @@ export function Navbar() {
             )}
             <div className="pt-2 border-t border-gray-100 mt-1 space-y-2">
               <Link
-                href="/prijava"
+                href="/portal"
                 className="flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-gray-600 hover:text-cyan-600 rounded-md transition-colors"
                 onClick={() => setIsOpen(false)}
               >
@@ -184,7 +184,7 @@ export function Navbar() {
                 Polaznički portal
               </Link>
               <Link
-                href="/upisi"
+                href="/prijava"
                 className="block py-2.5 text-center bg-cyan-500 text-white text-sm font-semibold rounded-lg hover:bg-cyan-600 transition-colors"
                 onClick={() => setIsOpen(false)}
               >

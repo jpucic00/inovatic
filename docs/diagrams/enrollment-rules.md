@@ -2,7 +2,7 @@
 
 Business rules for the inquiry → account-creation pipeline, spot reservation, and inquiry state transitions.
 
-**City tenancy:** the public `/upisi` form opens with a **mandatory city dropdown** (Split/Šibenik, no default) as Step 1's first field; the whole pipeline below runs inside that one city. `submitInquiry` server-verifies `chosenGroup.city === submitted city` and persists `Inquiry.city`; the party form has no dropdown — `submitPartyInquiry` stamps `SPLIT` (proslave are Split-only at launch). Admin review, group pickers and account creation are scoped to the admin's session city; `createStudentFromInquiry` additionally asserts `group.city === inquiry.city` inside the transaction, and a returning-student identity match in the *other* city blocks the accept flow with an escalation message (never auto-reuses the account).
+**City tenancy:** the public `/prijava` form opens with a **mandatory city dropdown** (Split/Šibenik, no default) as Step 1's first field; the whole pipeline below runs inside that one city. `submitInquiry` server-verifies `chosenGroup.city === submitted city` and persists `Inquiry.city`; the party form has no dropdown — `submitPartyInquiry` stamps `SPLIT` (proslave are Split-only at launch). Admin review, group pickers and account creation are scoped to the admin's session city; `createStudentFromInquiry` additionally asserts `group.city === inquiry.city` inside the transaction, and a returning-student identity match in the *other* city blocks the accept flow with an escalation message (never auto-reuses the account).
 
 ---
 
@@ -12,7 +12,7 @@ Only `Inquiry` has a real state machine. `Enrollment` and `ModuleEnrollment` are
 
 ```mermaid
 stateDiagram-v2
-    [*] --> NEW_COURSE: Parent submits course inquiry (/upisi)
+    [*] --> NEW_COURSE: Parent submits course inquiry (/prijava)
     [*] --> NEW_PARTY: Parent submits party inquiry (/proslave)
 
     NEW_COURSE --> ACCOUNT_CREATED: Admin creates student account
@@ -110,7 +110,7 @@ flowchart TD
     A2 --> B["For each ScheduledGroup of this city whose own (courseId, schoolYear, city) is in the open-window Set"]
     B --> C["nextEnrollingModule = getGroupModuleArc(dayOfWeek, modules + this city's ModuleSchedule rows, this city's holidays) race-ahead → first arc module whose firstSession &gt; now"]
     C --> D{nextEnrollingModule exists?}
-    D -->|No| HIDE[Group hidden from /upisi - graduated past M4 or schedule incomplete]
+    D -->|No| HIDE[Group hidden from /prijava - graduated past M4 or schedule incomplete]
     D -->|Yes| E["enrolledCount = enrollments whose moduleEnrollments include nextEnrollingModule.moduleScheduleId"]
     E --> F[preferredCount = inquiries where status = NEW]
     F --> G["available = maxStudents - enrolledCount - preferredCount"]
@@ -126,7 +126,7 @@ flowchart TD
 
 ### Radionica and competition groups (group-scoped, no dated modules)
 
-The same math serves both kinds without dated modules: `computeGroupCapacity` counts lifetime enrollments whenever `hasDatedModules(kind)` is false. The one difference is the feed — competition groups never appear in `getActivePrograms` (its filter is `kind: { not: 'COMPETITION' }`); their invitation link `/upisi/natjecateljski-program` is fed by `getSignupProgram(city, slug)`, which shares the same internal `loadPrograms`.
+The same math serves both kinds without dated modules: `computeGroupCapacity` counts lifetime enrollments whenever `hasDatedModules(kind)` is false. The one difference is the feed — competition groups never appear in `getActivePrograms` (its filter is `kind: { not: 'COMPETITION' }`); their invitation link `/prijava/natjecateljski-program` is fed by `getSignupProgram(city, slug)`, which shares the same internal `loadPrograms`.
 
 ```mermaid
 flowchart TD
@@ -315,7 +315,7 @@ flowchart TD
     B -->|8. razred| F
     B -->|"Srednja škola 1–4 (ss1–ss4)"| SS["null — no SLR level"]
 
-    SS --> SSX["No match — those grades exist only for the competitive program's own signup link, never the public /upisi form"]
+    SS --> SSX["No match — those grades exist only for the competitive program's own signup link, never the public /prijava form"]
 
     U --> G0[Filter programs where level = UVOD]
     C --> G[Filter programs where level = SLR_1]
@@ -362,16 +362,16 @@ flowchart TD
     E --> F[Group dropdown shows flat list not optgroups]
 ```
 
-### Per-program signup link (`/upisi/<slug>`)
+### Per-program signup link (`/prijava/<slug>`)
 
 The link you send when the program is already decided — a returning student
 moving up a level, or a competitor invited into the Natjecateljski program. It
 deliberately **bypasses §4's grade→level rule**: last year's SLR 1 group moves
-on to SLR 2 whatever their razred says. `/upisi` itself is unchanged.
+on to SLR 2 whatever their razred says. `/prijava` itself is unchanged.
 
 ```mermaid
 flowchart TD
-    A["Parent opens /upisi/<slug> from an invitation e-mail"] --> B[preselectedCourseId passed to InquiryForm]
+    A["Parent opens /prijava/<slug> from an invitation e-mail"] --> B[preselectedCourseId passed to InquiryForm]
     B --> C{Program city}
     C -->|"shared (SLR, natjecateljski)"| C1[Parent picks Split/Šibenik in Step 1]
     C -->|per-city| C2[City fixed, dropdown hidden]
@@ -390,7 +390,7 @@ flowchart TD
     style J fill:#fee2e2
 ```
 
-> The competition link's termin dropdown additionally offers the `noSuitableTermin` refusal answer — see §2. Admin copy buttons always build these links with `publicSignupPath(kind, slug)` (`src/lib/signup-links.ts`): a radionica's signup link is its own `/radionice/<slug>` page — `/upisi/<slug>` answers `notFound()` for RADIONICA — while the SLR ladder and the competitive program sign up at `/upisi/<slug>` (`signupPathForSlug`). Building `/upisi/<slug>` unconditionally is exactly the bug that once handed admins a 404 link for workshops.
+> The competition link's termin dropdown additionally offers the `noSuitableTermin` refusal answer — see §2. Admin copy buttons always build these links with `publicSignupPath(kind, slug)` (`src/lib/signup-links.ts`): a radionica's signup link is its own `/radionice/<slug>` page — `/prijava/<slug>` answers `notFound()` for RADIONICA — while the SLR ladder and the competitive program sign up at `/prijava/<slug>` (`signupPathForSlug`). Building `/prijava/<slug>` unconditionally is exactly the bug that once handed admins a 404 link for workshops.
 
 ---
 
@@ -477,7 +477,7 @@ sequenceDiagram
 
     Note over Parent, Admin: PHASE 1 — Public Inquiry Submission
 
-    Parent->>Web: Visits /upisi or /programi/slug/prijava
+    Parent->>Web: Visits /prijava or /programi/slug/prijava
     Web->>Server: getActivePrograms()
     Note right of Server: Filters by active enrollment window. For each group computes a per-group race-ahead arc (getGroupModuleArc on dayOfWeek + holidays). Standard groups with no future arc module (graduated past M4) are hidden.
     Server-->>Web: Programs with groups, spots-against-this-group's-next-module, enrollment windows

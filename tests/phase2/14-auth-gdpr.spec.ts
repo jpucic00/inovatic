@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { clickUntilVisible } from '../helpers/hydration'
-import { fillInquiryStep1 } from '../helpers/upisi'
+import { fillInquiryStep1 } from '../helpers/prijava'
 
 const BASE = 'http://localhost:3000'
 
@@ -12,7 +12,7 @@ const BASE = 'http://localhost:3000'
 
 test.describe('Login Page', () => {
   test('renders login form with identifier, password, and submit button', async ({ page }) => {
-    await page.goto(`${BASE}/prijava`)
+    await page.goto(`${BASE}/portal`)
     await expect(page.locator('h1')).toHaveText('Prijava')
     await expect(page.locator('#identifier')).toBeVisible()
     await expect(page.locator('input[type="password"]')).toBeVisible()
@@ -21,7 +21,7 @@ test.describe('Login Page', () => {
   })
 
   test('shows error message on wrong credentials', async ({ page }) => {
-    await page.goto(`${BASE}/prijava`)
+    await page.goto(`${BASE}/portal`)
     await page.waitForLoadState('networkidle')
     await page.locator('#identifier').fill('wrong@example.com')
     await page.locator('input[type="password"]').fill('wrongpassword')
@@ -30,13 +30,13 @@ test.describe('Login Page', () => {
   })
 
   test('uses shared Logo component', async ({ page }) => {
-    await page.goto(`${BASE}/prijava`)
+    await page.goto(`${BASE}/portal`)
     const logo = page.locator('img[alt*="Inovatic"]').or(page.locator('text=INOVATIC'))
     await expect(logo.first()).toBeVisible()
   })
 
   test('has back link to homepage', async ({ page }) => {
-    await page.goto(`${BASE}/prijava`)
+    await page.goto(`${BASE}/portal`)
     const backLink = page.locator('a[href="/"]', { hasText: 'Natrag' })
     await expect(backLink).toBeVisible()
   })
@@ -46,7 +46,7 @@ test.describe('Navbar Login Link', () => {
   test('navbar contains the portal login link on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 })
     await page.goto(`${BASE}/`)
-    const loginLink = page.locator('header a[href="/prijava"]')
+    const loginLink = page.locator('header a[href="/portal"]')
     await expect(loginLink).toBeVisible()
     // Renamed from "Prijava" to "Polaznički portal"; between md and lg only the
     // icon renders, so the accessible name is the stable assertion.
@@ -59,7 +59,7 @@ test.describe('Navbar Login Link', () => {
     const hamburger = page.locator('button[aria-label*="meni"]')
     // The mobile menu login link is inside the absolutely-positioned dropdown
     const mobileMenu = page.locator('.md\\:hidden[class*="absolute"]')
-    const loginLink = mobileMenu.locator('a[href="/prijava"]')
+    const loginLink = mobileMenu.locator('a[href="/portal"]')
     await clickUntilVisible(hamburger, loginLink)
   })
 })
@@ -114,7 +114,7 @@ test.describe('Footer Privacy Link', () => {
 
 test.describe('GDPR Consent on Inquiry Form', () => {
   test('consent checkbox appears on step 3 after filling steps 1 and 2', async ({ page }) => {
-    await page.goto(`${BASE}/upisi`)
+    await page.goto(`${BASE}/prijava`)
 
     // Step 1 — city + parent info
     await fillInquiryStep1(page, {
@@ -144,7 +144,7 @@ test.describe('GDPR Consent on Inquiry Form', () => {
   })
 
   test('form shows validation error when consent is not checked', async ({ page }) => {
-    await page.goto(`${BASE}/upisi`)
+    await page.goto(`${BASE}/prijava`)
 
     // Step 1 — city + parent info
     await fillInquiryStep1(page, {
@@ -174,21 +174,23 @@ test.describe('GDPR Consent on Inquiry Form', () => {
 })
 
 test.describe('Auth Redirects', () => {
-  test('/admin redirects to /prijava for unauthenticated users', async ({ page }) => {
+  test('/admin redirects to /portal for unauthenticated users', async ({ page }) => {
     await page.goto(`${BASE}/admin`)
-    await page.waitForURL('**/prijava**')
-    expect(page.url()).toContain('/prijava')
+    await page.waitForURL('**/portal**')
+    expect(page.url()).toContain('/portal')
   })
 
-  test('/nastavnik redirects to /prijava for unauthenticated users', async ({ page }) => {
+  test('/nastavnik redirects to /portal for unauthenticated users', async ({ page }) => {
     await page.goto(`${BASE}/nastavnik`)
-    await page.waitForURL('**/prijava**')
-    expect(page.url()).toContain('/prijava')
+    await page.waitForURL('**/portal**')
+    expect(page.url()).toContain('/portal')
   })
 
-  test('/portal redirects to /prijava for unauthenticated users', async ({ page }) => {
+  test('/portal shows the login screen in place for unauthenticated users', async ({ page }) => {
+    // /portal doubles as the sign-in URL — no redirect, the login form renders
+    // directly (redirecting would loop, since every guard points here).
     await page.goto(`${BASE}/portal`)
-    await page.waitForURL('**/prijava**')
-    expect(page.url()).toContain('/prijava')
+    await expect(page.locator('h1')).toHaveText('Prijava')
+    expect(page.url()).toContain('/portal')
   })
 })

@@ -1,11 +1,19 @@
 import Link from 'next/link'
 import { LogOut, BookOpen, User } from 'lucide-react'
-import { requireStudent } from '@/lib/auth-guard'
+import { auth } from '@/lib/auth'
 import { logoutAction } from '@/actions/logout'
 import { Logo } from '@/components/shared/logo'
 
 export default async function PortalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const session = await requireStudent()
+  // `/portal` doubles as the login screen, so this layout cannot gate: a guest
+  // (or a legacy session without a city claim, which the guards fail closed on)
+  // gets the bare children — the sign-in screen brings its own full-page shell.
+  // Access control still holds: every portal page's data action calls
+  // requireStudent() itself.
+  const session = await auth()
+  if (session?.user?.role !== 'STUDENT' || !session.user.city) {
+    return <>{children}</>
+  }
   const userName = session.user.name ?? session.user.email ?? 'Korisnik'
 
   return (

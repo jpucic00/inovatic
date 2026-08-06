@@ -12,7 +12,6 @@ describe('UMAMI_INTERNAL_PATH_PATTERN', () => {
     expect(isInternal('/nastavnik/grupa/xyz')).toBe(true)
     expect(isInternal('/portal')).toBe(true)
     expect(isInternal('/portal/grupa/xyz/galerija')).toBe(true)
-    expect(isInternal('/prijava')).toBe(true)
     expect(isInternal('/api/group-availability')).toBe(true)
   })
 
@@ -20,7 +19,10 @@ describe('UMAMI_INTERNAL_PATH_PATTERN', () => {
     expect(isInternal('/')).toBe(false)
     expect(isInternal('/programi')).toBe(false)
     expect(isInternal('/programi/slr-1')).toBe(false)
-    expect(isInternal('/upisi')).toBe(false)
+    // The signup form moved here from /upisi; the login moved to /portal.
+    // Tracking it is the point — course-inquiry conversions fire on it.
+    expect(isInternal('/prijava')).toBe(false)
+    expect(isInternal('/prijava/slr-2')).toBe(false)
     expect(isInternal('/proslave')).toBe(false)
     expect(isInternal('/radionice/ljetna')).toBe(false)
     expect(isInternal('/novosti')).toBe(false)
@@ -32,7 +34,7 @@ describe('UMAMI_INTERNAL_PATH_PATTERN', () => {
 
   it('does not match public paths that merely start with an internal prefix', () => {
     expect(isInternal('/administracija')).toBe(false)
-    expect(isInternal('/prijava-za-radionicu')).toBe(false)
+    expect(isInternal('/portali')).toBe(false)
     expect(isInternal('/apis')).toBe(false)
   })
 

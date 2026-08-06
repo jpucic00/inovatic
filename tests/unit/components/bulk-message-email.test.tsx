@@ -19,7 +19,7 @@ describe('BulkMessageEmail template', () => {
         subject="Upisi – Inovatic"
         bodyText={'Poštovani,\nPrvi odlomak poruke.\nDrugi odlomak poruke.'}
         options={options}
-        signupUrl="https://udruga-inovatic.hr/upisi"
+        signupUrl="https://udruga-inovatic.hr/prijava"
       />,
     )
     expect(html).toContain('Poštovani,')
@@ -29,7 +29,7 @@ describe('BulkMessageEmail template', () => {
     expect(html).toContain('SLR 2 – utorkom')
     expect(html).toContain('Utorak, 17:00–18:30')
     expect(html).toContain('Prilaz braće Kaliterna 10, 21000 Split')
-    expect(html).toContain('https://udruga-inovatic.hr/upisi')
+    expect(html).toContain('https://udruga-inovatic.hr/prijava')
     expect(html).toContain('Ispunite prijavu')
   })
 
@@ -40,7 +40,7 @@ describe('BulkMessageEmail template', () => {
     expect(html).toContain('Kratka obavijest roditeljima.')
     expect(html).not.toContain('Termini u novoj školskoj godini:')
     expect(html).not.toContain('Ispunite prijavu')
-    expect(html).not.toContain('/upisi')
+    expect(html).not.toContain('/prijava')
   })
 
   it('never auto-prepends a greeting — the body ships exactly as written', async () => {
@@ -55,18 +55,18 @@ describe('BulkMessageEmail template', () => {
 describe('renderBulkMessageHtml', () => {
   it('injects the CTA link only when a signupPath is given', async () => {
     const base = { subject: 'Upisi', bodyText: 'Tekst poruke.' }
-    const withCta = await renderBulkMessageHtml({ ...base, signupPath: '/upisi/slr-3' })
+    const withCta = await renderBulkMessageHtml({ ...base, signupPath: '/prijava/slr-3' })
     const withoutCta = await renderBulkMessageHtml(base)
-    expect(withCta).toContain('/upisi')
-    expect(withoutCta).not.toContain('/upisi')
+    expect(withCta).toContain('/prijava')
+    expect(withoutCta).not.toContain('/prijava')
   })
 
   it('links the CTA at the invited program, not the generic catalog', async () => {
     const html = await renderBulkMessageHtml({
       subject: 'Upisi',
       bodyText: 'Tekst poruke.',
-      signupPath: '/upisi/natjecateljski-program',
+      signupPath: '/prijava/natjecateljski-program',
     })
-    expect(html).toContain('/upisi/natjecateljski-program')
+    expect(html).toContain('/prijava/natjecateljski-program')
   })
 })

@@ -121,7 +121,7 @@ export default async function HomePage() {
               </p>
               <div className="flex w-full flex-col sm:w-auto sm:flex-row gap-4 lg:mt-2">
                 <Link
-                  href="/upisi"
+                  href="/prijava"
                   className="inline-flex items-center justify-center gap-2 px-8 py-[15px] sm:py-3.5 bg-yellow-400 text-gray-900 font-bold rounded-xl hover:bg-yellow-300 transition-colors shadow-[0_2px_6px_rgba(0,0,0,0.15)] text-base"
                 >
                   Prijavi dijete <ArrowRight className="w-4 h-4" />
@@ -208,7 +208,7 @@ export default async function HomePage() {
             Ispunite kratku upisnu formu i mi ćemo vas kontaktirati u najkraćem mogućem roku. Bez obaveza.
           </p>
           <Link
-            href="/upisi"
+            href="/prijava"
             className="inline-flex items-center gap-2 px-8 py-4 bg-yellow-400 text-gray-900 font-bold rounded-xl hover:bg-yellow-300 transition-colors shadow-md text-base"
           >
             Pošalji prijavu <ArrowRight className="w-4 h-4" />

@@ -62,30 +62,47 @@ export async function loginAsAdmin(page: Page) {
 }
 
 export async function loginWithEmail(page: Page, email: string, password: string) {
-  await page.goto(`${BASE}/prijava`)
+  // Specs re-login mid-test to switch accounts. /portal bounces an existing
+  // staff session straight to its panel before the form can render, so drop
+  // any current session first — the old standalone /prijava login page
+  // tolerated a live session, /portal deliberately does not.
+  await page.context().clearCookies()
+  await page.goto(`${BASE}/portal`)
   await page.locator('#identifier').fill(email)
   await page.locator('input[type="password"]').fill(password)
   // A dual-role admin (ADMIN with ≥1 TeacherAssignment) gets a panel-choice
   // step instead of an auto-redirect; pick "Administracija" so specs land on
   // /admin exactly as they did before the choice existed. Mirrors the retry
   // shape of submitUntilUrl (hydration can swallow early clicks).
-  const urlPattern = /\/(admin|nastavnik|portal)/
+  //
+  // /portal is BOTH the login screen and the student destination, so a URL
+  // check alone cannot tell "still logged out" from "logged in as student":
+  // staff navigate away to /admin | /nastavnik, while a student stays on
+  // /portal and the login form is replaced by the portal shell. The form's
+  // #identifier field disappearing is the student success signal.
+  const staffUrl = /\/(admin|nastavnik)/
   const adminChoice = page.getByRole('button', { name: 'Administracija' })
   const submit = page.locator('button[type="submit"]')
+  const identifier = page.locator('#identifier')
   const deadline = Date.now() + 45000
-  while (Date.now() < deadline && !urlPattern.test(page.url())) {
+  while (Date.now() < deadline) {
+    if (staffUrl.test(page.url())) break
     if (await adminChoice.isVisible().catch(() => false)) {
       await adminChoice.click({ timeout: 5000 }).catch(() => undefined)
       await page.waitForURL(/\/admin/, { timeout: 20000 }).catch(() => undefined)
       continue
     }
+    if ((await identifier.count()) === 0) break // student: portal shell replaced the form
     await submit.click({ timeout: 5000 }).catch(() => undefined)
     await Promise.race([
-      page.waitForURL(urlPattern, { timeout: 20000 }).catch(() => undefined),
+      page.waitForURL(staffUrl, { timeout: 20000 }).catch(() => undefined),
       adminChoice.waitFor({ state: 'visible', timeout: 20000 }).catch(() => undefined),
+      identifier.waitFor({ state: 'detached', timeout: 20000 }).catch(() => undefined),
     ])
   }
-  await page.waitForURL(urlPattern, { timeout: 5000 })
+  if (!staffUrl.test(page.url()) && (await identifier.count()) > 0) {
+    throw new Error(`login as ${email} did not complete within 45s`)
+  }
   await page.waitForLoadState('domcontentloaded')
 }
 

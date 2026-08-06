@@ -8,7 +8,7 @@ function telHref(phone: string): string {
 /**
  * The "Imate pitanja?" box every signup page shows — BOTH cities, always,
  * whatever program the page belongs to (owner decision 2026-08-03: uniform on
- * /upisi, /upisi/[slug] and /radionice/[slug], including city-pinned
+ * /prijava, /prijava/[slug] and /radionice/[slug], including city-pinned
  * radionice). Inboxes and phones come from locations.ts so a staffing change
  * happens in exactly one place.
  */

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
-import { fillInquiryStep1 } from '../helpers/upisi'
+import { fillInquiryStep1 } from '../helpers/prijava'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 8 — Student Management
@@ -66,7 +66,7 @@ async function loginAsAdmin(page: Page) {
 }
 
 async function submitInquiry(page: Page, data: typeof INQUIRY_FOR_ACCOUNT) {
-  await page.goto(`${BASE}/upisi`)
+  await page.goto(`${BASE}/prijava`)
 
   // Step 1 — city + parent info
   await fillInquiryStep1(page, data)

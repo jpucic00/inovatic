@@ -48,7 +48,7 @@ export const STATUS_FLOW = [
 // via the GRADE_LABELS[v] ?? v fallback.
 //
 // Split in two because which set a FORM OFFERS is not the same as what the
-// column accepts: `/upisi` and the radionica pages stop at 8. razred (the
+// column accepts: `/prijava` and the radionica pages stop at 8. razred (the
 // programs behind them are osnovnoškolski), while competitors carry on through
 // srednja škola. `GRADE_VALUES` is the union — the Zod schema and every admin
 // view accept all of them; `submitInquiry` is what enforces that a high-school

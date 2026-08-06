@@ -19,7 +19,7 @@ type ProgramCourse = Awaited<ReturnType<typeof getCourses>>[number]
 
 /**
  * One program row. Every program carries a copy button for its own signup link
- * (`/upisi/<slug>`) — the link that shows only this program's termini and
+ * (`/prijava/<slug>`) — the link that shows only this program's termini and
  * ignores the public grade→program rule, so a returning student can be invited
  * straight into the next level.
  */

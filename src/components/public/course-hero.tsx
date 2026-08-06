@@ -105,7 +105,7 @@ export function CourseHero({ course, levelLabel }: { readonly course: Course; re
             mobile, where the fixed bottom bar (CourseStickyCta) already carries it. */}
         <div className="mt-3 flex flex-col gap-2 min-[480px]:mt-3.5 min-[480px]:flex-row min-[480px]:gap-2.5">
           <Link
-            href="/upisi"
+            href="/prijava"
             className="hidden rounded-xl bg-cyan-500 px-6 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-cyan-600 min-[480px]:block"
           >
             Pošalji prijavu za upis

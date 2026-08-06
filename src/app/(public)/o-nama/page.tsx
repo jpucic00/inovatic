@@ -337,7 +337,7 @@ export default function AboutPage() {
             Upišite dijete i dajte mu šansu da otkrije svoju strast prema robotici i programiranju.
           </p>
           <Link
-            href="/upisi"
+            href="/prijava"
             className="inline-flex items-center gap-2 px-7 py-3.5 bg-yellow-400 text-gray-900 font-semibold rounded-xl hover:bg-yellow-300 transition-colors shadow-sm"
           >
             Prijavi dijete <ArrowRight className="w-4 h-4" />

@@ -48,7 +48,7 @@ export function CourseStickyCta({ priceYear, priceModule, targetId }: CourseStic
         <div className="text-[11px] text-gray-500">ili {priceModule} EUR po modulu</div>
       </div>
       <Link
-        href="/upisi"
+        href="/prijava"
         tabIndex={hidden ? -1 : undefined}
         className="whitespace-nowrap rounded-[11px] bg-cyan-500 px-5 py-3 text-[13.5px] font-semibold text-white transition-colors hover:bg-cyan-600"
       >

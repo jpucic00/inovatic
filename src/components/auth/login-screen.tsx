@@ -1,16 +1,13 @@
-import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Logo } from '@/components/shared/logo'
 import { LoginForm } from '@/components/auth/login-form'
 
-export const metadata: Metadata = {
-  title: 'Prijava',
-  description: 'Prijava u Inovatic portal za učenike i nastavnike.',
-  // Private auth entry point — keep it out of search indexes.
-  robots: { index: false, follow: false },
-}
-
-export default function LoginPage() {
+/**
+ * The full-page sign-in screen. Rendered by `/portal` for visitors without a
+ * usable session — that route doubles as the login URL, so this screen has no
+ * page of its own.
+ */
+export function LoginScreen() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">

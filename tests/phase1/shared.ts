@@ -9,7 +9,7 @@ export const ALL_PAGES = [
   { path: '/programi/slr-4', name: 'SLR 4 course detail' },
   { path: '/o-nama', name: 'About page' },
   { path: '/novosti', name: 'News listing' },
-  { path: '/upisi', name: 'Inquiry form' },
+  { path: '/prijava', name: 'Inquiry form' },
   { path: '/lokacije', name: 'Locations overview' },
   { path: '/lokacije/split', name: 'Split location page' },
   { path: '/lokacije/sibenik', name: 'Šibenik location page' },

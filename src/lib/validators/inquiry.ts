@@ -19,7 +19,7 @@ const step2Schema = z.object({
   childSchool: z.string().optional(),
 })
 
-// grade is required for every inquiry — both the /upisi flow and the
+// grade is required for every inquiry — both the /prijava flow and the
 // /radionice/{slug} preselect flow. On radionica forms it is captured
 // for admin reference only and does not gate group selection.
 const step3Schema = z.object({

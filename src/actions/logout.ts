@@ -3,5 +3,5 @@
 import { signOut } from '@/lib/auth'
 
 export async function logoutAction() {
-  await signOut({ redirectTo: '/prijava' })
+  await signOut({ redirectTo: '/portal' })
 }

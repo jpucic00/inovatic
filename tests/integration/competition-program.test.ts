@@ -99,7 +99,7 @@ describe('the competitive program is invitation-only', () => {
     await loginSplitAdmin()
   })
 
-  it('never appears in the public /upisi catalog, even with an open window', async () => {
+  it('never appears in the public /prijava catalog, even with an open window', async () => {
     const course = await competitionCourse()
     await createEnrollmentWindow(course.id, {
       schoolYear: SY,

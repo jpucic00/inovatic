@@ -7,10 +7,12 @@
 /**
  * Pathname pattern for internal sections that must never be tracked. Mounting
  * the tracker only in the (public) layout is not enough on its own: the script
- * tag survives client-side navigation into /prijava → /admin etc., so the
+ * tag survives client-side navigation into /portal → /admin etc., so the
  * data-before-send guard drops these even while the tracker stays loaded.
+ * /portal covers the sign-in screen too; /prijava is the public signup form
+ * and must stay tracked.
  */
-export const UMAMI_INTERNAL_PATH_PATTERN = '^/(?:admin|nastavnik|portal|prijava|api)(?:/|$)'
+export const UMAMI_INTERNAL_PATH_PATTERN = '^/(?:admin|nastavnik|portal|api)(?:/|$)'
 
 type UmamiEventData = Record<string, string | number | boolean>
 

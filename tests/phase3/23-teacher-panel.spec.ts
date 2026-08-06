@@ -81,8 +81,8 @@ test.describe('Phase 3 Step 12 — Teacher Panel', () => {
 
   test('unauthenticated visitor is redirected from /nastavnik', async ({ page }) => {
     await page.goto(`${BASE}/nastavnik`)
-    await page.waitForURL(/\/prijava/, { timeout: 30000 })
-    expect(page.url()).toContain('/prijava')
+    await page.waitForURL(/\/portal/, { timeout: 30000 })
+    expect(page.url()).toContain('/portal')
   })
 
   test('teacher dashboard renders only their assigned groups', async ({ page }) => {

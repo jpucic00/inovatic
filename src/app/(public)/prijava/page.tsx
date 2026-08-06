@@ -10,16 +10,16 @@ import { CITY_VALUES } from '@/lib/city'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Upisi',
+  title: 'Prijave',
   description: 'Upiši dijete na tečaj LEGO robotike u Splitu i Šibeniku. Ispuni upit i kontaktirat ćemo te s dostupnim terminima. Bez obveza.',
   openGraph: {
     ...OG_DEFAULTS,
     title: 'Upiši dijete – LEGO Robotika | Inovatic',
     description: 'Ispuni kratki upit i kontaktirat ćemo te s dostupnim grupama i terminima u Splitu i Šibeniku. Bez obveza.',
-    url: 'https://udruga-inovatic.hr/upisi',
+    url: 'https://udruga-inovatic.hr/prijava',
     images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – LEGO Robotika za djecu' }],
   },
-  alternates: { canonical: 'https://udruga-inovatic.hr/upisi' },
+  alternates: { canonical: 'https://udruga-inovatic.hr/prijava' },
 }
 
 const perks = [

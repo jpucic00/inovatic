@@ -40,8 +40,8 @@ type ProgramDetail = {
     enrollmentStart: Date | null
     enrollmentEnd: Date | null
     /**
-     * Public signup link for this program, e.g. `/upisi/slr-2` — or
-     * `/radionice/<slug>` for a radionica, which has no `/upisi` page.
+     * Public signup link for this program, e.g. `/prijava/slr-2` — or
+     * `/radionice/<slug>` for a radionica, which has no `/prijava` page.
      */
     signupPath: string
   }

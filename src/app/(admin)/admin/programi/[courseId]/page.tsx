@@ -38,7 +38,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
   const editable = !isArchivedYear(selectedYear)
 
   // What the copied link actually is. A radionica's link is its own public page
-  // — it has no /upisi entry, so the grade/termin wording below would be wrong.
+  // — it has no /prijava entry, so the grade/termin wording below would be wrong.
   let signupHint: string
   if (radionica) {
     signupHint = 'Javna stranica radionice s prijavnicom.'

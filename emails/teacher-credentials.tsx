@@ -101,7 +101,7 @@ TeacherCredentialsEmail.PreviewProps = {
   lastName: 'Kovač',
   email: 'ivana.kovac@udruga-inovatic.hr',
   password: 'Xk7mQ2ph',
-  loginUrl: 'https://udruga-inovatic.hr/prijava',
+  loginUrl: 'https://udruga-inovatic.hr/portal',
 } satisfies TeacherCredentialsProps
 
 export default TeacherCredentialsEmail

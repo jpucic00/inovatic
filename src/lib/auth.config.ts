@@ -13,7 +13,7 @@ export const authConfig = {
   session: { strategy: 'jwt' },
   providers: [],
   pages: {
-    signIn: '/prijava',
+    signIn: '/portal',
   },
   callbacks: {
     session: ({ session, token }) => {

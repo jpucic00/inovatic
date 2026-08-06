@@ -20,19 +20,19 @@ interface Props {
 /**
  * Per-program signup link.
  *
- * `/upisi` is the public catalog: it narrows programs by the child's razred, so
+ * `/prijava` is the public catalog: it narrows programs by the child's razred, so
  * a 2. razred child is offered SLR 1. That is right for a first enrollment and
  * wrong for a returning one — last year's SLR 1 group moves on to SLR 2 whatever
  * their razred says. This page is the link you send when the program is already
  * decided: it offers that program's termini and nothing else, and the grade
  * narrowing does not apply (InquiryForm's `preselectedCourseId` path bypasses it).
  *
- * `/upisi/natjecateljski-program` is the same route. It is not special-cased —
+ * `/prijava/natjecateljski-program` is the same route. It is not special-cased —
  * the competitive program is simply absent from every public listing, so this
  * unlisted link is the only way in.
  *
  * Deliberately `noindex` and absent from the sitemap: these would otherwise be
- * thin duplicates of `/upisi` and `/programi/<slug>`.
+ * thin duplicates of `/prijava` and `/programi/<slug>`.
  */
 async function getProgramCourse(slug: string) {
   return db.course.findUnique({
@@ -58,7 +58,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: course ? `Prijava – ${course.title}` : 'Prijava',
     // Utility links, not landing pages: keep them out of the index so they
-    // never compete with /upisi or /programi/<slug>.
+    // never compete with /prijava or /programi/<slug>.
     robots: { index: false, follow: false },
   }
 }
@@ -75,7 +75,7 @@ export default async function ProgramSignupPage({ params }: Readonly<Props>) {
   if (isRadionica(course.kind)) notFound()
 
   // A city-bound program is offered in that city only; shared ones (SLR and the
-  // competitive program) let the parent pick, exactly like /upisi.
+  // competitive program) let the parent pick, exactly like /prijava.
   const cities: readonly City[] = course.city ? [course.city] : CITY_VALUES
   const entries = await Promise.all(
     cities.map(async (c) => [c, await getSignupProgram(c, slug)] as const),
@@ -139,7 +139,7 @@ export default async function ProgramSignupPage({ params }: Readonly<Props>) {
           <div className="grid lg:grid-cols-5 gap-10">
             {/* No "Prednosti" card here: this page is reached from an invitation,
                 where the program is already decided — the selling points belong on
-                the public /upisi catalog, not on a link someone was sent. */}
+                the public /prijava catalog, not on a link someone was sent. */}
             <div className="lg:col-span-2 space-y-6 order-1 lg:order-none">
               <SignupContactBox />
             </div>

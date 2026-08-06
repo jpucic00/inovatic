@@ -26,7 +26,7 @@ export async function assertTeacherOwnsGroup(groupId: string): Promise<{
     where: { id: session.user.id },
     select: { deletedAt: true },
   })
-  if (!caller || caller.deletedAt) redirect('/prijava')
+  if (!caller || caller.deletedAt) redirect('/portal')
 
   const group = await db.scheduledGroup.findUnique({
     where: { id: groupId },

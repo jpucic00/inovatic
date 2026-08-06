@@ -3,18 +3,18 @@ import { auth } from '@/lib/auth'
 
 async function requireAuth() {
   const session = await auth()
-  if (!session?.user) redirect('/prijava')
+  if (!session?.user) redirect('/portal')
   // Fail closed: a session without a city claim (legacy token kept alive
   // through a transient DB error on refresh) must never reach tenant-scoped
   // queries — Prisma treats `city: undefined` in a where-clause as "no
   // filter", which would silently disable the separation.
-  if (!session.user.city) redirect('/prijava')
+  if (!session.user.city) redirect('/portal')
   return session
 }
 
 export async function requireAdmin() {
   const session = await requireAuth()
-  if (session.user.role !== 'ADMIN') redirect('/prijava')
+  if (session.user.role !== 'ADMIN') redirect('/portal')
   return session
 }
 
@@ -30,12 +30,12 @@ export async function requireAdminCtx() {
 
 export async function requireTeacher() {
   const session = await requireAuth()
-  if (session.user.role !== 'TEACHER' && session.user.role !== 'ADMIN') redirect('/prijava')
+  if (session.user.role !== 'TEACHER' && session.user.role !== 'ADMIN') redirect('/portal')
   return session
 }
 
 export async function requireStudent() {
   const session = await requireAuth()
-  if (session.user.role !== 'STUDENT') redirect('/prijava')
+  if (session.user.role !== 'STUDENT') redirect('/portal')
   return session
 }

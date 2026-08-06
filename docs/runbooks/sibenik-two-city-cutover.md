@@ -124,7 +124,7 @@ As Slavica, in this order:
 - [ ] **Grupe:** create the Šibenik group(s) at the Trokut location (the location select
       only offers same-city venues; `group.city` is stamped from the venue). Assign
       Slavica as the group's teacher (she appears in the same-city teacher multi-select).
-- [ ] Public check: `/upisi` → pick **Šibenik** → only Trokut groups appear under an open
+- [ ] Public check: `/prijava` → pick **Šibenik** → only Trokut groups appear under an open
       Šibenik window; submitting files an `Inquiry` with `city = SIBENIK`.
 
 ---
@@ -184,4 +184,4 @@ SELECT city, count(*) FROM "Inquiry"        GROUP BY city;
 ```
 
 Sign-off: Trokut present (SIBENIK), Slavica ADMIN/SIBENIK, her panel scoped, public
-`/upisi` Šibenik path works end-to-end.
+`/prijava` Šibenik path works end-to-end.

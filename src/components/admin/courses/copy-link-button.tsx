@@ -6,7 +6,7 @@ import { Check, Copy } from 'lucide-react'
 /**
  * Copies an absolute link to the clipboard — the signup or radionica URL an
  * admin sends to parents. Takes a site-relative `path` so the same button
- * serves `/upisi/<slug>` and `/radionice/<slug>`; the origin comes from the
+ * serves `/prijava/<slug>` and `/radionice/<slug>`; the origin comes from the
  * browser, so it is correct on localhost, staging and production alike.
  */
 export function CopyLinkButton({

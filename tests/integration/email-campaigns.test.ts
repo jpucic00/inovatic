@@ -982,7 +982,7 @@ describe('preporuka selection mode', () => {
 })
 
 describe('previewEmailHtml', () => {
-  it('renders schedule boxes and the /upisi CTA for the invitation kind', async () => {
+  it('renders schedule boxes and the /prijava CTA for the invitation kind', async () => {
     await loginAdmin()
     const target = await makeTarget()
 
@@ -996,7 +996,7 @@ describe('previewEmailHtml', () => {
     if (res.success) {
       expect(res.html).toContain('Termini u novoj školskoj godini:')
       expect(res.html).toContain('Četvrtak · 18:30–20:00')
-      expect(res.html).toContain('/upisi')
+      expect(res.html).toContain('/prijava')
       expect(res.html).toContain(CONTENT.bodyText)
     }
   })
@@ -1014,7 +1014,7 @@ describe('previewEmailHtml', () => {
     expect(res.success).toBe(true)
     // A parent invited to a specific program lands on that program's own form,
     // which offers its termini regardless of the child's razred.
-    if (res.success) expect(res.html).toContain(`/upisi/${target.course.slug}`)
+    if (res.success) expect(res.html).toContain(`/prijava/${target.course.slug}`)
   })
 
   it('points a competition invitation at the unlisted competition link', async () => {
@@ -1035,7 +1035,7 @@ describe('previewEmailHtml', () => {
       ...CONTENT,
     })
     expect(res.success).toBe(true)
-    if (res.success) expect(res.html).toContain(`/upisi/${course.slug}`)
+    if (res.success) expect(res.html).toContain(`/prijava/${course.slug}`)
   })
 
   it('renders neither schedules nor CTA for the custom kind', async () => {
@@ -1044,7 +1044,7 @@ describe('previewEmailHtml', () => {
     expect(res.success).toBe(true)
     if (res.success) {
       expect(res.html).not.toContain('Termini u novoj školskoj godini:')
-      expect(res.html).not.toContain('/upisi')
+      expect(res.html).not.toContain('/prijava')
     }
   })
 

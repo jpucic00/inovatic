@@ -94,7 +94,7 @@ describe('/api/upload/gallery role rejection', () => {
   })
 })
 
-describe('Route guards bounce wrong roles to /prijava (via redirect throw)', () => {
+describe('Route guards bounce wrong roles to /portal (via redirect throw)', () => {
   it('requireAdmin throws NEXT_REDIRECT when unauthenticated', async () => {
     mockSession(null)
     await expect(requireAdmin()).rejects.toThrow(/NEXT_REDIRECT/)

@@ -18,7 +18,7 @@ test.describe('Public Pages — All routes return HTTP 200', () => {
     { path: '/programi/slr-4', name: 'SLR 4 — Expert course (ages 12–14)' },
     { path: '/o-nama', name: 'About — Association history, team, mission' },
     { path: '/novosti', name: 'News — Paginated article listing' },
-    { path: '/upisi', name: 'Inquiry form — Multi-step parent registration' },
+    { path: '/prijava', name: 'Inquiry form — Multi-step parent registration' },
     { path: '/lokacije', name: 'Locations overview — Split & Šibenik' },
     { path: '/lokacije/split', name: 'Split — venues, coordinators, maps' },
     { path: '/lokacije/sibenik', name: 'Šibenik — Trokut inkubator' },

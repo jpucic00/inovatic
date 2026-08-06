@@ -7,7 +7,7 @@
  * admin. The cutoff is the start day, and it is enforced twice:
  *
  *   - `loadPrograms` → `toActiveGroup` drops the group, which covers every
- *     public surface at once (`/upisi`, `/radionice/<slug>`, `/upisi/<slug>`
+ *     public surface at once (`/prijava`, `/radionice/<slug>`, `/prijava/<slug>`
  *     and the `/api/group-availability` poll behind them)
  *   - `submitInquiry` re-checks it, so a tab left open across the start date
  *     cannot post the termin it still has rendered

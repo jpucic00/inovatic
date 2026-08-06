@@ -91,10 +91,10 @@ function toActiveGroup(
  *
  * `courseWhere` narrows which programs are in scope, and is the ONLY difference
  * between the public feed and the per-program signup link:
- *   - `/upisi` + `/api/group-availability` exclude COMPETITION entirely — the
+ *   - `/prijava` + `/api/group-availability` exclude COMPETITION entirely — the
  *     competitive track is invitation-only and must never appear in a public
  *     listing.
- *   - `/upisi/<slug>` asks for exactly one program by slug, competition included.
+ *   - `/prijava/<slug>` asks for exactly one program by slug, competition included.
  *
  * Everything else — the per-city enrollment window, capacity, holiday-aware
  * module arcs, the radionica start-date cutoff — is shared, so the two feeds can
@@ -227,7 +227,7 @@ async function loadPrograms(
 }
 
 /**
- * The public `/upisi` catalog. COMPETITION is deliberately absent: signing up
+ * The public `/prijava` catalog. COMPETITION is deliberately absent: signing up
  * for the competitive track happens only through the invitation link.
  */
 export async function getActivePrograms(city: City): Promise<ActiveProgram[]> {
@@ -235,7 +235,7 @@ export async function getActivePrograms(city: City): Promise<ActiveProgram[]> {
 }
 
 /**
- * One program by slug, for its own signup link (`/upisi/<slug>`). Returns null
+ * One program by slug, for its own signup link (`/prijava/<slug>`). Returns null
  * when the slug is unknown or that program has no open window / no bookable
  * group in this city — the page renders a closed-signups state either way, so a
  * link already mailed out never has to be retracted.

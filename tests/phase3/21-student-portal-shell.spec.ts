@@ -90,17 +90,19 @@ test.describe('Phase 3 Step 10 — Student Portal Shell', () => {
 
   // ── Redirects ──────────────────────────────────────────────────────────────
 
-  test('unauthenticated visitor is redirected from /portal to /prijava', async ({ page }) => {
+  test('unauthenticated visitor gets the login screen in place on /portal', async ({ page }) => {
+    // /portal doubles as the sign-in URL — the login form renders directly,
+    // with no redirect (every guard points here, so bouncing would loop).
     await page.goto(`${BASE}/portal`)
-    await page.waitForURL(/\/prijava/, { timeout: 30000 })
-    expect(page.url()).toContain('/prijava')
+    await expect(page.locator('h1')).toHaveText('Prijava')
+    expect(page.url()).toContain('/portal')
   })
 
-  test('admin on /portal is redirected by requireStudent() guard', async ({ page }) => {
+  test('admin on /portal is bounced to /admin', async ({ page }) => {
     await loginAsAdmin(page)
     await page.goto(`${BASE}/portal`)
-    await page.waitForURL(/\/prijava/, { timeout: 30000 })
-    expect(page.url()).toContain('/prijava')
+    await page.waitForURL(/\/admin/, { timeout: 30000 })
+    expect(page.url()).toContain('/admin')
   })
 
   // ── Zero-enrollment experience ─────────────────────────────────────────────

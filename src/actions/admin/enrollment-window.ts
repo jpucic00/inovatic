@@ -31,7 +31,7 @@ export async function upsertEnrollmentWindow(
 
     revalidatePath('/admin/programi', 'layout')
     revalidatePath('/admin/grupe', 'layout')
-    revalidatePath('/upisi')
+    revalidatePath('/prijava')
     revalidatePath('/radionice', 'layout')
     return { success: true }
   })

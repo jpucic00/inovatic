@@ -196,7 +196,7 @@ export function sendTeacherCredentialsEmail(params: {
       lastName: params.lastName,
       email: params.to,
       password: params.password,
-      loginUrl: `${baseUrl}/prijava`,
+      loginUrl: `${baseUrl}/portal`,
     }),
   })
 }
@@ -213,7 +213,7 @@ type BulkMessageParams = {
   options?: GroupOption[]
   /**
    * Site-relative path the "Ispunite prijavu" button links to, e.g.
-   * `/upisi/slr-3`. Set on REENROLLMENT invitations only — an invitation links
+   * `/prijava/slr-3`. Set on REENROLLMENT invitations only — an invitation links
    * to the program it invited the child to, not to the generic catalog, so the
    * parent lands on a form already narrowed to the right termini. Absent = no
    * button.

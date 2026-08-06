@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { BASE, loginAsAdmin } from '../helpers/phase3'
 import { clickUntilVisible } from '../helpers/hydration'
-import { fillInquiryStep1 } from '../helpers/upisi'
+import { fillInquiryStep1 } from '../helpers/prijava'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 — Inquiry field round-trip: childGrade + referralSource
@@ -57,7 +57,7 @@ const INQUIRY_EMPTY_REFERRAL: InquiryData = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function submitInquiry(page: Page, data: InquiryData) {
-  await page.goto(`${BASE}/upisi`)
+  await page.goto(`${BASE}/prijava`)
 
   // Step 1 — city + parent info
   await fillInquiryStep1(page, data)
@@ -194,7 +194,7 @@ test.describe.serial('noSuitableTermin round-trip — competition signup link', 
 
   test('parent submits with "Ne odgovara mi predloženi termin" and a srednja-škola grade', async ({ page }) => {
     test.setTimeout(120000)
-    await page.goto(`${BASE}/upisi/natjecateljski-program`)
+    await page.goto(`${BASE}/prijava/natjecateljski-program`)
 
     await fillInquiryStep1(page, COMPETITION_INQUIRY)
 

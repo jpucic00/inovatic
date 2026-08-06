@@ -1,17 +1,38 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 
+import { auth } from '@/lib/auth'
 import { getMyCurrentEnrollments, type StudentEnrollmentSummary } from '@/actions/student/dashboard'
 import { getEffectiveMaterialsForStudent } from '@/actions/student/materials'
+import { LoginScreen } from '@/components/auth/login-screen'
 import { GroupMaterialsScreen } from '@/components/portal/group-materials-screen'
 import { GroupCard, groupByCourse } from '@/components/shared/group-card'
 import { formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
 
 export const metadata: Metadata = {
-  title: 'Portal – Moje grupe',
+  title: 'Polaznički portal',
+  description: 'Prijava u Inovatic portal za učenike i nastavnike.',
+  // Private auth entry point — keep it out of search indexes.
+  robots: { index: false, follow: false },
 }
 
-export default async function PortalDashboard() {
+/**
+ * `/portal` is both the sign-in URL and the student dashboard. A guest — and,
+ * failing closed, a legacy session without a city claim — gets the login
+ * screen rendered in place: every auth guard redirects here, so redirecting
+ * onward would loop. Signed-in staff bounce to their own panel, mirroring the
+ * login action's role routing.
+ */
+export default async function PortalPage() {
+  const session = await auth()
+  if (!session?.user?.city) return <LoginScreen />
+  if (session.user.role === 'ADMIN') redirect('/admin')
+  if (session.user.role === 'TEACHER') redirect('/nastavnik')
+  return <PortalDashboard />
+}
+
+async function PortalDashboard() {
   const enrollments = await getMyCurrentEnrollments()
 
   if (enrollments.length === 0) {

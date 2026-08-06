@@ -59,28 +59,28 @@ async function course(kind: 'STANDARD' | 'COMPETITION' | 'RADIONICA', slug: stri
 /**
  * The link behind "Kopiraj URL za upise" on /admin/programi/[courseId].
  *
- * It used to be `/upisi/<slug>` for every kind, but /upisi/[slug] answers
+ * It used to be `/prijava/<slug>` for every kind, but /prijava/[slug] answers
  * notFound() for a radionica — so on a radionica's detail page the admin copied
  * a link that 404'd. The list rows were already correct, which is why only the
  * detail page misbehaved.
  */
 describe('getProgramDetail — copied signup link', () => {
-  it('points the SLR ladder at /upisi/<slug>', async () => {
+  it('points the SLR ladder at /prijava/<slug>', async () => {
     const c = await course('STANDARD', 'signup-link-standard')
     const { course: detail } = await getProgramDetail(c.id)
-    expect(detail.signupPath).toBe('/upisi/signup-link-standard')
+    expect(detail.signupPath).toBe('/prijava/signup-link-standard')
   })
 
-  it('points the competitive program at /upisi/<slug>', async () => {
+  it('points the competitive program at /prijava/<slug>', async () => {
     const c = await course('COMPETITION', 'signup-link-competition')
     const { course: detail } = await getProgramDetail(c.id)
-    expect(detail.signupPath).toBe('/upisi/signup-link-competition')
+    expect(detail.signupPath).toBe('/prijava/signup-link-competition')
   })
 
-  it('points a radionica at its own /radionice/<slug> page, not /upisi', async () => {
+  it('points a radionica at its own /radionice/<slug> page, not /prijava', async () => {
     const c = await course('RADIONICA', 'signup-link-radionica')
     const { course: detail } = await getProgramDetail(c.id)
     expect(detail.signupPath).toBe('/radionice/signup-link-radionica')
-    expect(detail.signupPath).not.toContain('/upisi/')
+    expect(detail.signupPath).not.toContain('/prijava/')
   })
 })
