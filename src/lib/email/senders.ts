@@ -3,9 +3,8 @@ import { render } from '@react-email/components'
 import type { City } from '@prisma/client'
 import type { EvaluationCard } from '@/lib/evaluation-email-cards'
 import { ASSOCIATION_EMAIL, sendTransactionalEmail } from './client'
-import InquiryConfirmationEmail, {
-  type InquiryNextStep,
-} from '../../../emails/inquiry-confirmation'
+import type { InquiryNextStep } from '@/lib/inquiry-next-step'
+import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
 import PartyInquiryConfirmationEmail from '../../../emails/party-inquiry-confirmation'
 import StemEducationInquiryEmail from '../../../emails/stem-education-inquiry'
 import StemEducationConfirmationEmail from '../../../emails/stem-education-confirmation'

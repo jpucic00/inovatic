@@ -9,6 +9,11 @@ import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
 import { submitInquiry } from '@/actions/inquiry'
 import { trackUmamiEvent } from '@/lib/umami'
 import { isTerminRequired } from '@/lib/inquiry-availability'
+import {
+  INQUIRY_NEXT_STEP_TEXT,
+  inquiryNextStep,
+  type InquiryNextStep,
+} from '@/lib/inquiry-next-step'
 import type { ActiveProgram } from '@/actions/public/programs'
 import { InquiryStep1 } from './inquiry/InquiryStep1'
 import { InquiryStep2 } from './inquiry/InquiryStep2'
@@ -56,6 +61,9 @@ export function InquiryForm({
   const [step, setStep] = useState(1)
   const [done, setDone] = useState(false)
   const [submittedCount, setSubmittedCount] = useState(0)
+  // What the success screen promises, decided from the submission that produced
+  // it — same call and same copy as the confirmation e-mail.
+  const [nextStep, setNextStep] = useState<InquiryNextStep>('TERMIN_TO_OFFER')
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   // Live availability keyed by city — the 30s poll / GROUP_FULL refresh only
@@ -176,6 +184,7 @@ export function InquiryForm({
       if (result.success) {
         trackUmamiEvent('course-inquiry', { city: data.city })
         setSubmittedCount((c) => c + 1)
+        setNextStep(inquiryNextStep(data.scheduledGroupId, data.noSuitableTermin))
         setDone(true)
       } else if ('code' in result) {
         // Availability shifted since render (a slot opened or filled, a
@@ -214,8 +223,10 @@ export function InquiryForm({
           {submittedCount > 1 ? 'Još jedan upit je poslan!' : 'Upit je poslan!'}
         </h2>
         <p className="text-gray-600 max-w-md mx-auto">
-          Zahvaljujemo na upitu. Provjerite email — poslali smo potvrdu. Kontaktirat ćemo vas s dostupnim terminima u
-          najkraćem mogućem roku.
+          Zahvaljujemo na upitu. Provjerite email — poslali smo potvrdu.
+        </p>
+        <p className="text-gray-600 max-w-md mx-auto mt-3">
+          {INQUIRY_NEXT_STEP_TEXT[nextStep]}
         </p>
         <button
           type="button"

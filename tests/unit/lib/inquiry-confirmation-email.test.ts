@@ -13,9 +13,8 @@
 import { createElement } from 'react'
 import { render } from '@react-email/components'
 import { describe, expect, it } from 'vitest'
-import InquiryConfirmationEmail, {
-  type InquiryNextStep,
-} from '../../../emails/inquiry-confirmation'
+import type { InquiryNextStep } from '@/lib/inquiry-next-step'
+import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
 
 const baseProps = {
   parentName: 'Ana Anić',

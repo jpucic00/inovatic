@@ -1,39 +1,17 @@
 import { Heading, Hr, Link, Section, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
+// Relative — `emails/` sits outside the `@/*` alias. Shared with the form's
+// success screen so the two can never disagree about what happens next.
+import {
+  INQUIRY_NEXT_STEP_TEXT,
+  type InquiryNextStep,
+} from '../src/lib/inquiry-next-step'
 
 const courseLevelLabels: Record<string, string> = {
   SLR_1: 'Svijet LEGO Robotike 1 (6–8 god.)',
   SLR_2: 'Svijet LEGO Robotike 2 (9–10 god.)',
   SLR_3: 'Svijet LEGO Robotike 3 (11–12 god.)',
   SLR_4: 'Svijet LEGO Robotike 4 (13–14 god.)',
-}
-
-/**
- * What actually happens next, which is not the same for every inquiry:
- *
- * - `TERMIN_CHOSEN` — the parent booked a termin in the form's dropdown, so
- *   there is nothing left to offer them; what remains is the admin turning the
- *   inquiry into an account. Promising to "contact you with available termini"
- *   here reads as if their choice never arrived.
- * - `TERMIN_TO_ARRANGE` — the competitive program's "Ne odgovara mi predloženi
- *   termin" answer. They have already seen the termini and refused them, so the
- *   next step is agreeing on one, not sending the same list again.
- * - `TERMIN_TO_OFFER` — no termin was chosen because none was on the table
- *   (every radionica termin has passed, or the grade has no open group). This
- *   is the only case the original single sentence described.
- */
-export type InquiryNextStep = 'TERMIN_CHOSEN' | 'TERMIN_TO_ARRANGE' | 'TERMIN_TO_OFFER'
-
-const NEXT_STEP_TEXT: Record<InquiryNextStep, string> = {
-  TERMIN_CHOSEN:
-    'Vaš odabrani termin je zabilježen. Nakon pregleda prijave javit ćemo vam se s ' +
-    'potvrdom upisa i svim potrebnim informacijama u najkraćem mogućem roku.',
-  TERMIN_TO_ARRANGE:
-    'Zabilježili smo da vam ponuđeni termini ne odgovaraju. Javit ćemo vam se u ' +
-    'najkraćem mogućem roku kako bismo dogovorili termin koji vam odgovara.',
-  TERMIN_TO_OFFER:
-    'Naš tim će pregledati vašu prijavu i kontaktirati vas s dostupnim terminima i ' +
-    'grupama u najkraćem mogućem roku.',
 }
 
 interface InquiryConfirmationProps {
@@ -114,7 +92,7 @@ function InquiryConfirmationEmail({
           <Hr style={emailStyles.hr} />
         </>
       )}
-      <Text style={emailStyles.text}>{NEXT_STEP_TEXT[nextStep]}</Text>
+      <Text style={emailStyles.text}>{INQUIRY_NEXT_STEP_TEXT[nextStep]}</Text>
       <Text style={emailStyles.text}>
         U međuvremenu, možete saznati više o našim programima na{' '}
         <Link href="https://udruga-inovatic.hr/programi" style={emailStyles.link}>

@@ -3,11 +3,7 @@
 import { Prisma } from '@prisma/client'
 import type { City, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
-import {
-  sendInquiryConfirmationEmail,
-  sendPartyInquiryConfirmationEmail,
-  type InquiryNextStep,
-} from '@/lib/email'
+import { sendInquiryConfirmationEmail, sendPartyInquiryConfirmationEmail } from '@/lib/email'
 import {
   inquirySchema,
   partyInquirySchema,
@@ -24,6 +20,7 @@ import {
 import { CITY_LABELS } from '@/lib/city'
 import { computeSchoolYear } from '@/lib/school-year'
 import { isHighSchoolGrade } from '@/lib/inquiry-status'
+import { inquiryNextStep } from '@/lib/inquiry-next-step'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
 import { radionicaDepositAmount } from '@/lib/radionica-deposit'
 import { isRadionicaOpenForSignup } from '@/lib/session-dates'
@@ -73,22 +70,6 @@ async function loadProgramsForCheck(
     return program ? [program] : []
   }
   return getActivePrograms(city)
-}
-
-/**
- * What the confirmation e-mail should promise the parent. Since the form gained
- * its termin dropdown most parents book their own slot, so the blanket "we will
- * contact you with available termini" is only true for the two cases where no
- * slot was taken: none was on offer, or the competitive program's parent said
- * none of the offered ones suit them.
- */
-function inquiryNextStep(
-  scheduledGroupId: string | undefined,
-  noSuitableTermin: boolean | undefined,
-): InquiryNextStep {
-  if (scheduledGroupId) return 'TERMIN_CHOSEN'
-  if (noSuitableTermin) return 'TERMIN_TO_ARRANGE'
-  return 'TERMIN_TO_OFFER'
 }
 
 type InquiryActionResult =
