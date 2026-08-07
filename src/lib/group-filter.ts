@@ -61,9 +61,16 @@ const NEUTRAL: Palette = {
 }
 
 const PALETTES: Record<string, Palette> = {
+  // Indigo, not emerald: on the weekly grid the fill is the only thing telling
+  // two programs apart, and emerald against SLR 2's green measured ΔE 0.015
+  // (fill) / 0.038 (border) in OKLab — under the just-noticeable threshold, so
+  // the two read as one program. Indigo's nearest neighbour is SLR 4's purple at
+  // 0.026 / 0.077. Blue was the other candidate and is marginally better against
+  // purple, but its border lands 0.045 from radionice sky — back at the
+  // emerald/green failure — so it only moves the collision onto the chip row.
   UVOD: {
-    bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-800',
-    dot: 'bg-emerald-500', active: 'border-emerald-500 bg-emerald-500 text-white', ring: 'focus-visible:ring-emerald-400',
+    bg: 'bg-indigo-100', border: 'border-indigo-300', text: 'text-indigo-800',
+    dot: 'bg-indigo-500', active: 'border-indigo-500 bg-indigo-500 text-white', ring: 'focus-visible:ring-indigo-400',
   },
   SLR_1: {
     bg: 'bg-cyan-100', border: 'border-cyan-300', text: 'text-cyan-800',
@@ -95,7 +102,7 @@ const PALETTES: Record<string, Palette> = {
   // colours so the chip reads as "all of the above" rather than a sixth program.
   standard: {
     ...NEUTRAL,
-    dot: 'bg-gradient-to-br from-emerald-500 via-cyan-500 to-purple-500',
+    dot: 'bg-gradient-to-br from-indigo-500 via-green-500 to-purple-500',
   },
 }
 
