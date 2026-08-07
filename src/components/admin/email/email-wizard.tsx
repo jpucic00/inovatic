@@ -133,7 +133,7 @@ const DEFAULT_INVITATION_BODY = [
 const DEFAULT_EVALUATION_BODY = [
   'Poštovani,',
   'U nastavku se nalazi evaluacija Vašeg djeteta po završetku programa. Opisuje napredak kroz praktične i timske vještine te preporuku mentora za nastavak.',
-  'Evaluacija je uvijek dostupna i u učeničkom portalu. Za sva pitanja slobodno nam odgovorite na ovu poruku.',
+  'Evaluacija je uvijek dostupna u polazničkom portalu. Za sva pitanja slobodno nam odgovorite na ovu poruku.',
 ].join('\n')
 
 const SELECT_CLASS =

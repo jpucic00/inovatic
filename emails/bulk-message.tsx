@@ -71,7 +71,7 @@ function BulkMessageEmail({ bodyText, options, signupUrl, cards, subject }: Bulk
             <EvaluationCardBlock key={i} card={card} />
           ))}
           <Text style={emailStyles.textSmall}>
-            Evaluacija je uvijek dostupna i u učeničkom portalu, pod
+            Evaluacija je uvijek dostupna u polazničkom portalu, pod
             &nbsp;<strong>Evaluacija</strong>.
           </Text>
         </>
