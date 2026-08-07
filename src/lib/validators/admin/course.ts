@@ -3,8 +3,11 @@ import { z } from 'zod'
 export const createCourseSchema = z.object({
   title: z.string().min(2, 'Naziv mora imati najmanje 2 znaka'),
   description: z.string().min(5, 'Opis mora imati najmanje 5 znakova'),
-  ageMin: z.coerce.number().int().min(3).max(18),
-  ageMax: z.coerce.number().int().min(3).max(18),
+  // Upper bound is 19, not 18: the natjecateljski program keeps competitors
+  // through secondary school (its signup link offers grades ss1–ss4), and a
+  // 4th-year student turns 19 during the school year.
+  ageMin: z.coerce.number().int().min(3).max(19),
+  ageMax: z.coerce.number().int().min(3).max(19),
   // A blank number input arrives as '' — coercion would turn it into 0 and
   // trip .positive(), so blanks become undefined before the optional gate.
   // Price is genuinely optional: a radionica may be free or priced later.

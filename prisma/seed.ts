@@ -1612,8 +1612,11 @@ export async function seedCompetitionProgram() {
         'žele dodatne izazove. Kroz cijelu školsku godinu timovi se pripremaju i nastupaju na ' +
         'najprestižnijim robotičkim natjecanjima u Hrvatskoj i svijetu. Upis je isključivo po ' +
         'preporuci mentora, putem osobne poveznice za prijavu.',
+      // Runs up to 19: unlike the SLR ladder this program keeps its competitors
+      // through secondary school, which is why its signup link offers the
+      // ss1–ss4 grades that no other program does.
       ageMin: 10,
-      ageMax: 15,
+      ageMax: 19,
       // After SLR 1–4 (sortOrder 1–4), before radionice (99).
       sortOrder: 5,
       // Shared catalog, like the standard programs.

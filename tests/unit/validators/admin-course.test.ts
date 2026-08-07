@@ -39,8 +39,13 @@ describe('createCourseSchema', () => {
     expect(createCourseSchema.safeParse({ ...validCourse, ageMin: 2 }).success).toBe(false)
   })
 
-  it('rejects ageMax > 18', () => {
-    expect(createCourseSchema.safeParse({ ...validCourse, ageMax: 19 }).success).toBe(false)
+  // 19 is in range because the natjecateljski program runs 10–19; 20 is not.
+  it('accepts ageMax up to 19', () => {
+    expect(createCourseSchema.safeParse({ ...validCourse, ageMax: 19 }).success).toBe(true)
+  })
+
+  it('rejects ageMax > 19', () => {
+    expect(createCourseSchema.safeParse({ ...validCourse, ageMax: 20 }).success).toBe(false)
   })
 
   it('rejects price <= 0', () => {
@@ -90,7 +95,7 @@ describe('updateCourseSchema', () => {
 
   it('inherits the field rules from createCourseSchema', () => {
     expect(updateCourseSchema.safeParse({ ...validUpdate, title: 'S' }).success).toBe(false)
-    expect(updateCourseSchema.safeParse({ ...validUpdate, ageMax: 19 }).success).toBe(false)
+    expect(updateCourseSchema.safeParse({ ...validUpdate, ageMax: 20 }).success).toBe(false)
     expect(updateCourseSchema.safeParse({ ...validUpdate, price: 0 }).success).toBe(false)
     expect(updateCourseSchema.parse({ ...validUpdate, price: '' }).price).toBeUndefined()
   })
