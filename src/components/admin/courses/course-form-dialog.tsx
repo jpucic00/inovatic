@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { Pencil, Plus } from 'lucide-react'
 import type { z } from 'zod'
+import type { ProgramKind } from '@prisma/client'
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { createCourseSchema, type CreateCourseInput } from '@/lib/validators/admin/course'
 import { createCourse, updateCourse } from '@/actions/admin/course'
+import { isRadionica } from '@/lib/program-kind'
 import { adminInputClass as inputClass } from '@/lib/admin-styles'
 
 type EditableCourse = {
@@ -25,6 +27,7 @@ type EditableCourse = {
   ageMin: number
   ageMax: number
   price: number | null
+  kind: ProgramKind
 }
 
 // z.input, not the parsed output: the number inputs hand back strings and the
@@ -51,14 +54,18 @@ function defaultsFor(course?: EditableCourse): FormValues {
 
 /**
  * One form for both radionica create and edit — same fields, same validation.
- * Standard SLR programs are not editable here (the server action refuses them);
- * only radionice ever get this dialog.
+ * Standard SLR programs are not editable here (the server action refuses them),
+ * so this dialog is opened by radionice and by the natjecateljski program.
  */
 export function CourseFormDialog({ course, compact = false }: Readonly<Props>) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const isEdit = course != null
+  // Creating from here always makes a radionica ("Nova radionica"); an edit
+  // follows the row it was opened on.
+  const workshop = isRadionica(course?.kind ?? 'RADIONICA')
+  const noun = workshop ? 'radionicu' : 'program'
 
   const {
     register,
@@ -105,7 +112,7 @@ export function CourseFormDialog({ course, compact = false }: Readonly<Props>) {
       <DialogTrigger asChild>
         {isEdit ? (
           <button
-            title="Uredi radionicu"
+            title={`Uredi ${noun}`}
             className={
               compact
                 ? 'inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors'
@@ -124,7 +131,7 @@ export function CourseFormDialog({ course, compact = false }: Readonly<Props>) {
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Uredi radionicu' : 'Nova radionica'}</DialogTitle>
+          <DialogTitle>{isEdit ? `Uredi ${noun}` : 'Nova radionica'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div>
@@ -139,7 +146,7 @@ export function CourseFormDialog({ course, compact = false }: Readonly<Props>) {
               {...register('description')}
               rows={3}
               className={`${inputClass} resize-none`}
-              placeholder="Kratki opis radionice..."
+              placeholder={workshop ? 'Kratki opis radionice...' : 'Kratki opis programa...'}
             />
             {errors.description && <p className="text-xs text-red-600 mt-1">{errors.description.message}</p>}
           </div>
@@ -155,14 +162,21 @@ export function CourseFormDialog({ course, compact = false }: Readonly<Props>) {
               {errors.ageMax && <p className="text-xs text-red-600 mt-1">{errors.ageMax.message}</p>}
             </div>
           </div>
-          <div>
-            <label htmlFor="course-price" className="block text-sm font-medium text-gray-700 mb-1">Cijena radionice (€)</label>
-            <input id="course-price" {...register('price')} type="number" step="0.01" className={inputClass} placeholder="npr. 80" />
-            {errors.price && <p className="text-xs text-red-600 mt-1">{errors.price.message}</p>}
-          </div>
+          {/* Cijena is the radionica's single up-front fee — the one the
+              akontacija is derived from. The natjecateljski program is billed
+              monthly and has no field for that yet, so it is hidden rather than
+              removed: the stored value still round-trips through the form's
+              defaults, so saving here never blanks it. */}
+          {workshop && (
+            <div>
+              <label htmlFor="course-price" className="block text-sm font-medium text-gray-700 mb-1">Cijena radionice (€)</label>
+              <input id="course-price" {...register('price')} type="number" step="0.01" className={inputClass} placeholder="npr. 80" />
+              {errors.price && <p className="text-xs text-red-600 mt-1">{errors.price.message}</p>}
+            </div>
+          )}
           {isEdit && (
             <p className="text-xs text-gray-400">
-              Javna poveznica radionice ostaje ista i nakon promjene naziva.
+              Javna poveznica ostaje ista i nakon promjene naziva.
             </p>
           )}
           <div className="flex justify-end gap-3 pt-2">

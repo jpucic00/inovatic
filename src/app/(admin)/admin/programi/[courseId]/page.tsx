@@ -109,6 +109,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
                 ageMin: course.ageMin,
                 ageMax: course.ageMax,
                 price: course.price,
+                kind: course.kind,
               }}
             />
           )}
