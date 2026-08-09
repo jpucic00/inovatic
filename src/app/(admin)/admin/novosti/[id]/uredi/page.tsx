@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
 import { requireAdmin } from '@/lib/auth-guard'
+import { BackToListLink } from '@/components/admin/back-to-list-link'
 import { getArticle } from '@/actions/admin/article'
 import { getAllTags } from '@/actions/admin/tag'
 import { ArticleForm } from '@/components/admin/articles/article-form'
@@ -25,13 +24,7 @@ export default async function EditArticlePage({ params }: Readonly<PageProps>) {
   return (
     <div>
       <div className="flex items-center justify-between gap-4 mb-6">
-        <Link
-          href="/admin/novosti"
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Natrag na članke
-        </Link>
+        <BackToListLink listPath="/admin/novosti" label="Natrag na članke" />
         <DeleteArticleButton
           articleId={article.id}
           articleTitle={article.title}

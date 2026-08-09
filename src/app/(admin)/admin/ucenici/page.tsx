@@ -9,6 +9,10 @@ import { StudentFilters } from '@/components/admin/students/student-filters'
 import { StudentTable } from '@/components/admin/students/student-table'
 import { CreateStudentDialog } from '@/components/admin/students/create-student-dialog'
 import { Pagination } from '@/components/admin/pagination'
+import {
+  ListFilterMemory,
+  type ActiveFilterChip,
+} from '@/components/admin/list-filter-memory'
 import { PAYMENT_FILTER_VALUES, type PaymentFilter } from '@/lib/payment-status'
 
 export const metadata: Metadata = { title: 'Admin – Učenici' }
@@ -61,6 +65,31 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
     isModuleView ? Promise.resolve<string[]>([]) : getAllSchoolYears(),
   ])
 
+  // Ids are what the URL carries, but nothing on screen should say "grupa
+  // cme3k9…" — every chip is resolved to the label the admin picked.
+  const selectedGroup = groups.find((g) => g.id === groupId)
+  const chips: ActiveFilterChip[] = [
+    year && { key: 'year', label: `Godina: ${year}` },
+    courseId && {
+      key: 'courseId',
+      label: `Program: ${courses.find((c) => c.id === courseId)?.title ?? courseId}`,
+    },
+    groupId && {
+      key: 'groupId',
+      label: `Grupa: ${selectedGroup ? (selectedGroup.name ?? selectedGroup.course.title) : groupId}`,
+    },
+    paymentStatus && {
+      key: 'payment',
+      label: paymentStatus === 'PAID' ? 'Plaćeno' : 'Nije plaćeno',
+    },
+    scheduleId &&
+      scheduleInfo && {
+        key: 'scheduleId',
+        label: `Modul: ${scheduleInfo.module.course.title} – ${scheduleInfo.module.title}`,
+      },
+    search && { key: 'search', label: `Pretraga: „${search}”` },
+  ].filter((c): c is ActiveFilterChip => Boolean(c))
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -83,6 +112,8 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
           />
         )}
       </div>
+
+      <ListFilterMemory listPath="/admin/ucenici" chips={chips} />
 
       <StudentFilters
         currentSearch={search}

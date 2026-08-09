@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, MapPin } from 'lucide-react'
+import { MapPin } from 'lucide-react'
+import { BackToListLink } from '@/components/admin/back-to-list-link'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { getGroupDetail } from '@/actions/admin/group'
 import { getAssignableTeachers } from '@/actions/admin/teacher'
@@ -85,13 +86,7 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   return (
     <div className="max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link
-          href="/admin/grupe"
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Natrag na grupe
-        </Link>
+        <BackToListLink listPath="/admin/grupe" label="Natrag na grupe" />
       </div>
 
       <div className="flex items-start justify-between mb-8">

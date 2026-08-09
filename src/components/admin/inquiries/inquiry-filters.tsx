@@ -53,41 +53,13 @@ export function InquiryFilters({ currentStatus, currentSearch, currentCourse, cu
   }
 
   return (
-    <div className="flex flex-col sm:flex-row gap-3 mb-6">
-      <select
-        value={currentType || 'ALL'}
-        onChange={(e) => pushUrl({ type: e.target.value })}
-        className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-      >
-        <option value="ALL">Sve vrste</option>
-        <option value="COURSE">Upisi</option>
-        <option value="PARTY">Proslave</option>
-      </select>
-
-      <select
-        value={currentCourse}
-        onChange={(e) => pushUrl({ course: e.target.value })}
-        className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-      >
-        <option value="">Svi upiti</option>
-        {courses.map((c) => (
-          <option key={c.id} value={c.id}>{c.title}</option>
-        ))}
-        <option value="NONE">Upiti bez preference programa</option>
-      </select>
-
-      <select
-        value={currentGrade}
-        onChange={(e) => pushUrl({ grade: e.target.value })}
-        className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-      >
-        <option value="">Svi razredi</option>
-        {GRADE_VALUES.map((v) => (
-          <option key={v} value={v}>{GRADE_LABELS[v]}</option>
-        ))}
-      </select>
-
-      <form onSubmit={handleSearchSubmit} className="relative flex-1 flex gap-2">
+    // Search on its own row, filters under it — same shape as /admin/ucenici.
+    // All six controls used to share one `sm:flex-row`, where the three selects
+    // and the status buttons take their content width and only the search form
+    // flexes: at desktop width it was squeezed down to about its magnifier
+    // icon, too narrow to show the placeholder or read what had been typed.
+    <div className="flex flex-col gap-3 mb-6">
+      <form onSubmit={handleSearchSubmit} className="relative flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           <Input
@@ -105,27 +77,64 @@ export function InquiryFilters({ currentStatus, currentSearch, currentCourse, cu
         </button>
       </form>
 
-      <div className="flex gap-1 flex-wrap">
-        {STATUSES.map((s) => {
-          const isActive =
-            s.value === 'ALL'
-              ? !currentStatus || currentStatus === 'ALL'
-              : currentStatus === s.value
-          return (
-            <button
-              key={s.value}
-              onClick={() => pushUrl({ status: s.value })}
-              className={cn(
-                'px-3 py-1.5 text-sm rounded-md border transition-colors whitespace-nowrap',
-                isActive
-                  ? 'bg-cyan-600 text-white border-cyan-600'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400',
-              )}
-            >
-              {s.label}
-            </button>
-          )
-        })}
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={currentType || 'ALL'}
+          onChange={(e) => pushUrl({ type: e.target.value })}
+          className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+        >
+          <option value="ALL">Sve vrste</option>
+          <option value="COURSE">Upisi</option>
+          <option value="PARTY">Proslave</option>
+        </select>
+
+        <select
+          value={currentCourse}
+          onChange={(e) => pushUrl({ course: e.target.value })}
+          className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+        >
+          <option value="">Svi upiti</option>
+          {courses.map((c) => (
+            <option key={c.id} value={c.id}>{c.title}</option>
+          ))}
+          <option value="NONE">Upiti bez preference programa</option>
+        </select>
+
+        <select
+          value={currentGrade}
+          onChange={(e) => pushUrl({ grade: e.target.value })}
+          className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+        >
+          <option value="">Svi razredi</option>
+          {GRADE_VALUES.map((v) => (
+            <option key={v} value={v}>{GRADE_LABELS[v]}</option>
+          ))}
+        </select>
+
+        {/* Pushed to the far end so the status tabs read as their own group
+            rather than a fourth dropdown. */}
+        <div className="flex gap-1 flex-wrap sm:ml-auto">
+          {STATUSES.map((s) => {
+            const isActive =
+              s.value === 'ALL'
+                ? !currentStatus || currentStatus === 'ALL'
+                : currentStatus === s.value
+            return (
+              <button
+                key={s.value}
+                onClick={() => pushUrl({ status: s.value })}
+                className={cn(
+                  'px-3 py-1.5 text-sm rounded-md border transition-colors whitespace-nowrap',
+                  isActive
+                    ? 'bg-cyan-600 text-white border-cyan-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400',
+                )}
+              >
+                {s.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

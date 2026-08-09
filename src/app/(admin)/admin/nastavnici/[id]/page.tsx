@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Mail, Phone } from 'lucide-react'
+import { Mail, Phone } from 'lucide-react'
+import { BackToListLink } from '@/components/admin/back-to-list-link'
 import { requireAdmin } from '@/lib/auth-guard'
 import {
   getTeacher,
@@ -55,13 +55,7 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
   return (
     <div className="max-w-5xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link
-          href="/admin/nastavnici"
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Natrag na nastavnike
-        </Link>
+        <BackToListLink listPath="/admin/nastavnici" label="Natrag na nastavnike" />
       </div>
 
       {/* Header */}

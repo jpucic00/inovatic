@@ -132,10 +132,15 @@ export function isSingleProgramFilter(key: GroupFilterKey): boolean {
   return key === 'competition' || LEVEL_FILTERS.some((f) => f.key === key)
 }
 
+/** Derived from the label map so a new filter key can never be forgotten here. */
+const FILTER_KEYS = new Set<string>(Object.keys(FILTER_LABEL))
+
 /**
- * `/admin/programi` links here with the program's own id (and `__radionice__`
- * for the shared workshop view) — those links predate this filter and must keep
- * landing on the matching selection.
+ * `?tab=` carries two different things. The board writes its own filter key so
+ * the selection survives a reload, the browser Back button and the trip out to
+ * a group and back; `/admin/programi` links here with the program's own id
+ * (and `__radionice__` for the shared workshop view), and those links predate
+ * the filter and must keep landing on the matching selection.
  */
 export function resolveGroupFilter(
   tab: string | undefined,
@@ -143,6 +148,7 @@ export function resolveGroupFilter(
 ): GroupFilterKey {
   if (!tab) return 'all'
   if (tab === '__radionice__') return 'radionice'
+  if (FILTER_KEYS.has(tab)) return tab as GroupFilterKey
 
   const course = courses.find((c) => c.id === tab)
   if (!course) return 'all'

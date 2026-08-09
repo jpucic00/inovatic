@@ -5,8 +5,12 @@ import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { InquiryFilters } from '@/components/admin/inquiries/inquiry-filters'
 import { InquiryTable } from '@/components/admin/inquiries/inquiry-table'
 import { Pagination } from '@/components/admin/pagination'
+import {
+  ListFilterMemory,
+  type ActiveFilterChip,
+} from '@/components/admin/list-filter-memory'
 import { InquiryStatus, InquiryType } from '@prisma/client'
-import { GRADE_VALUES, type Grade } from '@/lib/inquiry-status'
+import { GRADE_VALUES, GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
 
 export const metadata: Metadata = { title: 'Admin – Upiti' }
 
@@ -14,6 +18,13 @@ const VALID_STATUSES = Object.values(InquiryStatus) as string[]
 const VALID_TYPES = Object.values(InquiryType) as string[]
 const VALID_GRADES = GRADE_VALUES as readonly string[]
 const PAGE_SIZE = 20
+
+const STATUS_LABELS: Record<InquiryStatus, string> = {
+  NEW: 'Nove',
+  ACCOUNT_CREATED: 'Račun stvoren',
+  DECLINED: 'Odbijene',
+  PARTY_SCHEDULED: 'Proslava dogovorena',
+}
 
 interface PageProps {
   searchParams: Promise<{ status?: string; search?: string; course?: string; grade?: string; type?: string; page?: string }>
@@ -56,6 +67,23 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
   const currentGrade = gradeFilter ?? ''
   const currentType = typeFilter ?? ''
 
+  const chips: ActiveFilterChip[] = [
+    statusFilter && { key: 'status', label: `Status: ${STATUS_LABELS[statusFilter]}` },
+    typeFilter && {
+      key: 'type',
+      label: `Vrsta: ${typeFilter === 'COURSE' ? 'Upisi' : 'Proslave'}`,
+    },
+    currentCourse && {
+      key: 'course',
+      label:
+        currentCourse === 'NONE'
+          ? 'Bez preference programa'
+          : `Program: ${courses.find((c) => c.id === currentCourse)?.title ?? currentCourse}`,
+    },
+    gradeFilter && { key: 'grade', label: `Razred: ${GRADE_LABELS[gradeFilter]}` },
+    currentSearch && { key: 'search', label: `Pretraga: „${currentSearch}”` },
+  ].filter((c): c is ActiveFilterChip => Boolean(c))
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -67,6 +95,8 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
           </p>
         </div>
       </div>
+
+      <ListFilterMemory listPath="/admin/upiti" chips={chips} />
 
       <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} currentCourse={currentCourse} currentGrade={currentGrade} currentType={currentType} courses={courses} />
 

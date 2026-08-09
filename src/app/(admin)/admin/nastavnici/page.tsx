@@ -4,6 +4,10 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { getTeachers } from '@/actions/admin/teacher'
 import { CreateTeacherDialog } from '@/components/admin/teachers/create-teacher-dialog'
 import { Pagination } from '@/components/admin/pagination'
+import {
+  ListFilterMemory,
+  type ActiveFilterChip,
+} from '@/components/admin/list-filter-memory'
 import { Mail, Phone, ExternalLink } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Admin – Nastavnici' }
@@ -23,6 +27,10 @@ export default async function TeachersPage({ searchParams }: Readonly<PageProps>
 
   const result = await getTeachers({ search, page, pageSize: PAGE_SIZE })
 
+  const chips: ActiveFilterChip[] = search
+    ? [{ key: 'search', label: `Pretraga: „${search}”` }]
+    : []
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -34,6 +42,8 @@ export default async function TeachersPage({ searchParams }: Readonly<PageProps>
         </div>
         <CreateTeacherDialog />
       </div>
+
+      <ListFilterMemory listPath="/admin/nastavnici" chips={chips} />
 
       <form className="mb-4">
         <input

@@ -8,6 +8,7 @@ import { db } from '@/lib/db'
 import { GroupsBoard } from '@/components/admin/groups/groups-board'
 import { CreateGroupDialog } from '@/components/admin/groups/create-group-dialog'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
+import { ListFilterMemory } from '@/components/admin/list-filter-memory'
 import { resolveGroupFilter } from '@/lib/group-filter'
 
 export const metadata: Metadata = { title: 'Admin – Grupe' }
@@ -68,6 +69,9 @@ export default async function GroupsPage({ searchParams }: Readonly<PageProps>) 
       </div>
 
       {!editable && <ArchivedYearBanner year={selectedYear} />}
+
+      {/* Restore only — the chip bar below already names the active program. */}
+      <ListFilterMemory listPath="/admin/grupe" chips={[]} />
 
       <GroupsBoard
         groups={groups}

@@ -4,6 +4,10 @@ import Link from 'next/link'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getArticles } from '@/actions/admin/article'
 import { Pagination } from '@/components/admin/pagination'
+import {
+  ListFilterMemory,
+  type ActiveFilterChip,
+} from '@/components/admin/list-filter-memory'
 import { Plus, ExternalLink, ImageIcon } from 'lucide-react'
 import { DeleteArticleButton } from '@/components/admin/articles/delete-article-button'
 import { CityBadge } from '@/components/shared/city-badge'
@@ -35,6 +39,14 @@ export default async function ArticlesAdminPage({ searchParams }: Readonly<PageP
 
   const result = await getArticles({ search, status, page, pageSize: PAGE_SIZE })
 
+  const chips: ActiveFilterChip[] = [
+    status !== 'ALL' && {
+      key: 'status',
+      label: status === 'PUBLISHED' ? 'Objavljeni' : 'Skice',
+    },
+    search && { key: 'search', label: `Pretraga: „${search}”` },
+  ].filter((c): c is ActiveFilterChip => Boolean(c))
+
   const statusTabs: { key: StatusFilter; label: string }[] = [
     { key: 'ALL', label: 'Svi' },
     { key: 'PUBLISHED', label: 'Objavljeni' },
@@ -58,6 +70,8 @@ export default async function ArticlesAdminPage({ searchParams }: Readonly<PageP
           Novi članak
         </Link>
       </div>
+
+      <ListFilterMemory listPath="/admin/novosti" chips={chips} />
 
       {/* Status tabs */}
       <div className="flex gap-1 border-b border-gray-200 mb-4">

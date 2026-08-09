@@ -259,15 +259,20 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti`)
 
+      // Scoped to the table: the "Filter aktivan" bar echoes the search term,
+      // so a page-wide text locator matches the chip as well as the row and
+      // trips strict mode (and could never reach "not visible").
+      const rows = page.locator('table')
+
       await test.step('Search by parent name filters down to that row only', async () => {
         await page.locator('input[placeholder*="Pretraži"]').fill(INQUIRY_MAIN.parentName)
         await page.locator('button', { hasText: 'Traži' }).click()
         await expect(
-          page.locator(`text=${INQUIRY_MAIN.parentName}`),
+          rows.locator(`text=${INQUIRY_MAIN.parentName}`),
           'searched parent row is visible',
         ).toBeVisible()
         await expect(
-          page.locator(`text=${INQUIRY_TO_DECLINE.parentName}`),
+          rows.locator(`text=${INQUIRY_TO_DECLINE.parentName}`),
           'other parent rows are filtered out',
         ).not.toBeVisible()
       })
@@ -278,11 +283,11 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
           .fill(INQUIRY_TO_DECLINE.childName)
         await page.locator('button', { hasText: 'Traži' }).click()
         await expect(
-          page.locator(`text=${INQUIRY_TO_DECLINE.childName}`),
+          rows.locator(`text=${INQUIRY_TO_DECLINE.childName}`),
           'searched child row is visible',
         ).toBeVisible()
         await expect(
-          page.locator(`text=${INQUIRY_MAIN.childName}`),
+          rows.locator(`text=${INQUIRY_MAIN.childName}`),
           'other child rows are filtered out',
         ).not.toBeVisible()
       })
@@ -291,7 +296,7 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
         await page.locator('input[placeholder*="Pretraži"]').fill('')
         await page.locator('button', { hasText: 'Traži' }).click()
         await expect(
-          page.locator(`text=${INQUIRY_MAIN.parentName}`),
+          rows.locator(`text=${INQUIRY_MAIN.parentName}`),
           'main parent reappears after clearing search',
         ).toBeVisible()
       })

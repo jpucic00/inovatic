@@ -3,6 +3,14 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { GroupsBoard } from '@/components/admin/groups/groups-board'
 
+// The board mirrors its selection into ?tab= so Back can restore it. This suite
+// is about which rows the filter picks, so the navigation is stubbed — the URL
+// round-trip itself is covered in tests/unit/lib/group-filter.test.ts.
+const replace = vi.fn()
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace }),
+}))
+
 // The real table pulls deleteGroup + next/navigation; all this suite needs from
 // it is which rows it was handed, and whether the Program column was dropped.
 vi.mock('@/components/admin/groups/group-table', () => ({
@@ -173,5 +181,20 @@ describe('GroupsBoard — one filter over the grid and the table', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Poništi filter/ }))
     expect(tableRows()).toHaveLength(4)
+  })
+
+  // The selection used to live in state alone, so Back from a group landed on
+  // "Sve grupe" whichever program you had been looking at.
+  it('mirrors the selection into ?tab= so it survives leaving the page', () => {
+    replace.mockClear()
+    renderBoard()
+
+    fireEvent.click(screen.getByRole('button', { name: /SLR 1/ }))
+    expect(replace).toHaveBeenLastCalledWith('/admin/grupe?tab=SLR_1', { scroll: false })
+
+    // "Poništi filter" is this board's clear, so it has to land on the bare
+    // path — that is what stops the memory putting the old tab straight back.
+    fireEvent.click(screen.getByRole('button', { name: /Poništi filter/ }))
+    expect(replace).toHaveBeenLastCalledWith('/admin/grupe', { scroll: false })
   })
 })

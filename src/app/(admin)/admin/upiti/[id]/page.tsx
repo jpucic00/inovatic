@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Check, RotateCcw, CalendarCheck, PartyPopper } from 'lucide-react'
+import { Check, RotateCcw, CalendarCheck, PartyPopper } from 'lucide-react'
+import { BackToListLink } from '@/components/admin/back-to-list-link'
 import { requireAdmin } from '@/lib/auth-guard'
 import {
   getInquiry,
@@ -122,13 +123,7 @@ function PartyInquiryDetail({
   return (
     <div className="max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link
-          href="/admin/upiti"
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Natrag na upite
-        </Link>
+        <BackToListLink listPath="/admin/upiti" label="Natrag na upite" />
       </div>
 
       {/* Header */}
@@ -341,13 +336,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   return (
     <div className="max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link
-          href="/admin/upiti"
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Natrag na upite
-        </Link>
+        <BackToListLink listPath="/admin/upiti" label="Natrag na upite" />
       </div>
 
       {/* Header */}

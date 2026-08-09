@@ -74,6 +74,26 @@ describe('resolveGroupFilter', () => {
   it('falls back when a standard course has no usable level', () => {
     expect(resolveGroupFilter('c-x', [{ id: 'c-x', level: null, kind: 'STANDARD' }])).toBe('all')
   })
+
+  // The board writes its own key back to ?tab= so the selection survives a
+  // reload and the trip out to a group and back. Every key has to round-trip,
+  // including the two that no course id can produce.
+  it.each<GroupFilterKey>([
+    'standard',
+    'competition',
+    'radionice',
+    'UVOD',
+    'SLR_1',
+    'SLR_2',
+    'SLR_3',
+    'SLR_4',
+  ])('round-trips its own filter key %s', (key) => {
+    expect(resolveGroupFilter(key, courses)).toBe(key)
+  })
+
+  it('resolves a filter key even when no courses are loaded', () => {
+    expect(resolveGroupFilter('SLR_3', [])).toBe('SLR_3')
+  })
 })
 
 describe('isSingleProgramFilter', () => {

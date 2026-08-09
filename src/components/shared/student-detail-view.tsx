@@ -8,6 +8,7 @@ import type {
   GradebookYearTab,
 } from '@/lib/student-assessment-view'
 import type { RecommendationOption } from '@/lib/assessment-rubric'
+import { BackToListLink } from '@/components/admin/back-to-list-link'
 import { DeleteStudentDialog } from '@/components/admin/students/delete-student-dialog'
 import { EditStudentDialog } from '@/components/admin/students/edit-student-dialog'
 import { ResetPasswordButton } from '@/components/admin/students/reset-password-button'
@@ -59,6 +60,11 @@ interface Props {
   selectedYear?: string
   backHref: string
   backLabel: string
+  /**
+   * Admin only: land back on the list the way it was left — filter, search and
+   * page included. The teacher panel has no filtered list to return to.
+   */
+  backRemembersFilter?: boolean
   onCreateComment: CreateCommentAction
   onDeleteComment: DeleteCommentAction
   onSaveAssessment: SaveAssessmentAction
@@ -85,6 +91,7 @@ export function StudentDetailView({
   selectedYear,
   backHref,
   backLabel,
+  backRemembersFilter = false,
   onCreateComment,
   onDeleteComment,
   onSaveAssessment,
@@ -140,13 +147,17 @@ export function StudentDetailView({
   return (
     <div className="max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link
-          href={backHref}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {backLabel}
-        </Link>
+        {backRemembersFilter ? (
+          <BackToListLink listPath={backHref} label={backLabel} />
+        ) : (
+          <Link
+            href={backHref}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {backLabel}
+          </Link>
+        )}
       </div>
 
       {/* Header */}

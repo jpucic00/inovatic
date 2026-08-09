@@ -50,6 +50,7 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
       selectedYear={defaultYear}
       backHref="/admin/ucenici"
       backLabel="Natrag na učenike"
+      backRemembersFilter
       onCreateComment={createComment}
       onDeleteComment={deleteComment}
       onSaveAssessment={upsertAssessment}

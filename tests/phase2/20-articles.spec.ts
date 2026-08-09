@@ -84,8 +84,10 @@ test.describe('Admin — Articles', () => {
       await page.goto(
         `${BASE}/admin/novosti?status=DRAFT&search=${encodeURIComponent(ARTICLE.title)}`,
       )
+      // By role, not by text: the "Filter aktivan" bar echoes the search term,
+      // so a bare getByText(title) now matches the chip as well as the row.
       await expect(
-        page.getByText(ARTICLE.title),
+        page.getByRole('link', { name: ARTICLE.title }),
         'draft is listed when filtering by DRAFT',
       ).toBeVisible()
       await expect(
@@ -217,8 +219,10 @@ test.describe('Admin — Articles', () => {
       await page.goto(
         `${BASE}/admin/novosti?search=${encodeURIComponent(DELETE_ARTICLE.title)}`,
       )
+      // By role: searching for the title now also prints it in the
+      // "Filter aktivan" chip, so getByText would never reach 0.
       await expect(
-        page.getByText(DELETE_ARTICLE.title),
+        page.getByRole('link', { name: DELETE_ARTICLE.title }),
         'admin list filters out the deleted article',
       ).toHaveCount(0)
     })

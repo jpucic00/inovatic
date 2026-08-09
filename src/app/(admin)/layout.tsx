@@ -1,6 +1,7 @@
 import { Toaster } from '@/components/ui/toaster'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { AdminDesktopSidebar, AdminMobileNav } from '@/components/admin/admin-mobile-nav'
+import { AdminIdProvider } from '@/components/admin/filter-memory-provider'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { getAllSchoolYears } from '@/actions/admin/school-year'
 import { computeSchoolYear, isArchivedYear, schoolYearNeedsPlanning } from '@/lib/school-year'
@@ -38,18 +39,11 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
   })
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminMobileNav
-        userName={userName}
-        cityLabel={cityLabel}
-        years={years}
-        selectedYear={selectedYear}
-        currentYear={currentYear}
-        calendarNeedsPlanning={calendarNeedsPlanning}
-      />
-
-      <div className="flex">
-        <AdminDesktopSidebar
+    // Scopes the per-tab filter memory to this admin, so a colleague signing in
+    // on the same tab never inherits their filters.
+    <AdminIdProvider adminId={session.user.id}>
+      <div className="min-h-screen bg-gray-50">
+        <AdminMobileNav
           userName={userName}
           cityLabel={cityLabel}
           years={years}
@@ -58,12 +52,23 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
           calendarNeedsPlanning={calendarNeedsPlanning}
         />
 
-        <div className="flex-1 flex flex-col min-w-0">
-          <main className="flex-1 p-4 pt-18 lg:p-8 lg:pt-8 overflow-x-hidden">{children}</main>
-        </div>
-      </div>
+        <div className="flex">
+          <AdminDesktopSidebar
+            userName={userName}
+            cityLabel={cityLabel}
+            years={years}
+            selectedYear={selectedYear}
+            currentYear={currentYear}
+            calendarNeedsPlanning={calendarNeedsPlanning}
+          />
 
-      <Toaster />
-    </div>
+          <div className="flex-1 flex flex-col min-w-0">
+            <main className="flex-1 p-4 pt-18 lg:p-8 lg:pt-8 overflow-x-hidden">{children}</main>
+          </div>
+        </div>
+
+        <Toaster />
+      </div>
+    </AdminIdProvider>
   )
 }
