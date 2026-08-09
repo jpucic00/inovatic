@@ -59,6 +59,13 @@ tests/fixtures/phase3-state.json
 # Design handoff bundles — transient reference material, not part of the codebase
 /design_handoff_*/
 
+# Remotion brand-video workspace — local only. Standalone package with its own
+# node_modules and tsconfig, unrelated to the app build or deploy. Its one
+# committed trace is `video` in the root tsconfig's `exclude`: without it the
+# root `include` globs pull `video/src/**` into the app's type-check. ESLint and
+# knip need no entry — neither walks in there. Inert on a clone without it.
+/video/
+
 # Historical import workbooks — contain personal data, must never be committed
 # (any filename containing "Evidencija", e.g. "Kopija datoteke Evidencija_….numbers")
 *Evidencija*
