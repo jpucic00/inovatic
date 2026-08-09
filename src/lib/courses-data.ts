@@ -19,6 +19,12 @@ export interface Course {
    * One or two characters for the square badge on the program cards. Derived
    * from the title everywhere until the intro program arrived, whose title does
    * not end in its own number.
+   *
+   * Uvod's `0` is authored, not derived, and is deliberate: it places the intro
+   * program before SLR 1 rather than beside it, which an initial `U` did not.
+   * `/programi` pads numeric badges to two digits, so that column reads 00–04.
+   * The non-numeric branch there is unused today but stays — a future badge
+   * that is not a digit would come out as `0U` under a bare pad.
    */
   badge: string
   title: string
@@ -49,7 +55,7 @@ export const courses: Course[] = [
   {
     slug: 'uvod-u-svijet-lego-robotike',
     level: 'UVOD',
-    badge: 'U',
+    badge: '0',
     title: 'Uvod u Svijet LEGO robotike',
     subtitle: 'Početni program robotike za predškolce (5 – 6 godina)',
     description:
