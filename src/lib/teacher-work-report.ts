@@ -19,8 +19,14 @@
 import { toDateKey } from './session-dates'
 import { zagrebDateKey } from './attendance-window'
 
-/** How many calendar months the admin report covers, current month first. */
-export const REPORT_MONTH_COUNT = 6
+/**
+ * How many calendar months the admin report covers, current month first — a
+ * full year, so any month of a school year is still reachable from any other.
+ * Every month is emitted worked or not, so this is also exactly how many rows
+ * the card renders; they are collapsed `<details>`, so the cost of raising it
+ * is one query bound, not markup.
+ */
+export const REPORT_MONTH_COUNT = 12
 
 export type WorkReportGroup = {
   id: string

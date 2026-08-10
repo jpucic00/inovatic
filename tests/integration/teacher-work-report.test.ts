@@ -151,7 +151,7 @@ describe('getTeacherWorkReport — hours come from TeacherAttendance', () => {
     expect(sumSessions(report)).toBe(3)
   })
 
-  it('reaches back six months — a session four months ago is still reported', async () => {
+  it('reaches back a full year — a session four months ago is still reported', async () => {
     const teacher = await createTeacher()
     const { group } = await groupWithStudent()
     await createTeacherAssignment(teacher.id, group.id)

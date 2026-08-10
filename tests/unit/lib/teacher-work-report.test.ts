@@ -12,6 +12,13 @@ import {
 
 const WINDOWS = recentMonthWindows(new Date('2026-07-15T10:00:00.000Z'))
 
+/** `YYYY-MM` of the oldest reported month, and a date just before it. */
+const OLDEST_KEY = WINDOWS[WINDOWS.length - 1].startKey.slice(0, 7)
+const BEFORE_WINDOW = (() => {
+  const { year, month } = WINDOWS[WINDOWS.length - 1]
+  return new Date(Date.UTC(year, month - 2, 20)).toISOString().slice(0, 10)
+})()
+
 function group(overrides: Partial<WorkReportGroup> = {}): WorkReportGroup {
   return {
     id: 'group-1',
@@ -79,7 +86,7 @@ describe('sessionMinutes', () => {
 })
 
 describe('recentMonthWindows', () => {
-  it('returns six months, newest first', () => {
+  it('returns a full year of months, newest first', () => {
     const w = recentMonthWindows(new Date('2026-07-15T10:00:00.000Z'))
 
     expect(w).toHaveLength(REPORT_MONTH_COUNT)
@@ -97,7 +104,13 @@ describe('recentMonthWindows', () => {
       startKey: '2026-06-01',
       endKey: '2026-06-30',
     })
-    expect(w[5]).toMatchObject({ year: 2026, month: 2, endKey: '2026-02-28' })
+    // Twelve months back from July is the previous August, not January.
+    expect(w.at(-1)).toEqual({
+      year: 2025,
+      month: 8,
+      startKey: '2025-08-01',
+      endKey: '2025-08-31',
+    })
   })
 
   it('rolls back across the new year', () => {
@@ -105,7 +118,15 @@ describe('recentMonthWindows', () => {
 
     expect(w[0]).toMatchObject({ year: 2026, month: 1 })
     expect(w[1]).toMatchObject({ year: 2025, month: 12 })
-    expect(w[5]).toMatchObject({ year: 2025, month: 8 })
+    expect(w.at(-1)).toMatchObject({ year: 2025, month: 2 })
+  })
+
+  it('ends February on the right day in a leap year', () => {
+    // A year-long window crosses a February on most days of the year, so the
+    // "day 0 of the next month" trick has to hold for 29 days too.
+    const w = recentMonthWindows(new Date('2028-03-15T10:00:00.000Z'), 2)
+
+    expect(w[1]).toMatchObject({ year: 2028, month: 2, endKey: '2028-02-29' })
   })
 
   it('anchors on the Zagreb date, not UTC, at a month boundary', () => {
@@ -139,10 +160,11 @@ describe('buildTeacherWorkReport', () => {
       [
         row('2026-07-06'),
         row('2026-06-29'),
-        // Four months back — visible now, unreachable under the old two-month report.
+        // Well back in the window — unreachable under the old two-month report.
         row('2026-03-10'),
-        // The month before the window opens.
-        row('2026-01-20'),
+        // The oldest month the report still reaches.
+        row(`${OLDEST_KEY}-20`),
+        row(BEFORE_WINDOW),
       ],
     )
 
@@ -150,8 +172,10 @@ describe('buildTeacherWorkReport', () => {
     expect(month(res, '2026-07').sessionCount).toBe(1)
     expect(month(res, '2026-06').sessionCount).toBe(1)
     expect(month(res, '2026-03').sessionCount).toBe(1)
-    expect(sumSessions(res)).toBe(3)
-    // A month with no work is still present, so the card renders a full six.
+    expect(month(res, OLDEST_KEY).sessionCount).toBe(1)
+    // The row before the window is dropped, not folded into the oldest month.
+    expect(sumSessions(res)).toBe(4)
+    // A month with no work is still present, so the card renders a full year.
     expect(month(res, '2026-05')).toMatchObject({ sessionCount: 0, groups: [] })
   })
 

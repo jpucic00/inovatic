@@ -74,8 +74,8 @@ function MonthBody({ month }: Readonly<{ month: WorkReportMonth }>) {
 
 /**
  * One collapsible month. Native `<details>` rather than client state — the card
- * stays a server component, and six months of session chips cost nothing until
- * a month is opened.
+ * stays a server component, and a year of session chips costs nothing until a
+ * month is opened.
  */
 function MonthBlock({
   month,
@@ -113,10 +113,10 @@ function MonthBlock({
 }
 
 /**
- * Read-only payout basis: hours credited to this teacher over the last six
- * calendar months, derived from their present TeacherAttendance rows and the
- * group's session length — never from who recorded the students — priced at the
- * teacher's current hourly rate.
+ * Read-only payout basis: hours credited to this teacher over the last
+ * `REPORT_MONTH_COUNT` calendar months, derived from their present
+ * TeacherAttendance rows and the group's session length — never from who
+ * recorded the students — priced at the teacher's current hourly rate.
  */
 export function TeacherWorkReportCard({
   report,
