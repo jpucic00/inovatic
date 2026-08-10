@@ -3,9 +3,8 @@
 import type { ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireTeacher } from '@/lib/auth-guard'
-import { computeSchoolYear } from '@/lib/school-year'
 
-type TeacherGroupSummary = {
+export type TeacherGroupSummary = {
   id: string
   name: string | null
   dayOfWeek: string | null
@@ -19,25 +18,26 @@ type TeacherGroupSummary = {
 }
 
 /**
- * Returns the current school year's groups visible to the logged-in user.
+ * Returns every group visible to the logged-in user, ALL school years — the
+ * dashboard tabs by year and needs the past ones to build the tab list.
  * TEACHER users see only groups they have a TeacherAssignment for.
- * ADMIN users see every group of THEIR CITY in the current school year — the
- * tenant-bound pass-through that makes /nastavnik show Slavica exactly her
- * Šibenik groups.
+ * ADMIN users see every group of THEIR CITY — the tenant-bound pass-through
+ * that makes /nastavnik show Slavica exactly her Šibenik groups.
  */
 export async function getMyAssignedGroups(): Promise<TeacherGroupSummary[]> {
   const session = await requireTeacher()
-  const schoolYear = computeSchoolYear()
   const isAdmin = session.user.role === 'ADMIN'
 
   const groups = await db.scheduledGroup.findMany({
-    where: {
-      schoolYear,
-      ...(isAdmin
-        ? { city: session.user.city }
-        : { teacherAssignments: { some: { userId: session.user.id } } }),
-    },
-    orderBy: [{ course: { sortOrder: 'asc' } }, { name: 'asc' }, { createdAt: 'asc' }],
+    where: isAdmin
+      ? { city: session.user.city }
+      : { teacherAssignments: { some: { userId: session.user.id } } },
+    orderBy: [
+      { schoolYear: 'desc' },
+      { course: { sortOrder: 'asc' } },
+      { name: 'asc' },
+      { createdAt: 'asc' },
+    ],
     include: {
       course: { select: { id: true, title: true, kind: true } },
       location: { select: { id: true, name: true } },

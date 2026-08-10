@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Session } from 'next-auth'
-import { computeSchoolYear } from '@/lib/school-year'
+import { computeSchoolYear, getPreviousSchoolYear } from '@/lib/school-year'
 import { mockSession } from './setup'
 import {
   createAdmin,
@@ -37,9 +37,10 @@ const { getTeacherGroupDetail } = await import('@/actions/teacher/group')
 const { assertTeacherCanViewStudent } = await import('@/lib/teacher-guard')
 const { canManageMaterial } = await import('@/lib/material-access')
 
-// The teacher dashboard filters by the CURRENT school year (July 2026 →
-// 2025/2026), not the factories' default 2026/2027.
+// The dashboard returns ALL school years (it tabs by year), so these fixtures
+// only need a year to exist; CY keeps them on the year the panel opens on.
 const CY = computeSchoolYear()
+const PY = getPreviousSchoolYear(CY)
 
 const fakeSession = (id: string, city: 'SPLIT' | 'SIBENIK'): Session =>
   ({
@@ -48,28 +49,35 @@ const fakeSession = (id: string, city: 'SPLIT' | 'SIBENIK'): Session =>
   }) as Session
 
 describe('getMyAssignedGroups — tenant-bound ADMIN pass-through (Slavica)', () => {
-  it('an ADMIN sees only their own city current-year groups', async () => {
+  it('an ADMIN sees only their own city groups — in every school year', async () => {
     const splitGroup = await createGroup({ city: 'SPLIT', schoolYear: CY })
+    const splitPast = await createGroup({ city: 'SPLIT', schoolYear: PY })
     const sibenikGroup = await createGroup({ city: 'SIBENIK', schoolYear: CY })
+    const sibenikPast = await createGroup({ city: 'SIBENIK', schoolYear: PY })
     const slavica = await createAdmin({ city: 'SIBENIK' })
     mockSession({ id: slavica.id, role: 'ADMIN', city: 'SIBENIK' })
 
     const groups = await getMyAssignedGroups()
     const ids = new Set(groups.map((g) => g.id))
     expect(ids.has(sibenikGroup.id)).toBe(true)
+    expect(ids.has(sibenikPast.id)).toBe(true)
     expect(ids.has(splitGroup.id)).toBe(false)
+    expect(ids.has(splitPast.id)).toBe(false)
   })
 
-  it('a TEACHER still sees exactly their assigned groups', async () => {
+  it('a TEACHER sees exactly their assigned groups, past years included', async () => {
     const group = await createGroup({ city: 'SIBENIK', schoolYear: CY })
+    const pastGroup = await createGroup({ city: 'SIBENIK', schoolYear: PY })
     const otherGroup = await createGroup({ city: 'SIBENIK', schoolYear: CY })
     const teacher = await createTeacher({ city: 'SIBENIK' })
     await createTeacherAssignment(teacher.id, group.id)
+    await createTeacherAssignment(teacher.id, pastGroup.id)
     mockSession({ id: teacher.id, role: 'TEACHER', city: 'SIBENIK' })
 
     const groups = await getMyAssignedGroups()
     const ids = new Set(groups.map((g) => g.id))
     expect(ids.has(group.id)).toBe(true)
+    expect(ids.has(pastGroup.id)).toBe(true)
     expect(ids.has(otherGroup.id)).toBe(false)
   })
 })

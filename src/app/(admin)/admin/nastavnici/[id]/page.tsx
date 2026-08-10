@@ -8,6 +8,7 @@ import {
   getAssignableGroupsForTeacher,
 } from '@/actions/admin/teacher'
 import { getTeacherWorkReport } from '@/actions/admin/teacher-work'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { EditTeacherDialog } from '@/components/admin/teachers/edit-teacher-dialog'
 import { ResetPasswordButton } from '@/components/admin/teachers/reset-password-button'
 import { DeleteTeacherDialog } from '@/components/admin/teachers/delete-teacher-dialog'
@@ -38,10 +39,11 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
   await requireAdmin()
 
   const { id } = await params
-  const [teacher, assignableGroups, workReport] = await Promise.all([
+  const [teacher, assignableGroups, workReport, selectedYear] = await Promise.all([
     getTeacher(id),
     getAssignableGroupsForTeacher(id),
     getTeacherWorkReport(id),
+    getSelectedSchoolYear(),
   ])
 
   if (!teacher) notFound()
@@ -168,6 +170,7 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
           teacherId={teacher.id}
           assignments={teacher.teacherAssignments}
           assignableGroups={assignableGroups}
+          defaultYear={selectedYear}
         />
       </div>
 
