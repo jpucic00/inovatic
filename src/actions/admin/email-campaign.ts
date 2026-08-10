@@ -9,7 +9,7 @@ import { requireAdminCtx } from '@/lib/auth-guard'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
 import { toGroupOptions } from '@/lib/email-campaign-options'
-import { signupPathForSlug } from '@/lib/signup-links'
+import { publicSignupPath } from '@/lib/signup-links'
 import {
   decodeRecommendation,
   formatRecommendationLabel,
@@ -538,12 +538,17 @@ async function buildTargetOptions(
 
   // Every selected group belongs to targetCourseId (the where clause says so),
   // so any of them names the target program.
-  const targetSlug = groups[0]?.course.slug
-  if (!targetSlug) return { ok: false, error: INVALID_DATA }
+  const target = groups[0]?.course
+  if (!target?.slug) return { ok: false, error: INVALID_DATA }
 
   return {
     ok: true,
-    signupPath: signupPathForSlug(targetSlug),
+    // `publicSignupPath`, never `signupPathForSlug`: `/prijava/<slug>` answers
+    // notFound() for a RADIONICA, and this year's own-city radionice ARE
+    // selectable as a target (`getInquiryCourses`). A bare slug path would mail
+    // a 404 CTA to the whole cohort — and the sentKey claim would then mark
+    // everyone ALREADY_SENT, so the corrected re-send reaches nobody.
+    signupPath: publicSignupPath(target.kind, target.slug),
     options: toGroupOptions(groups),
   }
 }
@@ -1337,7 +1342,7 @@ export async function getCampaignEmailHtml(campaignId: string): Promise<PreviewE
       targetCourseId: true,
       targetGroupIds: true,
       targetSchoolYear: true,
-      targetCourse: { select: { slug: true } },
+      targetCourse: { select: { kind: true, slug: true } },
     },
   })
   if (!campaign) notFound()
@@ -1362,7 +1367,12 @@ export async function getCampaignEmailHtml(campaignId: string): Promise<PreviewE
       // No strict count check, unlike the send path: a group deleted since must
       // not make the sent mail unviewable. Whatever survives is rendered.
       options = groups.length > 0 ? toGroupOptions(groups) : undefined
-      signupPath = signupPathForSlug(campaign.targetCourse.slug)
+      // Same rule as the send path — the preview must show the link that was
+      // actually mailed, radionica included.
+      signupPath = publicSignupPath(
+        campaign.targetCourse.kind,
+        campaign.targetCourse.slug,
+      )
     }
 
     const html = await renderBulkMessageHtml({

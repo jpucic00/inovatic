@@ -201,7 +201,7 @@ flowchart TD
 
 ## The teacher marking window
 
-Hours are money, so a **TEACHER** may only record the current calendar month, up to and including today — no marking a class that hasn't happened, and no filling in a whole month after the fact. The window is anchored on the Europe/Zagreb date (`teacherMarkingWindow` in `src/lib/attendance-window.ts`), matching how `monthWindows` computes the report, so the 1st never flips a couple of hours early on a UTC server.
+Hours are money, so a **TEACHER** may only record the current calendar month, up to and including today — no marking a class that hasn't happened, and no filling in a whole month after the fact. The window is anchored on the Europe/Zagreb date (`teacherMarkingWindow` in `src/lib/attendance-window.ts`), matching how `recentMonthWindows` computes the report, so the 1st never flips a couple of hours early on a UTC server.
 
 | Selected date | TEACHER | ADMIN |
 |---|---|---|
@@ -229,7 +229,7 @@ flowchart LR
     style SAVE fill:#d1fae5
 ```
 
-> Source: `src/actions/admin/holidays.ts` (`upsertHolidayRange` and `importHolidays` share the same scoped helper). The city filter is load-bearing — this delete is irreversible, and a Šibenik closure must never destroy Split rows. Deleting the teacher rows too is what stops a cancelled class from still being billed.
+> Source: `src/actions/admin/holidays.ts` (`upsertHolidayRange` and `bulkImportHolidays` share the same scoped helper). The city filter is load-bearing — this delete is irreversible, and a Šibenik closure must never destroy Split rows. Deleting the teacher rows too is what stops a cancelled class from still being billed.
 
 ## Default Session Selection (standard groups)
 

@@ -207,7 +207,11 @@ async function submitInquiryErrorResult(
       success: false,
       error: 'Odabrani termin je u međuvremenu popunjen. Molimo odaberite drugi termin.',
       code: 'GROUP_FULL' as const,
-      programs: await getActivePrograms(city),
+      // Same feed as the branch above, for the same reason: `getActivePrograms`
+      // excludes COMPETITION, so answering a per-program link from it would
+      // hand back a payload the form filters down to nothing — the parent is
+      // told to pick another termin while the dropdown renders zero options.
+      programs: await loadProgramsForCheck(city, targetCourse),
     }
   }
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {

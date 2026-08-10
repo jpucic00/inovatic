@@ -135,9 +135,13 @@ async function enrollStudent(
   return student
 }
 
-async function makeTarget(city: City = 'SPLIT') {
+async function makeTarget(city: City = 'SPLIT', kind: ProgramKind = 'STANDARD') {
   const location = await createLocation({ city })
-  const course = await createCourse()
+  const course = await createCourse(
+    kind === 'RADIONICA'
+      ? { kind, city, schoolYear: TARGET_YEAR }
+      : { kind },
+  )
   const group = await createGroup({
     courseId: course.id,
     locationId: location.id,
@@ -1017,6 +1021,28 @@ describe('previewEmailHtml', () => {
     // A parent invited to a specific program lands on that program's own form,
     // which offers its termini regardless of the child's razred.
     if (res.success) expect(res.html).toContain(`/prijava/${target.course.slug}`)
+  })
+
+  it('points a radionica invitation at /radionice, never the 404 /prijava path', async () => {
+    // `/prijava/<slug>` answers notFound() for a RADIONICA, and this year's
+    // own-city radionice ARE offered in the target dropdown — so a bare
+    // `signupPathForSlug` mails a dead CTA to the whole cohort. Worse, the
+    // sentKey claim then marks every parent ALREADY_SENT, so the corrected
+    // re-send to the same target reaches nobody.
+    await loginAdmin()
+    const target = await makeTarget('SPLIT', 'RADIONICA')
+
+    const res = await previewEmailHtml({
+      kind: 'REENROLLMENT',
+      targetCourseId: target.course.id,
+      targetGroupIds: [target.group.id],
+      ...CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (res.success) {
+      expect(res.html).toContain(`/radionice/${target.course.slug}`)
+      expect(res.html).not.toContain(`/prijava/${target.course.slug}`)
+    }
   })
 
   it('points a competition invitation at the unlisted competition link', async () => {
