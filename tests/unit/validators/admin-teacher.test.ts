@@ -3,6 +3,7 @@ import {
   createTeacherSchema,
   updateTeacherSchema,
   assignTeacherSchema,
+  updateTeacherHourlyRateSchema,
 } from '@/lib/validators/admin/teacher'
 
 describe('createTeacherSchema', () => {
@@ -91,6 +92,48 @@ describe('updateTeacherSchema', () => {
         lastName: 'Marić',
         email: 'not-email',
       }).success,
+    ).toBe(false)
+  })
+})
+
+describe('updateTeacherHourlyRateSchema', () => {
+  const parse = (hourlyRateCents: unknown) =>
+    updateTeacherHourlyRateSchema.safeParse({ id: 't1', hourlyRateCents })
+
+  it('converts euros to cents, with either decimal separator', () => {
+    // A Croatian keyboard produces the comma; a paste may bring the dot.
+    expect(parse('12,50').success && parse('12,50').data?.hourlyRateCents).toBe(1250)
+    expect(parse('12.50').success && parse('12.50').data?.hourlyRateCents).toBe(1250)
+    expect(parse(' 9 ').success && parse(' 9 ').data?.hourlyRateCents).toBe(900)
+  })
+
+  it('rounds to whole cents', () => {
+    expect(parse('12,505').success && parse('12,505').data?.hourlyRateCents).toBe(1251)
+  })
+
+  it('treats a blank input as clearing the rate, not as zero', () => {
+    expect(parse('').data?.hourlyRateCents).toBeNull()
+    expect(parse('   ').data?.hourlyRateCents).toBeNull()
+    expect(parse(null).data?.hourlyRateCents).toBeNull()
+  })
+
+  it('keeps an explicit zero distinct from a cleared rate', () => {
+    expect(parse('0').data?.hourlyRateCents).toBe(0)
+  })
+
+  it('rejects garbage rather than silently wiping the rate', () => {
+    expect(parse('abc').success).toBe(false)
+    expect(parse('12,5,0').success).toBe(false)
+  })
+
+  it('rejects a negative rate and an implausible one', () => {
+    expect(parse('-1').success).toBe(false)
+    expect(parse('5000').success).toBe(false)
+  })
+
+  it('rejects an empty id', () => {
+    expect(
+      updateTeacherHourlyRateSchema.safeParse({ id: '', hourlyRateCents: '12' }).success,
     ).toBe(false)
   })
 })

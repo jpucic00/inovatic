@@ -173,7 +173,7 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
 
       {/* Work report */}
       <div className="bg-white rounded-xl border p-6 mb-6">
-        <TeacherWorkReportCard report={workReport} />
+        <TeacherWorkReportCard report={workReport} teacherId={teacher.id} />
       </div>
 
       {/* Danger zone */}

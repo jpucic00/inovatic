@@ -74,6 +74,13 @@ export function formatHours(minutes: number): string {
   return `${value} h`
 }
 
+/** Euro cents as Croatian currency, e.g. 1875 → "18,75 €". */
+export function formatEurCents(cents: number): string {
+  return new Intl.NumberFormat('hr-HR', { style: 'currency', currency: 'EUR' }).format(
+    cents / 100,
+  )
+}
+
 /** Month heading, e.g. (2026, 7) → "Srpanj 2026.". `month` is 1-12. */
 export function formatMonthYear(year: number, month: number): string {
   const label = new Intl.DateTimeFormat('hr-HR', {

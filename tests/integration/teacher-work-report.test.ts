@@ -1,6 +1,11 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { monthWindows } from '@/lib/teacher-work-report'
+import {
+  REPORT_MONTH_COUNT,
+  recentMonthWindows,
+  type MonthWindow,
+  type TeacherWorkReport,
+} from '@/lib/teacher-work-report'
 import { zagrebDateKey } from '@/lib/attendance-window'
 import { mockSession } from './setup'
 import {
@@ -27,12 +32,17 @@ vi.mock('next/navigation', async () => {
 })
 
 // Import after the mocks so the actions pick up the mocked notFound.
-const { getTeacherWorkReport } = await import('@/actions/admin/teacher-work')
+const { getTeacherWorkReport, updateTeacherHourlyRate } = await import(
+  '@/actions/admin/teacher-work'
+)
 const { bulkMarkSession } = await import('@/actions/teacher/attendance')
 const { unassignTeacherFromGroup } = await import('@/actions/admin/teacher')
 
 const SY = '2026/2027'
-const WINDOWS = monthWindows(new Date())
+const WINDOWS = recentMonthWindows(new Date())
+const CURRENT = WINDOWS[0]
+const PREVIOUS = WINDOWS[1]
+const OLDEST = WINDOWS[WINDOWS.length - 1]
 const DAY_MS = 86_400_000
 
 /** Nth day (1-based) of a report window, as a UTC-midnight date. */
@@ -44,8 +54,29 @@ function dateKeyOf(window: { year: number; month: number }, day: number): string
   return dayOf(window, day).toISOString().slice(0, 10)
 }
 
-/** A date safely outside both report windows. */
-const LONG_AGO = new Date(dayOf(WINDOWS.previous, 1).getTime() - 40 * DAY_MS)
+/** A date safely before the oldest reported month. */
+const BEFORE_WINDOW = new Date(dayOf(OLDEST, 1).getTime() - 40 * DAY_MS)
+
+/** The report block for one window — never by array position. */
+function monthOf(report: TeacherWorkReport, window: MonthWindow) {
+  const found = report.months.find((m) => m.window.startKey === window.startKey)
+  if (!found) throw new Error(`no month ${window.startKey} in the report`)
+  return found
+}
+
+/** Shorthand for the overwhelmingly common assertion target. */
+async function currentMonth(userId: string) {
+  return monthOf(await getTeacherWorkReport(userId), CURRENT)
+}
+
+// The report deliberately carries no totals of its own — a six-month sum is not
+// a figure anyone pays out. Tests that want one add it up here.
+const sumSessions = (r: TeacherWorkReport) =>
+  r.months.reduce((sum, m) => sum + m.sessionCount, 0)
+const sumMinutes = (r: TeacherWorkReport) =>
+  r.months.reduce((sum, m) => sum + m.totalMinutes, 0)
+const sumAmountCents = (r: TeacherWorkReport) =>
+  r.months.reduce((sum, m) => sum + (m.amountCents ?? 0), 0)
 
 /**
  * A date a TEACHER is still allowed to mark: this month, never in the future.
@@ -98,24 +129,43 @@ function markTeacherPresent(
 }
 
 describe('getTeacherWorkReport — hours come from TeacherAttendance', () => {
-  it('splits sessions into this month and last month, ignoring older ones', async () => {
+  it('splits sessions across the reported months, ignoring older ones', async () => {
     const teacher = await createTeacher()
     const { group } = await groupWithStudent()
     await createTeacherAssignment(teacher.id, group.id)
 
-    await markTeacherPresent(teacher.id, group.id, dayOf(WINDOWS.current, 2))
-    await markTeacherPresent(teacher.id, group.id, dayOf(WINDOWS.current, 9))
-    await markTeacherPresent(teacher.id, group.id, dayOf(WINDOWS.previous, 3))
-    await markTeacherPresent(teacher.id, group.id, LONG_AGO)
+    await markTeacherPresent(teacher.id, group.id, dayOf(CURRENT, 2))
+    await markTeacherPresent(teacher.id, group.id, dayOf(CURRENT, 9))
+    await markTeacherPresent(teacher.id, group.id, dayOf(PREVIOUS, 3))
+    await markTeacherPresent(teacher.id, group.id, BEFORE_WINDOW)
 
     await adminSession()
     const report = await getTeacherWorkReport(teacher.id)
 
-    expect(report.current.sessionCount).toBe(2)
-    expect(report.current.totalMinutes).toBe(180)
-    expect(report.current.groupCount).toBe(1)
-    expect(report.previous.sessionCount).toBe(1)
-    expect(report.previous.totalMinutes).toBe(90)
+    expect(monthOf(report, CURRENT).sessionCount).toBe(2)
+    expect(monthOf(report, CURRENT).totalMinutes).toBe(180)
+    expect(monthOf(report, CURRENT).groupCount).toBe(1)
+    expect(monthOf(report, PREVIOUS).sessionCount).toBe(1)
+    expect(monthOf(report, PREVIOUS).totalMinutes).toBe(90)
+    // The row before the window is dropped, not folded into the oldest month.
+    expect(sumSessions(report)).toBe(3)
+  })
+
+  it('reaches back six months — a session four months ago is still reported', async () => {
+    const teacher = await createTeacher()
+    const { group } = await groupWithStudent()
+    await createTeacherAssignment(teacher.id, group.id)
+
+    await markTeacherPresent(teacher.id, group.id, dayOf(WINDOWS[3], 10))
+    await markTeacherPresent(teacher.id, group.id, dayOf(OLDEST, 5))
+
+    await adminSession()
+    const report = await getTeacherWorkReport(teacher.id)
+
+    expect(report.months).toHaveLength(REPORT_MONTH_COUNT)
+    expect(monthOf(report, WINDOWS[3]).sessionCount).toBe(1)
+    expect(monthOf(report, OLDEST).sessionCount).toBe(1)
+    expect(sumMinutes(report)).toBe(180)
   })
 
   it('ignores a session the teacher was marked absent for', async () => {
@@ -123,21 +173,21 @@ describe('getTeacherWorkReport — hours come from TeacherAttendance', () => {
     const { group } = await groupWithStudent()
     await createTeacherAssignment(teacher.id, group.id)
 
-    await markTeacherPresent(teacher.id, group.id, dayOf(WINDOWS.current, 4), true)
-    await markTeacherPresent(teacher.id, group.id, dayOf(WINDOWS.current, 11), false)
+    await markTeacherPresent(teacher.id, group.id, dayOf(CURRENT, 4), true)
+    await markTeacherPresent(teacher.id, group.id, dayOf(CURRENT, 11), false)
 
     await adminSession()
-    expect((await getTeacherWorkReport(teacher.id)).current.sessionCount).toBe(1)
+    expect((await currentMonth(teacher.id)).sessionCount).toBe(1)
   })
 
   it('counts a 60-minute group as one hour per session', async () => {
     const teacher = await createTeacher()
     const { group } = await groupWithStudent({ startTime: '17:00', endTime: '18:00' })
     await createTeacherAssignment(teacher.id, group.id)
-    await markTeacherPresent(teacher.id, group.id, dayOf(WINDOWS.current, 4))
+    await markTeacherPresent(teacher.id, group.id, dayOf(CURRENT, 4))
 
     await adminSession()
-    expect((await getTeacherWorkReport(teacher.id)).current.totalMinutes).toBe(60)
+    expect((await currentMonth(teacher.id)).totalMinutes).toBe(60)
   })
 
   it('returns empty months for a teacher with no hours', async () => {
@@ -146,8 +196,98 @@ describe('getTeacherWorkReport — hours come from TeacherAttendance', () => {
 
     const report = await getTeacherWorkReport(teacher.id)
 
-    expect(report.current).toMatchObject({ sessionCount: 0, totalMinutes: 0, groupCount: 0 })
-    expect(report.previous.groups).toEqual([])
+    expect(report.months).toHaveLength(REPORT_MONTH_COUNT)
+    expect(sumSessions(report)).toBe(0)
+    expect(sumMinutes(report)).toBe(0)
+    expect(report.months.every((m) => m.groups.length === 0)).toBe(true)
+  })
+})
+
+describe('teacher hourly rate — the payout amount', () => {
+  /** Teacher with exactly two 90-minute sessions in the current month. */
+  async function teacherWithThreeHours() {
+    const teacher = await createTeacher()
+    const { group } = await groupWithStudent()
+    await createTeacherAssignment(teacher.id, group.id)
+    await markTeacherPresent(teacher.id, group.id, dayOf(CURRENT, 2))
+    await markTeacherPresent(teacher.id, group.id, dayOf(CURRENT, 9))
+    return teacher
+  }
+
+  it('shows hours but no amount until a rate is set', async () => {
+    const teacher = await teacherWithThreeHours()
+
+    await adminSession()
+    const report = await getTeacherWorkReport(teacher.id)
+
+    expect(report.rateCents).toBeNull()
+    expect(report.months.every((m) => m.amountCents === null)).toBe(true)
+    expect(monthOf(report, CURRENT).totalMinutes).toBe(180)
+    expect(monthOf(report, CURRENT).amountCents).toBeNull()
+  })
+
+  it('prices the report once a rate is set', async () => {
+    const teacher = await teacherWithThreeHours()
+
+    await adminSession()
+    expect(
+      await updateTeacherHourlyRate({ id: teacher.id, hourlyRateCents: '12,50' }),
+    ).toEqual({ success: true })
+
+    const report = await getTeacherWorkReport(teacher.id)
+    expect(report.rateCents).toBe(1250)
+    // 3 h at 12,50 €/h.
+    expect(monthOf(report, CURRENT).amountCents).toBe(3750)
+    expect(sumAmountCents(report)).toBe(3750)
+  })
+
+  it('clears the rate on a blank input, keeping the hours', async () => {
+    const teacher = await teacherWithThreeHours()
+
+    await adminSession()
+    await updateTeacherHourlyRate({ id: teacher.id, hourlyRateCents: '12,50' })
+    expect(await updateTeacherHourlyRate({ id: teacher.id, hourlyRateCents: '' })).toEqual({
+      success: true,
+    })
+
+    const report = await getTeacherWorkReport(teacher.id)
+    expect(report.rateCents).toBeNull()
+    expect(report.months.every((m) => m.amountCents === null)).toBe(true)
+    expect(monthOf(report, CURRENT).totalMinutes).toBe(180)
+  })
+
+  it('rejects a malformed rate without touching the stored one', async () => {
+    const teacher = await teacherWithThreeHours()
+
+    await adminSession()
+    await updateTeacherHourlyRate({ id: teacher.id, hourlyRateCents: '12,50' })
+    const res = await updateTeacherHourlyRate({ id: teacher.id, hourlyRateCents: 'abc' })
+
+    expect(res.success).toBe(false)
+    expect((await getTeacherWorkReport(teacher.id)).rateCents).toBe(1250)
+  })
+
+  it('can pay a teaching ADMIN — Šibenik’s only teacher is its admin', async () => {
+    const slavica = await createAdmin({ city: 'SIBENIK' })
+    const { group } = await groupWithStudent({ city: 'SIBENIK' })
+    await createTeacherAssignment(slavica.id, group.id)
+    await markTeacherPresent(slavica.id, group.id, dayOf(CURRENT, 6))
+
+    await adminSession('SIBENIK')
+    expect(
+      await updateTeacherHourlyRate({ id: slavica.id, hourlyRateCents: '20' }),
+    ).toEqual({ success: true })
+
+    expect((await currentMonth(slavica.id)).amountCents).toBe(3000)
+  })
+
+  it('404s when setting a rate on a teacher from the other city', async () => {
+    const splitTeacher = await createTeacher({ city: 'SPLIT' })
+    await adminSession('SIBENIK')
+
+    await expect(
+      updateTeacherHourlyRate({ id: splitTeacher.id, hourlyRateCents: '12,50' }),
+    ).rejects.toThrow('NEXT_NOT_FOUND')
   })
 })
 
@@ -166,9 +306,9 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     expect(res).toEqual({ success: true })
 
     await adminSession()
-    const report = await getTeacherWorkReport(teacher.id)
-    expect(report.current.sessionCount).toBe(1)
-    expect(report.current.totalMinutes).toBe(90)
+    const current = await currentMonth(teacher.id)
+    expect(current.sessionCount).toBe(1)
+    expect(current.totalMinutes).toBe(90)
   })
 
   it('books only the teachers marked present on a two-teacher group', async () => {
@@ -190,8 +330,8 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     })
 
     await adminSession()
-    expect((await getTeacherWorkReport(present.id)).current.sessionCount).toBe(1)
-    expect((await getTeacherWorkReport(absent.id)).current.sessionCount).toBe(0)
+    expect((await currentMonth(present.id)).sessionCount).toBe(1)
+    expect((await currentMonth(absent.id)).sessionCount).toBe(0)
   })
 
   it('books nobody when two teachers are assigned and none were marked', async () => {
@@ -209,8 +349,8 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     })
 
     await adminSession()
-    expect((await getTeacherWorkReport(first.id)).current.sessionCount).toBe(0)
-    expect((await getTeacherWorkReport(second.id)).current.sessionCount).toBe(0)
+    expect((await currentMonth(first.id)).sessionCount).toBe(0)
+    expect((await currentMonth(second.id)).sessionCount).toBe(0)
   })
 
   it('refuses to book someone who is not assigned to the group', async () => {
@@ -229,7 +369,7 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     })
 
     await adminSession()
-    expect((await getTeacherWorkReport(outsider.id)).current.sessionCount).toBe(0)
+    expect((await currentMonth(outsider.id)).sessionCount).toBe(0)
   })
 
   it('an admin marking the session does not book herself', async () => {
@@ -246,8 +386,8 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     })
 
     // The group's teacher is credited; the admin who typed it is not.
-    expect((await getTeacherWorkReport(teacher.id)).current.sessionCount).toBe(1)
-    expect((await getTeacherWorkReport(admin.id)).current.sessionCount).toBe(0)
+    expect((await currentMonth(teacher.id)).sessionCount).toBe(1)
+    expect((await currentMonth(admin.id)).sessionCount).toBe(0)
   })
 
   it('re-marking the same session keeps one row, not two', async () => {
@@ -266,7 +406,7 @@ describe('bulkMarkSession — teaching hours are written with the students', () 
     }
 
     await adminSession()
-    expect((await getTeacherWorkReport(teacher.id)).current.sessionCount).toBe(1)
+    expect((await currentMonth(teacher.id)).sessionCount).toBe(1)
   })
 })
 
@@ -307,18 +447,18 @@ describe('bulkMarkSession — the teacher marking window', () => {
     // Neither the student roster nor the teacher's hours may be touched.
     expect(await db.attendance.count({ where: { enrollmentId: enrollment.id } })).toBe(0)
     await adminSession()
-    expect((await getTeacherWorkReport(teacher.id)).current.sessionCount).toBe(0)
+    expect((await currentMonth(teacher.id)).sessionCount).toBe(0)
   })
 
   it('rejects a session in the previous month', async () => {
     const { teacher, group, enrollment } = await teacherOnGroup()
 
-    const res = await mark(group.id, enrollment.id, dateKeyOf(WINDOWS.previous, 15))
+    const res = await mark(group.id, enrollment.id, dateKeyOf(PREVIOUS, 15))
 
     expect(res.success).toBe(false)
     expect(res.success === false && res.error).toMatch(/tekućeg mjeseca/)
     await adminSession()
-    expect((await getTeacherWorkReport(teacher.id)).previous.sessionCount).toBe(0)
+    expect(monthOf(await getTeacherWorkReport(teacher.id), PREVIOUS).sessionCount).toBe(0)
   })
 
   it('accepts today', async () => {
@@ -327,7 +467,7 @@ describe('bulkMarkSession — the teacher marking window', () => {
     expect(await mark(group.id, enrollment.id, markableDateKey(0))).toEqual({ success: true })
 
     await adminSession()
-    expect((await getTeacherWorkReport(teacher.id)).current.sessionCount).toBe(1)
+    expect((await currentMonth(teacher.id)).sessionCount).toBe(1)
   })
 
   it('accepts the 1st of the current month', async () => {
@@ -341,7 +481,7 @@ describe('bulkMarkSession — the teacher marking window', () => {
     const teacher = await createTeacher()
     const { group, enrollment } = await groupWithStudent()
     await createTeacherAssignment(teacher.id, group.id)
-    const pastDate = dateKeyOf(WINDOWS.previous, 12)
+    const pastDate = dateKeyOf(PREVIOUS, 12)
 
     mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
     expect((await mark(group.id, enrollment.id, pastDate)).success).toBe(false)
@@ -354,7 +494,7 @@ describe('bulkMarkSession — the teacher marking window', () => {
       }),
     ).toBe(1)
     // The admin is not assigned to the group, so no hours are booked for them.
-    expect((await getTeacherWorkReport(admin.id)).previous.sessionCount).toBe(0)
+    expect(monthOf(await getTeacherWorkReport(admin.id), PREVIOUS).sessionCount).toBe(0)
   })
 })
 
@@ -374,10 +514,10 @@ describe('hours survive the assignment', () => {
     await adminSession()
     expect(await unassignTeacherFromGroup(assignment.id)).toEqual({ success: true })
 
-    const report = await getTeacherWorkReport(teacher.id)
-    expect(report.current.sessionCount).toBe(1)
-    expect(report.current.totalMinutes).toBe(90)
-    expect(report.current.groups[0].groupId).toBe(group.id)
+    const current = await currentMonth(teacher.id)
+    expect(current.sessionCount).toBe(1)
+    expect(current.totalMinutes).toBe(90)
+    expect(current.groups[0].groupId).toBe(group.id)
   })
 })
 
@@ -392,9 +532,9 @@ describe('getTeacherWorkReport — city scoping', () => {
   it('ignores hours booked on a group outside the admin city', async () => {
     const teacher = await createTeacher({ city: 'SIBENIK' })
     const { group } = await groupWithStudent({ city: 'SPLIT' })
-    await markTeacherPresent(teacher.id, group.id, dayOf(WINDOWS.current, 12))
+    await markTeacherPresent(teacher.id, group.id, dayOf(CURRENT, 12))
 
     await adminSession('SIBENIK')
-    expect((await getTeacherWorkReport(teacher.id)).current.sessionCount).toBe(0)
+    expect((await currentMonth(teacher.id)).sessionCount).toBe(0)
   })
 })

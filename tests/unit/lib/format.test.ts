@@ -4,6 +4,7 @@ import {
   formatChildName,
   formatDate,
   formatDateKey,
+  formatEurCents,
   formatGroupSchedule,
   formatHours,
   formatMonthYear,
@@ -141,6 +142,23 @@ describe('formatHours', () => {
     expect(formatHours(60)).toBe('1 h')
     expect(formatHours(750)).toBe('12,5 h')
     expect(formatHours(0)).toBe('0 h')
+  })
+})
+
+describe('formatEurCents', () => {
+  // Intl separates the amount from the symbol with a NON-BREAKING space, which
+  // is what keeps "18,75 €" from wrapping mid-figure — spelled out here so a
+  // future edit doesn't "fix" it to a plain space.
+  const eur = (amount: string) => `${amount} €`
+
+  it('renders euro cents in Croatian currency format', () => {
+    expect(formatEurCents(1875)).toBe(eur('18,75'))
+    expect(formatEurCents(1250)).toBe(eur('12,50'))
+    expect(formatEurCents(0)).toBe(eur('0,00'))
+  })
+
+  it('keeps two decimals on a whole-euro rate', () => {
+    expect(formatEurCents(1200)).toBe(eur('12,00'))
   })
 })
 

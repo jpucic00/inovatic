@@ -1,22 +1,21 @@
-import { CalendarClock } from 'lucide-react'
-import { formatDateKey, formatHours, formatMonthYear } from '@/lib/format'
+import { CalendarClock, ChevronRight, TriangleAlert } from 'lucide-react'
+import {
+  croatianPlural,
+  formatDateKey,
+  formatEurCents,
+  formatHours,
+  formatMonthYear,
+} from '@/lib/format'
 import type { TeacherWorkReport, WorkReportMonth } from '@/lib/teacher-work-report'
+import { TeacherHourlyRateDialog } from './teacher-hourly-rate-dialog'
 
-function MonthTotals({ month }: Readonly<{ month: WorkReportMonth }>) {
-  return (
-    <div className="grid grid-cols-3 gap-2 mb-3">
-      {[
-        { label: 'Sati', value: formatHours(month.totalMinutes) },
-        { label: 'Termina', value: String(month.sessionCount) },
-        { label: 'Grupa', value: String(month.groupCount) },
-      ].map((stat) => (
-        <div key={stat.label} className="rounded-lg border bg-white px-3 py-2">
-          <p className="text-xs text-gray-500">{stat.label}</p>
-          <p className="text-lg font-bold text-gray-900 tabular-nums">{stat.value}</p>
-        </div>
-      ))}
-    </div>
-  )
+/** Euro cents, or an em dash when no rate is set — never a misleading 0 €. */
+function amountLabel(cents: number | null): string {
+  return cents === null ? '—' : formatEurCents(cents)
+}
+
+function terminLabel(count: number): string {
+  return `${count} ${croatianPlural(count, 'termin', 'termina', 'termina')}`
 }
 
 function SessionChip({ date }: Readonly<{ date: string }>) {
@@ -30,74 +29,138 @@ function SessionChip({ date }: Readonly<{ date: string }>) {
   )
 }
 
-function MonthBlock({ month }: Readonly<{ month: WorkReportMonth }>) {
-  const { window } = month
+function MonthBody({ month }: Readonly<{ month: WorkReportMonth }>) {
+  if (month.groups.length === 0) {
+    return (
+      <p className="px-4 pb-4 text-sm text-gray-400 italic">Nema evidentiranih termina.</p>
+    )
+  }
+
   return (
-    <div className="rounded-xl border bg-gray-50 p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">
-        {formatMonthYear(window.year, window.month)}
-      </h3>
-
-      <MonthTotals month={month} />
-
-      {month.groups.length === 0 ? (
-        <p className="text-sm text-gray-400 italic">Nema evidentiranih termina.</p>
-      ) : (
-        <div className="space-y-2">
-          {month.groups.map((g) => (
-            <div key={g.groupId} className="rounded-lg border bg-white p-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-sm font-medium text-gray-900">{g.label}</p>
-                <p className="text-sm font-semibold text-gray-900 tabular-nums shrink-0">
-                  {formatHours(g.totalMinutes)}
-                </p>
-              </div>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {g.sessionMinutes === null ? (
-                  <span className="text-amber-700">
-                    Grupa nema definirano vrijeme — sati se ne mogu izračunati
-                  </span>
-                ) : (
-                  <>
-                    {g.sessionCount} × {formatHours(g.sessionMinutes)}
-                    {g.startTime && g.endTime && ` (${g.startTime}–${g.endTime})`}
-                  </>
-                )}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {g.sessions.map((date) => (
-                  <SessionChip key={date} date={date} />
-                ))}
-              </div>
-            </div>
-          ))}
+    <div className="space-y-2 px-4 pb-4">
+      {month.groups.map((g) => (
+        <div key={g.groupId} className="rounded-lg border bg-white p-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm font-medium text-gray-900">{g.label}</p>
+            <p className="text-sm tabular-nums shrink-0 text-gray-500">
+              {formatHours(g.totalMinutes)}
+              <span className="ml-2 font-semibold text-gray-900">
+                {amountLabel(g.amountCents)}
+              </span>
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {g.sessionMinutes === null ? (
+              <span className="text-amber-700">
+                Grupa nema definirano vrijeme — sati se ne mogu izračunati
+              </span>
+            ) : (
+              <>
+                {g.sessionCount} × {formatHours(g.sessionMinutes)}
+                {g.startTime && g.endTime && ` (${g.startTime}–${g.endTime})`}
+              </>
+            )}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {g.sessions.map((date) => (
+              <SessionChip key={date} date={date} />
+            ))}
+          </div>
         </div>
-      )}
+      ))}
     </div>
   )
 }
 
 /**
- * Read-only payout basis: hours credited to this teacher in the current and
- * previous calendar month, derived from this teacher's present TeacherAttendance
- * rows and the group's session length — never from who recorded the students.
+ * One collapsible month. Native `<details>` rather than client state — the card
+ * stays a server component, and six months of session chips cost nothing until
+ * a month is opened.
+ */
+function MonthBlock({
+  month,
+  defaultOpen,
+}: Readonly<{ month: WorkReportMonth; defaultOpen: boolean }>) {
+  const { window } = month
+  return (
+    <details open={defaultOpen} className="group rounded-xl border bg-gray-50">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-center gap-2">
+          <ChevronRight className="w-4 h-4 shrink-0 text-gray-400 transition-transform group-open:rotate-90" />
+          <span className="truncate text-sm font-semibold text-gray-700">
+            {formatMonthYear(window.year, window.month)}
+          </span>
+          {month.hasUnpricedSessions && (
+            <TriangleAlert
+              className="w-3.5 h-3.5 shrink-0 text-amber-600"
+              aria-label="Dio termina nema definirano trajanje pa nije uračunat"
+            />
+          )}
+        </span>
+        <span className="flex shrink-0 items-baseline gap-3 tabular-nums">
+          <span className="hidden text-xs text-gray-500 sm:inline">
+            {terminLabel(month.sessionCount)}
+          </span>
+          <span className="text-sm text-gray-600">{formatHours(month.totalMinutes)}</span>
+          <span className="w-20 text-right text-sm font-bold text-gray-900">
+            {amountLabel(month.amountCents)}
+          </span>
+        </span>
+      </summary>
+      <MonthBody month={month} />
+    </details>
+  )
+}
+
+/**
+ * Read-only payout basis: hours credited to this teacher over the last six
+ * calendar months, derived from their present TeacherAttendance rows and the
+ * group's session length — never from who recorded the students — priced at the
+ * teacher's current hourly rate.
  */
 export function TeacherWorkReportCard({
   report,
-}: Readonly<{ report: TeacherWorkReport }>) {
+  teacherId,
+}: Readonly<{ report: TeacherWorkReport; teacherId: string }>) {
+  const { rateCents } = report
+
   return (
     <div>
-      <div className="flex items-center gap-2 mb-1">
-        <CalendarClock className="w-4 h-4 text-gray-400" />
-        <h2 className="text-sm font-semibold text-gray-700">Evidencija rada</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-2">
+          <CalendarClock className="w-4 h-4 text-gray-400" />
+          <h2 className="text-sm font-semibold text-gray-700">Evidencija rada</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">
+            Satnica:{' '}
+            {rateCents === null ? (
+              <span className="italic text-gray-400">nije postavljena</span>
+            ) : (
+              <span className="font-semibold text-gray-900 tabular-nums">
+                {formatEurCents(rateCents)}/h
+              </span>
+            )}
+          </span>
+          <TeacherHourlyRateDialog teacherId={teacherId} rateCents={rateCents} />
+        </div>
       </div>
       <p className="text-xs text-gray-500 mb-4">
-        Sati se broje iz evidencije nastavnika na terminu i trajanja grupe.
-        Zapisi ostaju i nakon što nastavnik više nije dodijeljen grupi.
+        Sati se broje iz evidencije nastavnika na terminu i trajanja grupe. Zapisi
+        ostaju i nakon što nastavnik više nije dodijeljen grupi.{' '}
+        {rateCents === null
+          ? 'Postavite satnicu da se izračuna iznos za isplatu.'
+          : 'Svi iznosi računaju se po trenutnoj satnici, uključujući ranije mjesece.'}
       </p>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <MonthBlock month={report.current} />
-        <MonthBlock month={report.previous} />
+
+      <div className="space-y-2">
+        {report.months.map((month, index) => (
+          <MonthBlock
+            key={month.window.startKey}
+            month={month}
+            defaultOpen={index === 0}
+          />
+        ))}
       </div>
     </div>
   )

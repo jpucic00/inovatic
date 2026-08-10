@@ -144,6 +144,14 @@ model User {
   parentEmail   String?
   parentPhone   String?
   childSchool   String?
+  // Payout rate for a TEACHER (or a teaching ADMIN) in euro CENTS per hour —
+  // 1250 = 12,50 €/h. Integer cents, not a Float like `Course.price`: the figure
+  // is multiplied by fractional hours and summed per group, and the per-group
+  // subtotals the admin reads must add up to the month total exactly. Null = not
+  // set, and the work report then shows hours with no money column rather than a
+  // wrong number. Admin-only — the payout action is the sole reader, and no
+  // teacher- or student-facing query may select it.
+  hourlyRateCents Int?
   gdprConsentAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

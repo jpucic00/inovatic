@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
+  REPORT_MONTH_COUNT,
   buildTeacherWorkReport,
-  monthWindows,
   parseClockMinutes,
+  recentMonthWindows,
   sessionMinutes,
+  type TeacherWorkReport,
   type WorkReportAttendanceRow,
   type WorkReportGroup,
 } from '@/lib/teacher-work-report'
 
-const WINDOWS = monthWindows(new Date('2026-07-15T10:00:00.000Z'))
+const WINDOWS = recentMonthWindows(new Date('2026-07-15T10:00:00.000Z'))
 
 function group(overrides: Partial<WorkReportGroup> = {}): WorkReportGroup {
   return {
@@ -24,9 +26,27 @@ function row(date: string, groupId = 'group-1'): WorkReportAttendanceRow {
   return { scheduledGroupId: groupId, sessionDate: new Date(`${date}T00:00:00.000Z`) }
 }
 
-function report(groups: WorkReportGroup[], rows: WorkReportAttendanceRow[]) {
-  return buildTeacherWorkReport({ groups, rows, windows: WINDOWS })
+function report(
+  groups: WorkReportGroup[],
+  rows: WorkReportAttendanceRow[],
+  rateCents: number | null = null,
+) {
+  return buildTeacherWorkReport({ groups, rows, windows: WINDOWS, rateCents })
 }
+
+/** The month block for a `YYYY-MM`, so a test never depends on array position. */
+function month(res: TeacherWorkReport, key: string) {
+  const found = res.months.find((m) => m.window.startKey.startsWith(key))
+  if (!found) throw new Error(`no month ${key} in the report`)
+  return found
+}
+
+// The report deliberately carries no totals of its own — a six-month sum is not
+// a figure anyone pays out. Tests that want one add it up here.
+const sumSessions = (res: TeacherWorkReport) =>
+  res.months.reduce((sum, m) => sum + m.sessionCount, 0)
+const sumAmountCents = (res: TeacherWorkReport) =>
+  res.months.reduce((sum, m) => sum + (m.amountCents ?? 0), 0)
 
 describe('parseClockMinutes', () => {
   it('accepts one- and two-digit hours', () => {
@@ -58,35 +78,46 @@ describe('sessionMinutes', () => {
   })
 })
 
-describe('monthWindows', () => {
-  it('spans the current month and the one before it', () => {
-    const w = monthWindows(new Date('2026-07-15T10:00:00.000Z'))
+describe('recentMonthWindows', () => {
+  it('returns six months, newest first', () => {
+    const w = recentMonthWindows(new Date('2026-07-15T10:00:00.000Z'))
+
+    expect(w).toHaveLength(REPORT_MONTH_COUNT)
     // Date keys, not Dates: these cross a 'use server' boundary via
     // getTeacherWorkReport, which returns serializable values only.
-    expect(w.current).toEqual({
+    expect(w[0]).toEqual({
       year: 2026,
       month: 7,
       startKey: '2026-07-01',
       endKey: '2026-07-31',
     })
-    expect(w.previous).toEqual({
+    expect(w[1]).toEqual({
       year: 2026,
       month: 6,
       startKey: '2026-06-01',
       endKey: '2026-06-30',
     })
+    expect(w[5]).toMatchObject({ year: 2026, month: 2, endKey: '2026-02-28' })
   })
 
-  it('rolls the previous month across the new year', () => {
-    const w = monthWindows(new Date('2026-01-10T10:00:00.000Z'))
-    expect(w.previous).toMatchObject({ year: 2025, month: 12 })
+  it('rolls back across the new year', () => {
+    const w = recentMonthWindows(new Date('2026-01-10T10:00:00.000Z'))
+
+    expect(w[0]).toMatchObject({ year: 2026, month: 1 })
+    expect(w[1]).toMatchObject({ year: 2025, month: 12 })
+    expect(w[5]).toMatchObject({ year: 2025, month: 8 })
   })
 
   it('anchors on the Zagreb date, not UTC, at a month boundary', () => {
     // 23:30 UTC on 31 July is already 01 August in Zagreb (UTC+2).
-    const w = monthWindows(new Date('2026-07-31T23:30:00.000Z'))
-    expect(w.current).toMatchObject({ year: 2026, month: 8 })
-    expect(w.previous).toMatchObject({ year: 2026, month: 7 })
+    const w = recentMonthWindows(new Date('2026-07-31T23:30:00.000Z'))
+
+    expect(w[0]).toMatchObject({ year: 2026, month: 8 })
+    expect(w[1]).toMatchObject({ year: 2026, month: 7 })
+  })
+
+  it('honours a custom count', () => {
+    expect(recentMonthWindows(new Date('2026-07-15T10:00:00.000Z'), 2)).toHaveLength(2)
   })
 })
 
@@ -94,41 +125,53 @@ describe('buildTeacherWorkReport', () => {
   it('turns each attendance row into a session of the group length', () => {
     const res = report([group()], [row('2026-07-06'), row('2026-07-13')])
 
-    expect(res.current.sessionCount).toBe(2)
-    expect(res.current.groupCount).toBe(1)
-    expect(res.current.totalMinutes).toBe(180)
-    expect(res.current.groups[0].sessions).toEqual(['2026-07-06', '2026-07-13'])
+    expect(month(res, '2026-07')).toMatchObject({
+      sessionCount: 2,
+      groupCount: 1,
+      totalMinutes: 180,
+    })
+    expect(month(res, '2026-07').groups[0].sessions).toEqual(['2026-07-06', '2026-07-13'])
   })
 
-  it('splits into the current and previous month and drops older rows', () => {
+  it('reports every month in the window and drops rows older than it', () => {
     const res = report(
       [group()],
       [
         row('2026-07-06'),
         row('2026-06-29'),
-        row('2026-06-01'),
-        row('2026-05-25'),
+        // Four months back — visible now, unreachable under the old two-month report.
+        row('2026-03-10'),
+        // The month before the window opens.
+        row('2026-01-20'),
       ],
     )
 
-    expect(res.current.sessionCount).toBe(1)
-    expect(res.previous.sessionCount).toBe(2)
-    expect(res.previous.totalMinutes).toBe(180)
+    expect(res.months).toHaveLength(REPORT_MONTH_COUNT)
+    expect(month(res, '2026-07').sessionCount).toBe(1)
+    expect(month(res, '2026-06').sessionCount).toBe(1)
+    expect(month(res, '2026-03').sessionCount).toBe(1)
+    expect(sumSessions(res)).toBe(3)
+    // A month with no work is still present, so the card renders a full six.
+    expect(month(res, '2026-05')).toMatchObject({ sessionCount: 0, groups: [] })
   })
 
   it('collapses duplicate rows for the same group and date', () => {
     const res = report([group()], [row('2026-07-06'), row('2026-07-06')])
 
-    expect(res.current.sessionCount).toBe(1)
-    expect(res.current.totalMinutes).toBe(90)
+    expect(month(res, '2026-07').sessionCount).toBe(1)
+    expect(month(res, '2026-07').totalMinutes).toBe(90)
   })
 
-  it('lists a group without times but contributes no hours', () => {
-    const res = report([group({ startTime: null, endTime: null })], [row('2026-07-06')])
+  it('lists a group without times, contributes no hours, and flags the month', () => {
+    const res = report([group({ startTime: null, endTime: null })], [row('2026-07-06')], 1250)
+    const july = month(res, '2026-07')
 
-    expect(res.current.sessionCount).toBe(1)
-    expect(res.current.totalMinutes).toBe(0)
-    expect(res.current.groups[0].sessionMinutes).toBeNull()
+    expect(july.sessionCount).toBe(1)
+    expect(july.totalMinutes).toBe(0)
+    expect(july.groups[0].sessionMinutes).toBeNull()
+    expect(july.groups[0].amountCents).toBe(0)
+    // The total below those sessions is knowably short — the card says so.
+    expect(july.hasUnpricedSessions).toBe(true)
   })
 
   it('totals across several groups, sorted by label', () => {
@@ -139,11 +182,13 @@ describe('buildTeacherWorkReport', () => {
       ],
       [row('2026-07-06'), row('2026-07-07', 'group-2')],
     )
+    const july = month(res, '2026-07')
 
-    expect(res.current.groupCount).toBe(2)
-    expect(res.current.sessionCount).toBe(2)
-    expect(res.current.totalMinutes).toBe(150)
-    expect(res.current.groups.map((g) => g.label)).toEqual([
+    expect(july.groupCount).toBe(2)
+    expect(july.sessionCount).toBe(2)
+    expect(july.totalMinutes).toBe(150)
+    expect(july.hasUnpricedSessions).toBe(false)
+    expect(july.groups.map((g) => g.label)).toEqual([
       'SLR 1 — Utorak',
       'SLR 2 — Ponedjeljak',
     ])
@@ -152,14 +197,79 @@ describe('buildTeacherWorkReport', () => {
   it('ignores a row whose group is missing from the feed', () => {
     const res = report([group()], [row('2026-07-06', 'unknown-group')])
 
-    expect(res.current.sessionCount).toBe(0)
-    expect(res.current.groups).toEqual([])
+    expect(month(res, '2026-07').sessionCount).toBe(0)
+    expect(month(res, '2026-07').groups).toEqual([])
   })
 
   it('returns empty months when nothing was recorded', () => {
     const res = report([group()], [])
 
-    expect(res.current).toMatchObject({ totalMinutes: 0, sessionCount: 0, groupCount: 0 })
-    expect(res.previous.groups).toEqual([])
+    expect(res.months).toHaveLength(REPORT_MONTH_COUNT)
+    expect(
+      res.months.every(
+        (m) => m.sessionCount === 0 && m.totalMinutes === 0 && m.groups.length === 0,
+      ),
+    ).toBe(true)
+  })
+})
+
+describe('buildTeacherWorkReport — money', () => {
+  it('leaves every amount null when no rate is set', () => {
+    const res = report([group()], [row('2026-07-06')])
+
+    expect(res.rateCents).toBeNull()
+    expect(res.months.every((m) => m.amountCents === null)).toBe(true)
+    expect(month(res, '2026-07').amountCents).toBeNull()
+    expect(month(res, '2026-07').groups[0].amountCents).toBeNull()
+    // Hours stay valid — only the money column disappears.
+    expect(month(res, '2026-07').totalMinutes).toBe(90)
+  })
+
+  it('prices a 90-minute session at the hourly rate', () => {
+    const res = report([group()], [row('2026-07-06')], 1250)
+
+    expect(month(res, '2026-07').amountCents).toBe(1875)
+    expect(sumAmountCents(res)).toBe(1875)
+  })
+
+  it('distinguishes a zero rate from no rate', () => {
+    const res = report([group()], [row('2026-07-06')], 0)
+
+    expect(res.months.every((m) => m.amountCents === 0)).toBe(true)
+    expect(month(res, '2026-07').groups[0].amountCents).toBe(0)
+  })
+
+  it('keeps group subtotals adding up to the month total exactly', () => {
+    // A rate that does not divide evenly, so rounding is actually exercised.
+    const res = report(
+      [
+        group(),
+        group({ id: 'group-2', label: 'SLR 1 — Utorak', startTime: '17:00', endTime: '18:00' }),
+      ],
+      [
+        row('2026-07-06'),
+        row('2026-07-07', 'group-2'),
+        row('2026-07-13'),
+        row('2026-06-01'),
+      ],
+      1233,
+    )
+
+    for (const m of res.months) {
+      expect(m.amountCents).toBe(m.groups.reduce((sum, g) => sum + (g.amountCents ?? 0), 0))
+    }
+    // 180 min at 12,33 €/h = 36,99 €; the 60-min group adds 12,33 €.
+    expect(month(res, '2026-07').groups.map((g) => g.amountCents)).toEqual([1233, 3699])
+    expect(month(res, '2026-07').amountCents).toBe(4932)
+    // June rounds a half cent up (90 min = 1849.5), which must not drift the sum.
+    expect(month(res, '2026-06').amountCents).toBe(1850)
+    expect(sumAmountCents(res)).toBe(6782)
+  })
+
+  it('rounds a half-cent session up rather than truncating it', () => {
+    // 90 min at 12,33 €/h = 1849.5 cents.
+    const res = report([group()], [row('2026-07-06')], 1233)
+
+    expect(month(res, '2026-07').groups[0].amountCents).toBe(1850)
   })
 })
