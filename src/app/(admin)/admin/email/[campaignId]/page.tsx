@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { getCampaignDetail } from '@/actions/admin/email-campaign'
+import { CampaignContent } from '@/components/admin/email/campaign-content'
 import { CampaignRecipients } from '@/components/admin/email/campaign-recipients'
 import { EMAIL_CAMPAIGN_KINDS } from '@/lib/email-campaign-kind'
 import { formatDate } from '@/lib/format'
@@ -37,6 +38,13 @@ export default async function CampaignDetailPage({
           {campaign.targetSchoolYear ? ` · ${campaign.targetSchoolYear}` : ''}
         </p>
       </div>
+
+      <CampaignContent
+        campaignId={campaign.id}
+        kind={campaign.kind}
+        subject={campaign.subject}
+        bodyText={campaign.bodyText}
+      />
 
       <CampaignRecipients campaign={campaign} />
     </div>

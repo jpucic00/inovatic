@@ -50,7 +50,9 @@ const {
   previewEvaluationEmailForRecipient,
   sendEmailCampaign,
   getCampaignDetail,
+  getCampaignEmailHtml,
   getCampaignProgress,
+  getRecipientEmailHtml,
   resumeEmailCampaign,
 } = await import('@/actions/admin/email-campaign')
 
@@ -1663,5 +1665,140 @@ describe('overlapping runs of one campaign', () => {
         where: { campaignId: campaign.id, status: 'PENDING' },
       }),
     ).toBe(0)
+  })
+})
+
+describe('reading back what was sent', () => {
+  it('rebuilds a CUSTOM campaign e-mail from the stored subject and body', async () => {
+    await loginAdmin()
+    const { group } = await makeSourceGroup()
+    await enrollStudent(group.id, { parentEmail: uniqEmail('archive-custom') })
+
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+
+    const html = await getCampaignEmailHtml(res.campaignId)
+    expect(html.success).toBe(true)
+    if (html.success) {
+      expect(html.html).toContain(CONTENT.bodyText)
+      // A CUSTOM mail carries neither termin boxes nor a signup CTA.
+      expect(html.html).not.toContain('/prijava')
+    }
+  })
+
+  it('rebuilds an invitation’s termin boxes, and survives a target group deleted since', async () => {
+    await loginAdmin()
+    const { group: source } = await makeSourceGroup()
+    await enrollStudent(source.id, { parentEmail: uniqEmail('archive-invite') })
+
+    const target = await makeTarget()
+    const location = await createLocation({ city: 'SPLIT' })
+    const second = await createGroup({
+      courseId: target.course.id,
+      locationId: location.id,
+      schoolYear: TARGET_YEAR,
+      city: 'SPLIT',
+      dayOfWeek: 'Ponedjeljak',
+      startTime: '17:00',
+      endTime: '18:30',
+    })
+
+    const res = await sendAndSettle({
+      kind: 'REENROLLMENT',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.id],
+      targetCourseId: target.course.id,
+      targetGroupIds: [target.group.id, second.id],
+      ...CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+
+    const before = await getCampaignEmailHtml(res.campaignId)
+    expect(before.success).toBe(true)
+    if (before.success) {
+      expect(before.html).toContain('Četvrtak · 18:30–20:00')
+      expect(before.html).toContain('Ponedjeljak · 17:00–18:30')
+      expect(before.html).toContain(`/prijava/${target.course.slug}`)
+    }
+
+    // A group deleted after the send must not make the sent mail unviewable —
+    // the archive view is deliberately laxer than the send path here.
+    await db.scheduledGroup.delete({ where: { id: second.id } })
+
+    const after = await getCampaignEmailHtml(res.campaignId)
+    expect(after.success).toBe(true)
+    if (after.success) {
+      expect(after.html).toContain('Četvrtak · 18:30–20:00')
+      expect(after.html).not.toContain('Ponedjeljak · 17:00–18:30')
+      expect(after.html).toContain(`/prijava/${target.course.slug}`)
+    }
+  })
+
+  it('renders one evaluation recipient’s own card, and refuses once the address no longer matches', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const student = await enrollStudent(group.id, {
+      parentEmail: uniqEmail('archive-eval'),
+      firstName: 'Ema',
+      lastName: 'Kovač',
+    })
+    await createAssessment(student.id, group.id, admin.id)
+
+    const res = await sendAndSettle({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...EVAL_CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+
+    const detail = await getCampaignDetail(res.campaignId)
+    const row = detail.recipients.find((r) => r.status === 'SENT')
+    expect(row).toBeDefined()
+    if (!row) return
+
+    const html = await getRecipientEmailHtml(row.id)
+    expect(html.success).toBe(true)
+    if (html.success) {
+      expect(html.html).toContain('Ema Kovač')
+      expect(html.html).toContain(EVAL_CONTENT.bodyText)
+    }
+
+    // The ownership guard governs this read exactly as it governs the send: a
+    // card is only ever loaded for the address the child currently lists.
+    await db.user.update({
+      where: { id: student.id },
+      data: { parentEmail: uniqEmail('archive-eval-changed') },
+    })
+    const stale = await getRecipientEmailHtml(row.id)
+    expect(stale.success).toBe(false)
+  })
+
+  it('hides both views from an admin of the other city', async () => {
+    await loginAdmin('SPLIT')
+    const { group } = await makeSourceGroup()
+    await enrollStudent(group.id, { parentEmail: uniqEmail('archive-city') })
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+    const detail = await getCampaignDetail(res.campaignId)
+    const rowId = detail.recipients[0].id
+
+    await loginAdmin('SIBENIK')
+    await expect(getCampaignEmailHtml(res.campaignId)).rejects.toThrow()
+    await expect(getRecipientEmailHtml(rowId)).rejects.toThrow()
   })
 })

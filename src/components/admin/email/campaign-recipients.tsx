@@ -3,13 +3,15 @@
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Eye, Loader2, RefreshCw } from 'lucide-react'
 import {
   getCampaignProgress,
+  getRecipientEmailHtml,
   resumeEmailCampaign,
   type CampaignDetail,
 } from '@/actions/admin/email-campaign'
 import { formatDate } from '@/lib/format'
+import { EmailPreviewDialog } from './email-preview-dialog'
 
 const STATUS_LABEL: Record<string, string> = {
   SENT: 'Poslano',
@@ -41,6 +43,11 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
   // exists for. Five polls (~15 s) without a single sent/failed increment while
   // rows are still owed means nothing is running — offer the resume.
   const [stalled, setStalled] = useState(false)
+  // Per-recipient preview — EVALUATION only, where every row carries a
+  // different report card and the campaign-level preview cannot show it.
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [previewFor, setPreviewFor] = useState<string | null>(null)
 
   // While a send is in flight the rows change under us, so refresh the page
   // data until the campaign closes out.
@@ -75,6 +82,31 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
       a.parentEmail.localeCompare(b.parentEmail, 'hr'),
   )
   const pendingCount = rows.filter((r) => r.status === 'PENDING').length
+
+  const showPreviewColumn = campaign.kind === 'EVALUATION'
+
+  function handlePreview(row: CampaignDetail['recipients'][number]) {
+    setPreviewHtml(null)
+    setPreviewFor(
+      [row.parentEmail, row.childNames.join(', ')].filter(Boolean).join(' – ') || null,
+    )
+    setPreviewOpen(true)
+    getRecipientEmailHtml(row.id)
+      .then((res) => {
+        if (res.success) {
+          setPreviewHtml(res.html)
+        } else {
+          setPreviewOpen(false)
+          // The ownership guard's own refusal (card deleted, address corrected
+          // since) surfaces here — that is the answer, not an error to hide.
+          toast.error(res.error)
+        }
+      })
+      .catch(() => {
+        setPreviewOpen(false)
+        toast.error('Greška pri izradi pregleda.')
+      })
+  }
 
   function handleResume() {
     startTransition(async () => {
@@ -140,12 +172,16 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
                 <th className="px-4 py-2.5 text-left font-medium">E-mail roditelja</th>
                 <th className="px-4 py-2.5 text-left font-medium w-40">Status</th>
                 <th className="px-4 py-2.5 text-left font-medium">Napomena</th>
+                {showPreviewColumn && <th className="px-4 py-2.5 text-right font-medium">E-mail</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                  <td
+                    colSpan={showPreviewColumn ? 5 : 4}
+                    className="px-4 py-6 text-center text-gray-500"
+                  >
                     Nema primatelja.
                   </td>
                 </tr>
@@ -170,12 +206,37 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {r.failureReason ?? (r.status === 'SENT' ? formatDate(new Date(r.sentAt)) : '')}
                   </td>
+                  {showPreviewColumn && (
+                    <td className="px-4 py-3 text-right">
+                      {/* FAILED too: seeing the card that was meant to go out is
+                          how an admin understands why it did not. */}
+                      {(r.status === 'SENT' || r.status === 'FAILED') && (
+                        <button
+                          type="button"
+                          onClick={() => handlePreview(r)}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-700 hover:text-cyan-900"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Pregled
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+
+      <EmailPreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        html={previewHtml}
+        description={
+          previewFor ? `Poruka poslana na ${previewFor}` : 'Poruka poslana ovom primatelju.'
+        }
+      />
     </div>
   )
 }

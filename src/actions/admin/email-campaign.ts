@@ -8,8 +8,7 @@ import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
-import { formatGroupSchedule } from '@/lib/format'
-import { isRadionica } from '@/lib/program-kind'
+import { toGroupOptions } from '@/lib/email-campaign-options'
 import { signupPathForSlug } from '@/lib/signup-links'
 import {
   decodeRecommendation,
@@ -545,19 +544,7 @@ async function buildTargetOptions(
   return {
     ok: true,
     signupPath: signupPathForSlug(targetSlug),
-    options: groups.map((g) => ({
-      groupName: g.name ?? 'Grupa',
-      schedule: formatGroupSchedule({
-        dateRange: isRadionica(g.course.kind),
-        dayOfWeek: g.dayOfWeek,
-        dateStart: g.dateStart,
-        dateEnd: g.dateEnd,
-        startTime: g.startTime,
-        endTime: g.endTime,
-      }),
-      locationName: g.location.name,
-      locationAddress: g.location.address,
-    })),
+    options: toGroupOptions(groups),
   }
 }
 
@@ -1322,5 +1309,114 @@ export async function getCampaignDetail(campaignId: string) {
       ...r,
       sentAt: r.sentAt.toISOString(),
     })),
+  }
+}
+
+/**
+ * The e-mail a finished campaign sent, rebuilt for the detail page.
+ *
+ * Nothing rendered is stored — only the inputs are (subject, body, and for an
+ * invitation the target program and its termin group ids) — so this re-runs the
+ * send path's own `renderBulkMessageHtml` over them. For CUSTOM that is exactly
+ * what went out; for REENROLLMENT the termin boxes are rebuilt from the same ids
+ * a resumed send would use.
+ *
+ * On EVALUATION this renders the shared layout WITHOUT a card: the card belongs
+ * to one child and is opened per recipient via {@link getRecipientEmailHtml},
+ * never at campaign level.
+ */
+export async function getCampaignEmailHtml(campaignId: string): Promise<PreviewEmailHtmlResult> {
+  const { city } = await requireAdminCtx()
+
+  const campaign = await db.emailCampaign.findFirst({
+    where: { id: campaignId, city },
+    select: {
+      kind: true,
+      subject: true,
+      bodyText: true,
+      targetCourseId: true,
+      targetGroupIds: true,
+      targetSchoolYear: true,
+      targetCourse: { select: { slug: true } },
+    },
+  })
+  if (!campaign) notFound()
+
+  try {
+    let options: GroupOption[] | undefined
+    let signupPath: string | undefined
+
+    if (campaign.kind === 'REENROLLMENT' && campaign.targetCourse) {
+      // Deliberately NOT `getSelectedSchoolYear()` — the campaign's own target
+      // year is what it was sent for, and the admin's selected year moves on.
+      const groups = await db.scheduledGroup.findMany({
+        where: {
+          id: { in: [...new Set(campaign.targetGroupIds)] },
+          city,
+          courseId: campaign.targetCourseId ?? undefined,
+          schoolYear: campaign.targetSchoolYear ?? undefined,
+        },
+        include: { location: true, course: { select: { kind: true } } },
+        orderBy: { createdAt: 'asc' },
+      })
+      // No strict count check, unlike the send path: a group deleted since must
+      // not make the sent mail unviewable. Whatever survives is rendered.
+      options = groups.length > 0 ? toGroupOptions(groups) : undefined
+      signupPath = signupPathForSlug(campaign.targetCourse.slug)
+    }
+
+    const html = await renderBulkMessageHtml({
+      subject: campaign.subject,
+      bodyText: campaign.bodyText,
+      options,
+      signupPath,
+    })
+    return { success: true, html }
+  } catch (err) {
+    console.error('getCampaignEmailHtml failed:', err)
+    return { success: false, error: 'Greška pri izradi pregleda.' }
+  }
+}
+
+/**
+ * The e-mail ONE recipient row received — EVALUATION only, where every row
+ * carries a different report card.
+ *
+ * Loads the card through {@link buildCardsForRecipient}, so `assertCardsBelongTo`
+ * remains the only path by which a card is ever read for an e-mail. If it now
+ * refuses (the card was deleted, or the parent's address was corrected after the
+ * send), the refusal is the answer — it is exactly what an admin looking back at
+ * a FAILED row needs to read.
+ */
+export async function getRecipientEmailHtml(recipientId: string): Promise<PreviewEmailHtmlResult> {
+  const { city } = await requireAdminCtx()
+
+  const recipient = await db.emailCampaignRecipient.findFirst({
+    // City lives on the campaign — scoping through it makes a cross-city id
+    // indistinguishable from a nonexistent one.
+    where: { id: recipientId, campaign: { city } },
+    select: {
+      parentEmail: true,
+      assessmentIds: true,
+      campaign: { select: { kind: true, subject: true, bodyText: true } },
+    },
+  })
+  if (!recipient) notFound()
+  if (recipient.campaign.kind !== 'EVALUATION') return { success: false, error: INVALID_DATA }
+
+  try {
+    const built = await buildCardsForRecipient(recipient, city)
+    if (!built.ok) return { success: false, error: built.reason }
+
+    const html = await renderBulkMessageHtml({
+      // Rebuilt exactly as the send composed it, child's name included.
+      subject: `${recipient.campaign.subject} – ${built.childName}`,
+      bodyText: recipient.campaign.bodyText,
+      cards: built.cards,
+    })
+    return { success: true, html }
+  } catch (err) {
+    console.error('getRecipientEmailHtml failed:', err)
+    return { success: false, error: 'Greška pri izradi pregleda.' }
   }
 }
