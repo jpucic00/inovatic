@@ -3,8 +3,9 @@
  * parent. Both assert on the rendered HTML rather than on props, because in
  * both cases the behaviour *is* whether a passage appears at all:
  *
- *  - the akontacija instruction, which must reach radionica parents and nobody
- *    else — a free workshop included, since "0,00 eura" is not a thing to ask for
+ *  - the payment instruction (akontacija + ostatak), which must reach radionica
+ *    parents and nobody else — a free workshop included, since "0,00 eura" is
+ *    not a thing to ask for
  *  - the closing paragraph, which used to promise every parent that we would
  *    contact them with available termini. Since the form gained its termin
  *    dropdown that is untrue for most of them: they picked their own slot, and
@@ -23,23 +24,61 @@ const baseProps = {
   cityLabel: 'Split',
 }
 
-describe('akontacija instruction', () => {
-  it('is carried in full when a deposit is owed', async () => {
+/** The 150 € ciklus, as `radionicaPaymentPlan` renders it. */
+const plan = {
+  deposit: '30,00',
+  remainder: '120,00',
+  total: '150,00',
+  discountedRemainder: '100,00',
+  discountedTotal: '130,00',
+}
+
+describe('payment instruction', () => {
+  it('carries both the akontacija and the ostatak when payment is owed', async () => {
     const html = await render(
-      createElement(InquiryConfirmationEmail, { ...baseProps, depositAmount: '30,00 eura' }),
+      createElement(InquiryConfirmationEmail, { ...baseProps, payment: plan }),
     )
 
-    expect(html).toContain('NAPOMENA')
-    expect(html).toContain('30,00 eura')
+    expect(html).toContain('NAPOMENA I UPUTE ZA PLAĆANJE')
     expect(html).toContain('HR7223400091110811408')
     expect(html).toContain('UDRUGA ZA ROBOTIKU')
     expect(html).toContain('datum uplate (DDMMGGG)')
+
+    // Akontacija: the amount appears in the sentence, in the box heading and as
+    // the box's own Iznos, so the parent never has to work out what to transfer.
     expect(html).toContain('u roku od 3 dana')
-    expect(html).toContain('BRIŠE')
-    expect(html).toContain('ne vraćamo uplaćenu akontaciju')
+    expect(html).toContain('30,00 eura')
+    expect(html).toContain('Podaci za uplatu akontacije (30,00 EUR)')
     // Radionice are admin-created with free-text names, so the payment
     // description is deliberately generic — never the workshop's own title.
     expect(html).toContain('Rezervacija za radionicu na ime i prezime djeteta')
+
+    // Ostatak: its own box, its own deadline, and both amounts with the total
+    // each one adds up to.
+    expect(html).toContain('najkasnije 3 dana prije početka odabranog ciklusa')
+    expect(html).toContain('Podaci za uplatu ostatka iznosa')
+    expect(html).toContain('120,00 EUR (ukupno 150,00 EUR)')
+    expect(html).toContain('100,00 EUR (ukupno 130,00 EUR)')
+    expect(html).toContain('drugo dijete / dijete polaznik cjelogodišnjeg programa')
+    expect(html).toContain('Ostatak uplate za radionicu na ime i prezime djeteta')
+
+    expect(html).toContain('BRIŠE')
+    expect(html).toContain('ne vraćamo uplaćenu akontaciju')
+  })
+
+  it('omits the popust line when the plan carries no discounted amount', async () => {
+    // A workshop cheap enough that the 20 € popust would leave nothing after
+    // the akontacija — the rest of the instruction still stands.
+    const html = await render(
+      createElement(InquiryConfirmationEmail, {
+        ...baseProps,
+        payment: { ...plan, discountedRemainder: null, discountedTotal: null },
+      }),
+    )
+
+    expect(html).toContain('120,00 EUR (ukupno 150,00 EUR)')
+    expect(html).not.toContain('Ostatak s popustom')
+    expect(html).not.toContain('cjelogodišnjeg programa')
   })
 
   it('is absent entirely otherwise', async () => {

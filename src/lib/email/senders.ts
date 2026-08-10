@@ -4,6 +4,7 @@ import type { City } from '@prisma/client'
 import type { EvaluationCard } from '@/lib/evaluation-email-cards'
 import { ASSOCIATION_EMAIL, cityInboxEmail, sendTransactionalEmail } from './client'
 import type { InquiryNextStep } from '@/lib/inquiry-next-step'
+import type { RadionicaPaymentPlan } from '@/lib/radionica-deposit'
 import { CITY_LABELS } from '@/lib/city'
 import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
 import InquiryNotificationEmail from '../../../emails/inquiry-notification'
@@ -43,11 +44,11 @@ export function sendInquiryConfirmationEmail(params: {
   /** Which "what happens next" paragraph closes the body. */
   nextStep?: InquiryNextStep
   /**
-   * Already-formatted radionica deposit ("30,00 eura"), which adds the
-   * akontacija payment instruction to the body. Radionica sign-ups only — the
-   * caller decides, since only it knows which program the inquiry landed on.
+   * Already-formatted akontacija + ostatak figures, which add the payment
+   * instruction to the body. Radionica sign-ups only — the caller decides,
+   * since only it knows which program the inquiry landed on.
    */
-  depositAmount?: string
+  payment?: RadionicaPaymentPlan
 }): Promise<boolean> {
   return sendTransactionalEmail({
     to: params.to,
@@ -59,7 +60,7 @@ export function sendInquiryConfirmationEmail(params: {
       cityLabel: params.cityLabel,
       courseLevelPref: params.courseLevelPref,
       nextStep: params.nextStep,
-      depositAmount: params.depositAmount,
+      payment: params.payment,
     }),
   })
 }

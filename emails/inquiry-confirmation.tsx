@@ -6,6 +6,7 @@ import {
   INQUIRY_NEXT_STEP_TEXT,
   type InquiryNextStep,
 } from '../src/lib/inquiry-next-step'
+import type { RadionicaPaymentPlan } from '../src/lib/radionica-deposit'
 
 const courseLevelLabels: Record<string, string> = {
   SLR_1: 'Svijet LEGO Robotike 1 (6–8 god.)',
@@ -23,13 +24,13 @@ interface InquiryConfirmationProps {
   /** Defaults to the offer-them-termini wording — the pre-dropdown behaviour. */
   nextStep?: InquiryNextStep
   /**
-   * Croatian money copy for the radionica booking deposit, e.g. "30,00 eura"
-   * (see `radionicaDepositAmount`). Set on radionica sign-ups with a price and
-   * on nothing else — SLR and natjecateljski confirmations carry no payment
+   * The akontacija + ostatak figures for a radionica (see
+   * `radionicaPaymentPlan`). Set on radionica sign-ups with a price and on
+   * nothing else — SLR and natjecateljski confirmations carry no payment
    * instruction, and a free radionica must not either, so its absence removes
-   * the whole NAPOMENA block rather than zeroing the amount inside it.
+   * the whole NAPOMENA block rather than zeroing the amounts inside it.
    */
-  depositAmount?: string
+  payment?: RadionicaPaymentPlan
 }
 
 function InquiryConfirmationEmail({
@@ -39,7 +40,7 @@ function InquiryConfirmationEmail({
   cityLabel,
   courseLevelPref,
   nextStep = 'TERMIN_TO_OFFER',
-  depositAmount,
+  payment,
 }: InquiryConfirmationProps) {
   const courseLabel = courseLevelPref ? courseLevelLabels[courseLevelPref] : undefined
 
@@ -61,14 +62,22 @@ function InquiryConfirmationEmail({
         </Text>
       )}
       <Hr style={emailStyles.hr} />
-      {depositAmount && (
+      {payment && (
         <>
-          <Text style={napomenaHeading}>NAPOMENA:</Text>
+          <Text style={napomenaHeading}>NAPOMENA I UPUTE ZA PLAĆANJE</Text>
           <Text style={emailStyles.text}>
-            Kako bi potvrdili svoju prijavu u roku od 3 dana molimo da uplatite akontaciju
-            u iznosu od <strong>{depositAmount}</strong> po djetetu za odabrani ciklus.
+            <strong>Akontacija:</strong> Kako bi potvrdili svoju prijavu, u roku od 3 dana
+            molimo da uplatite akontaciju u iznosu od{' '}
+            <strong>{`${payment.deposit} eura`}</strong> po djetetu za odabrani ciklus.
           </Text>
-          <Text style={emailStyles.text}>Uplatu izvršiti na sljedeći način:</Text>
+          <Text style={emailStyles.text}>
+            <strong>Ostatak uplate:</strong> Ostatak novca potrebno je uplatiti najkasnije
+            3 dana prije početka odabranog ciklusa.
+          </Text>
+
+          <Text style={paymentBoxHeading}>
+            {`Podaci za uplatu akontacije (${payment.deposit} EUR):`}
+          </Text>
           <Section style={paymentBox}>
             <Text style={paymentText}>
               <strong>Primatelj:</strong> UDRUGA ZA ROBOTIKU &quot;INOVATIC&quot;
@@ -79,10 +88,42 @@ function InquiryConfirmationEmail({
               <br />
               <strong>Poziv na broj:</strong> datum uplate (DDMMGGG)
               <br />
+              <strong>Iznos:</strong> {`${payment.deposit} EUR`}
+              <br />
+              {/* Radionice are admin-created with free-text names, so this stays
+                  generic — never the workshop's own title. */}
               <strong>Opis plaćanja:</strong> Rezervacija za radionicu na ime i prezime
-              djeteta.
+              djeteta
             </Text>
           </Section>
+
+          <Text style={paymentBoxHeading}>Podaci za uplatu ostatka iznosa:</Text>
+          <Section style={paymentBox}>
+            <Text style={paymentText}>
+              <strong>Primatelj:</strong> UDRUGA ZA ROBOTIKU &quot;INOVATIC&quot;
+              <br />
+              <strong>IBAN:</strong> HR7223400091110811408
+              <br />
+              <strong>Model:</strong> 00
+              <br />
+              <strong>Poziv na broj:</strong> datum uplate (DDMMGGG)
+              <br />
+              <strong>Opis plaćanja:</strong> Ostatak uplate za radionicu na ime i prezime
+              djeteta
+            </Text>
+            <Text style={paymentAmountLabel}>Iznos:</Text>
+            <Text style={paymentText}>
+              • <strong>Redovni ostatak:</strong>{' '}
+              {`${payment.remainder} EUR (ukupno ${payment.total} EUR)`}
+              {payment.discountedRemainder && (
+                <>
+                  <br />• <strong>Ostatak s popustom</strong>
+                  {` (drugo dijete / dijete polaznik cjelogodišnjeg programa): ${payment.discountedRemainder} EUR (ukupno ${payment.discountedTotal} EUR)`}
+                </>
+              )}
+            </Text>
+          </Section>
+
           <Text style={emailStyles.textSmall}>
             *u slučaju ne izvršenja uplate akontacije u roku 3 radna dana prijava se
             automatski <strong>BRIŠE</strong>.
@@ -111,6 +152,15 @@ const napomenaHeading = {
   margin: '0 0 8px',
 }
 
+// Names the box that follows it, so the two payments can never be confused for
+// one another — the akontacija and the ostatak share an IBAN and a model, and
+// only the amount and the description tell them apart.
+const paymentBoxHeading = {
+  ...emailStyles.text,
+  fontWeight: '700' as const,
+  margin: '0 0 8px',
+}
+
 // Amber rather than the teal/emerald of the informational boxes elsewhere: this
 // one is an action with a 3-day deadline attached, not a detail to file away.
 const paymentBox = {
@@ -128,10 +178,18 @@ const paymentText = {
   margin: '0',
 }
 
+// The ostatak has two possible amounts, so its "Iznos:" label heads a short
+// list instead of sitting inline like every other field.
+const paymentAmountLabel = {
+  ...paymentText,
+  fontWeight: '700' as const,
+  margin: '8px 0 0',
+}
+
 // Sample data for the `react-email` preview server (`npm run email`) — a
-// radionica sign-up with a booked termin, so both the deposit block (a 150 €
-// ciklus → 30,00 eura) and the chosen-termin wording show. Drop `depositAmount`
-// or switch `nextStep` in the preview's Props panel to see the other variants.
+// radionica sign-up with a booked termin, so both the payment block (a 150 €
+// ciklus) and the chosen-termin wording show. Drop `payment` or switch
+// `nextStep` in the preview's Props panel to see the other variants.
 InquiryConfirmationEmail.PreviewProps = {
   parentName: 'Ana Anić',
   childName: 'Marko Anić',
@@ -139,7 +197,13 @@ InquiryConfirmationEmail.PreviewProps = {
   cityLabel: 'Šibenik',
   courseLevelPref: 'SLR_2',
   nextStep: 'TERMIN_CHOSEN',
-  depositAmount: '30,00 eura',
+  payment: {
+    deposit: '30,00',
+    remainder: '120,00',
+    total: '150,00',
+    discountedRemainder: '100,00',
+    discountedTotal: '130,00',
+  },
 } satisfies InquiryConfirmationProps
 
 export default InquiryConfirmationEmail

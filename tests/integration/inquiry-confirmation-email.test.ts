@@ -10,8 +10,8 @@
  * The program is resolved from the chosen group rather than the submitted
  * `courseId`, which is the part worth pinning at this level; the copy itself is
  * asserted over the template in
- * `tests/unit/lib/inquiry-confirmation-email.test.ts`, and the 20% arithmetic in
- * `tests/unit/lib/radionica-deposit.test.ts`.
+ * `tests/unit/lib/inquiry-confirmation-email.test.ts`, and the akontacija /
+ * ostatak arithmetic in `tests/unit/lib/radionica-deposit.test.ts`.
  */
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
@@ -88,17 +88,23 @@ function confirmationSent() {
   return sendInquiryConfirmationEmail.mock.calls[0][0]
 }
 
-const depositQuoted = () => confirmationSent().depositAmount
+const paymentQuoted = () => confirmationSent().payment
 
-describe('radionica sign-up confirmation quotes the akontacija', () => {
-  it('quotes 20% of the price for a priced radionica', async () => {
+describe('radionica sign-up confirmation quotes the payment plan', () => {
+  it('quotes the akontacija and the ostatak for a priced radionica', async () => {
     const course = await fx.course({ kind: 'RADIONICA', schoolYear: YEAR, price: 150 })
     const group = await upcomingGroup(course.id)
 
     expect(
       await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id })),
     ).toEqual({ success: true })
-    expect(depositQuoted()).toBe('30,00 eura')
+    expect(paymentQuoted()).toEqual({
+      deposit: '30,00',
+      remainder: '120,00',
+      total: '150,00',
+      discountedRemainder: '100,00',
+      discountedTotal: '130,00',
+    })
   })
 
   it('quotes nothing for a free radionica', async () => {
@@ -110,7 +116,7 @@ describe('radionica sign-up confirmation quotes the akontacija', () => {
     expect(
       await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id })),
     ).toEqual({ success: true })
-    expect(depositQuoted()).toBeUndefined()
+    expect(paymentQuoted()).toBeUndefined()
   })
 
   it('quotes nothing for a standard program, priced or not', async () => {
@@ -120,7 +126,7 @@ describe('radionica sign-up confirmation quotes the akontacija', () => {
     expect(
       await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id })),
     ).toEqual({ success: true })
-    expect(depositQuoted()).toBeUndefined()
+    expect(paymentQuoted()).toBeUndefined()
   })
 
   it('quotes nothing when no termin was booked', async () => {
@@ -137,7 +143,7 @@ describe('radionica sign-up confirmation quotes the akontacija', () => {
     })
 
     expect(await submitInquiry(inquiryFor({ courseId: course.id }))).toEqual({ success: true })
-    expect(depositQuoted()).toBeUndefined()
+    expect(paymentQuoted()).toBeUndefined()
   })
 
   it('reads the program off the chosen group, not the submitted courseId', async () => {
@@ -150,7 +156,7 @@ describe('radionica sign-up confirmation quotes the akontacija', () => {
     expect(
       await submitInquiry(inquiryFor({ courseId: standard.id, scheduledGroupId: group.id })),
     ).toEqual({ success: true })
-    expect(depositQuoted()).toBe('12,00 eura')
+    expect(paymentQuoted()).toMatchObject({ deposit: '12,00', remainder: '48,00' })
   })
 })
 
