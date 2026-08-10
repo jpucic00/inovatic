@@ -9,5 +9,5 @@ export default async function TeacherGroupPolazniciPage({
 }: Readonly<{ params: Promise<{ groupId: string }> }>) {
   const { groupId } = await params
   const roster = await getGroupRoster(groupId)
-  return <GroupRosterTable rows={roster} />
+  return <GroupRosterTable rows={roster} groupId={groupId} />
 }

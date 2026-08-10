@@ -12,9 +12,15 @@ function formatDob(iso: string | null): string {
 
 interface Props {
   rows: RosterRow[]
+  /**
+   * The group this roster belongs to, threaded onto every student link as
+   * `?grupa=` so the student page can send the teacher back HERE instead of all
+   * the way out to the groups list.
+   */
+  groupId: string
 }
 
-export function GroupRosterTable({ rows }: Readonly<Props>) {
+export function GroupRosterTable({ rows, groupId }: Readonly<Props>) {
   if (rows.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center">
@@ -42,7 +48,7 @@ export function GroupRosterTable({ rows }: Readonly<Props>) {
               <tr key={r.enrollmentId} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-900">
                   <Link
-                    href={`/nastavnik/ucenik/${r.studentId}`}
+                    href={`/nastavnik/ucenik/${r.studentId}?grupa=${groupId}`}
                     className="text-cyan-700 hover:underline"
                   >
                     {fullName}
