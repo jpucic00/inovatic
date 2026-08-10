@@ -1,5 +1,6 @@
 import { Heading, Hr, Link, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
+import { Field } from './components/notification-field'
 
 interface StemEducationInquiryProps {
   contactName: string
@@ -10,32 +11,6 @@ interface StemEducationInquiryProps {
   services: string[]
   trainingPlace?: string
   message: string
-}
-
-const labelStyle = {
-  color: '#6b7280',
-  fontSize: '12px',
-  fontWeight: '700' as const,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase' as const,
-  margin: '0 0 2px',
-}
-
-const valueStyle = {
-  color: '#111827',
-  fontSize: '15px',
-  lineHeight: '1.5',
-  margin: '0 0 14px',
-  whiteSpace: 'pre-wrap' as const,
-}
-
-function Field({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return (
-    <>
-      <Text style={labelStyle}>{label}</Text>
-      <Text style={valueStyle}>{children}</Text>
-    </>
-  )
 }
 
 /**

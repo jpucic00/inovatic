@@ -3,7 +3,12 @@
 import { Prisma } from '@prisma/client'
 import type { City, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
-import { sendInquiryConfirmationEmail, sendPartyInquiryConfirmationEmail } from '@/lib/email'
+import {
+  sendInquiryConfirmationEmail,
+  sendInquiryNotificationEmail,
+  sendPartyInquiryConfirmationEmail,
+  sendPartyInquiryNotificationEmail,
+} from '@/lib/email'
 import {
   inquirySchema,
   partyInquirySchema,
@@ -23,8 +28,9 @@ import {
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
 import { CITY_LABELS } from '@/lib/city'
+import { formatGroupSchedule } from '@/lib/format'
 import { computeSchoolYear } from '@/lib/school-year'
-import { isHighSchoolGrade } from '@/lib/inquiry-status'
+import { GRADE_LABELS, NO_SUITABLE_TERMIN_LABEL, isHighSchoolGrade } from '@/lib/inquiry-status'
 import { inquiryNextStep } from '@/lib/inquiry-next-step'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
 import { radionicaDepositAmount } from '@/lib/radionica-deposit'
@@ -47,8 +53,14 @@ class RadionicaStartedError extends Error {}
 async function resolveTargetCourse(
   scheduledGroupId: string | undefined,
   courseId: string | undefined,
-): Promise<{ id: string; slug: string; kind: ProgramKind; price: number | null } | null> {
-  const select = { id: true, slug: true, kind: true, price: true } as const
+): Promise<{
+  id: string
+  slug: string
+  title: string
+  kind: ProgramKind
+  price: number | null
+} | null> {
+  const select = { id: true, slug: true, title: true, kind: true, price: true } as const
   if (scheduledGroupId) {
     const group = await db.scheduledGroup.findUnique({
       where: { id: scheduledGroupId },
@@ -75,6 +87,47 @@ async function loadProgramsForCheck(
     return program ? [program] : []
   }
   return getActivePrograms(city)
+}
+
+/**
+ * What the staff notification prints in its "Željeni termin" row — the same two
+ * answers `/admin/upiti/[id]` shows there. Undefined when nothing was bookable,
+ * which is itself the useful signal: this parent still needs termini offered.
+ *
+ * Read after the transaction commits, so it costs a query only when a termin
+ * was actually chosen and can never hold the capacity guard open.
+ */
+async function resolveTerminLabel(
+  scheduledGroupId: string | undefined,
+  noSuitableTermin: boolean | undefined,
+): Promise<string | undefined> {
+  if (noSuitableTermin) return NO_SUITABLE_TERMIN_LABEL
+  if (!scheduledGroupId) return undefined
+  const group = await db.scheduledGroup.findUnique({
+    where: { id: scheduledGroupId },
+    select: {
+      name: true,
+      dateStart: true,
+      dateEnd: true,
+      dayOfWeek: true,
+      startTime: true,
+      endTime: true,
+      course: { select: { kind: true } },
+      location: { select: { name: true } },
+    },
+  })
+  if (!group) return undefined
+  const schedule = formatGroupSchedule({
+    // A radionica runs a closed date range; everything else runs weekly. Same
+    // discriminator the public and admin group lines use.
+    dateRange: isRadionica(group.course.kind),
+    dayOfWeek: group.dayOfWeek,
+    dateStart: group.dateStart,
+    dateEnd: group.dateEnd,
+    startTime: group.startTime,
+    endTime: group.endTime,
+  })
+  return [group.name, schedule, group.location.name].filter(Boolean).join(' · ')
 }
 
 type InquiryActionResult =
@@ -226,8 +279,9 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     }
   }
 
+  let inquiryId: string
   try {
-    await runWithGroupCapacityGuard(async (tx) => {
+    const created = await runWithGroupCapacityGuard(async (tx) => {
       // Derive the inquiry's school year server-side: the year of the chosen
       // group (so future-year enrollments file under that year, not "now"),
       // else the current computed year for group-less general inquiries.
@@ -277,8 +331,10 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
           consentGivenAt: new Date(),
           city,
         },
+        select: { id: true },
       })
     })
+    inquiryId = created.id
   } catch (err) {
     return submitInquiryErrorResult(err, city, targetCourse)
   }
@@ -307,6 +363,30 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     })
   } catch (err) {
     console.error('Failed to send inquiry confirmation email:', err)
+  }
+
+  // Announce the upit to the city's own enrollment inbox so staff can act on it
+  // (and reply to the parent) without watching /admin/upiti. Swallow-and-log
+  // like the confirmation above: the upit is already committed, so a failed
+  // notification must never surface as a failed sign-up.
+  try {
+    await sendInquiryNotificationEmail({
+      inquiryId,
+      city,
+      parentName,
+      parentEmail,
+      parentPhone,
+      childName: `${childFirstName} ${childLastName}`,
+      childDateOfBirth: isoToCroatianDate(childDateOfBirth),
+      childSchool: childSchool || undefined,
+      gradeLabel: GRADE_LABELS[grade],
+      programName: targetCourse?.title,
+      terminLabel: await resolveTerminLabel(scheduledGroupId, noSuitableTermin),
+      message: message || undefined,
+      referralSource: referralSource || undefined,
+    })
+  } catch (err) {
+    console.error('Failed to send inquiry notification email:', err)
   }
 
   return { success: true }
@@ -339,8 +419,9 @@ export async function submitPartyInquiry(
   const proposedDate = proposedIso ? new Date(`${proposedIso}T00:00:00.000Z`) : null
   const parentName = `${parentFirstName} ${parentLastName}`.trim()
 
+  let inquiryId: string
   try {
-    await db.inquiry.create({
+    const created = await db.inquiry.create({
       data: {
         type: 'PARTY',
         parentName,
@@ -357,7 +438,9 @@ export async function submitPartyInquiry(
         // Proslave are Split-only (owner decision 2026-07-10)
         city: 'SPLIT',
       },
+      select: { id: true },
     })
+    inquiryId = created.id
   } catch (err) {
     console.error('submitPartyInquiry failed:', err)
     return { success: false, error: 'Greška pri slanju upita. Pokušajte ponovo.' }
@@ -371,6 +454,22 @@ export async function submitPartyInquiry(
     })
   } catch (err) {
     console.error('Failed to send party inquiry confirmation email:', err)
+  }
+
+  // Same swallow-and-log notification as the course flow — the booking is
+  // already stored, so a failed announcement is an inbox problem, not the
+  // parent's.
+  try {
+    await sendPartyInquiryNotificationEmail({
+      inquiryId,
+      parentName,
+      parentEmail,
+      parentPhone,
+      message,
+      partyProposedDate: proposedIso ? isoToCroatianDate(proposedIso) : undefined,
+    })
+  } catch (err) {
+    console.error('Failed to send party inquiry notification email:', err)
   }
 
   return { success: true }

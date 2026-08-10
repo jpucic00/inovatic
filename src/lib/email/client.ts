@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import type { ReactElement } from 'react'
+import type { City } from '@prisma/client'
 
 let resendClient: Resend | null = null
 
@@ -21,6 +22,21 @@ const FROM_EMAIL = process.env.EMAIL_FROM ?? 'Inovatic <noreply@udruga-inovatic.
  * form, whose submissions are never persisted).
  */
 export const ASSOCIATION_EMAIL = 'prijave@udruga-inovatic.hr'
+
+/**
+ * Šibenik runs its own enrollment inbox — its parents write to and are answered
+ * by Šibenik, never Split.
+ */
+const SIBENIK_EMAIL = 'prijave.sibenik@udruga-inovatic.hr'
+
+/**
+ * The inbox that owns a city's enrollment correspondence: where a new upit is
+ * announced, and where a parent's reply lands. Split keeps the association
+ * address, which is also the fallback for everything that has no city.
+ */
+export function cityInboxEmail(city: City): string {
+  return city === 'SIBENIK' ? SIBENIK_EMAIL : ASSOCIATION_EMAIL
+}
 
 /**
  * Low-level transactional send shared by every function in ./senders.

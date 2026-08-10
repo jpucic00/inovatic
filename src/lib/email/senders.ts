@@ -2,9 +2,11 @@ import { createElement } from 'react'
 import { render } from '@react-email/components'
 import type { City } from '@prisma/client'
 import type { EvaluationCard } from '@/lib/evaluation-email-cards'
-import { ASSOCIATION_EMAIL, sendTransactionalEmail } from './client'
+import { ASSOCIATION_EMAIL, cityInboxEmail, sendTransactionalEmail } from './client'
 import type { InquiryNextStep } from '@/lib/inquiry-next-step'
+import { CITY_LABELS } from '@/lib/city'
 import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
+import InquiryNotificationEmail from '../../../emails/inquiry-notification'
 import PartyInquiryConfirmationEmail from '../../../emails/party-inquiry-confirmation'
 import StemEducationInquiryEmail from '../../../emails/stem-education-inquiry'
 import StemEducationConfirmationEmail from '../../../emails/stem-education-confirmation'
@@ -74,6 +76,76 @@ export function sendPartyInquiryConfirmationEmail(params: {
     react: createElement(PartyInquiryConfirmationEmail, {
       parentName: params.parentName,
       proposedDate: params.proposedDate,
+    }),
+  })
+}
+
+/** The upit's own row in the admin — the notification's "act on it" link. */
+const adminInquiryUrl = (inquiryId: string) => `${publicBaseUrl()}/admin/upiti/${inquiryId}`
+
+/**
+ * Public course inquiry → the enrollment inbox of the city it was filed under,
+ * so Šibenik's upiti never land in Split's inbox and vice versa.
+ *
+ * The upit is already stored, so unlike the /stem-edukacija notification this
+ * is not the record — but reply-to is the parent, which lets staff answer the
+ * family straight from Outlook instead of opening the admin first.
+ */
+export function sendInquiryNotificationEmail(params: {
+  inquiryId: string
+  city: City
+  parentName: string
+  parentEmail: string
+  parentPhone: string
+  childName: string
+  /** Already formatted dd.MM.yyyy. */
+  childDateOfBirth: string
+  childSchool?: string
+  gradeLabel?: string
+  programName?: string
+  /** Booked group, or the competitive program's "nijedan termin ne odgovara". */
+  terminLabel?: string
+  message?: string
+  referralSource?: string
+}): Promise<boolean> {
+  const { inquiryId, city, ...fields } = params
+  const cityLabel = CITY_LABELS[city]
+  return sendTransactionalEmail({
+    to: cityInboxEmail(city),
+    replyTo: params.parentEmail,
+    subject: `Novi upit za upis: ${params.childName} – ${cityLabel}`,
+    react: createElement(InquiryNotificationEmail, {
+      ...fields,
+      kind: 'COURSE',
+      cityLabel,
+      adminUrl: adminInquiryUrl(inquiryId),
+    }),
+  })
+}
+
+/**
+ * Public /proslave inquiry → the association inbox. Proslave are Split-only
+ * (owner decision), so there is no city to route on here.
+ */
+export function sendPartyInquiryNotificationEmail(params: {
+  inquiryId: string
+  parentName: string
+  parentEmail: string
+  parentPhone: string
+  message: string
+  /** Already formatted dd.MM.yyyy. */
+  partyProposedDate?: string
+}): Promise<boolean> {
+  const { inquiryId, ...fields } = params
+  return sendTransactionalEmail({
+    to: ASSOCIATION_EMAIL,
+    replyTo: params.parentEmail,
+    subject: `Novi upit za proslavu: ${params.parentName}`,
+    react: createElement(InquiryNotificationEmail, {
+      ...fields,
+      kind: 'PARTY',
+      cityLabel: CITY_LABELS.SPLIT,
+      adminUrl: adminInquiryUrl(inquiryId),
     }),
   })
 }
@@ -227,10 +299,6 @@ type BulkMessageParams = {
   cards?: EvaluationCard[]
 }
 
-/** Šibenik parents reply to Šibenik; Split keeps the default association inbox. */
-const SIBENIK_EMAIL = 'prijave.sibenik@udruga-inovatic.hr'
-const replyToForCity = (city: City) => (city === 'SIBENIK' ? SIBENIK_EMAIL : undefined)
-
 function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>) {
   return createElement(BulkMessageEmail, {
     subject: params.subject,
@@ -241,13 +309,17 @@ function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>)
   })
 }
 
-/** Admin bulk campaign (/admin/email) → one parent per call. */
+/**
+ * Admin bulk campaign (/admin/email) → one parent per call. A parent hitting
+ * Reply must reach the office that mailed them, so the reply-to follows the
+ * campaign's city.
+ */
 export function sendBulkMessageEmail(params: BulkMessageParams): Promise<boolean> {
   const { to, ...rest } = params
   return sendTransactionalEmail({
     to,
     subject: params.subject,
-    replyTo: replyToForCity(params.city),
+    replyTo: cityInboxEmail(params.city),
     react: buildBulkMessageElement(rest),
   })
 }

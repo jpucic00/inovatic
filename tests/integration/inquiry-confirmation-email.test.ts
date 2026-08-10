@@ -32,6 +32,10 @@ const { sendInquiryConfirmationEmail } = vi.hoisted(() => ({
 vi.mock('@/lib/email', () => ({
   sendInquiryConfirmationEmail,
   sendPartyInquiryConfirmationEmail: vi.fn(async () => true),
+  // Not this file's subject, but the action calls it on the same success path —
+  // an unmocked export would be `undefined` here and throw into the swallow.
+  sendInquiryNotificationEmail: vi.fn(async () => true),
+  sendPartyInquiryNotificationEmail: vi.fn(async () => true),
 }))
 
 const { submitInquiry } = await import('@/actions/inquiry')

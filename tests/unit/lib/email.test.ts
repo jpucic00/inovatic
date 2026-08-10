@@ -12,6 +12,8 @@ vi.mock('resend', () => ({
 import {
   sendBulkMessageEmail,
   sendInquiryConfirmationEmail,
+  sendInquiryNotificationEmail,
+  sendPartyInquiryNotificationEmail,
   sendScheduleOptionsEmail,
   sendStemEducationConfirmationEmail,
   sendStemEducationInquiryEmail,
@@ -151,6 +153,62 @@ describe('email senders', () => {
       replyTo: 'prijave@udruga-inovatic.hr',
       subject: 'Zaprimili smo vaš upit za STEM edukaciju – Inovatic',
     })
+  })
+
+  // The staff notification exists so an upit can be acted on — and answered —
+  // straight from Outlook. Two things make that work and are asserted here:
+  // it lands in the inbox of the city the upit was filed under, and Reply goes
+  // to the parent rather than back to the association.
+  const notificationArgs = {
+    inquiryId: 'clx123',
+    parentName: 'Ana Anić',
+    parentEmail: 'ana.anic@example.hr',
+    parentPhone: '091 234 5678',
+    childName: 'Marko Anić',
+    childDateOfBirth: '15.06.2016.',
+  }
+
+  it('routes a Split upit notification to the association inbox, reply-to the parent', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendInquiryNotificationEmail({ ...notificationArgs, city: 'SPLIT' })
+    expect(send.mock.calls[0][0]).toMatchObject({
+      to: 'prijave@udruga-inovatic.hr',
+      replyTo: 'ana.anic@example.hr',
+      subject: 'Novi upit za upis: Marko Anić – Split',
+    })
+  })
+
+  it('routes a Šibenik upit notification to the Šibenik inbox', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendInquiryNotificationEmail({ ...notificationArgs, city: 'SIBENIK' })
+    expect(send.mock.calls[0][0]).toMatchObject({
+      to: 'prijave.sibenik@udruga-inovatic.hr',
+      replyTo: 'ana.anic@example.hr',
+      subject: 'Novi upit za upis: Marko Anić – Šibenik',
+    })
+  })
+
+  it('routes a proslava notification to the association inbox (Split-only form)', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendPartyInquiryNotificationEmail({
+      inquiryId: 'clx456',
+      parentName: 'Ana Anić',
+      parentEmail: 'ana.anic@example.hr',
+      parentPhone: '091 234 5678',
+      message: 'Zanima nas proslava za 12 djece.',
+    })
+    expect(send.mock.calls[0][0]).toMatchObject({
+      to: 'prijave@udruga-inovatic.hr',
+      replyTo: 'ana.anic@example.hr',
+      subject: 'Novi upit za proslavu: Ana Anić',
+    })
+  })
+
+  it('upit notification no-ops without a key like every other sender', async () => {
+    vi.stubEnv('RESEND_API_KEY', '')
+    const sent = await sendInquiryNotificationEmail({ ...notificationArgs, city: 'SPLIT' })
+    expect(sent).toBe(false)
+    expect(send).not.toHaveBeenCalled()
   })
 
   it('surfaces a Resend in-band error (e.g. unverified domain) as a throw', async () => {

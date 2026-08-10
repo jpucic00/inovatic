@@ -1,6 +1,8 @@
 export {
   sendInquiryConfirmationEmail,
+  sendInquiryNotificationEmail,
   sendPartyInquiryConfirmationEmail,
+  sendPartyInquiryNotificationEmail,
   sendStemEducationInquiryEmail,
   sendStemEducationConfirmationEmail,
   sendScheduleOptionsEmail,

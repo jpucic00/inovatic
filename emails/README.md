@@ -14,13 +14,18 @@ All outbound mail goes through **Resend** + **React Email**, in two layers.
   | Sender | Trigger | Recipient |
   | --- | --- | --- |
   | `sendInquiryConfirmationEmail` | public course inquiry submitted | parent |
+  | `sendInquiryNotificationEmail` | public course inquiry submitted | the inquiry city's inbox, reply-to the parent |
   | `sendPartyInquiryConfirmationEmail` | public party (proslava) inquiry submitted | parent |
+  | `sendPartyInquiryNotificationEmail` | public party (proslava) inquiry submitted | `prijave@`, reply-to the parent |
   | `sendScheduleOptionsEmail` | admin sends group options for a NEW inquiry | parent |
   | `sendStudentCredentialsEmail` | student account created (from inquiry or manually) | parent |
   | `sendTeacherCredentialsEmail` | teacher account created / password reset (`variant: 'new' \| 'reset'`) | teacher |
 
 Sender identity is **`EMAIL_FROM`** (must be a verified Resend sender domain), falling back to
-`Inovatic <noreply@udruga-inovatic.hr>`. Reply-to is always `prijave@udruga-inovatic.hr`.
+`Inovatic <noreply@udruga-inovatic.hr>`. Reply-to defaults to `prijave@udruga-inovatic.hr`;
+city-bound mail to parents replies to that city's inbox (`cityInboxEmail`), and the inbound
+notifications flip it around — they go *to* an inbox and reply to the person who submitted the
+form, so staff answer straight from Outlook.
 
 Server actions call the senders and never touch Resend directly. The **error policy lives at
 the call site**, not in the service: confirmations swallow-and-log, credentials emails
