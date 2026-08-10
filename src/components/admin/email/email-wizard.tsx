@@ -125,7 +125,7 @@ interface EmailWizardProps {
 
 const DEFAULT_INVITATION_BODY = [
   'Poštovani,',
-  'Vaše je dijete prošle školske godine pohađalo program LEGO robotike u našoj udruzi i nadamo se da ćemo se družiti i ove godine.',
+  'Vaše je dijete prošle školske godine pohađalo program Svijet LEGO robotike u našoj udruzi i nadamo se da ćemo se družiti i ove godine.',
   'Upisi u novu školsku godinu su otvoreni. U nastavku se nalaze termini grupa — prijavu ispunite putem poveznice na dnu ove poruke, a mi ćemo vam se javiti s potvrdom termina.',
   'Broj mjesta po grupi je ograničen, stoga preporučujemo što raniju prijavu.',
 ].join('\n')
