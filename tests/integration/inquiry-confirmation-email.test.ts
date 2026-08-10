@@ -165,6 +165,20 @@ describe('radionica sign-up confirmation quotes the payment plan', () => {
  * submitted payload rather than the program. Wording itself is asserted in
  * `tests/unit/lib/inquiry-confirmation-email.test.ts`.
  */
+describe('the confirmation carries the child’s data readably', () => {
+  it('formats the date of birth Croatian, matching the staff notification', async () => {
+    // The validator stores ISO; both outgoing mails read dd.MM.yyyy. — the two
+    // renderings of the same field must not disagree.
+    const course = await fx.course({ kind: 'STANDARD' })
+    const group = await fx.group({ courseId: course.id, city: 'SPLIT', schoolYear: YEAR })
+
+    expect(
+      await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id })),
+    ).toEqual({ success: true })
+    expect(confirmationSent().childDateOfBirth).toBe('12.06.2015.')
+  })
+})
+
 describe('confirmation says what actually happens next', () => {
   it('confirms the booked termin when the parent picked one', async () => {
     const course = await fx.course({ kind: 'STANDARD' })

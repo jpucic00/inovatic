@@ -290,8 +290,13 @@ export async function getCourseGradeRules(city: City): Promise<CourseGradeRules>
   })
 
   const byCourse = new Map<string, Grade[]>()
+  // One entry per course, resolved by its EARLIEST open year — even when that
+  // year has no row: "no row" means the default ladder, and a later year's rule
+  // must not reach across into an enrollment already under way.
+  const resolved = new Set<string>()
   for (const w of openWindows) {
-    if (byCourse.has(w.courseId)) continue
+    if (resolved.has(w.courseId)) continue
+    resolved.add(w.courseId)
     const row = rows.find((r) => r.courseId === w.courseId && r.schoolYear === w.schoolYear)
     if (row) byCourse.set(w.courseId, row.grades as Grade[])
   }

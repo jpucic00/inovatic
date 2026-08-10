@@ -30,9 +30,10 @@ export async function getTeacherWorkReport(
   await assertUserInCity(userId, city)
 
   const windows = recentMonthWindows(new Date())
-  // Newest first, so the oldest window is last.
-  const oldest = windows[windows.length - 1]
+  // Newest first, so the oldest window is last. The list is never empty
+  // (REPORT_MONTH_COUNT), so the fallback is for the type only.
   const newest = windows[0]
+  const oldest = windows.at(-1) ?? newest
 
   const [rows, teacher] = await Promise.all([
     db.teacherAttendance.findMany({
@@ -91,9 +92,13 @@ export async function getTeacherWorkReport(
 /**
  * Set (or clear, with a blank input) what this staff member is paid per hour.
  *
- * Scoped exactly like `getTeacher`: a teaching ADMIN is staff for this section
- * — Šibenik's only teacher is its admin — so the role filter admits both, and
- * the city guard keeps it inside the tenant.
+ * Admits exactly who `getTeacher`/`getTeachers` admit: a TEACHER, or an ADMIN
+ * with teaching evidence — currently assigned, or with hours already booked, so
+ * Šibenik's admin-who-teaches keeps her rate after an unassignment. A pure
+ * admin account is refused rather than accepting a write nothing can render.
+ * The same three-arm rule lives in `getTeachers` (as a `where` OR) and
+ * `getTeacher` (post-query, since it needs the assignment rows anyway); all
+ * three must agree, or a rate becomes settable on someone the section hides.
  */
 export async function updateTeacherHourlyRate(
   input: UpdateTeacherHourlyRateInput,
@@ -110,8 +115,17 @@ export async function updateTeacherHourlyRate(
   await assertUserInCity(id, city)
 
   try {
-    const staff = await db.user.findUnique({
-      where: { id, role: { in: ['TEACHER', 'ADMIN'] }, deletedAt: null, city },
+    const staff = await db.user.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+        city,
+        OR: [
+          { role: 'TEACHER' },
+          { role: 'ADMIN', teacherAssignments: { some: {} } },
+          { role: 'ADMIN', teacherAttendances: { some: {} } },
+        ],
+      },
       select: { id: true },
     })
     if (!staff) return { success: false, error: 'Nastavnik nije pronađen.' }

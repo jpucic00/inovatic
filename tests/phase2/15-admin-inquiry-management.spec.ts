@@ -444,12 +444,15 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
       await loginAsAdmin(page)
       await openInquiryDetail(page, INQUIRY_MAIN.parentName)
 
-      await test.step('"Natrag na upite" link points to /admin/upiti', async () => {
+      await test.step('"Natrag na upite" link points back to the list', async () => {
         const backLink = page.locator('a', { hasText: 'Natrag na upite' })
         await expect(backLink, 'back link is visible').toBeVisible()
-        await expect(backLink, 'back link href is /admin/upiti').toHaveAttribute(
+        // Sticky admin filters (2026-08-09): reaching this page via search
+        // upgrades the back href to /admin/upiti?search=… — pin the path, the
+        // query is the remembered filter and 34-admin-filter-memory owns it.
+        await expect(backLink, 'back link targets /admin/upiti').toHaveAttribute(
           'href',
-          '/admin/upiti',
+          /^\/admin\/upiti(?:\?|$)/,
         )
       })
 

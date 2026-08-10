@@ -281,6 +281,62 @@ describe('teacher hourly rate — the payout amount', () => {
     expect((await currentMonth(slavica.id)).amountCents).toBe(3000)
   })
 
+  it('refuses a same-city target who is not staff, writing nothing', async () => {
+    // The staff lookup is the second gate behind assertUserInCity: a STUDENT id
+    // and a soft-deleted teacher both pass the city assert and must die here,
+    // with the named error and no rate written.
+    const student = await createStudent({ city: 'SPLIT' })
+    const exTeacher = await createTeacher({ city: 'SPLIT' })
+    await db.user.update({ where: { id: exTeacher.id }, data: { deletedAt: new Date() } })
+
+    await adminSession()
+    for (const id of [student.id, exTeacher.id]) {
+      const res = await updateTeacherHourlyRate({ id, hourlyRateCents: '12,50' })
+      expect(res.success).toBe(false)
+      if (res.success) throw new Error('narrowing')
+      expect(res.error).toBe('Nastavnik nije pronađen.')
+    }
+
+    const rows = await db.user.findMany({
+      where: { id: { in: [student.id, exTeacher.id] } },
+      select: { hourlyRateCents: true },
+    })
+    expect(rows.map((r) => r.hourlyRateCents)).toEqual([null, null])
+  })
+
+  it('refuses a non-teaching ADMIN, but keeps paying one whose only evidence is past hours', async () => {
+    // Exact `getTeacher`/`getTeachers` symmetry. A pure admin account is not a
+    // row this section renders, so a rate on it has no reader — refuse rather
+    // than write it. Teaching evidence is assignment OR attendance, so the same
+    // account becomes payable once it has taught, and stays payable after the
+    // assignment is removed: the report outlives the assignment.
+    const admin = await createAdmin({ city: 'SIBENIK' })
+
+    await adminSession('SIBENIK')
+    const refused = await updateTeacherHourlyRate({ id: admin.id, hourlyRateCents: '20' })
+    expect(refused.success).toBe(false)
+    if (refused.success) throw new Error('narrowing')
+    expect(refused.error).toBe('Nastavnik nije pronađen.')
+    expect(
+      (
+        await db.user.findUniqueOrThrow({
+          where: { id: admin.id },
+          select: { hourlyRateCents: true },
+        })
+      ).hourlyRateCents,
+    ).toBeNull()
+
+    const { group } = await groupWithStudent({ city: 'SIBENIK' })
+    const assignment = await createTeacherAssignment(admin.id, group.id)
+    await markTeacherPresent(admin.id, group.id, dayOf(CURRENT, 6))
+    await unassignTeacherFromGroup(assignment.id)
+
+    expect(await updateTeacherHourlyRate({ id: admin.id, hourlyRateCents: '20' })).toEqual({
+      success: true,
+    })
+    expect((await currentMonth(admin.id)).amountCents).toBe(3000)
+  })
+
   it('404s when setting a rate on a teacher from the other city', async () => {
     const splitTeacher = await createTeacher({ city: 'SPLIT' })
     await adminSession('SIBENIK')

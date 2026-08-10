@@ -1801,4 +1801,53 @@ describe('reading back what was sent', () => {
     await expect(getCampaignEmailHtml(res.campaignId)).rejects.toThrow()
     await expect(getRecipientEmailHtml(rowId)).rejects.toThrow()
   })
+
+  it('refuses the per-recipient view for a campaign whose rows carry no card', async () => {
+    // Only EVALUATION rows hold assessmentIds — a CUSTOM row has no
+    // per-recipient e-mail distinct from the campaign's, and the view says so
+    // rather than rendering something that was never sent to that one parent.
+    await loginAdmin()
+    const { group } = await makeSourceGroup()
+    await enrollStudent(group.id, { parentEmail: uniqEmail('archive-kind') })
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+    const detail = await getCampaignDetail(res.campaignId)
+
+    const view = await getRecipientEmailHtml(detail.recipients[0].id)
+    expect(view.success).toBe(false)
+  })
+
+  it('renders an EVALUATION campaign at campaign level without any child card', async () => {
+    // A card belongs to exactly one recipient row; the campaign-level view is
+    // the shared shell and must never carry anyone's report card.
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const student = await enrollStudent(group.id, {
+      parentEmail: uniqEmail('archive-eval-shell'),
+      firstName: 'Vito',
+      lastName: 'Kartić',
+    })
+    await createAssessment(student.id, group.id, admin.id)
+    const res = await sendAndSettle({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...EVAL_CONTENT,
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+
+    const html = await getCampaignEmailHtml(res.campaignId)
+    expect(html.success).toBe(true)
+    if (html.success) {
+      expect(html.html).toContain(EVAL_CONTENT.bodyText)
+      expect(html.html).not.toContain('Vito Kartić')
+    }
+  })
 })

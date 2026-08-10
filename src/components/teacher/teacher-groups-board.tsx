@@ -41,13 +41,15 @@ export function TeacherGroupsBoard({ groups, currentYear }: Readonly<Props>) {
           used to name the year, so the list is never year-ambiguous. */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-gray-500">Školska godina:</span>
-        <div className="flex flex-wrap gap-1 rounded-lg bg-gray-100 p-1">
+        <fieldset className="m-0 flex min-w-0 flex-wrap gap-1 rounded-lg border-0 bg-gray-100 p-1">
+          <legend className="sr-only">Odabir školske godine</legend>
           {years.map((y) => {
             const isActive = y === activeYear
             return (
               <button
                 key={y}
                 type="button"
+                aria-pressed={isActive}
                 onClick={() => setActiveYear(y)}
                 className={[
                   'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
@@ -60,7 +62,7 @@ export function TeacherGroupsBoard({ groups, currentYear }: Readonly<Props>) {
               </button>
             )
           })}
-        </div>
+        </fieldset>
       </div>
 
       {yearGroups.length === 0 ? (

@@ -356,7 +356,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       to: parentEmail,
       parentName,
       childName: `${childFirstName} ${childLastName}`,
-      childDateOfBirth,
+      childDateOfBirth: isoToCroatianDate(childDateOfBirth),
       cityLabel: CITY_LABELS[city],
       nextStep: inquiryNextStep(scheduledGroupId, noSuitableTermin),
       payment: payment ?? undefined,

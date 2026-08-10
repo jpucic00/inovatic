@@ -42,6 +42,10 @@ type InquiryListRow = Awaited<ReturnType<typeof db.inquiry.findMany>>[number] & 
   isReturningOtherCity: boolean
 }
 
+function searchTokens(search: string | undefined): string[] {
+  return search?.trim().split(/\s+/).filter(Boolean) ?? []
+}
+
 export async function getInquiries(
   filters: InquiryFilters = {},
 ): Promise<PaginatedResult<InquiryListRow>> {
@@ -49,6 +53,7 @@ export async function getInquiries(
 
   const { status, search, courseId, grade, type, page = 1, pageSize = 20 } = filters
   const schoolYear = await getSelectedSchoolYear()
+  const tokens = searchTokens(search)
 
   const where = {
     schoolYear,
@@ -57,14 +62,20 @@ export async function getInquiries(
     ...(type && type !== 'ALL' ? { type } : {}),
     ...(courseIdFilter(courseId)),
     ...(grade ? { childGrade: grade } : {}),
-    ...(search
+    // Every whitespace-separated token must land in SOME field. A child's full
+    // name spans two columns ("Petra" in childFirstName, "Testić" in
+    // childLastName), so matching the whole string against each column finds
+    // nothing — the natural staff search is the full name off the upit mail.
+    ...(tokens.length > 0
       ? {
-          OR: [
-            { parentName: { contains: search, mode: 'insensitive' as const } },
-            { childFirstName: { contains: search, mode: 'insensitive' as const } },
-            { childLastName: { contains: search, mode: 'insensitive' as const } },
-            { parentEmail: { contains: search, mode: 'insensitive' as const } },
-          ],
+          AND: tokens.map((token) => ({
+            OR: [
+              { parentName: { contains: token, mode: 'insensitive' as const } },
+              { childFirstName: { contains: token, mode: 'insensitive' as const } },
+              { childLastName: { contains: token, mode: 'insensitive' as const } },
+              { parentEmail: { contains: token, mode: 'insensitive' as const } },
+            ],
+          })),
         }
       : {}),
   }

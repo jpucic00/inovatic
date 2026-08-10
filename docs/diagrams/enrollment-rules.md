@@ -32,6 +32,8 @@ stateDiagram-v2
         city = parent's Step-1 choice (group.city verified against it)
         consentGivenAt set to now
         Email: InquiryConfirmationEmail to parent
+        Email: InquiryNotificationEmail to cityInboxEmail(city),
+        reply-to = the parent, so staff answer from Outlook
         Spot reserved if scheduledGroupId provided
         noSuitableTermin = true answers the termin question
         without reserving anything (COMPETITION link only)
@@ -43,6 +45,8 @@ stateDiagram-v2
         city = SPLIT stamped server-side (proslave are Split-only)
         partyProposedDate from form (optional)
         Email: PartyInquiryConfirmationEmail to parent
+        Email: PartyInquiryNotificationEmail to the Split inbox
+        (no city argument — proslave are Split-only)
         No spot reservation (not a group enrollment)
     end note
 
@@ -79,7 +83,7 @@ stateDiagram-v2
 
 | From | To | Action | Guard | Side effects |
 |------|-----|--------|-------|-------------|
-| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation (`inquirySchema` rejects `scheduledGroupId` + `noSuitableTermin` together); COURSE: high-school grade / `noSuitableTermin` only on a COMPETITION target (`competitionOnlyAnswerError`); with group: `group.city === submitted city`, radionica termin not yet started; **without** group **and** without `noSuitableTermin`: `!isTerminRequired(programs, grade, courseId)` against `loadProgramsForCheck` | Inquiry created with `city`; confirmation email; spot reserved if group selected (COURSE) |
+| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation (`inquirySchema` rejects `scheduledGroupId` + `noSuitableTermin` together); COURSE: high-school grade / `noSuitableTermin` only on a COMPETITION target (`competitionOnlyAnswerError`); with group: `group.city === submitted city`, radionica termin not yet started; **without** group **and** without `noSuitableTermin`: `!isTerminRequired(programs, grade, courseId)` against `loadProgramsForCheck` | Inquiry created with `city`; confirmation email to the parent **and** a notification to the city's staff inbox (reply-to = parent, swallow-and-log after the row is committed); spot reserved if group selected (COURSE) |
 | `NEW` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED && status !== DECLINED`; `type === COURSE` | User + Enrollment + ModuleEnrollments; credentials email; `studentId` + `assignedGroupId` set |
 | `NEW` | `PARTY_SCHEDULED` | `schedulePartyInquiry` | `type === PARTY` | `partyConfirmedDate` + `partyStartTime` set; appears on Kalendar |
 | `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000) | `declineReason` persisted; spot freed |
@@ -229,12 +233,13 @@ flowchart TD
     G1 -->|No| B{"scheduledGroupId provided,<br/>OR noSuitableTermin = true?"}
     B -->|Yes| TX["Capacity guard transaction (above) —<br/>the refusal answer skips it (no group, nothing to reserve)"]
     B -->|No| C["programs = loadProgramsForCheck(city, targetCourse):<br/>getSignupProgram for a per-program link's target,<br/>else getActivePrograms(city)"]
-    C --> D["isTerminRequired → programsForSelection(programs, grade, courseId)<br/>radionica/preselected flow → only that course<br/>standard flow → only hasDatedModules programs, grade → level"]
+    C --> CR["gradeRules = getCourseGradeRules(city) —<br/>each program's saved razred override, read for the year<br/>its OWN open enrollment window names (§4)"]
+    CR --> D["isTerminRequired → programsForSelection(programs, grade, courseId, gradeRules)<br/>radionica/preselected flow → only that course<br/>standard flow → only hasDatedModules programs,<br/>then saved rule if any, else grade → level"]
     D --> E{"Selection chosen?<br/>grade OR preselected course"}
     E -->|No| TX
     E -->|Yes| F{"hasOpenTermin — any matching group with isFull = false?"}
     F -->|No| TX
-    F -->|Yes| ERR["Reject: code TERMIN_REQUIRED<br/>'Za odabrani razred dostupni su termini – odaberite jedan.'<br/>+ fresh programs payload, no Inquiry row written"]
+    F -->|Yes| ERR["Reject: code TERMIN_REQUIRED<br/>'Za odabrani razred dostupni su termini – odaberite jedan.'<br/>+ fresh programs AND gradeRules payload,<br/>no Inquiry row written"]
 
     style ERR fill:#fee2e2
     style GERR fill:#fee2e2
@@ -245,6 +250,8 @@ flowchart TD
 > Source: `isTerminRequired` / `programsForSelection` / `hasOpenTermin` in `src/lib/inquiry-availability.ts`, plus `resolveTargetCourse` / `competitionOnlyAnswerError` / `loadProgramsForCheck` in `src/actions/inquiry.ts`, all run **before** `runWithGroupCapacityGuard`. It is the server mirror of the client's conditional requirement, so a stale or tampered payload can't skip the choice. When no enrolment window is open, or every matching group is full, the termin stays **optional** — a general "leave your details" inquiry still goes through. `courseId` is only sent in the radionica/preselected flow, so it maps to the same `preselectedCourseId` argument the client uses.
 >
 > `loadProgramsForCheck` is load-bearing: the competitive program is deliberately absent from `getActivePrograms`, so re-checking a competition inquiry against the public catalog would find no matching program and silently make its termin optional. A per-program link therefore re-checks against its own single-program feed (`getSignupProgram`).
+>
+> `getCourseGradeRules` is load-bearing for the same reason in the other direction: in an overriding city the built-in ladder makes this gate wrong **both** ways — a termin-less payload for 8. razred sails through (the server checks SLR 4 and finds nothing), and an SLR 4 window opened there demands a termin the form never offered. The `TERMIN_REQUIRED` arm therefore ships `gradeRules` alongside `programs`; a form rendered before an admin's edit would otherwise be told to pick from a program its own dropdown is now filtering out, with no way forward but a reload.
 >
 > The public result union carries **three** codes — `code: 'GROUP_FULL' | 'TERMIN_REQUIRED' | 'TERMIN_CLOSED'` — and every arm ships a fresh `programs[]` so the form re-renders live availability rather than acting on the stale list the visitor submitted against (`GROUP_FULL` and `TERMIN_REQUIRED` refresh from the relevant feed via `getActivePrograms` / `loadProgramsForCheck`; `TERMIN_CLOSED` — a radionica that started while the tab sat open — always via `loadProgramsForCheck`).
 
@@ -298,7 +305,7 @@ flowchart TD
 
 > Step 3 renders only the **Step-1 city's** programs/groups (`programsByCity` payload; changing the city clears any stale course/group selection). Grade filtering below then applies within that city.
 >
-> The mapping is a single source of truth: `GRADE_TO_LEVEL` in `src/lib/inquiry-availability.ts`, shared by the client dropdown filter and the server-side `TERMIN_REQUIRED` gate in §2 — so the two can't drift apart.
+> `GRADE_TO_LEVEL` in `src/lib/inquiry-availability.ts` is the **default** ladder, shared by the client dropdown filter and the server-side `TERMIN_REQUIRED` gate in §2 — so the two can't drift apart. Since 2026-08-10 a saved `CourseGradeRule` row can replace it per program; see *Per-program override* below.
 
 ```mermaid
 flowchart TD
@@ -339,6 +346,35 @@ flowchart TD
 ```
 
 > Since the Uvod split (2026-07-29), predškolci map to their own program (`UVOD`, WeDo 2.0) rather than SLR 1, and SLR 1 starts at 1. razred. `GRADE_VALUES` = `ELEMENTARY_GRADE_VALUES` (predškolci–8) + `ss1`–`ss4`; the high-school grades map to `null` — no SLR level fits them.
+
+### Per-program override — `CourseGradeRule` (2026-08-10)
+
+The ladder above is what a program is offered to **when nothing says otherwise**. A `CourseGradeRule` row keyed `(courseId, schoolYear, city)` — sibling of `CourseEnrollmentWindow` and `CourseSeason` — replaces it for that one program in that one city and year. Šibenik launched SLR 4 a year after the rest of the ladder, so its 7. and 8. razred are pointed at SLR 3 while Split keeps the default.
+
+```mermaid
+flowchart TD
+    A["programAcceptsGrade(program, grade, rules)"] --> B{"rules[program.id] exists?"}
+
+    B -->|"no row"| C["Default ladder: GRADE_TO_LEVEL[grade] === program.level"]
+    B -->|"row present"| D{"grades array contains this razred?"}
+
+    D -->|yes| E[Offered]
+    D -->|"no — includes the EMPTY array"| F[Not offered]
+    C -->|match| E
+    C -->|no match| F
+
+    F --> G["Program absent from the Step 3 optgroups; its termini are unreachable from /prijava"]
+
+    style E fill:#dcfce7
+    style F fill:#fee2e2
+```
+
+- **Absent row = default; `grades: []` = offered to nobody.** That distinction is the whole model — the override is consulted whenever it *exists*, empty or not. Never rewrite the check as `override?.length ? … : default`: that hands a deliberately retired program straight back to the ladder.
+- **Overlap is intentional.** Two programs may both claim 8. razred; `programsForSelection` returns both and Step 3 renders one optgroup per program. The rule is *not* a function from razred to program, and nothing enforces uniqueness.
+- **Only STANDARD programs have a rule.** `hasDatedModules` is the gate in three places that must agree: `programsForSelection`, the action's `assertGradeRuleTarget`, and whether `<CourseGradesEditor>` renders at all. Radionice reach signup through `/radionice/<slug>` and the competitive program through its invitation link — both bypass razred narrowing via `preselectedCourseId`, so a rule there would be dead data.
+- **`getCourseGradeRules(city)` keys each program on the year its OWN open enrollment window names**, not `computeSchoolYear()`. Upisi for the next school year open during the summer while today's date still names the year that is ending, so keying on "today" would ignore the setup the admin did under the year they are actually enrolling for. With two windows open at once the **earlier** year wins — and a program with no row in that earlier year falls back to the default ladder rather than inheriting the later year's row. Same open-window set `loadPrograms` gates groups on, so rule and termini can never belong to different years.
+- **`submitInquiry` re-resolves the same rules** for its `isTerminRequired` re-check. Left on the built-in ladder the guard would be wrong in *both* directions in an overriding city: a termin-less payload for 8. razred sails through (the server looks at SLR 4 and finds nothing) and an SLR 4 window opened there demands a termin the form never offered. The `TERMIN_REQUIRED` result therefore ships `gradeRules` alongside `programs`. `/api/group-availability` is deliberately left returning a bare `ActiveProgram[]`.
+- Edited on `/admin/programi/[courseId]`; **"Vrati na zadano" deletes the row** rather than writing the defaults into it — that is what keeps the fallback tracking `GRADE_TO_LEVEL` when the catalog changes. `/admin/programi` shows each standard program's razredi and warns **"Razredi bez programa: …"** (`uncoveredGrades`), because per-program editing makes stranding a razred easy and a stranded razred is invisible on the public form.
 
 ### Grade changes reset group selection
 
@@ -492,7 +528,7 @@ sequenceDiagram
     Server->>Server: Validate with Zod inquirySchema
     Server->>Server: resolveTargetCourse (chosen group's course wins, courseId fallback)
     Server->>Server: competitionOnlyAnswerError guard (high-school grade / noSuitableTermin only on COMPETITION)
-    Server->>Server: Termin gate when no group AND no refusal - isTerminRequired against loadProgramsForCheck
+    Server->>Server: Termin gate when no group AND no refusal - isTerminRequired against loadProgramsForCheck plus getCourseGradeRules(city)
     Server->>Server: Create Inquiry type COURSE status NEW consentGivenAt now
 
     alt scheduledGroupId provided
@@ -506,6 +542,10 @@ sequenceDiagram
 
     Server->>Email: Send InquiryConfirmationEmail
     Email-->>Parent: Zaprimili smo vasu prijavu
+    Note right of Server: Radionica with a price AND a booked termin: the confirmation carries the akontacija + ostatak payment block, derived by radionicaPaymentPlan off the GROUP's course.
+    Server->>Email: Send InquiryNotificationEmail to cityInboxEmail(city), replyTo the parent
+    Email-->>Admin: Novi upit with an Otvori upit u aplikaciji link
+    Note right of Server: Sent AFTER the row is committed and swallow-and-log on failure - the Inquiry is the record, this is only the announcement. Zeljeni termin is resolved here from the group (formatGroupSchedule) or from NO_SUITABLE_TERMIN_LABEL.
     Server-->>Web: Success
     Web-->>Parent: Thank you page
 

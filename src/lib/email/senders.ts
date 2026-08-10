@@ -40,7 +40,6 @@ export function sendInquiryConfirmationEmail(params: {
   childName: string
   childDateOfBirth: string
   cityLabel?: string
-  courseLevelPref?: string
   /** Which "what happens next" paragraph closes the body. */
   nextStep?: InquiryNextStep
   /**
@@ -58,7 +57,6 @@ export function sendInquiryConfirmationEmail(params: {
       childName: params.childName,
       childDateOfBirth: params.childDateOfBirth,
       cityLabel: params.cityLabel,
-      courseLevelPref: params.courseLevelPref,
       nextStep: params.nextStep,
       payment: params.payment,
     }),

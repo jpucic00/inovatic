@@ -39,6 +39,14 @@ erDiagram
         datetime endDate "nullable - @db.Date season upper bound"
     }
 
+    CourseGradeRule {
+        string id PK
+        string courseId FK
+        string schoolYear "part of unique(courseId, schoolYear, city)"
+        City city "each city offers the shared program to its own razredi"
+        string grades "String[] - ELEMENTARY_GRADE_VALUES ('predskolci' - '1'…'8'), the same values Inquiry.childGrade stores; an EMPTY array is the explicit 'offered to nobody' and an ABSENT ROW means 'use the default ladder'"
+    }
+
     CourseModule {
         string id PK
         string courseId FK
@@ -143,6 +151,7 @@ erDiagram
         string parentEmail "nullable - migrated from Inquiry"
         string parentPhone "nullable - migrated from Inquiry"
         string childSchool "nullable - migrated from Inquiry"
+        int hourlyRateCents "nullable - payout rate in euro CENTS per hour for a TEACHER or teaching ADMIN; admin-only - never selected into a teacher- or student-facing payload"
         datetime gdprConsentAt "nullable"
         datetime deletedAt "nullable - soft-delete for teachers (migration 20260513101212)"
         City city "tenant - drives session scoping for all three roles"
@@ -319,6 +328,7 @@ erDiagram
     Course ||--o{ ScheduledGroup : "has groups"
     Course ||--o{ CourseEnrollmentWindow : "per-year signup window"
     Course ||--o{ CourseSeason : "per-year COMPETITION season"
+    Course ||--o{ CourseGradeRule : "per-year razred override - Cascade"
     Location ||--o{ ScheduledGroup : "hosts"
 
     CourseModule ||--o{ ModuleSchedule : "year instances"
@@ -416,10 +426,11 @@ erDiagram
 | Enrollment → Attendance | One attendance record per session date per enrollment. Session dates are derived, not stored. |
 | User → Article | Author relation for news articles |
 | Course → CourseEnrollmentWindow | Per-`(course, schoolYear, city)` public signup window. Every group of that program/year/city inherits it; replaces the old per-group `enrollmentStart/End`. |
+| Course → CourseGradeRule | Which razredi a **STANDARD** program is offered to on the public signup form (`onDelete: Cascade`) — the editable override of the built-in `GRADE_TO_LEVEL` ladder. **Absent row = the default ladder; `grades: []` = offered to nobody**, and that distinction is the whole model (`programAcceptsGrade` returns the override whenever one exists, empty or not). Overlap is intentional: two programs may both claim 8. razred and Step 3 renders one optgroup each. `getCourseGradeRules(city)` reads each program's rule for the year that program's **own open enrollment window** names — not `computeSchoolYear()`, because upisi for the next year open while today still names the year that is ending. Only STANDARD programs have one (`hasDatedModules`); radionice and the competition program reach signup through `preselectedCourseId`, which bypasses razred narrowing entirely. Edited via `<CourseGradesEditor>`, where "Vrati na zadano" **deletes** the row rather than writing the defaults into it. |
 | SchoolYear → SchoolYearHoliday | Per-year non-class days (holidays, breaks, ad-hoc closures). Excluded from `computeExpectedSessions` / `computeRadionicaSessions` / `computeSeasonSessions`. `SchoolYearHoliday.schoolYear` is a real Prisma FK to `SchoolYear.label` (`onDelete: Cascade`). |
 | User → SchoolYearHoliday | `createdBy` relation (nullable) — admin who added the holiday. |
 | SchoolYear | Standalone registry of valid year labels (`YYYY/YYYY`). The `schoolYear` string columns on `ScheduledGroup`, `ModuleSchedule`, `Enrollment`, `Inquiry`, `Course` (radionice) and `CourseEnrollmentWindow` reference `SchoolYear.label` by string with **no** Prisma FK relation; only `SchoolYearHoliday.schoolYear` is a true FK. |
-| User → TeacherAttendance ← ScheduledGroup | Teaching hours, keyed `(userId, scheduledGroupId, sessionDate)` — deliberately **not** keyed on `TeacherAssignment`, so unassigning a teacher or a stand-in covering one session never rewrites who worked which hour. Sole input to the admin payout report (`src/lib/teacher-work-report.ts`). Cascades from `User`, but **RESTRICT** from `ScheduledGroup`: these rows are payout evidence, so `deleteGroup`/`deleteCourse` block on them explicitly and the FK is the backstop. `recordedBy` is a separate non-cascading `User` relation — authorship, not entitlement. |
+| User → TeacherAttendance ← ScheduledGroup | Teaching hours, keyed `(userId, scheduledGroupId, sessionDate)` — deliberately **not** keyed on `TeacherAssignment`, so unassigning a teacher or a stand-in covering one session never rewrites who worked which hour. Sole source of **hours** for the admin payout report (`src/lib/teacher-work-report.ts`), which prices them at the teacher's current `User.hourlyRateCents` over the last `REPORT_MONTH_COUNT` (6) months — a null rate makes every `amountCents` null rather than 0, and changing the rate re-prices all six months, including ones already paid. Cascades from `User`, but **RESTRICT** from `ScheduledGroup`: these rows are payout evidence, so `deleteGroup`/`deleteCourse` block on them explicitly and the FK is the backstop. `recordedBy` is a separate non-cascading `User` relation — authorship, not entitlement. |
 | EmailCampaign → EmailCampaignRecipient | One row per parent inbox per send — except EVALUATION, where a row is one **child** (two siblings on one address get two rows, each mailing exactly one card via the row's `assessmentIds`, re-verified by `assertCardsBelongTo` immediately before each send). Rows cascade (`onDelete: Cascade`) and are written as `PENDING` **before** any mail goes out. A `SENT` row carries `sentKey`, and the `(sentKey, parentEmail)` unique index is what actually prevents a double invitation — two overlapping sends can't both win the insert. Cleared to null on `FAILED` so a retry may re-invite. The four `*Count` columns are display counters; recipient rows are ground truth. |
 | Course → EmailCampaign | `targetCourse` for REENROLLMENT invitations, `onDelete: SetNull` — deleting a program keeps the send history readable. |
 
@@ -436,6 +447,7 @@ erDiagram
 | ModuleSchedule | `(moduleId, schoolYear, city)` |
 | CourseEnrollmentWindow | `(courseId, schoolYear, city)` |
 | CourseSeason | `(courseId, schoolYear, city)` |
+| CourseGradeRule | `(courseId, schoolYear, city)` |
 | SchoolYearHoliday | `(schoolYear, city, date)` |
 | Location | `(id, city)` — backstop target for the `ScheduledGroup(locationId, city)` composite FK |
 | Enrollment | `(userId, scheduledGroupId, schoolYear)` |
@@ -445,6 +457,7 @@ erDiagram
 | MaterialGroupHide | `(materialId, scheduledGroupId)` |
 | Attendance | `(enrollmentId, sessionDate)` |
 | TeacherAttendance | `(userId, scheduledGroupId, sessionDate)` |
+| StudentAssessment | `(studentId, groupId)` — one report card per student per group |
 | EmailCampaignRecipient | `(sentKey, parentEmail)` — NULLs are distinct in Postgres, so CUSTOM and FAILED rows (both `sentKey = null`) never collide; only SENT invitations are constrained |
 | ArticleTag | `(articleId, tagId)` composite PK |
 
@@ -459,10 +472,12 @@ erDiagram
 | Article | `(city, isPublished)` |
 | CourseEnrollmentWindow | `schoolYear` |
 | CourseSeason | `schoolYear` |
+| CourseGradeRule | `(schoolYear, city)` |
 | SchoolYearHoliday | `schoolYear` |
 | EnrollmentMonth | `periodStart` |
 | Material | `(scope, moduleId)`, `(scope, courseId)`, `(scope, scheduledGroupId)` |
 | GalleryImage | `(scheduledGroupId, moduleId, sortOrder)` |
+| StudentAssessment | `groupId` |
 | Attendance | `sessionDate` |
 | TeacherAttendance | `(userId, sessionDate)`, `(scheduledGroupId, sessionDate)`, `recordedById` |
 | EmailCampaign | `(city, createdAt)`, `(city, kind, targetCourseId, targetSchoolYear)`, `sentById`, `targetCourseId` |
@@ -474,7 +489,7 @@ erDiagram
 
 Split and Šibenik run as fully separated tenants inside one app. "City" is the tenant; `Location` stays the venue *within* a city (Trokut inkubator is a `Location` with `city = SIBENIK`).
 
-**Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `CourseSeason` (each city runs the shared competition program's season on its own dates), `SchoolYearHoliday`, `EmailCampaign` (the sending admin's city — the tenant boundary for both recipient resolution and the `/admin/email` history list), and `Course` (nullable — `null` = shared standard SLR program and the competition program, set = per-city radionica).
+**Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `CourseSeason` (each city runs the shared competition program's season on its own dates), `CourseGradeRule` (each city offers the shared standard program to its own razredi), `SchoolYearHoliday`, `EmailCampaign` (the sending admin's city — the tenant boundary for both recipient resolution and the `/admin/email` history list), and `Course` (nullable — `null` = shared standard SLR program and the competition program, set = per-city radionica).
 
 **Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`EnrollmentMonth`/`Attendance`/`TeacherAttendance`/`GalleryImage`/`TeacherAssignment`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `ArticleImage`/`ArticleTag` through their article, `EmailCampaignRecipient` through its campaign.
 

@@ -9,6 +9,7 @@ import {
 } from '@/actions/admin/teacher'
 import { getTeacherWorkReport } from '@/actions/admin/teacher-work'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
+import { computeSchoolYear } from '@/lib/school-year'
 import { EditTeacherDialog } from '@/components/admin/teachers/edit-teacher-dialog'
 import { ResetPasswordButton } from '@/components/admin/teachers/reset-password-button'
 import { DeleteTeacherDialog } from '@/components/admin/teachers/delete-teacher-dialog'
@@ -171,6 +172,7 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
           assignments={teacher.teacherAssignments}
           assignableGroups={assignableGroups}
           defaultYear={selectedYear}
+          currentYear={computeSchoolYear()}
         />
       </div>
 

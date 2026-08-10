@@ -220,6 +220,25 @@ describe('getCourseGradeRules', () => {
     expect(await getCourseGradeRules('SIBENIK')).not.toHaveProperty(course.id)
   })
 
+  it('resolves each course by its EARLIEST open window even when only the later year has a rule', async () => {
+    // The summer overlap: this year's and next year's windows open at once. The
+    // earlier year has NO rule — the default ladder — and the later year's rule
+    // must not reach across into the enrollment already under way. (Regression:
+    // the resolver used to mark a course "seen" only when a rule row existed,
+    // so next year's `[]` would silently hide a program still on this year's
+    // default ladder.)
+    const { course } = await openStandardProgram('SLR_3', 'SIBENIK')
+    await createEnrollmentWindow(course.id, {
+      schoolYear: '2027/2028',
+      city: 'SIBENIK',
+      enrollmentStart: new Date('2020-01-01'),
+      enrollmentEnd: new Date('2099-12-31'),
+    })
+    await createCourseGradeRule(course.id, [], { schoolYear: '2027/2028', city: 'SIBENIK' })
+
+    expect(await getCourseGradeRules('SIBENIK')).not.toHaveProperty(course.id)
+  })
+
   it('reads the rule for the year the program is enrolling FOR, not today\'s year', async () => {
     // The whole point: upisi for YEAR are open now, while computeSchoolYear()
     // still names the year that is ending.
@@ -275,6 +294,50 @@ describe('submitInquiry honours the razred rule', () => {
     const inquiry = await db.inquiry.findFirst({ where: { parentEmail: form.parentEmail } })
     expect(inquiry?.scheduledGroupId).toBe(group.id)
     expect(inquiry?.childGrade).toBe('8')
+  })
+
+  it('relaxes the built-in requirement when the rule pulls a razred off an open program', async () => {
+    // SLR 4 open in Šibenik with a bookable termin — the default ladder demands
+    // a termin for 8. razred. A rule handing the razred to someone else means a
+    // termin-less submission must go straight through: this is the second
+    // direction of "wrong in both directions", and the one a parent cannot work
+    // around (the form never offered them a termin to pick).
+    const { course } = await openStandardProgram('SLR_4', 'SIBENIK')
+
+    // The gate asks whether ANY open program offers this razred a termin, and
+    // earlier tests leave open SIBENIK programs whose rules claim 8. razred —
+    // retire every other open program first, so the only claim left is this
+    // course's own default (SLR 4 ⇒ 7.–8. razred).
+    const now = new Date()
+    const open = await db.courseEnrollmentWindow.findMany({
+      where: { city: 'SIBENIK', enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
+      select: { courseId: true, schoolYear: true },
+    })
+    for (const w of open) {
+      if (w.courseId === course.id) continue
+      await db.courseGradeRule.upsert({
+        where: {
+          courseId_schoolYear_city: {
+            courseId: w.courseId,
+            schoolYear: w.schoolYear,
+            city: 'SIBENIK',
+          },
+        },
+        create: { courseId: w.courseId, schoolYear: w.schoolYear, city: 'SIBENIK', grades: [] },
+        update: { grades: [] },
+      })
+    }
+
+    // Anti-vacuous guard: with no rule on THIS course, the payload is refused.
+    const refused = await submitInquiry(inquiryFor({ grade: '8' }))
+    expect(refused.success).toBe(false)
+
+    await createCourseGradeRule(course.id, ['7'], { schoolYear: YEAR, city: 'SIBENIK' })
+
+    const form = inquiryFor({ grade: '8' })
+    expect(await submitInquiry(form)).toEqual({ success: true })
+    const inquiry = await db.inquiry.findFirst({ where: { parentEmail: form.parentEmail } })
+    expect(inquiry?.scheduledGroupId).toBeNull()
   })
 
   it('leaves a city without a rule on the default ladder', async () => {

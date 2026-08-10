@@ -21,7 +21,7 @@
  * parent a payment instruction for a workshop that costs nothing.
  */
 const DEPOSIT_RATE = 0.2
-const DISCOUNT_CENTS = 20_00
+const DISCOUNT_CENTS = 20 * 100
 
 /**
  * Croatian money copy WITHOUT a unit ("120,00") — the e-mail appends "EUR" or

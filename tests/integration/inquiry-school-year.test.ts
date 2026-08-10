@@ -181,3 +181,37 @@ describe('getInquiryCourses — radionica year-scoping', () => {
     expect(ids).not.toContain(radioCurrent.id)
   })
 })
+
+describe('getInquiries search', () => {
+  it('finds a child by full name even though it spans two columns', async () => {
+    // The natural staff search is the child's full name off the upit mail —
+    // "Petra Testić" lives as first/last in separate columns, so the search
+    // must AND its tokens across fields rather than match the whole string
+    // against each column (which finds nothing).
+    const admin = await createAdmin({ city: 'SPLIT' })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    setSelectedYearCookie(undefined)
+    const year = computeSchoolYear()
+    const tag = `${Date.now().toString(36)}srch`
+
+    const match = await createInquiry({
+      city: 'SPLIT',
+      schoolYear: year,
+      childFirstName: `Petra${tag}`,
+      childLastName: `Testić${tag}`,
+    })
+    const other = await createInquiry({
+      city: 'SPLIT',
+      schoolYear: year,
+      childFirstName: `Petra${tag}`,
+      childLastName: `Drugić${tag}`,
+    })
+
+    const full = await getInquiries({ search: `Petra${tag} Testić${tag}` })
+    expect(full.data.map((r) => r.id)).toEqual([match.id])
+
+    // A single token still behaves like the old contains-search.
+    const single = await getInquiries({ search: `Petra${tag}` })
+    expect(new Set(single.data.map((r) => r.id))).toEqual(new Set([match.id, other.id]))
+  })
+})

@@ -34,6 +34,9 @@ export const updateTeacherHourlyRateSchema = z.object({
   hourlyRateCents: z.preprocess(
     (v) => {
       if (v === null || v === undefined) return null
+      // Only primitives stringify meaningfully — an object would coerce to
+      // '[object Object]', which reads as garbage below anyway.
+      if (typeof v !== 'string' && typeof v !== 'number') return Number.NaN
       const raw = String(v).trim().replace(',', '.')
       if (raw === '') return null
       const euros = Number(raw)

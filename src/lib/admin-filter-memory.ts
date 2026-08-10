@@ -25,9 +25,9 @@ export function filterMemoryKey(adminId: string, listPath: string): string {
 function storage(): Storage | null {
   // Server render, and Safari private mode, where touching sessionStorage
   // throws rather than returning null.
-  if (typeof window === 'undefined') return null
+  if (globalThis.window === undefined) return null
   try {
-    return window.sessionStorage
+    return globalThis.sessionStorage
   } catch {
     return null
   }

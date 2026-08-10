@@ -54,6 +54,12 @@ interface Props {
    * that choice, and this one must not be the outlier that forces two switches.
    */
   defaultYear: string
+  /**
+   * `computeSchoolYear()` from the server, so "is this year archived?" is a
+   * plain string comparison here instead of a clock read during render — same
+   * reasoning as the payment panel's server-computed month boundary.
+   */
+  currentYear: string
 }
 
 function formatSchedule(g: {
@@ -70,6 +76,7 @@ export function TeacherAssignmentPanel({
   assignments,
   assignableGroups,
   defaultYear,
+  currentYear,
 }: Readonly<Props>) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
@@ -106,15 +113,25 @@ export function TeacherAssignmentPanel({
 
   const yearAssignableGroups = assignableGroups.filter((g) => g.schoolYear === assignYear)
 
+  // An archived year is view-only — `assignTeacherToGroup` refuses it at submit.
+  // Its groups still list (dropping the year would read as missing data, the way
+  // a fully-assigned year did), but the dialog says so and Dodijeli is dead.
+  const isArchived = (year: string) => year < currentYear
+  const assignYearArchived = isArchived(assignYear)
+
   const handleOpenChange = (next: boolean) => {
     if (next) {
-      // Open on the year being viewed, but only if there is something to pick
-      // there; otherwise start on the newest year that has a free group.
-      const hasFree = (y: string) => assignableGroups.some((g) => g.schoolYear === y)
-      const start = hasFree(activeYear)
+      // Open on the year being viewed, but only if something there can actually
+      // be assigned; otherwise the newest year that can. A free group in an
+      // archived year does not count — that year refuses at submit — and when
+      // no year is assignable at all, still prefer a live one: "sve grupe već
+      // dodijeljene" is a state the admin can act on, an archived year is not.
+      const isOpenable = (y: string) =>
+        !isArchived(y) && assignableGroups.some((g) => g.schoolYear === y)
+      const openable = isOpenable(activeYear)
         ? activeYear
-        : (dialogYears.find(hasFree) ?? activeYear)
-      setAssignYear(start)
+        : dialogYears.find(isOpenable)
+      setAssignYear(openable ?? dialogYears.find((y) => !isArchived(y)) ?? activeYear)
       setSelectedGroupId('')
     }
     setAdding(next)
@@ -197,6 +214,12 @@ export function TeacherAssignmentPanel({
                       </option>
                     ))}
                   </select>
+                  {assignYearArchived && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      Arhivirana školska godina je samo za pregled — dodjela nije
+                      moguća.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -230,7 +253,7 @@ export function TeacherAssignmentPanel({
                       )
                     })}
                   </select>
-                  {yearAssignableGroups.length === 0 && (
+                  {!assignYearArchived && yearAssignableGroups.length === 0 && (
                     <p className="mt-1 text-xs text-gray-500">
                       Sve grupe u {assignYear} već su dodijeljene ovom nastavniku.
                     </p>
@@ -247,7 +270,7 @@ export function TeacherAssignmentPanel({
                   </button>
                   <button
                     onClick={handleAssign}
-                    disabled={isPending || !selectedGroupId}
+                    disabled={isPending || !selectedGroupId || assignYearArchived}
                     className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
                   >
                     {isPending ? 'Dodjeljujem...' : 'Dodijeli'}
@@ -262,13 +285,17 @@ export function TeacherAssignmentPanel({
       {assignments.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-gray-500">Školska godina:</span>
-          <div className="flex flex-wrap gap-1 rounded-lg bg-gray-100 p-1">
+          <fieldset className="m-0 flex min-w-0 flex-wrap gap-1 rounded-lg border-0 bg-gray-100 p-1">
+            {/* Not "Školska godina" — the assign dialog's select carries that
+                accessible name, and the two must stay distinguishable. */}
+            <legend className="sr-only">Odabir školske godine</legend>
             {years.map((y) => {
               const isActive = y === activeYear
               return (
                 <button
                   key={y}
                   type="button"
+                  aria-pressed={isActive}
                   onClick={() => setActiveYear(y)}
                   className={[
                     'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
@@ -281,17 +308,19 @@ export function TeacherAssignmentPanel({
                 </button>
               )
             })}
-          </div>
+          </fieldset>
         </div>
       )}
 
-      {assignments.length === 0 ? (
+      {assignments.length === 0 && (
         <p className="text-sm text-gray-400 italic">Još nema dodijeljenih grupa.</p>
-      ) : yearAssignments.length === 0 ? (
+      )}
+      {assignments.length > 0 && yearAssignments.length === 0 && (
         <p className="text-sm text-gray-400 italic">
           Nema dodijeljenih grupa u {activeYear}.
         </p>
-      ) : (
+      )}
+      {yearAssignments.length > 0 && (
         <div className="space-y-2">
           {yearAssignments.map((a) => (
             <div

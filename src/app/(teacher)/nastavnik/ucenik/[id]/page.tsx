@@ -23,7 +23,9 @@ export const metadata: Metadata = { title: 'Nastavnik – Učenik' }
 
 interface PageProps {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ grupa?: string }>
+  // A duplicated param (`?grupa=a&grupa=b`) arrives as an array — the honest
+  // type keeps the guard below from ever handing Prisma a string[] id.
+  searchParams: Promise<{ grupa?: string | string[] }>
 }
 
 export default async function TeacherStudentDetailPage({
@@ -37,7 +39,7 @@ export default async function TeacherStudentDetailPage({
     getStudentForTeacher(id),
     getStudentAttendanceForTeacher(id),
     getRecommendationOptions(),
-    grupa ? getStudentGroupContext(id, grupa) : null,
+    typeof grupa === 'string' ? getStudentGroupContext(id, grupa) : null,
   ])
 
   if (!student) notFound()

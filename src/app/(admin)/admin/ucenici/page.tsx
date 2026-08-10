@@ -65,30 +65,17 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
     isModuleView ? Promise.resolve<string[]>([]) : getAllSchoolYears(),
   ])
 
-  // Ids are what the URL carries, but nothing on screen should say "grupa
-  // cme3k9…" — every chip is resolved to the label the admin picked.
-  const selectedGroup = groups.find((g) => g.id === groupId)
-  const chips: ActiveFilterChip[] = [
-    year && { key: 'year', label: `Godina: ${year}` },
-    courseId && {
-      key: 'courseId',
-      label: `Program: ${courses.find((c) => c.id === courseId)?.title ?? courseId}`,
-    },
-    groupId && {
-      key: 'groupId',
-      label: `Grupa: ${selectedGroup ? (selectedGroup.name ?? selectedGroup.course.title) : groupId}`,
-    },
-    paymentStatus && {
-      key: 'payment',
-      label: paymentStatus === 'PAID' ? 'Plaćeno' : 'Nije plaćeno',
-    },
-    scheduleId &&
-      scheduleInfo && {
-        key: 'scheduleId',
-        label: `Modul: ${scheduleInfo.module.course.title} – ${scheduleInfo.module.title}`,
-      },
-    search && { key: 'search', label: `Pretraga: „${search}”` },
-  ].filter((c): c is ActiveFilterChip => Boolean(c))
+  const chips = buildStudentChips({
+    year,
+    courseId,
+    groupId,
+    scheduleId,
+    search,
+    paymentStatus,
+    courses,
+    groups,
+    scheduleInfo,
+  })
 
   return (
     <div>
@@ -143,4 +130,50 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
       />
     </div>
   )
+}
+
+/**
+ * Ids are what the URL carries, but nothing on screen should say "grupa
+ * cme3k9…" — every chip resolves to the label the admin picked, and every one
+ * falls back to the raw id: a filter that still narrows the query must always
+ * render its chip, or the × on it would be the only way out and it would be
+ * gone (a remembered module view whose ModuleSchedule was later deleted is
+ * exactly that trap).
+ */
+function buildStudentChips(args: {
+  year: string
+  courseId: string
+  groupId: string
+  scheduleId: string
+  search: string
+  paymentStatus: PaymentFilter | undefined
+  courses: ReadonlyArray<{ id: string; title: string }>
+  groups: ReadonlyArray<{ id: string; name: string | null; course: { title: string } }>
+  scheduleInfo: { module: { title: string; course: { title: string } } } | null
+}): ActiveFilterChip[] {
+  const { year, courseId, groupId, scheduleId, search, paymentStatus, courses, groups, scheduleInfo } =
+    args
+  const selectedGroup = groups.find((g) => g.id === groupId)
+  return [
+    year && { key: 'year', label: `Godina: ${year}` },
+    courseId && {
+      key: 'courseId',
+      label: `Program: ${courses.find((c) => c.id === courseId)?.title ?? courseId}`,
+    },
+    groupId && {
+      key: 'groupId',
+      label: `Grupa: ${selectedGroup ? (selectedGroup.name ?? selectedGroup.course.title) : groupId}`,
+    },
+    paymentStatus && {
+      key: 'payment',
+      label: paymentStatus === 'PAID' ? 'Plaćeno' : 'Nije plaćeno',
+    },
+    scheduleId && {
+      key: 'scheduleId',
+      label: scheduleInfo
+        ? `Modul: ${scheduleInfo.module.course.title} – ${scheduleInfo.module.title}`
+        : `Modul: ${scheduleId}`,
+    },
+    search && { key: 'search', label: `Pretraga: „${search}”` },
+  ].filter((c): c is ActiveFilterChip => Boolean(c))
 }

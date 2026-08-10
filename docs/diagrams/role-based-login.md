@@ -7,7 +7,9 @@ After a successful login, the user lands on the route that matches their `UserRo
 | `ADMIN` | `/admin` — **unless dual-role**, then a panel chooser (see below) | `/admin/*`, `/nastavnik/*`, `/portal/*` (any auth) | `requireAuth`, `requireAdmin`, `requireTeacher` *(ADMIN bypass for support)* |
 | `TEACHER` | `/nastavnik` | `/nastavnik/*`, `/portal/*` (any auth) | `requireAuth`, `requireTeacher` |
 | `STUDENT` | `/portal` | `/portal/*` (any auth) | `requireAuth`, `requireStudent` |
-| unauthenticated | login page | none — every match redirects to `/prijava` | none |
+| unauthenticated | `/portal` — the login screen renders **in place** there | nothing below `/portal`; every other match redirects to `/portal` | none |
+
+> **`/portal` is both the sign-in screen and the student destination (2026-08-06).** The URL swap moved the public signup form onto `/prijava` and login onto `/portal`, so there is no standalone sign-in route any more: `(portal)/portal/page.tsx` branches — guest (or a fail-closed session with no `city` claim) → `<LoginScreen>`, ADMIN → `/admin`, TEACHER → `/nastavnik`, STUDENT → dashboard. Every auth redirect in the app targets `/portal`, which makes it the **loop terminator**: it must never bounce a guest. The middleware therefore exempts the exact `/portal` path (see below) and the `(portal)` layout no longer gates — its chrome renders only for a city-bearing STUDENT, and access control lives in the student actions' own `requireStudent()`.
 
 > Middleware lets any authenticated user through to `/portal/*`, but `requireStudent()` rejects non-STUDENT roles at the page level. ADMIN bypass inside `requireTeacher()` is deliberate so admins can support a class without holding a teacher seat.
 
@@ -77,20 +79,23 @@ flowchart TD
 
     PATH -->|/admin| A{role === 'ADMIN'?}
     PATH -->|/nastavnik| N{role === 'TEACHER'<br/>or role === 'ADMIN'?}
-    PATH -->|/portal| P{req.auth set?}
+    PATH -->|"exactly /portal"| EX["always continue —<br/>this IS the sign-in screen"]
+    PATH -->|"below /portal"| P{req.auth set?}
 
     A -->|Yes| PASS[continue]
-    A -->|No| RED["NextResponse.redirect → /prijava"]
+    A -->|No| RED["NextResponse.redirect → /portal"]
     N -->|Yes| PASS
     N -->|No| RED
+    EX --> PASS
     P -->|Yes| PASS
     P -->|No| RED
 
     style PASS fill:#d1fae5
+    style EX   fill:#d1fae5
     style RED  fill:#fee2e2
 ```
 
-> Source: `src/middleware.ts`. Matcher list at the bottom of the file pins exactly which prefixes the middleware fires for; anything else passes straight to the route.
+> Source: `src/middleware.ts`. Matcher list at the bottom of the file pins exactly which prefixes the middleware fires for; anything else passes straight to the route. The `pathname !== '/portal'` condition on the portal branch is load-bearing, not an optimization: `/portal` is where every other branch redirects to, so gating it would bounce a guest to the page they are already on.
 
 ## Subsequent requests — server-side guards
 
@@ -103,7 +108,7 @@ flowchart TD
     WHICH -->|requireTeacher| A3{role === 'TEACHER'<br/>or role === 'ADMIN'?}
     WHICH -->|requireStudent| A4{role === 'STUDENT'?}
 
-    A1 -->|No| RED[redirect → /prijava]
+    A1 -->|No| RED[redirect → /portal]
     A1 -->|Yes| OK[return session]
     A2 -->|No| RED
     A2 -->|Yes| OK
@@ -116,7 +121,7 @@ flowchart TD
     style RED fill:#fee2e2
 ```
 
-> Source: `src/lib/auth-guard.ts`. Each helper composes on top of `requireAuth()`, so an unauthenticated request always lands on `/prijava` regardless of which role check follows. `requireAuth` also **fails closed on a session without a `city` claim** — Prisma treats `city: undefined` in a where-clause as "no filter", so a legacy token must never reach a query. `requireAdminCtx()` returns `{ session, city }` for read actions; `adminAction` hands the same city to wrapped mutations via handler ctx.
+> Source: `src/lib/auth-guard.ts`. Each helper composes on top of `requireAuth()` (module-private), so an unauthenticated request always lands on `/portal` regardless of which role check follows — the same target as the middleware, `logoutAction` and `pages.signIn`. `requireAuth` also **fails closed on a session without a `city` claim** — Prisma treats `city: undefined` in a where-clause as "no filter", so a legacy token must never reach a query. `requireAdminCtx()` returns `{ session, city }` for read actions; `adminAction` hands the same city to wrapped mutations via handler ctx.
 
 ## Defence in depth
 

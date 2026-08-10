@@ -212,4 +212,31 @@ describe('every proslava inquiry announces itself too', () => {
       partyProposedDate: '12.09.2026.',
     })
   })
+
+  it('still notifies when the parent confirmation throws, and its own failure stays swallowed', async () => {
+    // The two sends sit in separate try/catch blocks: the confirmation blowing
+    // up must not cost the staff their notification, and the notification's own
+    // failure must not surface as a failed sign-up.
+    const email = await import('@/lib/email')
+    vi.mocked(email.sendPartyInquiryConfirmationEmail).mockRejectedValueOnce(
+      new Error('smtp down'),
+    )
+    sendPartyInquiryNotificationEmail.mockRejectedValueOnce(new Error('inbox down'))
+
+    const data: PartyInquiryFormData = {
+      parentFirstName: 'Iva',
+      parentLastName: 'Ivić',
+      parentEmail: nextParentEmail(),
+      parentPhone: '+385912345678',
+      message: 'Proslava unatoč kvaru maila.',
+      partyProposedDate: '2026-10-03',
+      consent: true,
+    }
+    expect(await submitPartyInquiry(data)).toEqual({ success: true })
+
+    expect(sendPartyInquiryNotificationEmail).toHaveBeenCalledTimes(1)
+    expect(
+      await db.inquiry.findFirst({ where: { parentEmail: data.parentEmail } }),
+    ).not.toBeNull()
+  })
 })

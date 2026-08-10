@@ -8,19 +8,11 @@ import {
 } from '../src/lib/inquiry-next-step'
 import type { RadionicaPaymentPlan } from '../src/lib/radionica-deposit'
 
-const courseLevelLabels: Record<string, string> = {
-  SLR_1: 'Svijet LEGO Robotike 1 (6–8 god.)',
-  SLR_2: 'Svijet LEGO Robotike 2 (9–10 god.)',
-  SLR_3: 'Svijet LEGO Robotike 3 (11–12 god.)',
-  SLR_4: 'Svijet LEGO Robotike 4 (13–14 god.)',
-}
-
 interface InquiryConfirmationProps {
   parentName: string
   childName: string
   childDateOfBirth: string
   cityLabel?: string
-  courseLevelPref?: string
   /** Defaults to the offer-them-termini wording — the pre-dropdown behaviour. */
   nextStep?: InquiryNextStep
   /**
@@ -38,12 +30,9 @@ function InquiryConfirmationEmail({
   childName,
   childDateOfBirth,
   cityLabel,
-  courseLevelPref,
   nextStep = 'TERMIN_TO_OFFER',
   payment,
 }: InquiryConfirmationProps) {
-  const courseLabel = courseLevelPref ? courseLevelLabels[courseLevelPref] : undefined
-
   return (
     <EmailLayout preview={`Zaprimili smo vašu prijavu za ${childName} – Inovatic`}>
       <Heading style={emailStyles.h1}>Hvala na upitu, {parentName}!</Heading>
@@ -54,11 +43,6 @@ function InquiryConfirmationEmail({
       {cityLabel && (
         <Text style={emailStyles.text}>
           Odabrani grad: <strong>{cityLabel}</strong>
-        </Text>
-      )}
-      {courseLabel && (
-        <Text style={emailStyles.text}>
-          Navedena preferencija programa: <strong>{courseLabel}</strong>
         </Text>
       )}
       <Hr style={emailStyles.hr} />
@@ -115,7 +99,7 @@ function InquiryConfirmationEmail({
             <Text style={paymentText}>
               • <strong>Redovni ostatak:</strong>{' '}
               {`${payment.remainder} EUR (ukupno ${payment.total} EUR)`}
-              {payment.discountedRemainder && (
+              {payment.discountedRemainder && payment.discountedTotal && (
                 <>
                   <br />• <strong>Ostatak s popustom</strong>
                   {` (drugo dijete / dijete polaznik cjelogodišnjeg programa): ${payment.discountedRemainder} EUR (ukupno ${payment.discountedTotal} EUR)`}
@@ -195,7 +179,6 @@ InquiryConfirmationEmail.PreviewProps = {
   childName: 'Marko Anić',
   childDateOfBirth: '15.06.2016.',
   cityLabel: 'Šibenik',
-  courseLevelPref: 'SLR_2',
   nextStep: 'TERMIN_CHOSEN',
   payment: {
     deposit: '30,00',

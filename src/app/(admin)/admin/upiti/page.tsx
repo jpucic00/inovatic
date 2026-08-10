@@ -67,22 +67,14 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
   const currentGrade = gradeFilter ?? ''
   const currentType = typeFilter ?? ''
 
-  const chips: ActiveFilterChip[] = [
-    statusFilter && { key: 'status', label: `Status: ${STATUS_LABELS[statusFilter]}` },
-    typeFilter && {
-      key: 'type',
-      label: `Vrsta: ${typeFilter === 'COURSE' ? 'Upisi' : 'Proslave'}`,
-    },
-    currentCourse && {
-      key: 'course',
-      label:
-        currentCourse === 'NONE'
-          ? 'Bez preference programa'
-          : `Program: ${courses.find((c) => c.id === currentCourse)?.title ?? currentCourse}`,
-    },
-    gradeFilter && { key: 'grade', label: `Razred: ${GRADE_LABELS[gradeFilter]}` },
-    currentSearch && { key: 'search', label: `Pretraga: „${currentSearch}”` },
-  ].filter((c): c is ActiveFilterChip => Boolean(c))
+  const chips = buildInquiryChips({
+    statusFilter,
+    typeFilter,
+    currentCourse,
+    gradeFilter,
+    currentSearch,
+    courses,
+  })
 
   return (
     <div>
@@ -111,4 +103,36 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
       />
     </div>
   )
+}
+
+/**
+ * Chip labels resolved to what the admin actually picked — an id only ever
+ * shows as itself when its row no longer resolves, so the chip (and its ×)
+ * never vanishes while the filter still narrows the table.
+ */
+function buildInquiryChips(args: {
+  statusFilter: InquiryStatus | undefined
+  typeFilter: InquiryType | undefined
+  currentCourse: string
+  gradeFilter: Grade | undefined
+  currentSearch: string
+  courses: ReadonlyArray<{ id: string; title: string }>
+}): ActiveFilterChip[] {
+  const { statusFilter, typeFilter, currentCourse, gradeFilter, currentSearch, courses } = args
+  return [
+    statusFilter && { key: 'status', label: `Status: ${STATUS_LABELS[statusFilter]}` },
+    typeFilter && {
+      key: 'type',
+      label: `Vrsta: ${typeFilter === 'COURSE' ? 'Upisi' : 'Proslave'}`,
+    },
+    currentCourse && {
+      key: 'course',
+      label:
+        currentCourse === 'NONE'
+          ? 'Bez preference programa'
+          : `Program: ${courses.find((c) => c.id === currentCourse)?.title ?? currentCourse}`,
+    },
+    gradeFilter && { key: 'grade', label: `Razred: ${GRADE_LABELS[gradeFilter]}` },
+    currentSearch && { key: 'search', label: `Pretraga: „${currentSearch}”` },
+  ].filter((c): c is ActiveFilterChip => Boolean(c))
 }

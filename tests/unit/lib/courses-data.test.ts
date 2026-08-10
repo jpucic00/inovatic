@@ -27,6 +27,12 @@ describe('courses catalog', () => {
     }
   })
 
+  it('gives the intro program badge "0" — before SLR 1, not beside it', () => {
+    // '0' (not 'U') so the padded /programi column reads 00–04 and the intro
+    // program sorts ahead of the ladder it feeds.
+    expect(courses[0].badge).toBe('0')
+  })
+
   it('keeps every program on its own image folder and badge', () => {
     for (const c of courses) {
       const folder = `/images/courses/${c.slug}/`

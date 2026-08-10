@@ -45,6 +45,8 @@ type Seeded = {
   groupBId: string
   groupACourseTitle: string
   studentId: string
+  studentLoginEmail: string
+  studentPassword: string
 }
 
 let seeded: Seeded | null = null
@@ -75,6 +77,8 @@ test.describe('Phase 3 Step 12 — Teacher Panel', () => {
       groupBId,
       groupACourseTitle,
       studentId: s.studentId,
+      studentLoginEmail: `${s.username}@student.inovatic.local`,
+      studentPassword: s.password,
     }
     await page.close()
   })
@@ -154,5 +158,94 @@ test.describe('Phase 3 Step 12 — Teacher Panel', () => {
     await expect(page.getByRole('heading', { name: studentFullName })).toBeVisible()
     await expect(page.getByText('Evidencija dolaska')).toBeVisible()
     await expect(page.getByText(STUDENT.childSchool)).toBeVisible()
+  })
+
+  // ── Back link: the roster is the only way in, so it must be the way out ────
+
+  test('student opened from a roster goes back to that group, not out to the list', async ({
+    page,
+  }) => {
+    if (!seeded) throw new Error('not seeded')
+    await loginWithEmail(page, seeded.teacherA.email, seeded.teacherA.password)
+    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+    await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupAId}`)
+
+    // The roster threads the group id onto every student link — that param is
+    // the whole mechanism, so assert it before following it.
+    const studentFullName = `${STUDENT.firstName} ${STUDENT.lastName}`
+    const rosterLink = page.getByRole('link', { name: studentFullName })
+    await expect(rosterLink).toHaveAttribute(
+      'href',
+      `/nastavnik/ucenik/${seeded.studentId}?grupa=${seeded.groupAId}`,
+    )
+    await rosterLink.click()
+    await page.waitForURL(new RegExp(`/nastavnik/ucenik/${seeded.studentId}`), {
+      timeout: 30000,
+    })
+
+    const back = page.getByRole('link', { name: /^Natrag na / })
+    await expect(back).toHaveAttribute('href', `/nastavnik/grupa/${seeded.groupAId}`)
+    // Named after the group, so a child in two of this teacher's groups says
+    // which one — the generic list label would be the bug this fixed.
+    await expect(back).not.toHaveText('Natrag na moje grupe')
+
+    await back.click()
+    await page.waitForURL(`${BASE}/nastavnik/grupa/${seeded.groupAId}`, { timeout: 30000 })
+    await expect(page.getByRole('heading', { name: seeded.groupACourseTitle })).toBeVisible()
+  })
+
+  test('student opened without ?grupa= falls back to the groups list', async ({ page }) => {
+    if (!seeded) throw new Error('not seeded')
+    await loginWithEmail(page, seeded.teacherA.email, seeded.teacherA.password)
+    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+    await page.goto(`${BASE}/nastavnik/ucenik/${seeded.studentId}`)
+
+    const back = page.getByRole('link', { name: 'Natrag na moje grupe' })
+    await expect(back).toHaveAttribute('href', '/nastavnik')
+  })
+
+  test('a stale ?grupa= costs the back link and nothing else', async ({ page }) => {
+    if (!seeded) throw new Error('not seeded')
+    await loginWithEmail(page, seeded.teacherA.email, seeded.teacherA.password)
+    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+
+    // Teacher B's group: a real id this teacher may not open. The resolver is
+    // the non-throwing twin of assertTeacherOwnsGroup — 404-ing a student
+    // profile over a query param would be worse than losing the back link.
+    await page.goto(
+      `${BASE}/nastavnik/ucenik/${seeded.studentId}?grupa=${seeded.groupBId}`,
+    )
+
+    const studentFullName = `${STUDENT.firstName} ${STUDENT.lastName}`
+    await expect(page.getByRole('heading', { name: studentFullName })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Natrag na moje grupe' })).toBeVisible()
+  })
+
+  // ── Payout rate must never reach a teacher- or student-facing payload ──────
+
+  test('hourlyRateCents never appears in the /nastavnik or /portal payloads', async ({
+    page,
+  }) => {
+    if (!seeded) throw new Error('not seeded')
+    await loginWithEmail(page, seeded.teacherA.email, seeded.teacherA.password)
+    await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
+
+    // One-string canary: the column is admin-only and has exactly one reader.
+    // A stray `include` anywhere in these trees ships every scalar with it, and
+    // the RSC payload is where that would surface first.
+    for (const path of [
+      '/nastavnik',
+      `/nastavnik/grupa/${seeded.groupAId}`,
+      `/nastavnik/ucenik/${seeded.studentId}?grupa=${seeded.groupAId}`,
+    ]) {
+      await page.goto(`${BASE}${path}`)
+      expect(await page.content()).not.toContain('hourlyRateCents')
+    }
+
+    // The parent-facing half: this child's only enrollment is group A, so
+    // /portal lands straight on its materials.
+    await loginWithEmail(page, seeded.studentLoginEmail, seeded.studentPassword)
+    await page.waitForURL(/\/portal/, { timeout: 30000 })
+    expect(await page.content()).not.toContain('hourlyRateCents')
   })
 })
