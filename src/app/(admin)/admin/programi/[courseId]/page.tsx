@@ -15,6 +15,7 @@ import {
 import { ModuleDatesTable } from '@/components/admin/courses/module-dates-table'
 import { EnrollmentWindowEditor } from '@/components/admin/courses/enrollment-window-editor'
 import { CourseSeasonEditor } from '@/components/admin/courses/course-season-editor'
+import { CourseGradesEditor } from '@/components/admin/courses/course-grades-editor'
 import { CopyLinkButton } from '@/components/admin/courses/copy-link-button'
 import { CourseFormDialog } from '@/components/admin/courses/course-form-dialog'
 import { UploadMaterialDialog } from '@/components/material/upload-dialog'
@@ -32,7 +33,8 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
   const { courseId } = await params
 
   const detail = await getProgramDetail(courseId)
-  const { course, season, moduleDates, courseMaterials, moduleSections, selectedYear } = detail
+  const { course, season, gradeRule, moduleDates, courseMaterials, moduleSections, selectedYear } =
+    detail
   const competition = isCompetition(course.kind)
   const radionica = isRadionica(course.kind)
   const editable = !isArchivedYear(selectedYear)
@@ -145,7 +147,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
 
       {!editable && <ArchivedYearBanner year={selectedYear} />}
 
-      <section className="mb-10">
+      <section className="mb-10 space-y-4">
         <EnrollmentWindowEditor
           courseId={course.id}
           schoolYear={selectedYear}
@@ -153,6 +155,19 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
           enrollmentEnd={course.enrollmentEnd}
           editable={editable}
         />
+        {/* Only the SLR ladder is narrowed by razred — radionice and the
+            competitive program are reached through their own links. Same gate
+            `programsForSelection` applies, so the card never appears where it
+            would do nothing. */}
+        {hasDatedModules(course.kind) && (
+          <CourseGradesEditor
+            courseId={course.id}
+            schoolYear={selectedYear}
+            grades={gradeRule.grades}
+            defaults={gradeRule.defaults}
+            editable={editable}
+          />
+        )}
       </section>
 
       {competition && (

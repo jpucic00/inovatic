@@ -17,7 +17,7 @@ import {
   NO_SUITABLE_TERMIN_LABEL,
   type Grade,
 } from '@/lib/inquiry-status'
-import { programsForSelection } from '@/lib/inquiry-availability'
+import { programsForSelection, type CourseGradeRules } from '@/lib/inquiry-availability'
 import { formatGroupSchedule } from '@/lib/format'
 import { FieldError } from './FieldError'
 import { hasModules, isCompetition, isRadionica } from '@/lib/program-kind'
@@ -30,6 +30,12 @@ interface Props {
   getValues: UseFormGetValues<InquiryFormData>
   clearErrors: UseFormClearErrors<InquiryFormData>
   programs: ActiveProgram[]
+  /**
+   * The selected city's razred→program overrides. Absent means the built-in
+   * ladder — which is also the case on every preselected-course flow, where the
+   * razred narrows nothing at all.
+   */
+  gradeRules?: CourseGradeRules
   preselectedCourseId?: string
   /**
    * Which razred options to offer. Defaults to osnovna škola — the competition
@@ -76,6 +82,7 @@ export function InquiryStep3({
   getValues,
   clearErrors,
   programs,
+  gradeRules,
   preselectedCourseId,
   gradeOptions = ELEMENTARY_GRADE_VALUES,
   terminRequired,
@@ -95,8 +102,14 @@ export function InquiryStep3({
 
   // The open programs whose groups render in the dropdown — radionica page shows
   // only its own course; standard /prijava excludes radionice and narrows to the
-  // selected grade's level (shared with the parent's terminRequired check).
-  const filteredPrograms = programsForSelection(programs, selectedGrade, preselectedCourseId)
+  // programs this razred is offered (shared with the parent's terminRequired
+  // check). More than one may qualify — each keeps its own optgroup below.
+  const filteredPrograms = programsForSelection(
+    programs,
+    selectedGrade,
+    preselectedCourseId,
+    gradeRules,
+  )
 
   const hasAnyGroups = filteredPrograms.some((p) => p.groups.length > 0)
 

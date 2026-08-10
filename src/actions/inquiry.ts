@@ -10,8 +10,13 @@ import {
   type InquiryFormData,
   type PartyInquiryFormData,
 } from '@/lib/validators/inquiry'
-import { getActivePrograms, getSignupProgram, type ActiveProgram } from '@/actions/public/programs'
-import { isTerminRequired } from '@/lib/inquiry-availability'
+import {
+  getActivePrograms,
+  getCourseGradeRules,
+  getSignupProgram,
+  type ActiveProgram,
+} from '@/actions/public/programs'
+import { isTerminRequired, type CourseGradeRules } from '@/lib/inquiry-availability'
 import {
   GroupFullError,
   assertGroupHasAvailableSpot,
@@ -78,8 +83,21 @@ type InquiryActionResult =
   | {
       success: false
       error: string
-      code: 'GROUP_FULL' | 'TERMIN_REQUIRED' | 'TERMIN_CLOSED'
+      code: 'GROUP_FULL' | 'TERMIN_CLOSED'
       programs: ActiveProgram[]
+    }
+  | {
+      success: false
+      error: string
+      code: 'TERMIN_REQUIRED'
+      programs: ActiveProgram[]
+      /**
+       * The razred rules this refusal was decided against. Shipped because the
+       * form may have rendered before an admin changed them, in which case its
+       * dropdown is filtering out the exact program it is now being told to
+       * pick from.
+       */
+      gradeRules: CourseGradeRules
     }
 
 /**
@@ -191,12 +209,19 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     // is deliberately absent from getActivePrograms, so checking against the
     // public catalog would silently make its termin optional.
     const programs = await loadProgramsForCheck(city, targetCourse)
-    if (isTerminRequired(programs, grade, courseId)) {
+    // Resolve the city's razred rules here too. Left on the built-in ladder
+    // this guard would be wrong in both directions wherever a city overrides
+    // it: a termin-less payload for 8. razred in Šibenik would sail through
+    // (the server would look at SLR 4 and find nothing), and an SLR 4 window
+    // opened there would demand a termin the form never offered.
+    const gradeRules = await getCourseGradeRules(city)
+    if (isTerminRequired(programs, grade, courseId, gradeRules)) {
       return {
         success: false,
         error: 'Za odabrani razred dostupni su termini – odaberite jedan.',
         code: 'TERMIN_REQUIRED' as const,
         programs,
+        gradeRules,
       }
     }
   }

@@ -1,5 +1,9 @@
 import type { ActiveProgram } from '@/actions/public/programs'
-import type { Grade } from '@/lib/inquiry-status'
+import {
+  ELEMENTARY_GRADE_VALUES,
+  type ElementaryGrade,
+  type Grade,
+} from '@/lib/inquiry-status'
 import { hasDatedModules } from '@/lib/program-kind'
 
 // Child grade → standard program level. Predškolci have their own program
@@ -10,6 +14,10 @@ import { hasDatedModules } from '@/lib/program-kind'
 // The srednja škola grades map to null: no SLR level is right for them. They
 // exist only for the competitive program, which is reached through its own
 // signup link and bypasses this narrowing entirely.
+//
+// This is the DEFAULT ladder, not the last word: a `CourseGradeRule` row for a
+// (course, school year, city) replaces it for that one program — see
+// `programAcceptsGrade`.
 const GRADE_TO_LEVEL: Record<Grade, string | null> = {
   predskolci: 'UVOD',
   '1': 'SLR_1',
@@ -27,18 +35,90 @@ const GRADE_TO_LEVEL: Record<Grade, string | null> = {
 }
 
 /**
+ * Saved per-program razred overrides for one city + school year, keyed by
+ * `Course.id`.
+ *
+ * A program ABSENT from the map falls back to the default ladder above. A
+ * program present with an EMPTY list is offered to nobody — that is a real
+ * answer an admin can save, so the two must never be conflated.
+ */
+export type CourseGradeRules = Readonly<Record<string, readonly Grade[]>>
+
+/**
+ * The razredi a standard program is offered to by default — the inverse of
+ * `GRADE_TO_LEVEL`, and what the admin editor pre-fills with. Only osnovna
+ * škola: the srednjoškolski grades belong to the competitive program, which is
+ * never narrowed by razred.
+ */
+export function defaultGradesForLevel(level: string | null): ElementaryGrade[] {
+  if (!level) return []
+  return ELEMENTARY_GRADE_VALUES.filter((g) => GRADE_TO_LEVEL[g] === level)
+}
+
+/**
+ * The razredi a program is actually offered to: its saved rule when it has one,
+ * else the default ladder. Also normalizes order and drops anything that is not
+ * a current razred value, so a stored list survives a catalog change.
+ */
+export function effectiveGrades(
+  level: string | null,
+  saved: readonly string[] | null | undefined,
+): ElementaryGrade[] {
+  if (saved) return ELEMENTARY_GRADE_VALUES.filter((g) => saved.includes(g))
+  return defaultGradesForLevel(level)
+}
+
+/**
+ * Razredi that no standard program is offered to. Configuring rules per program
+ * makes it possible to strand one — a razred pointing nowhere silently shows
+ * "Nema otvorenih termina" on `/prijava`, so the admin list warns about it.
+ */
+export function uncoveredGrades(
+  offered: readonly (readonly ElementaryGrade[])[],
+): ElementaryGrade[] {
+  const covered = new Set(offered.flat())
+  return ELEMENTARY_GRADE_VALUES.filter((g) => !covered.has(g))
+}
+
+/**
+ * Whether this program is offered to this razred — its saved rule when it has
+ * one, else the default ladder.
+ */
+function programAcceptsGrade(
+  program: ActiveProgram,
+  grade: Grade,
+  rules?: CourseGradeRules,
+): boolean {
+  const override = rules?.[program.id]
+  // An empty list is a saved answer ("offered to nobody") and is truthy — do
+  // NOT rewrite this as `override?.length ? … : default`, which would silently
+  // hand such a program back to the default ladder.
+  if (override) return override.includes(grade)
+  const level = GRADE_TO_LEVEL[grade]
+  // A srednja škola grade matches no SLR level — nothing in the public
+  // catalog is right for them.
+  return level !== null && program.level === level
+}
+
+/**
  * The open programs relevant to the current Step-3 selection — the exact set
  * whose groups render in the "Željeni termin" dropdown.
  *
  * - Radionica flow (`preselectedCourseId` set): only that one course.
  * - Standard flow: radionice are excluded (they enrol via their own URL); once
- *   a grade is chosen, narrow to that grade's SLR level. With no grade yet,
- *   every standard program qualifies (the dropdown is still disabled upstream).
+ *   a grade is chosen, narrow to the programs offered to that grade. With no
+ *   grade yet, every standard program qualifies (the dropdown is still disabled
+ *   upstream).
+ *
+ * `rules` are the admin's per-program razred overrides for the selected city.
+ * More than one program may answer to a grade — the dropdown renders each under
+ * its own optgroup, so a city offering 8. razred both SLR 3 and SLR 4 works.
  */
 export function programsForSelection(
   programs: ActiveProgram[],
   grade: Grade | '' | undefined,
   preselectedCourseId?: string,
+  rules?: CourseGradeRules,
 ): ActiveProgram[] {
   if (preselectedCourseId) return programs.filter((p) => p.id === preselectedCourseId)
   return programs.filter((p) => {
@@ -47,11 +127,7 @@ export function programsForSelection(
     // the grade-driven catalog.
     if (!hasDatedModules(p.kind)) return false
     if (!grade) return true
-    const level = GRADE_TO_LEVEL[grade]
-    // A srednja škola grade matches no SLR level — nothing in the public
-    // catalog is right for them.
-    if (!level) return false
-    return p.level === level
+    return programAcceptsGrade(p, grade, rules)
   })
 }
 
@@ -72,8 +148,9 @@ export function isTerminRequired(
   programs: ActiveProgram[],
   grade: Grade | '' | undefined,
   preselectedCourseId?: string,
+  rules?: CourseGradeRules,
 ): boolean {
   const selectionChosen = !!preselectedCourseId || !!grade
   if (!selectionChosen) return false
-  return hasOpenTermin(programsForSelection(programs, grade, preselectedCourseId))
+  return hasOpenTermin(programsForSelection(programs, grade, preselectedCourseId, rules))
 }

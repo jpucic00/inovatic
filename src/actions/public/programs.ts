@@ -7,6 +7,8 @@ import { computeGroupCapacity } from '@/lib/group-capacity'
 import { hasDatedModules, isRadionica } from '@/lib/program-kind'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { isRadionicaOpenForSignup } from '@/lib/session-dates'
+import type { CourseGradeRules } from '@/lib/inquiry-availability'
+import type { Grade } from '@/lib/inquiry-status'
 
 export type ActiveGroup = {
   id: string
@@ -247,6 +249,53 @@ export async function getSignupProgram(
   if (!slug) return null
   const programs = await loadPrograms(city, { slug })
   return programs[0] ?? null
+}
+
+/**
+ * This city's saved razred→program overrides, keyed by course id — what
+ * `programsForSelection` and `isTerminRequired` narrow with.
+ *
+ * A program absent from the result follows the built-in ladder in
+ * `inquiry-availability.ts`, so an untouched city (Split) behaves exactly as it
+ * did before this table existed.
+ *
+ * Each program's rule is read for the year its OWN open window names, not for
+ * `computeSchoolYear()`: upisi for the next school year open during the summer,
+ * while today's date still names the year that is ending, so "today's year"
+ * would quietly ignore the setup the admin did under the year they are actually
+ * enrolling for. Same open-window set `loadPrograms` gates groups on, so a rule
+ * and the termini it narrows always belong to one school year.
+ *
+ * Deliberately a separate query rather than part of the feed: `loadPrograms` is
+ * shared by three surfaces that all bypass the razred rule, and only `/prijava`
+ * needs this.
+ */
+export async function getCourseGradeRules(city: City): Promise<CourseGradeRules> {
+  const now = new Date()
+  const openWindows = await db.courseEnrollmentWindow.findMany({
+    where: { city, enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
+    select: { courseId: true, schoolYear: true },
+    // A program may have this year's and next year's windows open at once. Take
+    // the earlier one's rule: that is the enrollment already under way.
+    orderBy: { schoolYear: 'asc' },
+  })
+  if (openWindows.length === 0) return {}
+
+  const rows = await db.courseGradeRule.findMany({
+    where: {
+      city,
+      OR: openWindows.map((w) => ({ courseId: w.courseId, schoolYear: w.schoolYear })),
+    },
+    select: { courseId: true, schoolYear: true, grades: true },
+  })
+
+  const byCourse = new Map<string, Grade[]>()
+  for (const w of openWindows) {
+    if (byCourse.has(w.courseId)) continue
+    const row = rows.find((r) => r.courseId === w.courseId && r.schoolYear === w.schoolYear)
+    if (row) byCourse.set(w.courseId, row.grades as Grade[])
+  }
+  return Object.fromEntries(byCourse)
 }
 
 /**

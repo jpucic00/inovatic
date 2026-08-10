@@ -10,6 +10,7 @@ import bcrypt from 'bcryptjs'
 import {
   type Attendance,
   type City,
+  type CourseLevel,
   type CourseModule,
   type Enrollment,
   type Inquiry,
@@ -118,6 +119,8 @@ type CreateCourseOverrides = {
   slug?: string
   description?: string
   kind?: ProgramKind
+  /** Rung on the SLR ladder — what the default razred rule matches on. */
+  level?: CourseLevel | null
   schoolYear?: string | null
   ageMin?: number
   ageMax?: number
@@ -148,6 +151,7 @@ export async function createCourse(overrides: CreateCourseOverrides = {}) {
       ageMax: overrides.ageMax ?? 14,
       price: overrides.price ?? null,
       kind: overrides.kind ?? 'STANDARD',
+      level: overrides.level ?? null,
       // Legacy mirror of `kind` — kept in sync exactly as createCourse does.
       isCustom: (overrides.kind ?? 'STANDARD') === 'RADIONICA',
       schoolYear: overrides.schoolYear ?? null,
@@ -332,6 +336,21 @@ export async function createEnrollmentWindow(
       city: overrides.city ?? 'SPLIT',
       enrollmentStart: overrides.enrollmentStart ?? null,
       enrollmentEnd: overrides.enrollmentEnd ?? null,
+    },
+  })
+}
+
+export async function createCourseGradeRule(
+  courseId: string,
+  grades: string[],
+  overrides: Partial<{ schoolYear: string; city: City }> = {},
+) {
+  return db.courseGradeRule.create({
+    data: {
+      courseId,
+      grades,
+      schoolYear: overrides.schoolYear ?? '2026/2027',
+      city: overrides.city ?? 'SPLIT',
     },
   })
 }

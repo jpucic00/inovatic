@@ -73,6 +73,12 @@ export const GRADE_VALUES = [
 ] as const
 
 export type Grade = (typeof GRADE_VALUES)[number]
+/**
+ * The osnovna škola grades — the only ones the razred→program rule deals in.
+ * Srednja škola exists for the competitive program, which is never narrowed by
+ * razred, so a `CourseGradeRule` can never hold one.
+ */
+export type ElementaryGrade = (typeof ELEMENTARY_GRADE_VALUES)[number]
 type HighSchoolGrade = (typeof HIGH_SCHOOL_GRADE_VALUES)[number]
 
 /** True for the four srednja škola grades — offered only on the competition form. */

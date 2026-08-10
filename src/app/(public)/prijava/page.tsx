@@ -4,7 +4,12 @@ import type { City } from '@prisma/client'
 import { CheckCircle } from 'lucide-react'
 import { InquiryForm } from '@/components/public/inquiry-form'
 import { SignupContactBox } from '@/components/public/signup-contact-box'
-import { getActivePrograms, type ActiveProgram } from '@/actions/public/programs'
+import {
+  getActivePrograms,
+  getCourseGradeRules,
+  type ActiveProgram,
+} from '@/actions/public/programs'
+import type { CourseGradeRules } from '@/lib/inquiry-availability'
 import { CITY_VALUES } from '@/lib/city'
 
 export const dynamic = 'force-dynamic'
@@ -45,11 +50,21 @@ const stepStyles = [
 
 export default async function InquiryPage() {
   // Render every city's programs up front so the Step-1 city dropdown filters
-  // client-side with no post-selection loading state.
+  // client-side with no post-selection loading state. The razred rules ride
+  // along per city for the same reason — each city narrows razred→program on
+  // its own configuration.
   const entries = await Promise.all(
-    CITY_VALUES.map(async (c) => [c, await getActivePrograms(c)] as const),
+    CITY_VALUES.map(
+      async (c) =>
+        [c, await getActivePrograms(c), await getCourseGradeRules(c)] as const,
+    ),
   )
-  const programsByCity = Object.fromEntries(entries) as Partial<Record<City, ActiveProgram[]>>
+  const programsByCity = Object.fromEntries(
+    entries.map(([c, programs]) => [c, programs]),
+  ) as Partial<Record<City, ActiveProgram[]>>
+  const gradeRulesByCity = Object.fromEntries(
+    entries.map(([c, , rules]) => [c, rules]),
+  ) as Partial<Record<City, CourseGradeRules>>
   return (
     <>
       <section className="relative bg-gradient-to-br from-cyan-50 via-white to-blue-50 py-12 px-4 overflow-hidden">
@@ -110,7 +125,10 @@ export default async function InquiryPage() {
             {/* Form */}
             <div className="lg:col-span-3 order-2 lg:order-none">
               <div className="bg-white rounded-2xl border border-cyan-100 ring-1 ring-cyan-50 shadow-sm p-7">
-                <InquiryForm programsByCity={programsByCity} />
+                <InquiryForm
+                  programsByCity={programsByCity}
+                  gradeRulesByCity={gradeRulesByCity}
+                />
               </div>
             </div>
 

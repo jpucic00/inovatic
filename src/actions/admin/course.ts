@@ -47,6 +47,13 @@ export async function getCourses() {
       // year over year — count only this city's, this year's, so the badge
       // matches the `/admin/grupe` list it links to.
       _count: { select: { scheduledGroups: { where: { city, schoolYear: year } } } },
+      // This city's razred rule for the selected year — absent means the
+      // program still follows the default ladder. Drives the per-row "Razredi"
+      // line and the "razred bez programa" warning on /admin/programi.
+      gradeRules: {
+        where: { schoolYear: year, city },
+        select: { grades: true },
+      },
       modules: {
         orderBy: { sortOrder: 'asc' },
         select: {

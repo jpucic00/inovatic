@@ -7,6 +7,8 @@ import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { isArchivedYear } from '@/lib/school-year'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
 import { publicSignupPath } from '@/lib/signup-links'
+import { effectiveGrades, uncoveredGrades } from '@/lib/inquiry-availability'
+import { GRADE_LABELS, type ElementaryGrade } from '@/lib/inquiry-status'
 import { croatianPlural } from '@/lib/format'
 import { CourseTable } from '@/components/admin/courses/course-table'
 import { CourseFormDialog } from '@/components/admin/courses/course-form-dialog'
@@ -17,6 +19,11 @@ export const metadata: Metadata = { title: 'Admin – Programi' }
 
 type ProgramCourse = Awaited<ReturnType<typeof getCourses>>[number]
 
+/** Compact razred list for a program row: "5., 6., 7., 8." or "Predškolci". */
+function shortGrades(grades: readonly ElementaryGrade[]): string {
+  return grades.map((g) => (g === 'predskolci' ? 'Predškolci' : `${g}.`)).join(', ')
+}
+
 /**
  * One program row. Every program carries a copy button for its own signup link
  * (`/prijava/<slug>`) — the link that shows only this program's termini and
@@ -26,7 +33,13 @@ type ProgramCourse = Awaited<ReturnType<typeof getCourses>>[number]
 function ProgramRow({
   course,
   icon,
-}: Readonly<{ course: ProgramCourse; icon: React.ReactNode }>) {
+  grades,
+}: Readonly<{
+  course: ProgramCourse
+  icon: React.ReactNode
+  /** Razredi this program is offered to — omitted for kinds the rule ignores. */
+  grades?: readonly ElementaryGrade[]
+}>) {
   const groupCount = course._count.scheduledGroups
   return (
     <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-lg p-5 hover:border-cyan-400 hover:shadow-sm transition group">
@@ -43,6 +56,14 @@ function ProgramRow({
             {course.modules.length}{' '}
             {isCompetition(course.kind) ? 'natjecanja' : 'modula'}
           </span>
+          {grades && (
+            <>
+              <span className="text-gray-300">|</span>
+              <span className={grades.length === 0 ? 'text-amber-600' : undefined}>
+                {grades.length > 0 ? `Razredi: ${shortGrades(grades)}` : 'Bez razreda'}
+              </span>
+            </>
+          )}
         </div>
       </Link>
       <CopyLinkButton path={publicSignupPath(course.kind, course.slug)} />
@@ -74,6 +95,14 @@ export default async function CoursesPage() {
   const competition = courses.filter((c) => isCompetition(c.kind))
   const custom = courses.filter((c) => isRadionica(c.kind))
 
+  // Which razredi each standard program is offered to this year, in this city.
+  // Computed once so the per-row line and the stranded-razred warning below can
+  // never disagree.
+  const gradesByCourse = new Map(
+    standard.map((c) => [c.id, effectiveGrades(c.level, c.gradeRules[0]?.grades)]),
+  )
+  const stranded = uncoveredGrades([...gradesByCourse.values()])
+
   return (
     <div>
       <div className="mb-8">
@@ -92,12 +121,20 @@ export default async function CoursesPage() {
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Standardni programi (SLR 1–4)
           </h2>
+          {stranded.length > 0 && (
+            <p className="mb-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Razredi bez programa:{' '}
+              <strong>{stranded.map((g) => GRADE_LABELS[g]).join(', ')}</strong>. Djeca tih
+              razreda na prijavnici neće vidjeti nijedan termin — dodijelite ih programu.
+            </p>
+          )}
           <div className="space-y-3">
             {standard.map((course) => (
               <ProgramRow
                 key={course.id}
                 course={course}
                 icon={<BookOpen className="w-6 h-6 text-cyan-600 shrink-0" />}
+                grades={gradesByCourse.get(course.id) ?? []}
               />
             ))}
           </div>

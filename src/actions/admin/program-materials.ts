@@ -7,6 +7,8 @@ import { requireAdminCtx } from '@/lib/auth-guard'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import type { StaffMaterialRow } from '@/components/material/staff-material-list'
 import { publicSignupPath } from '@/lib/signup-links'
+import { defaultGradesForLevel } from '@/lib/inquiry-availability'
+import type { ElementaryGrade } from '@/lib/inquiry-status'
 
 type ProgramModuleSection = {
   module: { id: string; title: string }
@@ -47,6 +49,11 @@ type ProgramDetail = {
   }
   /** Selected-year season bounds — COMPETITION only, null elsewhere. */
   season: { startDate: Date | null; endDate: Date | null }
+  /**
+   * Selected-year razred rule for this city. `grades: null` = no override
+   * saved, so the program follows `defaults` (the built-in ladder).
+   */
+  gradeRule: { grades: ElementaryGrade[] | null; defaults: ElementaryGrade[] }
   selectedYear: string
   /** Module date rows for ModuleDatesTable (standard programs only). */
   moduleDates: ProgramModuleDate[]
@@ -90,6 +97,10 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       seasons: {
         where: { schoolYear: year, city },
         select: { startDate: true, endDate: true },
+      },
+      gradeRules: {
+        where: { schoolYear: year, city },
+        select: { grades: true },
       },
       modules: {
         orderBy: { sortOrder: 'asc' },
@@ -187,6 +198,12 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
     season: {
       startDate: course.seasons[0]?.startDate ?? null,
       endDate: course.seasons[0]?.endDate ?? null,
+    },
+    gradeRule: {
+      // No row means the program still follows the default ladder — the editor
+      // shows `defaults` in that case, so the two must stay distinguishable.
+      grades: (course.gradeRules[0]?.grades as ElementaryGrade[] | undefined) ?? null,
+      defaults: defaultGradesForLevel(course.level),
     },
     selectedYear: year,
     moduleDates,

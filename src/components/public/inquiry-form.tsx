@@ -8,7 +8,7 @@ import { CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
 import { submitInquiry } from '@/actions/inquiry'
 import { trackUmamiEvent } from '@/lib/umami'
-import { isTerminRequired } from '@/lib/inquiry-availability'
+import { isTerminRequired, type CourseGradeRules } from '@/lib/inquiry-availability'
 import {
   INQUIRY_NEXT_STEP_TEXT,
   inquiryNextStep,
@@ -42,6 +42,12 @@ interface InquiryFormProps {
    * the workshop's city. Missing keys resolve to an empty list.
    */
   programsByCity: Partial<Record<City, ActiveProgram[]>>
+  /**
+   * Per-city razred→program overrides. Only `/prijava` supplies them: every
+   * other surface passes `preselectedCourseId`, which bypasses the razred rule
+   * entirely.
+   */
+  gradeRulesByCity?: Partial<Record<City, CourseGradeRules>>
   preselectedCourseId?: string
   /** Fixed city for the radionica flow — hides the Step-1 city dropdown. */
   preselectedCity?: City
@@ -54,6 +60,7 @@ interface InquiryFormProps {
 
 export function InquiryForm({
   programsByCity,
+  gradeRulesByCity,
   preselectedCourseId,
   preselectedCity,
   gradeOptions,
@@ -70,6 +77,13 @@ export function InquiryForm({
   // ever touches the currently-selected city's entry, so a stale count for one
   // city can never leak into the other.
   const [liveByCity, setLiveByCity] = useState<Partial<Record<City, ActiveProgram[]>>>({})
+  // Razred rules refreshed by the server on a TERMIN_REQUIRED refusal. Admin
+  // config changes far too rarely to poll for, but if it changes while this
+  // form is open the server's answer would otherwise demand a termin the
+  // dropdown has already filtered away — with no way out but a reload.
+  const [liveRulesByCity, setLiveRulesByCity] = useState<
+    Partial<Record<City, CourseGradeRules>>
+  >({})
 
   const {
     register,
@@ -96,12 +110,20 @@ export function InquiryForm({
   const activePrograms: ActiveProgram[] = selectedCity
     ? (liveByCity[selectedCity] ?? programsByCity[selectedCity] ?? [])
     : []
+  const gradeRules: CourseGradeRules | undefined = selectedCity
+    ? (liveRulesByCity[selectedCity] ?? gradeRulesByCity?.[selectedCity])
+    : undefined
 
   // Termin becomes mandatory once the chosen grade (or preselected radionica)
   // still has a bookable, non-full group — kept in sync with Step 3's own view
   // via the shared helper so the required affordance and this guard never drift.
   const watchedGrade = watch('grade')
-  const terminRequired = isTerminRequired(activePrograms, watchedGrade, preselectedCourseId)
+  const terminRequired = isTerminRequired(
+    activePrograms,
+    watchedGrade,
+    preselectedCourseId,
+    gradeRules,
+  )
 
   // Poll availability for the selected city while on Step 3. On a per-program
   // signup link the poll must ask for THAT program — the default feed is the
@@ -192,6 +214,10 @@ export function InquiryForm({
         // against the true state.
         setLiveByCity((m) => ({ ...m, [data.city]: result.programs }))
         if (result.code === 'TERMIN_REQUIRED') {
+          // Adopt the server's razred rules too — they are what it decided
+          // "required" against, so without them the dropdown could keep hiding
+          // the very program the error is asking the parent to pick from.
+          setLiveRulesByCity((m) => ({ ...m, [data.city]: result.gradeRules }))
           setError('scheduledGroupId', { type: 'manual', message: result.error })
         }
         setServerError(result.error)
@@ -268,7 +294,7 @@ export function InquiryForm({
         {step === 1 && <InquiryStep1 register={register} errors={errors} showCity={!preselectedCity} />}
         {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} getValues={getValues} />}
         {step === 3 && (
-          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} clearErrors={clearErrors} programs={activePrograms} preselectedCourseId={preselectedCourseId} gradeOptions={gradeOptions} terminRequired={terminRequired} />
+          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} clearErrors={clearErrors} programs={activePrograms} gradeRules={gradeRules} preselectedCourseId={preselectedCourseId} gradeOptions={gradeOptions} terminRequired={terminRequired} />
         )}
 
         {serverError && (

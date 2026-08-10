@@ -202,6 +202,7 @@ model Course {
   materials         Material[]
   enrollmentWindows CourseEnrollmentWindow[]
   seasons           CourseSeason[]
+  gradeRules        CourseGradeRule[]
 
   recommendedInAssessments StudentAssessment[]
   emailCampaignsAsTarget   EmailCampaign[]     @relation("EmailCampaignTarget")
@@ -226,6 +227,35 @@ model CourseEnrollmentWindow {
 
   @@unique([courseId, schoolYear, city])
   @@index([schoolYear])
+}
+
+/// Which razredi a STANDARD program is offered to on the public signup form —
+/// the editable override of the built-in grade→program ladder in
+/// `src/lib/inquiry-availability.ts`. Per (course, schoolYear, city) like
+/// CourseEnrollmentWindow and CourseSeason: Šibenik's first year runs SLR 1–3
+/// only, so 7. and 8. razred are pointed at SLR 3 there while Split keeps the
+/// default.
+///
+/// An ABSENT row means "use the built-in default for this program's level".
+/// A row with an EMPTY `grades` array is the explicit "offered to nobody" —
+/// that distinction is what the whole model turns on, so never collapse [] to
+/// unset. Overlap between programs is allowed and meaningful: two programs may
+/// both claim 8. razred, and the termin dropdown then offers both.
+model CourseGradeRule {
+  id         String   @id @default(cuid())
+  courseId   String
+  schoolYear String
+  city       City
+  /// Values from ELEMENTARY_GRADE_VALUES ('predskolci', '1'…'8') — the same
+  /// strings Inquiry.childGrade stores.
+  grades     String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, schoolYear, city])
+  @@index([schoolYear, city])
 }
 
 /// How long a COMPETITION program runs in one school year. Standard programs
