@@ -20,7 +20,7 @@ import {
 import { programsForSelection, type CourseGradeRules } from '@/lib/inquiry-availability'
 import { formatGroupSchedule } from '@/lib/format'
 import { FieldError } from './FieldError'
-import { hasModules, isCompetition, isRadionica } from '@/lib/program-kind'
+import { isCompetition, isRadionica } from '@/lib/program-kind'
 import type { ProgramKind } from '@prisma/client'
 
 interface Props {
@@ -195,8 +195,11 @@ export function InquiryStep3({
                 </option>
               ))
             }
+            // Program title only: the razred→program rule is editable per city,
+            // so a program's own age range no longer describes who it is
+            // offered to, and printing it here contradicted the dropdown.
             return (
-              <optgroup key={p.id} label={hasModules(p.kind) ? `${p.title} (${p.ageMin}–${p.ageMax} god.)` : p.title}>
+              <optgroup key={p.id} label={p.title}>
                 {p.groups.map((g) => (
                   <option key={g.id} value={g.isFull ? '' : `${p.id}|${g.id}`} disabled={g.isFull}>
                     {formatGroupLabel(g, p.kind)}

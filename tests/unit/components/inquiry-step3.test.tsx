@@ -145,6 +145,19 @@ describe('InquiryStep3 — group dropdown scoping', () => {
     expect(screen.queryByRole('option', { name: /Termin Alpha/ })).not.toBeInTheDocument()
   })
 
+  it('labels each optgroup with the program title alone, no age range', () => {
+    // The razred→program rule is editable per city, so a program's own
+    // ageMin/ageMax no longer describes who it is offered to — printing it
+    // beside the termini contradicted the dropdown the parent was reading.
+    render(<Harness programs={[standardC]} />)
+    fireEvent.change(screen.getByLabelText(/Razred djeteta/), {
+      target: { value: '1' },
+    })
+
+    expect(screen.getByRole('group', { name: 'Program course-c' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Željeni termin/).innerHTML).not.toMatch(/god\./)
+  })
+
   it('radionica preselect flow still shows the grade dropdown (info only)', () => {
     render(
       <Harness
