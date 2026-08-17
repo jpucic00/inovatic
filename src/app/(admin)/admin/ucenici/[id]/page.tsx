@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { getStudent } from '@/actions/admin/student'
 import { getCourses } from '@/actions/admin/course'
 import { getStudentAttendance } from '@/actions/admin/attendance'
+import { setEnrollmentContractSigned } from '@/actions/admin/payment'
 import { createComment, deleteComment } from '@/actions/admin/student-comment'
 import {
   clearAssessment,
@@ -55,6 +56,7 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
       onDeleteComment={deleteComment}
       onSaveAssessment={upsertAssessment}
       onClearAssessment={clearAssessment}
+      onSetContractSigned={setEnrollmentContractSigned}
     />
   )
 }

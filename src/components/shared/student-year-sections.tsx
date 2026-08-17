@@ -15,6 +15,7 @@ import { DeleteEnrollmentButton } from '@/components/admin/students/delete-enrol
 import { AddEnrollmentDialog } from '@/components/admin/students/add-enrollment-dialog'
 import { ManageEnrollmentModules } from '@/components/admin/students/manage-enrollment-modules'
 import { EnrollmentPaymentPanel } from '@/components/admin/students/enrollment-payment-panel'
+import { EnrollmentContractToggle } from '@/components/shared/enrollment-contract-toggle'
 import { formatDate } from '@/lib/format'
 
 type StudentEnrollments = StudentDetail['enrollments']
@@ -36,6 +37,11 @@ type ClearAssessmentAction = (input: {
   groupId: string
 }) => Promise<AdminActionResult>
 
+type SetContractSignedAction = (
+  enrollmentId: string,
+  signed: boolean,
+) => Promise<AdminActionResult>
+
 interface Props {
   studentId: string
   /** Server-computed UTC month start (ms) — the monthly-fee owed/future boundary. */
@@ -55,6 +61,8 @@ interface Props {
   onDeleteComment: DeleteCommentAction
   onSaveAssessment: SaveAssessmentAction
   onClearAssessment: ClearAssessmentAction
+  /** Admin or teacher variant — unlike the paid marks, both roles may set this. */
+  onSetContractSigned: SetContractSignedAction
 }
 
 /**
@@ -79,6 +87,7 @@ export function StudentYearSections({
   onDeleteComment,
   onSaveAssessment,
   onClearAssessment,
+  onSetContractSigned,
 }: Readonly<Props>) {
   const years = useMemo(() => {
     const set = new Set<string>([defaultYear])
@@ -199,6 +208,14 @@ export function StudentYearSections({
                       available={availableModules}
                     />
                   )}
+                  {/* Both roles: teachers collect the signed contracts at the
+                      group, so this is the one enrollment mark that is not
+                      gated on isAdmin. */}
+                  <EnrollmentContractToggle
+                    enrollmentId={enrollment.id}
+                    contractSignedAt={enrollment.contractSignedAt}
+                    onSetContractSigned={onSetContractSigned}
+                  />
                   {isAdmin && (
                     <EnrollmentPaymentPanel
                       enrollmentId={enrollment.id}

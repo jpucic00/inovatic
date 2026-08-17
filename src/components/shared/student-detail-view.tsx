@@ -46,6 +46,11 @@ type ClearAssessmentAction = (input: {
   groupId: string
 }) => Promise<AdminActionResult>
 
+type SetContractSignedAction = (
+  enrollmentId: string,
+  signed: boolean,
+) => Promise<AdminActionResult>
+
 interface Props {
   viewerRole: 'ADMIN' | 'TEACHER'
   student: StudentWithRelations
@@ -69,6 +74,8 @@ interface Props {
   onDeleteComment: DeleteCommentAction
   onSaveAssessment: SaveAssessmentAction
   onClearAssessment: ClearAssessmentAction
+  /** Admin or teacher variant — unlike the paid marks, both roles may set this. */
+  onSetContractSigned: SetContractSignedAction
 }
 
 function DetailRow({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
@@ -96,6 +103,7 @@ export function StudentDetailView({
   onDeleteComment,
   onSaveAssessment,
   onClearAssessment,
+  onSetContractSigned,
 }: Readonly<Props>) {
   const isAdmin = viewerRole === 'ADMIN'
   const fullName = `${student.firstName} ${student.lastName}`
@@ -258,6 +266,7 @@ export function StudentDetailView({
         onDeleteComment={onDeleteComment}
         onSaveAssessment={onSaveAssessment}
         onClearAssessment={onClearAssessment}
+        onSetContractSigned={onSetContractSigned}
       />
 
       {/* Danger zone — admin only */}

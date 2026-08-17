@@ -15,9 +15,12 @@ import { buildStudentDetailForAdmin, buildStudentDetailForTeacher } from '@/lib/
 // - passwordHash is NEVER selected (neither variant),
 // - plainPassword IS retained (kids' passwords are shown to teachers by design),
 // - payment fields (Enrollment.fullYearPaidAt, ModuleEnrollment.paidAt) appear
-//   ONLY in the admin variant; the teacher variant hard-nulls them.
+//   ONLY in the admin variant; the teacher variant hard-nulls them,
+// - contractSignedAt is the deliberate EXCEPTION to that scrub: teachers collect
+//   the signed contracts at the group, so both variants carry the real value.
 const YEAR_PAID_AT = new Date('2026-09-01T00:00:00.000Z')
 const MODULE_PAID_AT = new Date('2026-09-15T00:00:00.000Z')
+const CONTRACT_SIGNED_AT = new Date('2026-08-20T00:00:00.000Z')
 
 async function seedPaidStudent() {
   const student = await createStudent()
@@ -27,6 +30,10 @@ async function seedPaidStudent() {
   const schedule = await createModuleSchedule(mod.id)
   const group = await createGroup({ courseId: course.id })
   const enrollment = await createEnrollment(student.id, group.id, { fullYearPaidAt: YEAR_PAID_AT })
+  await db.enrollment.update({
+    where: { id: enrollment.id },
+    data: { contractSignedAt: CONTRACT_SIGNED_AT },
+  })
   await createModuleEnrollment(enrollment.id, schedule.id, { paidAt: MODULE_PAID_AT })
   return student.id
 }
@@ -49,6 +56,14 @@ describe('student-detail payload scope (P4)', () => {
     }
   })
 
+  it('teacher payload KEEPS contractSignedAt — the one mark the scrub excludes', async () => {
+    const studentId = await seedPaidStudent()
+
+    const detail = await buildStudentDetailForTeacher(studentId)
+
+    expect(detail!.enrollments[0]?.contractSignedAt).toEqual(CONTRACT_SIGNED_AT)
+  })
+
   it('admin payload retains the real payment fields', async () => {
     const studentId = await seedPaidStudent()
 
@@ -57,6 +72,7 @@ describe('student-detail payload scope (P4)', () => {
     expect(detail).not.toBeNull()
     const enr = detail!.enrollments[0]
     expect(enr?.fullYearPaidAt).toEqual(YEAR_PAID_AT)
+    expect(enr?.contractSignedAt).toEqual(CONTRACT_SIGNED_AT)
     expect(enr?.moduleEnrollments[0]?.paidAt).toEqual(MODULE_PAID_AT)
     // passwordHash is omitted from the admin payload too.
     expect(detail !== null && 'passwordHash' in detail).toBe(false)

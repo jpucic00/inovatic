@@ -14,6 +14,7 @@ import {
   clearTeacherAssessment,
   upsertTeacherAssessment,
 } from '@/actions/teacher/student-assessment'
+import { setEnrollmentContractSignedByTeacher } from '@/actions/teacher/contract'
 import { computeSchoolYear } from '@/lib/school-year'
 import { getRecommendationOptions } from '@/lib/student-detail'
 import { buildGradebookTabs } from '@/lib/student-assessment-view'
@@ -72,6 +73,7 @@ export default async function TeacherStudentDetailPage({
       onDeleteComment={deleteTeacherComment}
       onSaveAssessment={upsertTeacherAssessment}
       onClearAssessment={clearTeacherAssessment}
+      onSetContractSigned={setEnrollmentContractSignedByTeacher}
     />
   )
 }

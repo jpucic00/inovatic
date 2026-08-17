@@ -55,6 +55,7 @@ function renderView(props: Partial<ComponentProps<typeof StudentDetailView>> = {
       onDeleteComment={vi.fn()}
       onSaveAssessment={vi.fn()}
       onClearAssessment={vi.fn()}
+      onSetContractSigned={vi.fn()}
       {...props}
     />,
   )

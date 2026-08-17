@@ -54,6 +54,12 @@ vi.mock('@/components/admin/students/enrollment-payment-panel', () => ({
   ),
 }))
 
+vi.mock('@/components/shared/enrollment-contract-toggle', () => ({
+  EnrollmentContractToggle: ({ enrollmentId }: Readonly<{ enrollmentId: string }>) => (
+    <div data-testid={`contract-toggle-${enrollmentId}`} />
+  ),
+}))
+
 type StudentEnrollments = NonNullable<
   Awaited<ReturnType<typeof getStudent>>
 >['enrollments']
@@ -164,6 +170,7 @@ function renderSections(
       onDeleteComment={noopAction}
       onSaveAssessment={noopAction}
       onClearAssessment={noopAction}
+      onSetContractSigned={noopAction}
       {...overrides}
     />,
   )
@@ -282,6 +289,7 @@ describe('StudentYearSections — admin vs teacher affordances', () => {
     expect(screen.getByTestId('payment-panel-e1')).toBeInTheDocument()
     // Admin gets the editable module manager, not the read-only list.
     expect(screen.queryByText('Upisani moduli')).not.toBeInTheDocument()
+    expect(screen.getByTestId('contract-toggle-e1')).toBeInTheDocument()
   })
 
   it('teacher mode is read-only: no dialog, no hint, no delete/manage — just the module list', () => {
@@ -297,5 +305,8 @@ describe('StudentYearSections — admin vs teacher affordances', () => {
     expect(screen.queryByTestId('payment-panel-e1')).not.toBeInTheDocument()
     expect(screen.getByText('Upisani moduli')).toBeInTheDocument()
     expect(screen.getByText('• Osnove robotike')).toBeInTheDocument()
+    // ...but the contract toggle IS theirs — the deliberate exception to the
+    // otherwise admin-only enrollment marks.
+    expect(screen.getByTestId('contract-toggle-e1')).toBeInTheDocument()
   })
 })

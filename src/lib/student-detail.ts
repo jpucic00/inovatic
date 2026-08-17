@@ -85,6 +85,9 @@ const baseEnrollmentSelect = {
   id: true,
   schoolYear: true,
   createdAt: true,
+  // Shared, NOT admin-only — deliberately unlike every paid mark below. Teachers
+  // collect the signed contracts at the group, so they both see and set this one.
+  contractSignedAt: true,
   scheduledGroup: {
     select: {
       id: true,

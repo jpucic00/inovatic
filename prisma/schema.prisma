@@ -482,6 +482,18 @@ model Enrollment {
   // enrollment including ones added later; for radionice (course.isCustom,
   // no modules) it doubles as the single paid mark. Null = not paid.
   fullYearPaidAt   DateTime?
+  // "Ugovor potpisan" — the family has actually signed for THIS group and year.
+  // Deliberately separate from the account existing: since 2026-08-17 an account
+  // and enrollment are created as soon as an inquiry is accepted, so the child is
+  // visible in the group and on the probni-sat roster before anyone has committed
+  // to anything. This column plus the paid marks are what "actually signed up"
+  // means. Null = not signed.
+  //
+  // Unlike every paid mark, this one is visible to (and settable by) a TEACHER
+  // for their own groups — teachers collect the signed contracts at the group.
+  // The payment scrub in `buildStudentDetailForTeacher` therefore does NOT
+  // cover it; it lives in the shared `baseEnrollmentSelect`.
+  contractSignedAt DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

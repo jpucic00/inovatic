@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import {
   setModulePaidSchema,
+  setEnrollmentContractSignedSchema,
   setEnrollmentMonthPaidSchema,
   setEnrollmentYearPaidSchema,
 } from '@/lib/validators/admin/payment'
@@ -112,4 +113,61 @@ export async function setEnrollmentYearPaid(
     revalidatePath('/admin/ucenici')
     return { success: true }
   })
+}
+
+/**
+ * Mark this enrollment's contract signed or unsigned. Same per-enrollment grain
+ * and same city guard as the paid marks above — a cross-city row answers exactly
+ * like a missing one.
+ *
+ * The teacher twin lives in `src/actions/teacher/contract.ts`: teachers collect
+ * signed contracts at the group, so unlike every paid mark this one is not
+ * admin-only. Both write the same column; the guard is the only difference.
+ */
+export async function setEnrollmentContractSigned(
+  enrollmentId: string,
+  signed: boolean,
+): Promise<AdminActionResult> {
+  return adminAction(
+    setEnrollmentContractSignedSchema,
+    { enrollmentId, signed },
+    async (d, { city }) => {
+      const row = await db.enrollment.findUnique({
+        where: { id: d.enrollmentId },
+        select: { userId: true, scheduledGroup: { select: { city: true } } },
+      })
+      if (row?.scheduledGroup.city !== city) {
+        return { success: false, error: 'Upis nije pronađen.' }
+      }
+
+      return writeContractSigned(d.enrollmentId, row.userId, signed)
+    },
+  )
+}
+
+/**
+ * The shared write behind both the admin and the teacher action. Kept here (and
+ * exported) rather than duplicated so the column, the error copy and the
+ * revalidation set can never drift between the two callers — only the guard in
+ * front of it differs.
+ */
+export async function writeContractSigned(
+  enrollmentId: string,
+  studentId: string,
+  signed: boolean,
+): Promise<AdminActionResult> {
+  try {
+    await db.enrollment.update({
+      where: { id: enrollmentId },
+      data: { contractSignedAt: signed ? new Date() : null },
+    })
+  } catch (err) {
+    console.error('writeContractSigned failed:', err)
+    return { success: false, error: 'Greška pri spremanju ugovora.' }
+  }
+
+  revalidatePath(`/admin/ucenici/${studentId}`)
+  revalidatePath('/admin/ucenici')
+  revalidatePath(`/nastavnik/ucenik/${studentId}`)
+  return { success: true }
 }
