@@ -5,7 +5,7 @@ import { Eye } from 'lucide-react'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { InquiryStatusBadge } from './inquiry-status-badge'
 import { InquiryTypeBadge } from './inquiry-type-badge'
-import { ReturningInquiryBadge } from './returning-inquiry-badge'
+import { ReturningBadge } from '@/components/admin/returning-badge'
 import { formatChildName, formatDate } from '@/lib/format'
 import { GRADE_LABELS, GRADE_SORT_KEY, type Grade } from '@/lib/inquiry-status'
 
@@ -90,7 +90,7 @@ const columns: ColumnDef<InquiryRow>[] = [
       <div className="flex flex-col items-start gap-1">
         <InquiryStatusBadge status={row.status} />
         <InquiryTypeBadge type={row.type} />
-        {row.isReturning && <ReturningInquiryBadge />}
+        {row.isReturning && <ReturningBadge />}
       </div>
     ),
   },

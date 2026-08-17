@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useTransition, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
+import { RETURNING_FILTER_LABELS } from '@/lib/returning-filter'
 
 type CourseOption = { id: string; title: string }
 type GroupOption = { id: string; name: string | null; course: { title: string } }
@@ -14,6 +15,9 @@ interface StudentFiltersProps {
   currentGroupId?: string
   currentPayment?: string
   currentYear?: string
+  currentReturning?: string
+  /** Year the ponovni-upis filter resolves against, named in its options. */
+  returningYear?: string
   courses?: CourseOption[]
   groups?: GroupOption[]
   years?: string[]
@@ -25,6 +29,8 @@ export function StudentFilters({
   currentGroupId,
   currentPayment,
   currentYear,
+  currentReturning,
+  returningYear,
   courses,
   groups,
   years,
@@ -51,10 +57,12 @@ export function StudentFilters({
       const groupId = overrides.groupId ?? currentGroupId ?? ''
       const payment = overrides.payment ?? currentPayment ?? ''
       const year = overrides.year ?? currentYear ?? ''
+      const returning = overrides.returning ?? currentReturning ?? ''
       if (courseId) sp.set('courseId', courseId)
       if (groupId) sp.set('groupId', groupId)
       if (payment) sp.set('payment', payment)
       if (year) sp.set('year', year)
+      if (returning) sp.set('returning', returning)
     }
 
     return sp.toString()
@@ -88,6 +96,12 @@ export function StudentFilters({
   const handleYearChange = (year: string) => {
     startTransition(() => {
       router.push(`${pathname}?${buildParams({ year })}`)
+    })
+  }
+
+  const handleReturningChange = (returning: string) => {
+    startTransition(() => {
+      router.push(`${pathname}?${buildParams({ returning })}`)
     })
   }
 
@@ -160,6 +174,23 @@ export function StudentFilters({
             <option value="">Plaćanje: svi</option>
             <option value="PENDING">Nije plaćeno</option>
             <option value="PAID">Plaćeno</option>
+          </select>
+
+          {/* Both options name the year, because both narrow to it: a returning
+              or first-time upis is a fact about one school year, so this filter
+              answers "who came back in <year>", not "who has ever come back". */}
+          <select
+            value={currentReturning ?? ''}
+            onChange={(e) => handleReturningChange(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Svi polaznici</option>
+            <option value="RETURNING">
+              {RETURNING_FILTER_LABELS.RETURNING} {returningYear}
+            </option>
+            <option value="NEW">
+              {RETURNING_FILTER_LABELS.NEW} {returningYear}
+            </option>
           </select>
         </div>
       )}

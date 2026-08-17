@@ -12,7 +12,7 @@ import {
 } from '@/actions/admin/inquiry'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
 import { InquiryTypeBadge } from '@/components/admin/inquiries/inquiry-type-badge'
-import { ReturningInquiryBadge } from '@/components/admin/inquiries/returning-inquiry-badge'
+import { ReturningBadge } from '@/components/admin/returning-badge'
 import { DeclineDialog } from '@/components/admin/inquiries/decline-dialog'
 import { DeleteDialog } from '@/components/admin/inquiries/delete-dialog'
 import { SendScheduleDialog } from '@/components/admin/inquiries/send-schedule-dialog'
@@ -356,7 +356,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {returningStudent && <ReturningInquiryBadge className="text-sm px-3 py-1" />}
+          {returningStudent && <ReturningBadge className="text-sm px-3 py-1" />}
           <InquiryStatusBadge status={inquiry.status} className="text-sm px-3 py-1" />
         </div>
       </div>

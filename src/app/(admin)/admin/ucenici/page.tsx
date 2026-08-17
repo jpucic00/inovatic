@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { requireAdminCtx } from '@/lib/auth-guard'
+import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { db } from '@/lib/db'
 import { getStudents } from '@/actions/admin/student'
 import { getCourses } from '@/actions/admin/course'
@@ -14,6 +15,11 @@ import {
   type ActiveFilterChip,
 } from '@/components/admin/list-filter-memory'
 import { PAYMENT_FILTER_VALUES, type PaymentFilter } from '@/lib/payment-status'
+import {
+  parseReturningFilter,
+  RETURNING_FILTER_LABELS,
+  type ReturningFilter,
+} from '@/lib/returning-filter'
 
 export const metadata: Metadata = { title: 'Admin – Učenici' }
 
@@ -35,9 +41,16 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
   const paymentStatus = PAYMENT_FILTER_VALUES.includes(params.payment as PaymentFilter)
     ? (params.payment as PaymentFilter)
     : undefined
+  const returning = parseReturningFilter(params.returning)
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1)
 
   const isModuleView = !!scheduleId
+
+  // "Ponovni upis" is a claim about one school year, and this list shows every
+  // year at once. The year the admin filtered to is the one they are looking at;
+  // with the filter off, the sidebar selection is what every other /admin
+  // surface treats as the current context, so it is the honest default here.
+  const returningYear = year || (await getSelectedSchoolYear())
 
   const groupFilter = courseId ? { courseId } : {}
   const [result, courses, groups, scheduleInfo, years] = await Promise.all([
@@ -48,6 +61,8 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
       scheduleId: scheduleId || undefined,
       schoolYear: year || undefined,
       paymentStatus,
+      returning,
+      returningYear,
       page,
       pageSize: PAGE_SIZE,
     }),
@@ -72,6 +87,8 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
     scheduleId,
     search,
     paymentStatus,
+    returning,
+    returningYear: result.returningYear,
     courses,
     groups,
     scheduleInfo,
@@ -109,6 +126,8 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
           currentGroupId: groupId,
           currentPayment: paymentStatus ?? '',
           currentYear: year,
+          currentReturning: returning ?? '',
+          returningYear: result.returningYear,
           courses: courses.map((c) => ({ id: c.id, title: c.title })),
           groups: groups.map((g) => ({
             id: g.id,
@@ -119,7 +138,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
         })}
       />
 
-      <StudentTable data={result.data} />
+      <StudentTable data={result.data} returningYear={result.returningYear} />
 
       <Pagination
         basePath="/admin/ucenici"
@@ -147,15 +166,24 @@ function buildStudentChips(args: {
   scheduleId: string
   search: string
   paymentStatus: PaymentFilter | undefined
+  returning: ReturningFilter | undefined
+  returningYear: string
   courses: ReadonlyArray<{ id: string; title: string }>
   groups: ReadonlyArray<{ id: string; name: string | null; course: { title: string } }>
   scheduleInfo: { module: { title: string; course: { title: string } } } | null
 }): ActiveFilterChip[] {
-  const { year, courseId, groupId, scheduleId, search, paymentStatus, courses, groups, scheduleInfo } =
+  const { year, courseId, groupId, scheduleId, search, paymentStatus, returning, returningYear, courses, groups, scheduleInfo } =
     args
   const selectedGroup = groups.find((g) => g.id === groupId)
   return [
     year && { key: 'year', label: `Godina: ${year}` },
+    // Names the year even when the Godina filter is off, because this filter
+    // narrows to it either way — a chip reading just "Ponovni upis" would hide
+    // the fact that the table is now showing one school year's students.
+    returning && {
+      key: 'returning',
+      label: `${RETURNING_FILTER_LABELS[returning]}: ${returningYear}`,
+    },
     courseId && {
       key: 'courseId',
       label: `Program: ${courses.find((c) => c.id === courseId)?.title ?? courseId}`,

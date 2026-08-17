@@ -6,7 +6,7 @@ import { db } from '@/lib/db'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { StatCard } from '@/components/admin/stat-card'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
-import { ReturningInquiryBadge } from '@/components/admin/inquiries/returning-inquiry-badge'
+import { ReturningBadge } from '@/components/admin/returning-badge'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
 
 export const metadata: Metadata = {
@@ -141,7 +141,7 @@ export default async function AdminDashboard() {
                           ? 'Proslava rođendana'
                           : `${inquiry.childFirstName ?? ''} ${inquiry.childLastName ?? ''}`.trim()}
                       </p>
-                      {inquiry.isReturning && <ReturningInquiryBadge />}
+                      {inquiry.isReturning && <ReturningBadge />}
                     </div>
                     <p className="text-xs text-gray-500 truncate">{inquiry.parentName}</p>
                   </div>

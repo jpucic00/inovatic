@@ -36,6 +36,11 @@ import {
   type PaymentStatus,
   type PaymentFilter,
 } from '@/lib/payment-status'
+import {
+  isReturningStudent,
+  returningStudentWhere,
+  type ReturningFilter,
+} from '@/lib/returning-filter'
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
 
@@ -97,6 +102,8 @@ export type StudentRow = {
   dateOfBirth: string | null
   createdAt: Date
   paymentStatus: PaymentStatus
+  /** Enrolled in the result's `returningYear` and in some year before it. */
+  isReturning: boolean
   enrollments: {
     id: string
     schoolYear: string
@@ -115,6 +122,15 @@ export type StudentRow = {
       moduleSchedule: { startDate: Date | null }
     }[]
   }[]
+}
+
+/**
+ * The list plus the school year its `isReturning` flags (and the "Ponovni upis"
+ * filter, when on) were resolved against — the page renders that year in the
+ * column header, so the flag can never be read against a year it does not name.
+ */
+type StudentListResult = PaginatedResult<StudentRow> & {
+  returningYear: string
 }
 
 type CreateStudentResult =
@@ -857,19 +873,38 @@ type StudentFilters = {
   scheduleId?: string
   schoolYear?: string
   paymentStatus?: PaymentFilter
+  returning?: ReturningFilter
+  /**
+   * School year the "Ponovni upis" marker is resolved against. Supplied by the
+   * page rather than read from the year cookie here: this list is deliberately
+   * NOT year-scoped, so which year the admin is *looking at* is a question the
+   * page answers (its `year` filter, else the sidebar selection) and the action
+   * should not grow a second opinion about. Falls back to the year filter, then
+   * to today's, for callers that pass nothing.
+   */
+  returningYear?: string
   page?: number
   pageSize?: number
 }
 
 export async function getStudents(
   filters: StudentFilters = {},
-): Promise<PaginatedResult<StudentRow>> {
+): Promise<StudentListResult> {
   const { city } = await requireAdminCtx()
 
-  const { search, courseId, groupId, scheduleId, schoolYear, paymentStatus, page = 1, pageSize = 20 } = filters
+  const { search, courseId, groupId, scheduleId, schoolYear, paymentStatus, returning, page = 1, pageSize = 20 } = filters
 
   const now = new Date()
   const currentYear = computeSchoolYear(now)
+
+  // Echoed back on the result: the column header names this year and the filter
+  // chip repeats it, and a badge reporting on a different year than the one it
+  // prints is the single way this feature can lie.
+  const returningYear = filters.returningYear || schoolYear || currentYear
+
+  const andClauses: Prisma.UserWhereInput[] = []
+  if (paymentStatus) andClauses.push(paymentStatusUserWhere(paymentStatus, currentYear, now))
+  if (returning) andClauses.push(returningStudentWhere(returning, returningYear))
 
   const where = {
     role: 'STUDENT' as const,
@@ -895,9 +930,10 @@ export async function getStudents(
           },
         }
       : {}),
-    // AND-wrapped so it does not collide with the `enrollments` key claimed by
-    // the course/group/schedule filter spread above.
-    ...(paymentStatus ? { AND: [paymentStatusUserWhere(paymentStatus, currentYear, now)] } : {}),
+    // AND-wrapped so they do not collide with the `enrollments` key claimed by
+    // the course/group/schedule filter spread above — nor with each other, since
+    // the payment and ponovni-upis filters both narrow on enrollments.
+    ...(andClauses.length > 0 ? { AND: andClauses } : {}),
   }
 
   const [data, total] = await Promise.all([
@@ -941,6 +977,7 @@ export async function getStudents(
   const rows: StudentRow[] = data.map((u) => ({
     ...u,
     paymentStatus: computeStudentPaymentStatus(u.enrollments, currentYear, now),
+    isReturning: isReturningStudent(u.enrollments, returningYear),
   })) as StudentRow[]
 
   return {
@@ -949,6 +986,7 @@ export async function getStudents(
     page,
     pageSize,
     pageCount: Math.ceil(total / pageSize),
+    returningYear,
   }
 }
 

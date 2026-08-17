@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GRADE_VALUES, GRADE_LABELS } from '@/lib/inquiry-status'
+import { RETURNING_FILTER_LABELS } from '@/lib/returning-filter'
 
 const STATUSES = [
   { value: 'ALL', label: 'Sve' },
@@ -20,27 +21,30 @@ interface InquiryFiltersProps {
   currentCourse: string
   currentGrade: string
   currentType: string
+  currentReturning: string
   courses: { id: string; title: string }[]
 }
 
-export function InquiryFilters({ currentStatus, currentSearch, currentCourse, currentGrade, currentType, courses }: Readonly<InquiryFiltersProps>) {
+export function InquiryFilters({ currentStatus, currentSearch, currentCourse, currentGrade, currentType, currentReturning, courses }: Readonly<InquiryFiltersProps>) {
   const router = useRouter()
   const pathname = usePathname()
   const [, startTransition] = useTransition()
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const pushUrl = (params: { status?: string; search?: string; course?: string; grade?: string; type?: string }) => {
+  const pushUrl = (params: { status?: string; search?: string; course?: string; grade?: string; type?: string; returning?: string }) => {
     const sp = new URLSearchParams()
     const s = params.status ?? currentStatus
     const q = params.search ?? currentSearch
     const c = params.course ?? currentCourse
     const g = params.grade ?? currentGrade
     const t = params.type ?? currentType
+    const r = params.returning ?? currentReturning
     if (s && s !== 'ALL') sp.set('status', s)
     if (q) sp.set('search', q)
     if (c) sp.set('course', c)
     if (g) sp.set('grade', g)
     if (t && t !== 'ALL') sp.set('type', t)
+    if (r) sp.set('returning', r)
     // Always reset to page 1 when filters change
     startTransition(() => {
       router.push(`${pathname}?${sp.toString()}`)
@@ -109,6 +113,16 @@ export function InquiryFilters({ currentStatus, currentSearch, currentCourse, cu
           {GRADE_VALUES.map((v) => (
             <option key={v} value={v}>{GRADE_LABELS[v]}</option>
           ))}
+        </select>
+
+        <select
+          value={currentReturning}
+          onChange={(e) => pushUrl({ returning: e.target.value })}
+          className="px-3 py-2 text-sm rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+        >
+          <option value="">Svi polaznici</option>
+          <option value="RETURNING">{RETURNING_FILTER_LABELS.RETURNING}</option>
+          <option value="NEW">{RETURNING_FILTER_LABELS.NEW}</option>
         </select>
 
         {/* Pushed to the far end so the status tabs read as their own group

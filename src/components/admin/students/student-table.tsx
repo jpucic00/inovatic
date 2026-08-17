@@ -5,9 +5,16 @@ import type { StudentRow } from '@/actions/admin/student'
 import { formatDate } from '@/lib/format'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { PaymentStatusBadge } from '@/components/admin/students/payment-status-badge'
+import { ReturningBadge } from '@/components/admin/returning-badge'
 import { PAYMENT_STATUS_SORT_KEY } from '@/lib/payment-status'
 
-const columns: ColumnDef<StudentRow>[] = [
+/**
+ * The "Ponovni upis" column names its own school year. The list is not
+ * year-scoped, so without the year in the header the badge would be a claim
+ * about an unstated year — and the admin cannot tell "returned this year" from
+ * "returned at some point" by looking.
+ */
+const buildColumns = (returningYear: string): ColumnDef<StudentRow>[] => [
   {
     key: 'name',
     header: 'Ime i prezime',
@@ -57,6 +64,16 @@ const columns: ColumnDef<StudentRow>[] = [
     },
   },
   {
+    key: 'returning',
+    header: `Ponovni upis (${returningYear})`,
+    sortable: true,
+    // Descending puts the returning kids on top, which is the way this column
+    // gets read — the filter is for extracting them, the sort for spotting them.
+    sortValue: (row) => (row.isReturning ? 1 : 0),
+    cell: (row) =>
+      row.isReturning ? <ReturningBadge /> : <span className="text-gray-400">—</span>,
+  },
+  {
     key: 'payment',
     header: 'Plaćanje',
     sortable: true,
@@ -86,13 +103,15 @@ const columns: ColumnDef<StudentRow>[] = [
 
 interface StudentTableProps {
   data: StudentRow[]
+  /** School year every row's `isReturning` was resolved against. */
+  returningYear: string
 }
 
-export function StudentTable({ data }: Readonly<StudentTableProps>) {
+export function StudentTable({ data, returningYear }: Readonly<StudentTableProps>) {
   return (
     <DataTable
       data={data}
-      columns={columns}
+      columns={buildColumns(returningYear)}
       getRowKey={(row) => row.id}
       emptyMessage="Nema učenika za prikaz."
     />

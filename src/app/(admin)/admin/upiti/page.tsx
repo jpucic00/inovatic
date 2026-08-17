@@ -11,6 +11,11 @@ import {
 } from '@/components/admin/list-filter-memory'
 import { InquiryStatus, InquiryType } from '@prisma/client'
 import { GRADE_VALUES, GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
+import {
+  parseReturningFilter,
+  RETURNING_FILTER_LABELS,
+  type ReturningFilter,
+} from '@/lib/returning-filter'
 
 export const metadata: Metadata = { title: 'Admin – Upiti' }
 
@@ -27,7 +32,7 @@ const STATUS_LABELS: Record<InquiryStatus, string> = {
 }
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; course?: string; grade?: string; type?: string; page?: string }>
+  searchParams: Promise<{ status?: string; search?: string; course?: string; grade?: string; type?: string; returning?: string; page?: string }>
 }
 
 export default async function InquiriesPage({ searchParams }: Readonly<PageProps>) {
@@ -35,7 +40,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
   const selectedYear = await getSelectedSchoolYear()
 
   const params = await searchParams
-  const { status, search, course, grade, type, page: pageParam } = params
+  const { status, search, course, grade, type, returning, page: pageParam } = params
 
   const statusFilter =
     status && VALID_STATUSES.includes(status) ? (status as InquiryStatus) : undefined
@@ -46,6 +51,8 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
   const typeFilter =
     type && VALID_TYPES.includes(type) ? (type as InquiryType) : undefined
 
+  const returningFilter = parseReturningFilter(returning)
+
   const currentPage = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1)
 
   const [{ data: inquiries, total }, courses] = await Promise.all([
@@ -55,6 +62,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
       courseId: course || undefined,
       grade: gradeFilter,
       type: typeFilter ?? 'ALL',
+      returning: returningFilter,
       page: currentPage,
       pageSize: PAGE_SIZE,
     }),
@@ -72,6 +80,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
     typeFilter,
     currentCourse,
     gradeFilter,
+    returningFilter,
     currentSearch,
     courses,
   })
@@ -90,7 +99,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
 
       <ListFilterMemory listPath="/admin/upiti" chips={chips} />
 
-      <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} currentCourse={currentCourse} currentGrade={currentGrade} currentType={currentType} courses={courses} />
+      <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} currentCourse={currentCourse} currentGrade={currentGrade} currentType={currentType} currentReturning={returningFilter ?? ''} courses={courses} />
 
       <InquiryTable data={inquiries} />
 
@@ -115,12 +124,17 @@ function buildInquiryChips(args: {
   typeFilter: InquiryType | undefined
   currentCourse: string
   gradeFilter: Grade | undefined
+  returningFilter: ReturningFilter | undefined
   currentSearch: string
   courses: ReadonlyArray<{ id: string; title: string }>
 }): ActiveFilterChip[] {
-  const { statusFilter, typeFilter, currentCourse, gradeFilter, currentSearch, courses } = args
+  const { statusFilter, typeFilter, currentCourse, gradeFilter, returningFilter, currentSearch, courses } = args
   return [
     statusFilter && { key: 'status', label: `Status: ${STATUS_LABELS[statusFilter]}` },
+    returningFilter && {
+      key: 'returning',
+      label: `Polaznici: ${RETURNING_FILTER_LABELS[returningFilter]}`,
+    },
     typeFilter && {
       key: 'type',
       label: `Vrsta: ${typeFilter === 'COURSE' ? 'Upisi' : 'Proslave'}`,

@@ -3,7 +3,7 @@
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertInquiryInCity } from '@/lib/city-guard'
-import { InquiryStatus, InquiryType } from '@prisma/client'
+import { InquiryStatus, InquiryType, type Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import {
   declineInquirySchema,
@@ -19,6 +19,7 @@ import { formatGroupSchedule } from '@/lib/format'
 import type { Grade } from '@/lib/inquiry-status'
 import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
+import type { ReturningFilter } from '@/lib/returning-filter'
 import { isRadionica } from '@/lib/program-kind'
 
 type InquiryFilters = {
@@ -27,6 +28,7 @@ type InquiryFilters = {
   courseId?: string
   grade?: Grade
   type?: InquiryType | 'ALL'
+  returning?: ReturningFilter
   page?: number
   pageSize?: number
 }
@@ -46,16 +48,62 @@ function searchTokens(search: string | undefined): string[] {
   return search?.trim().split(/\s+/).filter(Boolean) ?? []
 }
 
+/**
+ * Ids of the inquiries matching `where` that fall on the wanted side of the
+ * "Ponovni upis" marker.
+ *
+ * The marker is not a column — it comes out of an identity lookup run over a
+ * page of rows (`flagReturningInquiries`), so it cannot be pushed into the
+ * `where` without writing the two-tier matching rule a second time in SQL. That
+ * rule lives in `src/lib/student-match.ts` precisely so the dedup-on-create path
+ * and the display marker can never drift; a third copy for one filter would be
+ * the drift. So the whole (year + city + current filters) set is flagged once
+ * and the survivors narrow the real, paginated query — `total` and the page
+ * slice then agree, which they would not if the table filtered after paging.
+ *
+ * PARTY rows carry no child and so are never returning; they are dropped from
+ * BOTH directions rather than falling into "Novi upis", where a birthday party
+ * would be counted as somebody's first enrollment. An admin who has also picked
+ * Vrsta: Proslave therefore gets an empty table, which is the honest answer —
+ * silently overriding their choice would be worse.
+ */
+async function returningInquiryIds(
+  where: Prisma.InquiryWhereInput,
+  want: ReturningFilter,
+): Promise<string[]> {
+  const candidates = await db.inquiry.findMany({
+    where,
+    select: {
+      id: true,
+      type: true,
+      childFirstName: true,
+      childLastName: true,
+      childDateOfBirth: true,
+      parentEmail: true,
+      studentId: true,
+      city: true,
+    },
+  })
+  const flagged = await flagReturningInquiries(candidates)
+  return flagged
+    .filter(
+      (r) =>
+        r.type === InquiryType.COURSE &&
+        r.isReturning === (want === 'RETURNING'),
+    )
+    .map((r) => r.id)
+}
+
 export async function getInquiries(
   filters: InquiryFilters = {},
 ): Promise<PaginatedResult<InquiryListRow>> {
   const { city } = await requireAdminCtx()
 
-  const { status, search, courseId, grade, type, page = 1, pageSize = 20 } = filters
+  const { status, search, courseId, grade, type, returning, page = 1, pageSize = 20 } = filters
   const schoolYear = await getSelectedSchoolYear()
   const tokens = searchTokens(search)
 
-  const where = {
+  const where: Prisma.InquiryWhereInput = {
     schoolYear,
     city,
     ...(status && status !== 'ALL' ? { status } : {}),
@@ -80,14 +128,18 @@ export async function getInquiries(
       : {}),
   }
 
+  const scopedWhere: Prisma.InquiryWhereInput = returning
+    ? { ...where, id: { in: await returningInquiryIds(where, returning) } }
+    : where
+
   const [data, total] = await Promise.all([
     db.inquiry.findMany({
-      where,
+      where: scopedWhere,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
-    db.inquiry.count({ where }),
+    db.inquiry.count({ where: scopedWhere }),
   ])
 
   const enriched = await flagReturningInquiries(data)
