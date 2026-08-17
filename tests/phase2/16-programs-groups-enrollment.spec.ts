@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 import { fillInquiryStep1 } from '../helpers/prijava'
+import { cleanupRunFixtures } from '../helpers/cleanup'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 7 — Programs, Groups & Enrollment
@@ -219,6 +220,15 @@ async function openProgramWindow(page: Page, groupName: string, isRadionica: boo
 
 test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
   test.setTimeout(60000)
+
+  // This spec builds its whole world through the admin UI — a radionica, two
+  // groups, an empty group, plus the upiti the public form submits — and used
+  // to leave every bit of it behind. `/admin/grupe` lays each weekday's groups
+  // out in one lane, so a few dozen leftovers squeeze the entries to zero width
+  // and this spec starts failing on its own litter.
+  test.afterAll(async () => {
+    await cleanupRunFixtures(RUN_ID)
+  })
 
   // ── A: Admin creates a radionica ────────────────────────────────────────────
 

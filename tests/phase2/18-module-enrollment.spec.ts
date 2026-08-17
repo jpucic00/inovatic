@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
+import { cleanupRunFixtures } from '../helpers/cleanup'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 8 — Module Enrollment + School-Year Historization
@@ -300,6 +301,10 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
   })
 
   test.afterAll(async ({ browser }) => {
+    // The group + students this spec created: they are named after the run, so
+    // they would otherwise pile up in the same weekday lane forever.
+    await cleanupRunFixtures(RUN_ID)
+
     // Restore SLR 1 module dates so we don't leave the DB in a shifted state
     if (originalDates.length === 0) return
     test.setTimeout(120000)
