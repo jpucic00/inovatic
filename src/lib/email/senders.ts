@@ -30,16 +30,23 @@ function publicBaseUrl(): string {
  * off to {@link sendTransactionalEmail} (which applies the RESEND_API_KEY gate,
  * the `from`/`replyTo` identity, and returns `false` when unsent).
  *
+ * A sender whose email belongs to a tenant takes `city` and passes it down —
+ * that is what puts the city's own enrollment address in the From line, so a
+ * Šibenik family never sees or replies to Split. It is REQUIRED wherever a city
+ * exists (never defaulted), for the same reason the city columns have no
+ * `@default`: forgetting one must be a tsc error, not a silent Split stamp.
+ *
  * Callers keep their own error policy — the senders never swallow.
  */
 
 /** Public course-inquiry confirmation → the parent who submitted the form. */
 export function sendInquiryConfirmationEmail(params: {
   to: string
+  /** Sends from — and labels the body with — this city's enrollment inbox. */
+  city: City
   parentName: string
   childName: string
   childDateOfBirth: string
-  cityLabel?: string
   /** Which "what happens next" paragraph closes the body. */
   nextStep?: InquiryNextStep
   /**
@@ -51,19 +58,26 @@ export function sendInquiryConfirmationEmail(params: {
 }): Promise<boolean> {
   return sendTransactionalEmail({
     to: params.to,
+    city: params.city,
     subject: 'Zaprimili smo vašu prijavu – Inovatic',
     react: createElement(InquiryConfirmationEmail, {
       parentName: params.parentName,
       childName: params.childName,
       childDateOfBirth: params.childDateOfBirth,
-      cityLabel: params.cityLabel,
+      // Derived rather than taken as a second parameter: the grad named in the
+      // body and the office in the From line are the same fact.
+      cityLabel: CITY_LABELS[params.city],
       nextStep: params.nextStep,
       payment: params.payment,
     }),
   })
 }
 
-/** Public party (proslava) confirmation → the parent who submitted the form. */
+/**
+ * Public party (proslava) confirmation → the parent who submitted the form.
+ * Proslave are Split-only (owner decision), so this one carries no city and
+ * sends from the association address.
+ */
 export function sendPartyInquiryConfirmationEmail(params: {
   to: string
   parentName: string
@@ -84,7 +98,9 @@ const adminInquiryUrl = (inquiryId: string) => `${publicBaseUrl()}/admin/upiti/$
 
 /**
  * Public course inquiry → the enrollment inbox of the city it was filed under,
- * so Šibenik's upiti never land in Split's inbox and vice versa.
+ * so Šibenik's upiti never land in Split's inbox and vice versa. That same inbox
+ * is the From address, which is what keeps the announcement inside one office's
+ * own mail thread.
  *
  * The upit is already stored, so unlike the /stem-edukacija notification this
  * is not the record — but reply-to is the parent, which lets staff answer the
@@ -111,6 +127,7 @@ export function sendInquiryNotificationEmail(params: {
   const cityLabel = CITY_LABELS[city]
   return sendTransactionalEmail({
     to: cityInboxEmail(city),
+    city,
     replyTo: params.parentEmail,
     subject: `Novi upit za upis: ${params.childName} – ${cityLabel}`,
     react: createElement(InquiryNotificationEmail, {
@@ -195,15 +212,21 @@ export function sendStemEducationConfirmationEmail(params: {
   })
 }
 
-/** Admin-picked schedule options → the inquiry's parent (this one invites a reply). */
+/**
+ * Admin-picked schedule options → the inquiry's parent (this one invites a
+ * reply, so the city that offered the termini must be the city that gets it).
+ */
 export function sendScheduleOptionsEmail(params: {
   to: string
+  /** The inquiry's own city — the office offering these termini. */
+  city: City
   parentName: string
   childName: string
   options: GroupOption[]
 }): Promise<boolean> {
   return sendTransactionalEmail({
     to: params.to,
+    city: params.city,
     subject: `Dostupni termini za ${params.childName} – Inovatic`,
     react: createElement(ScheduleOptionsEmail, {
       parentName: params.parentName,
@@ -216,6 +239,8 @@ export function sendScheduleOptionsEmail(params: {
 /** Student account credentials + enrollment details → the student's parent. */
 export function sendStudentCredentialsEmail(params: {
   to: string
+  /** The city the child was enrolled in. */
+  city: City
   parentName: string
   childName: string
   username: string
@@ -227,6 +252,7 @@ export function sendStudentCredentialsEmail(params: {
 }): Promise<boolean> {
   return sendTransactionalEmail({
     to: params.to,
+    city: params.city,
     subject: `Pristupni podaci za ${params.childName} – Inovatic`,
     react: createElement(AccountCredentialsEmail, {
       parentName: params.parentName,
@@ -252,6 +278,8 @@ const TEACHER_SUBJECTS = {
  */
 export function sendTeacherCredentialsEmail(params: {
   to: string
+  /** The teacher's own city — staff answer their own office, not the other one. */
+  city: City
   firstName: string
   lastName: string
   password: string
@@ -260,6 +288,7 @@ export function sendTeacherCredentialsEmail(params: {
   const baseUrl = publicBaseUrl()
   return sendTransactionalEmail({
     to: params.to,
+    city: params.city,
     subject: TEACHER_SUBJECTS[params.variant],
     react: createElement(TeacherCredentialsEmail, {
       firstName: params.firstName,
@@ -278,7 +307,7 @@ type BulkMessageParams = {
    * (no auto greeting — parent names are missing on many imported students). */
   subject: string
   bodyText: string
-  /** The campaign's city — decides which inbox a parent's reply lands in. */
+  /** The campaign's city — decides which inbox it is sent from and replied to. */
   city: City
   options?: GroupOption[]
   /**
@@ -310,15 +339,15 @@ function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>)
 
 /**
  * Admin bulk campaign (/admin/email) → one parent per call. A parent hitting
- * Reply must reach the office that mailed them, so the reply-to follows the
- * campaign's city.
+ * Reply must reach the office that mailed them, so both the From address and
+ * the reply-to follow the campaign's city.
  */
 export function sendBulkMessageEmail(params: BulkMessageParams): Promise<boolean> {
-  const { to, ...rest } = params
+  const { to, city, ...rest } = params
   return sendTransactionalEmail({
     to,
+    city,
     subject: params.subject,
-    replyTo: cityInboxEmail(params.city),
     react: buildBulkMessageElement(rest),
   })
 }

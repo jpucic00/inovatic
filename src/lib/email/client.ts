@@ -10,16 +10,16 @@ function getResend(): Resend {
 }
 
 /**
- * Sender identity. `EMAIL_FROM` must be a verified sender domain in Resend; the
- * hardcoded value is the production default used when the env var is unset
- * (e.g. local dev / preview). Kept module-private — callers go through senders.
+ * Display name on every outgoing email — one association, whichever office
+ * sends. The address beside it is what carries the city.
  */
-const FROM_EMAIL = process.env.EMAIL_FROM ?? 'Inovatic <noreply@udruga-inovatic.hr>'
+const FROM_NAME = 'Inovatic'
 
 /**
- * The association's monitored inbox — default reply-to for everything we send,
- * and the recipient of the inbound notifications (e.g. the /stem-edukacija
- * form, whose submissions are never persisted).
+ * The association's monitored inbox — Split's enrollment inbox, the sender and
+ * reply-to for everything that has no city, and the recipient of the inbound
+ * notifications (e.g. the /stem-edukacija form, whose submissions are never
+ * persisted).
  */
 export const ASSOCIATION_EMAIL = 'prijave@udruga-inovatic.hr'
 
@@ -31,10 +31,11 @@ const SIBENIK_EMAIL = 'prijave.sibenik@udruga-inovatic.hr'
 
 /**
  * The inbox that owns a city's enrollment correspondence: where a new upit is
- * announced, and where a parent's reply lands. Split keeps the association
- * address, which is also the fallback for everything that has no city.
+ * announced, what a parent sees in the From line, and where their reply lands.
+ * Split keeps the association address, which is also the fallback for
+ * association-level mail that belongs to no city.
  */
-export function cityInboxEmail(city: City): string {
+export function cityInboxEmail(city?: City): string {
   return city === 'SIBENIK' ? SIBENIK_EMAIL : ASSOCIATION_EMAIL
 }
 
@@ -54,14 +55,24 @@ export async function sendTransactionalEmail(params: {
   to: string
   subject: string
   react: ReactElement
-  /** Overrides the association inbox — used by inbound notifications so staff
+  /**
+   * The tenant this email belongs to. Decides BOTH the From address and the
+   * default reply-to, so a Šibenik parent is written to — and answers — the
+   * Šibenik office rather than Split. Omitted only for association-level mail
+   * that has no city (the /stem-edukacija B2B form, proslave), which stays on
+   * the association address. Every address here lives on the one verified
+   * Resend sender domain, so routing per city needs no extra verification.
+   */
+  city?: City
+  /** Overrides the city inbox — used by inbound notifications so staff
    * reply straight to the person who submitted the form. */
   replyTo?: string
 }): Promise<boolean> {
   if (!process.env.RESEND_API_KEY) return false
+  const inbox = cityInboxEmail(params.city)
   const result = await getResend().emails.send({
-    from: FROM_EMAIL,
-    replyTo: params.replyTo ?? ASSOCIATION_EMAIL,
+    from: `${FROM_NAME} <${inbox}>`,
+    replyTo: params.replyTo ?? inbox,
     to: params.to,
     subject: params.subject,
     react: params.react,

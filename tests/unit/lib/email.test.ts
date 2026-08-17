@@ -17,15 +17,17 @@ import {
   sendScheduleOptionsEmail,
   sendStemEducationConfirmationEmail,
   sendStemEducationInquiryEmail,
+  sendStudentCredentialsEmail,
   sendTeacherCredentialsEmail,
 } from '@/lib/email'
 
 const inquiryArgs = {
   to: 'roditelj@example.hr',
+  city: 'SPLIT',
   parentName: 'Ana Anić',
   childName: 'Marko Anić',
   childDateOfBirth: '15.06.2016.',
-}
+} as const
 
 describe('email senders', () => {
   beforeEach(() => {
@@ -50,16 +52,45 @@ describe('email senders', () => {
     expect(send).toHaveBeenCalledTimes(1)
     expect(send.mock.calls[0][0]).toMatchObject({
       to: 'roditelj@example.hr',
-      from: 'Inovatic <noreply@udruga-inovatic.hr>',
+      from: 'Inovatic <prijave@udruga-inovatic.hr>',
       replyTo: 'prijave@udruga-inovatic.hr',
       subject: 'Zaprimili smo vašu prijavu – Inovatic',
     })
+  })
+
+  // The From address is the city's own enrollment inbox, not one global sender:
+  // a Šibenik family must see — and by replying reach — the Šibenik office.
+  it('sends a Šibenik confirmation from (and back to) the Šibenik inbox', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendInquiryConfirmationEmail({ ...inquiryArgs, city: 'SIBENIK' })
+    expect(send.mock.calls[0][0]).toMatchObject({
+      from: 'Inovatic <prijave.sibenik@udruga-inovatic.hr>',
+      replyTo: 'prijave.sibenik@udruga-inovatic.hr',
+    })
+  })
+
+  it('sends a Šibenik student credentials email from the Šibenik inbox', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendStudentCredentialsEmail({
+      to: 'roditelj@example.hr',
+      city: 'SIBENIK',
+      parentName: 'Ana Anić',
+      childName: 'Marko Anić',
+      username: 'marko.anic',
+      password: 'x',
+      groupName: 'SLR 2',
+      schedule: 'Utorak, 17:00–18:30',
+      locationName: 'Trokut',
+      locationAddress: 'Velimira Škorpika 5, 22000 Šibenik',
+    })
+    expect(send.mock.calls[0][0].from).toBe('Inovatic <prijave.sibenik@udruga-inovatic.hr>')
   })
 
   it('interpolates the child name into the schedule-options subject', async () => {
     vi.stubEnv('RESEND_API_KEY', 'test_key')
     await sendScheduleOptionsEmail({
       to: 'roditelj@example.hr',
+      city: 'SPLIT',
       parentName: 'Ana Anić',
       childName: 'Marko Anić',
       options: [
@@ -76,7 +107,13 @@ describe('email senders', () => {
 
   it('maps the teacher variant to its subject (new vs reset)', async () => {
     vi.stubEnv('RESEND_API_KEY', 'test_key')
-    const base = { to: 'ivana@example.hr', firstName: 'Ivana', lastName: 'Kovač', password: 'x' }
+    const base = {
+      to: 'ivana@example.hr',
+      city: 'SPLIT',
+      firstName: 'Ivana',
+      lastName: 'Kovač',
+      password: 'x',
+    } as const
     await sendTeacherCredentialsEmail({ ...base, variant: 'new' })
     await sendTeacherCredentialsEmail({ ...base, variant: 'reset' })
     expect(send.mock.calls[0][0].subject).toBe('Pristupni podaci – Inovatic')
@@ -100,7 +137,7 @@ describe('email senders', () => {
 
   // A parent hitting Reply must reach the office that mailed them. Before this,
   // every campaign fell back to the Split inbox regardless of who sent it.
-  it('routes a Šibenik campaign reply to the Šibenik inbox', async () => {
+  it('sends a Šibenik campaign from — and replies to — the Šibenik inbox', async () => {
     vi.stubEnv('RESEND_API_KEY', 'test_key')
     await sendBulkMessageEmail({
       to: 'roditelj@example.hr',
@@ -108,7 +145,10 @@ describe('email senders', () => {
       bodyText: 'Kratka obavijest.',
       city: 'SIBENIK',
     })
-    expect(send.mock.calls[0][0].replyTo).toBe('prijave.sibenik@udruga-inovatic.hr')
+    expect(send.mock.calls[0][0]).toMatchObject({
+      from: 'Inovatic <prijave.sibenik@udruga-inovatic.hr>',
+      replyTo: 'prijave.sibenik@udruga-inovatic.hr',
+    })
   })
 
   it('bulk-message no-ops without a key like every other sender', async () => {
@@ -133,8 +173,11 @@ describe('email senders', () => {
       services: ['Osnovna edukacija mentora'],
       message: 'Trebamo edukaciju za tri učiteljice.',
     })
+    // No city on this one (a B2B inquiry belongs to the association, not to an
+    // office), so it stays on the association address in both directions.
     expect(send.mock.calls[0][0]).toMatchObject({
       to: 'prijave@udruga-inovatic.hr',
+      from: 'Inovatic <prijave@udruga-inovatic.hr>',
       replyTo: 'ivana.ivic@skole.hr',
       subject: 'Upit za STEM edukaciju – OŠ Meje',
     })
@@ -183,6 +226,7 @@ describe('email senders', () => {
     await sendInquiryNotificationEmail({ ...notificationArgs, city: 'SIBENIK' })
     expect(send.mock.calls[0][0]).toMatchObject({
       to: 'prijave.sibenik@udruga-inovatic.hr',
+      from: 'Inovatic <prijave.sibenik@udruga-inovatic.hr>',
       replyTo: 'ana.anic@example.hr',
       subject: 'Novi upit za upis: Marko Anić – Šibenik',
     })

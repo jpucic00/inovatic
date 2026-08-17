@@ -27,7 +27,6 @@ import {
   assertGroupHasAvailableSpot,
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
-import { CITY_LABELS } from '@/lib/city'
 import { formatGroupSchedule } from '@/lib/format'
 import { computeSchoolYear } from '@/lib/school-year'
 import { GRADE_LABELS, NO_SUITABLE_TERMIN_LABEL, isHighSchoolGrade } from '@/lib/inquiry-status'
@@ -358,10 +357,10 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
   try {
     await sendInquiryConfirmationEmail({
       to: parentEmail,
+      city,
       parentName,
       childName: `${childFirstName} ${childLastName}`,
       childDateOfBirth: isoToCroatianDate(childDateOfBirth),
-      cityLabel: CITY_LABELS[city],
       nextStep: inquiryNextStep(scheduledGroupId, noSuitableTermin),
       payment: payment ?? undefined,
     })

@@ -457,6 +457,7 @@ export async function sendScheduleOptions(
 
     await sendScheduleOptionsEmail({
       to: inquiry.parentEmail,
+      city: inquiry.city,
       parentName: inquiry.parentName,
       childName,
       options,

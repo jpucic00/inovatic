@@ -1,6 +1,6 @@
 'use server'
 
-import type { UserRole } from '@prisma/client'
+import type { City, UserRole } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertGroupInCity, assertUserInCity } from '@/lib/city-guard'
@@ -45,12 +45,14 @@ type TeacherFilters = {
 
 async function dispatchTeacherCredentials(
   teacher: { email: string; firstName: string; lastName: string },
+  city: City,
   password: string,
   variant: 'new' | 'reset',
 ): Promise<boolean> {
   try {
     return await sendTeacherCredentialsEmail({
       to: teacher.email,
+      city,
       firstName: teacher.firstName,
       lastName: teacher.lastName,
       password,
@@ -273,6 +275,9 @@ export async function createTeacher(
 
     const emailSent = await dispatchTeacherCredentials(
       { email, firstName: data.firstName, lastName: data.lastName },
+      // The city the account was just stamped with — a teacher belongs to the
+      // admin's own city, so their mail comes from that office.
+      city,
       password,
       'new',
     )
@@ -360,7 +365,7 @@ export async function resetTeacherPassword(
       data: { passwordHash, plainPassword: password },
     })
 
-    const emailSent = await dispatchTeacherCredentials(teacher, password, 'reset')
+    const emailSent = await dispatchTeacherCredentials(teacher, city, password, 'reset')
 
     revalidatePath(`/admin/nastavnici/${id}`)
     return { success: true, password, emailSent }

@@ -21,11 +21,14 @@ All outbound mail goes through **Resend** + **React Email**, in two layers.
   | `sendStudentCredentialsEmail` | student account created (from inquiry or manually) | parent |
   | `sendTeacherCredentialsEmail` | teacher account created / password reset (`variant: 'new' \| 'reset'`) | teacher |
 
-Sender identity is **`EMAIL_FROM`** (must be a verified Resend sender domain), falling back to
-`Inovatic <noreply@udruga-inovatic.hr>`. Reply-to defaults to `prijave@udruga-inovatic.hr`;
-city-bound mail to parents replies to that city's inbox (`cityInboxEmail`), and the inbound
-notifications flip it around — they go *to* an inbox and reply to the person who submitted the
-form, so staff answer straight from Outlook.
+Sender identity **follows the city**: a sender that takes `city` passes it to
+`sendTransactionalEmail`, which uses `cityInboxEmail(city)` as both the From address and the
+default reply-to — `Inovatic <prijave@udruga-inovatic.hr>` for Split, `Inovatic
+<prijave.sibenik@udruga-inovatic.hr>` for Šibenik. It is not configurable per environment (there
+is no `EMAIL_FROM`); both addresses live on the one verified Resend domain. Association-level
+mail with no city (the /stem-edukacija B2B form, Split-only proslave) keeps the association
+address. The inbound notifications flip reply-to around — they go *to* an inbox and reply to the
+person who submitted the form, so staff answer straight from Outlook.
 
 Server actions call the senders and never touch Resend directly. The **error policy lives at
 the call site**, not in the service: confirmations swallow-and-log, credentials emails

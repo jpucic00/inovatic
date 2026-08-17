@@ -588,10 +588,12 @@ type InquiryEmailContext = {
   childLastName: string | null
   parentName: string
   parentEmail: string
+  city: City
 }
 
 async function dispatchStudentCredentials(
   to: string,
+  city: City,
   parentName: string,
   childName: string,
   core: CoreResult,
@@ -609,6 +611,7 @@ async function dispatchStudentCredentials(
 
   await sendStudentCredentialsEmail({
     to,
+    city,
     parentName,
     childName,
     username: core.user.username ?? '',
@@ -625,7 +628,15 @@ async function sendInquiryCredentialsEmail(
   core: CoreResult,
 ): Promise<void> {
   const childName = `${inquiry.childFirstName ?? ''} ${inquiry.childLastName ?? ''}`.trim()
-  await dispatchStudentCredentials(inquiry.parentEmail, inquiry.parentName, childName, core)
+  // The inquiry's own city — the office the parent applied to, and (per the
+  // pre-flight check) the admin's city too.
+  await dispatchStudentCredentials(
+    inquiry.parentEmail,
+    inquiry.city,
+    inquiry.parentName,
+    childName,
+    core,
+  )
 }
 
 export async function createStudentManually(
@@ -679,7 +690,7 @@ export async function createStudentManually(
   if (!core.isExisting && core.group) {
     try {
       const childName = `${data.firstName} ${data.lastName}`.trim()
-      await dispatchStudentCredentials(parentEmail, data.parentName ?? '', childName, core)
+      await dispatchStudentCredentials(parentEmail, city, data.parentName ?? '', childName, core)
     } catch (err) {
       emailFailed = true
       console.error(
