@@ -2,7 +2,7 @@
 
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
-import { requireStudent } from '@/lib/auth-guard'
+import { requireActiveStudent } from '@/lib/auth-guard'
 import { buildGroupMaterialsView, type GroupMaterialsView } from '@/lib/group-materials-view'
 
 /**
@@ -14,7 +14,7 @@ import { buildGroupMaterialsView, type GroupMaterialsView } from '@/lib/group-ma
 export async function getEffectiveMaterialsForStudent(
   groupId: string,
 ): Promise<GroupMaterialsView> {
-  const session = await requireStudent()
+  const session = await requireActiveStudent()
 
   const enrollment = await db.enrollment.findFirst({
     where: { userId: session.user.id, scheduledGroupId: groupId },

@@ -128,6 +128,20 @@ describe('getReturningStudentInfo', () => {
 describe('getInquiries — isReturning flag', () => {
   const YEAR = '2026/2027'
 
+  // `getSelectedSchoolYear` validates the cookie against the SchoolYear REGISTRY
+  // and silently falls back to computeSchoolYear() when the row is missing — so
+  // without this the list filters on a different year, returns nothing, and both
+  // assertions read `undefined`. It used to pass only because some earlier file
+  // in the shared-DB tier happened to create this row first; the tier has no
+  // per-file cleanup, so a test must seed what it depends on.
+  beforeAll(async () => {
+    await db.schoolYear.upsert({
+      where: { label: YEAR },
+      create: { label: YEAR },
+      update: {},
+    })
+  })
+
   it('flags a NEW inquiry whose child matches an existing student, not a fresh one', async () => {
     const admin = await createAdmin()
     const marker = `RET${Date.now().toString(36)}`

@@ -3,7 +3,7 @@
 import { notFound } from 'next/navigation'
 import type { ProgramKind, SkillLevel } from '@prisma/client'
 import { db } from '@/lib/db'
-import { requireStudent } from '@/lib/auth-guard'
+import { requireActiveStudent } from '@/lib/auth-guard'
 import { formatRecommendationLabel, isBlankAssessment } from '@/lib/assessment-rubric'
 import { formatDate } from '@/lib/format'
 import { isGradable } from '@/lib/program-kind'
@@ -52,7 +52,7 @@ type StudentAssessmentView = {
 export async function getMyAssessmentForGroup(
   groupId: string,
 ): Promise<StudentAssessmentView> {
-  const session = await requireStudent()
+  const session = await requireActiveStudent()
 
   const enrollment = await db.enrollment.findFirst({
     where: { userId: session.user.id, scheduledGroupId: groupId },

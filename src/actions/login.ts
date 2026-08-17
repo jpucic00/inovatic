@@ -12,6 +12,17 @@ type LoginActionResult =
   | { success: true; role: UserRole; showTeacherPanel: boolean }
   | { success: false; error: string }
 
+const WRONG_CREDENTIALS = 'Pogrešno korisničko ime ili lozinka.'
+/**
+ * Deliberately specific, and deliberately different from the wrong-password
+ * message: the password WAS right, and a parent told "wrong username or
+ * password" would hunt for a typo that does not exist. Yes, this confirms the
+ * account exists — accepted, since these parents know it does and the whole
+ * point is to tell them why it stopped working.
+ */
+const NO_ACTIVE_PROGRAM =
+  'Vaš račun više nije dio nijednog programa. Ako mislite da je ovo greška, javite nam se.'
+
 export async function loginAction(data: LoginFormData): Promise<LoginActionResult> {
   const parsed = loginSchema.safeParse(data)
   if (!parsed.success) {
@@ -26,7 +37,14 @@ export async function loginAction(data: LoginFormData): Promise<LoginActionResul
     })
   } catch (error) {
     if (error instanceof AuthError) {
-      return { success: false, error: 'Pogrešno korisničko ime ili lozinka.' }
+      // `CredentialsSignin` subclasses carry their own `code`; the base provider
+      // failure is 'credentials'. Anything unrecognised falls back to the
+      // generic message rather than leaking an internal token.
+      const code = (error as { code?: unknown }).code
+      return {
+        success: false,
+        error: code === 'no_active_program' ? NO_ACTIVE_PROGRAM : WRONG_CREDENTIALS,
+      }
     }
     throw error
   }

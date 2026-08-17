@@ -1,9 +1,9 @@
 'use server'
 
-import type { ProgramKind } from '@prisma/client'
+import type { City, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireStudent } from '@/lib/auth-guard'
-import { computeSchoolYear } from '@/lib/school-year'
+import { activeEnrollmentWhere } from '@/lib/enrollment-activity'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 
@@ -39,10 +39,13 @@ export type StudentEnrollmentSummary = {
  */
 export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummary[]> {
   const session = await requireStudent()
-  const schoolYear = computeSchoolYear()
 
+  // Current OR next year, matching the login gate exactly. Filtering on
+  // `computeSchoolYear()` alone meant a child enrolled only for NEXT year — the
+  // whole point of creating accounts over the summer — could log in and be shown
+  // an empty dashboard.
   const enrollments = await db.enrollment.findMany({
-    where: { userId: session.user.id, schoolYear },
+    where: { userId: session.user.id, ...activeEnrollmentWhere() },
     orderBy: [
       { scheduledGroup: { course: { sortOrder: 'asc' } } },
       { scheduledGroup: { name: 'asc' } },
@@ -55,9 +58,10 @@ export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummar
             include: {
               modules: {
                 orderBy: { sortOrder: 'asc' },
-                include: {
-                  schedules: { where: { schoolYear } },
-                },
+                // Unfiltered on purpose: two enrollments in one payload can now
+                // belong to different years, and `getCurrentActiveModuleForGroup`
+                // already selects by (schoolYear, city) itself.
+                include: { schedules: true },
               },
             },
           },
@@ -72,15 +76,18 @@ export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummar
     },
   })
 
-  // Every group paces by its own city's holiday calendar. A student's
-  // enrollments are all same-city by invariant, but keying per group keeps
-  // this correct even if that ever changes.
-  const cities = [...new Set(enrollments.map((e) => e.scheduledGroup.city))]
-  const holidaysByCity = new Map(
+  // Every group paces by its own city's holiday calendar, and now also by its
+  // own YEAR — the payload can hold a current-year and a next-year enrollment at
+  // once, and each must be paced against its own calendar.
+  const calendarKeys = [
+    ...new Set(enrollments.map((e) => `${e.schoolYear}:${e.scheduledGroup.city}`)),
+  ]
+  const holidaysByKey = new Map(
     await Promise.all(
-      cities.map(
-        async (c) => [c, await loadHolidayDateKeys(schoolYear, c)] as const,
-      ),
+      calendarKeys.map(async (key) => {
+        const [year, city] = key.split(':')
+        return [key, await loadHolidayDateKeys(year, city as City)] as const
+      }),
     ),
   )
 
@@ -88,10 +95,12 @@ export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummar
     const activeModule = getCurrentActiveModuleForGroup({
       dayOfWeek: e.scheduledGroup.dayOfWeek,
       modules: e.scheduledGroup.course.modules,
-      schoolYear,
+      // The enrollment's OWN year, not a single page-level one.
+      schoolYear: e.schoolYear,
       city: e.scheduledGroup.city,
       kind: e.scheduledGroup.course.kind,
-      holidayDates: holidaysByCity.get(e.scheduledGroup.city) ?? new Set(),
+      holidayDates:
+        holidaysByKey.get(`${e.schoolYear}:${e.scheduledGroup.city}`) ?? new Set(),
     })
 
     return {

@@ -4,14 +4,32 @@ import { db } from '@/lib/db'
 import { MIME_TO_EXT, sanitiseFilename } from '@/lib/cloudinary-url'
 import { canManageMaterial, materialTarget } from '@/lib/material-access'
 import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
+import { activeEnrollmentWhere } from '@/lib/enrollment-activity'
 
 export const runtime = 'nodejs'
 
-/** A student may download a material iff it is visible in one of their groups. */
+/**
+ * A student may download a material iff they are CURRENTLY in a program and the
+ * material is visible in one of their groups.
+ *
+ * The active check is what stops an alum pulling files: this route authorises
+ * off a session, so without it "no longer part of any program" would hold at the
+ * login form and not here, for as long as a JWT minted while they were still
+ * enrolled survives (`revalidateTokenClaims` evicts within ~60s).
+ *
+ * Their group list stays deliberately unfiltered by year. An enrolled child
+ * re-downloading something from their own previous group is legitimate; it is
+ * being enrolled at all that is the question.
+ */
 async function studentAllowed(
   userId: string,
   materialId: string,
 ): Promise<boolean> {
+  const active = await db.enrollment.count({
+    where: { userId, ...activeEnrollmentWhere() },
+  })
+  if (active === 0) return false
+
   const enrollments = await db.enrollment.findMany({
     where: { userId },
     select: {
