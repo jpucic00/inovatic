@@ -238,3 +238,52 @@ describe('computeGroupCapacity — per-group arc resolution', () => {
     expect(cap.nextEnrollingModule?.moduleScheduleId).toBe('s1')
   })
 })
+
+describe('computeGroupCapacity — the full boundary', () => {
+  it('is full the moment reservations close the last seat, not one short of it', () => {
+    const nearlyFull = mkGroup({
+      maxStudents: 4,
+      kind: 'RADIONICA' as const,
+      modules: [],
+      enrollments: [mkEnrollment('e1', []), mkEnrollment('e2', [])],
+      reservedInquiriesCount: 1,
+    })
+    const capOne = computeGroupCapacity(nearlyFull, new Set(), NOW)
+    expect(capOne.availableSpots).toBe(1)
+    expect(capOne.isFull).toBe(false)
+
+    // One more unanswered upit and the termin is closed — a reserved seat is as
+    // good as taken, which is what stops two families being offered one place.
+    const full = mkGroup({
+      maxStudents: 4,
+      kind: 'RADIONICA' as const,
+      modules: [],
+      enrollments: [mkEnrollment('e1', []), mkEnrollment('e2', [])],
+      reservedInquiriesCount: 2,
+    })
+    const capZero = computeGroupCapacity(full, new Set(), NOW)
+    expect(capZero.availableSpots).toBe(0)
+    expect(capZero.isFull).toBe(true)
+  })
+
+  it('clamps an over-subscribed group at 0 instead of reporting negative spots', () => {
+    // Over-subscription is reachable without a bug: an admin can enrol past
+    // maxStudents from /admin, and maxStudents itself can be lowered afterwards.
+    const group = mkGroup({
+      maxStudents: 2,
+      kind: 'RADIONICA' as const,
+      modules: [],
+      enrollments: [
+        mkEnrollment('e1', []),
+        mkEnrollment('e2', []),
+        mkEnrollment('e3', []),
+      ],
+      reservedInquiriesCount: 2,
+    })
+
+    const cap = computeGroupCapacity(group, new Set(), NOW)
+    expect(cap.enrolledCount).toBe(3)
+    expect(cap.availableSpots).toBe(0)
+    expect(cap.isFull).toBe(true)
+  })
+})
