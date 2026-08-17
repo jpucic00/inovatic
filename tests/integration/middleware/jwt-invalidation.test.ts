@@ -1,54 +1,95 @@
-import { describe, expect, it } from 'vitest'
+/**
+ * A logged-in teacher's session dies once an admin deletes them (Flux 7m98hdx,
+ * migrated from tests/phase3/31-jwt-soft-delete-invalidation.spec.ts; rewritten
+ * off mirror-testing per Flux 2se21an).
+ *
+ * This file used to re-implement the callback's `deletedAt` condition and assert
+ * on the copy, so it passed no matter what the real code did. It now drives the
+ * two real halves end to end: the admin action that soft-deletes, and
+ * `revalidateTokenClaims` — the DB-backed refresh the jwt callback delegates to,
+ * which lives outside the tier-wide `@/lib/auth` mock.
+ *
+ * `city-auth.test.ts` covers the same function's city/TTL/legacy-claim
+ * behaviour; what is unique here is the path from the admin's click to the
+ * session going away.
+ */
+import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { createTeacher } from '../helpers/factory'
+import { revalidateTokenClaims, type TokenClaims } from '@/lib/auth-token'
+import { createAdmin, createTeacher } from '../helpers/factory'
+import { mockSession } from '../setup'
 
-// JWT invalidation on soft-delete (Flux 7m98hdx, migrated from
-// tests/phase3/31-jwt-soft-delete-invalidation.spec.ts).
-//
-// The Playwright test verified that a logged-in teacher's session is rejected
-// on the next request after admin soft-deletes them. The instant-rejection
-// path is the `deletedAt` check inside the auth callback's TTL branch
-// (src/lib/auth.ts:62-66) — `if (!dbUser || dbUser.deletedAt) return null`.
-//
-// At integration tier we exercise the same code path directly: simulate a
-// JWT-callback re-check by querying `db.user.findUnique` exactly like the
-// callback does, and assert the soft-deleted user yields `null`/`deletedAt`.
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/navigation', async () => {
+  const actual = await vi.importActual<typeof import('next/navigation')>('next/navigation')
+  return {
+    ...actual,
+    redirect: vi.fn((url: string) => {
+      const err = new Error(`NEXT_REDIRECT: ${url}`)
+      ;(err as Error & { digest?: string }).digest = `NEXT_REDIRECT;replace;${url};303;`
+      throw err
+    }),
+    notFound: vi.fn(() => {
+      const err = new Error('NEXT_NOT_FOUND')
+      ;(err as Error & { digest?: string }).digest = 'NEXT_NOT_FOUND'
+      throw err
+    }),
+  }
+})
+
+const { deleteTeacher } = await import('@/actions/admin/teacher')
+
+/** The claims a teacher's cookie carries, due for its next DB re-check. */
+const staleToken = (teacher: { id: string }): TokenClaims => ({
+  id: teacher.id,
+  role: 'TEACHER',
+  city: 'SPLIT',
+  checkedAt: 0,
+})
 
 describe('JWT invalidation on soft-delete', () => {
-  it('soft-deleted teacher: db.user.findUnique with the same select returns deletedAt set → callback returns null', async () => {
-    const teacher = await createTeacher()
+  it('kills the session of a teacher the admin just deleted', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    const teacher = await createTeacher({ city: 'SPLIT' })
+    const token = staleToken(teacher)
+    // Still valid while they are on staff.
+    expect(await revalidateTokenClaims({ ...token })).not.toBeNull()
 
-    // Soft-delete via the same Prisma update the admin server action runs.
-    await db.user.update({
-      where: { id: teacher.id },
-      data: { deletedAt: new Date() },
-    })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    expect(await deleteTeacher(teacher.id)).toEqual({ success: true })
 
-    // Mirror the JWT-callback re-check (src/lib/auth.ts:62-66):
-    const dbUser = await db.user.findUnique({
-      where: { id: teacher.id },
-      select: { deletedAt: true, role: true },
-    })
-
-    expect(dbUser, 'user row still exists (soft, not hard, delete)').not.toBeNull()
-    expect(dbUser?.deletedAt, 'deletedAt is set').not.toBeNull()
-
-    // The callback returns null when deletedAt is set — verified by reading
-    // the condition itself:
-    const callbackResult = !dbUser || dbUser.deletedAt ? null : dbUser
-    expect(callbackResult, 'JWT callback would return null → session destroyed').toBeNull()
+    expect(await revalidateTokenClaims({ ...token })).toBeNull()
+    // Soft, not hard: the row stays so their materials and comments keep an author.
+    const row = await db.user.findUnique({ where: { id: teacher.id } })
+    expect(row?.deletedAt).not.toBeNull()
   })
 
-  it('non-deleted teacher: callback proceeds with the user', async () => {
-    const teacher = await createTeacher()
-    const dbUser = await db.user.findUnique({
-      where: { id: teacher.id },
-      select: { deletedAt: true, role: true },
-    })
-    expect(dbUser).not.toBeNull()
-    expect(dbUser?.deletedAt).toBeNull()
-    const callbackResult = !dbUser || dbUser.deletedAt ? null : dbUser
-    expect(callbackResult, 'callback keeps the session alive').not.toBeNull()
-    expect(callbackResult?.role).toBe('TEACHER')
+  it('keeps a live teacher signed in and refreshes their claims', async () => {
+    const teacher = await createTeacher({ city: 'SPLIT' })
+
+    const result = await revalidateTokenClaims(staleToken(teacher))
+
+    expect(result).not.toBeNull()
+    expect(result?.role).toBe('TEACHER')
+    expect(result?.city).toBe('SPLIT')
+    expect(result?.checkedAt).toBeGreaterThan(0)
+  })
+
+  it('lets a cookie checked seconds ago through — eviction is within a minute, not instant', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    const teacher = await createTeacher({ city: 'SPLIT' })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    await deleteTeacher(teacher.id)
+
+    const fresh: TokenClaims = {
+      id: teacher.id,
+      role: 'TEACHER',
+      city: 'SPLIT',
+      checkedAt: Date.now(),
+    }
+
+    // The 60s TTL is the deliberate cost of not querying on every request; a
+    // test asserting instant death would be asserting something untrue.
+    expect(await revalidateTokenClaims(fresh)).not.toBeNull()
   })
 })

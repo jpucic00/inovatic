@@ -79,10 +79,20 @@ describe('Teacher soft-delete', () => {
     expect(ids, 'soft-deleted teacher is NOT in the active-only list').not.toContain(deleted.id)
   })
 
-  it('auth.authorize rejects a soft-deleted teacher', async () => {
-    // The credentials.authorize callback in src/lib/auth.ts:32-33 returns null
-    // when user.deletedAt is set. We exercise the same logic here with a real
-    // password round-trip to pin the contract.
+  it('a soft-deleted teacher keeps a usable password hash — only deletedAt bars them', async () => {
+    // The login-side refusal is `if (user.deletedAt) return null` inside the
+    // credentials `authorize` callback (src/lib/auth.ts). It cannot be invoked
+    // from this tier: `@/lib/auth` is mocked for the whole integration tier
+    // (setup.ts), so nothing here can reach @auth/core's provider.
+    //
+    // This test used to re-implement that condition and assert on the copy,
+    // which passed no matter what auth.ts did (Flux 2se21an). What it can
+    // honestly pin is the state the callback reads: credentials still verify,
+    // so `deletedAt` is the ONLY thing standing between this row and a session
+    // — remove that check and the account is live again.
+    //
+    // The session-side twin IS covered for real, against
+    // `revalidateTokenClaims`, in middleware/jwt-invalidation.test.ts.
     const password = `pw-${Date.now()}`
     const passwordHash = await bcrypt.hash(password, 4)
     const teacher = await db.user.create({
@@ -101,9 +111,9 @@ describe('Teacher soft-delete', () => {
     const lookup = await db.user.findUnique({ where: { email: teacher.email } })
     expect(lookup, 'user row exists in DB').not.toBeNull()
     expect(lookup?.deletedAt, 'deletedAt is set').not.toBeNull()
-
-    // Mirror src/lib/auth.ts:32-33: `if (user.deletedAt) return null`
-    const authorizeResult = lookup && !lookup.deletedAt ? lookup : null
-    expect(authorizeResult, 'authorize would return null for soft-deleted user').toBeNull()
+    expect(
+      await bcrypt.compare(password, lookup!.passwordHash),
+      'the password still checks out — the deletedAt guard is load-bearing on its own',
+    ).toBe(true)
   })
 })
