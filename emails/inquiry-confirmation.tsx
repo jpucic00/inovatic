@@ -3,7 +3,7 @@ import { EmailLayout, emailStyles } from './components/email-layout'
 // Relative — `emails/` sits outside the `@/*` alias. Shared with the form's
 // success screen so the two can never disagree about what happens next.
 import {
-  INQUIRY_NEXT_STEP_TEXT,
+  inquiryNextStepText,
   type InquiryNextStep,
 } from '../src/lib/inquiry-next-step'
 import type { RadionicaPaymentPlan } from '../src/lib/radionica-deposit'
@@ -15,6 +15,11 @@ interface InquiryConfirmationProps {
   cityLabel?: string
   /** Defaults to the offer-them-termini wording — the pre-dropdown behaviour. */
   nextStep?: InquiryNextStep
+  /**
+   * The promised probni sat date, already formatted dd.MM.yyyy. Only meaningful
+   * for the TRIAL_BOOKED step, which is the only sentence that names it.
+   */
+  trialDateLabel?: string
   /**
    * The akontacija + ostatak figures for a radionica (see
    * `radionicaPaymentPlan`). Set on radionica sign-ups with a price and on
@@ -31,6 +36,7 @@ function InquiryConfirmationEmail({
   childDateOfBirth,
   cityLabel,
   nextStep = 'TERMIN_TO_OFFER',
+  trialDateLabel,
   payment,
 }: InquiryConfirmationProps) {
   return (
@@ -117,7 +123,9 @@ function InquiryConfirmationEmail({
           <Hr style={emailStyles.hr} />
         </>
       )}
-      <Text style={emailStyles.text}>{INQUIRY_NEXT_STEP_TEXT[nextStep]}</Text>
+      <Text style={emailStyles.text}>
+        {inquiryNextStepText(nextStep, { trialDateLabel })}
+      </Text>
       <Text style={emailStyles.text}>
         U međuvremenu, možete saznati više o našim programima na{' '}
         <Link href="https://udruga-inovatic.hr/programi" style={emailStyles.link}>

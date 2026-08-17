@@ -18,7 +18,8 @@ import {
   type Grade,
 } from '@/lib/inquiry-status'
 import { programsForSelection, type CourseGradeRules } from '@/lib/inquiry-availability'
-import { formatGroupSchedule } from '@/lib/format'
+import { checkTrialEligibility } from '@/actions/trial-eligibility'
+import { formatDateKey, formatGroupSchedule } from '@/lib/format'
 import { FieldError } from './FieldError'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
 import type { ProgramKind } from '@prisma/client'
@@ -122,6 +123,57 @@ export function InquiryStep3({
   // something while the dropdown is actually offering termini.
   const offersNoSuitableTermin =
     hasAnyGroups && filteredPrograms.every((p) => isCompetition(p.kind))
+
+  // ── Probni sat ────────────────────────────────────────────────────────────
+  // Offered to first-timers only, and only on a group whose year actually has a
+  // trial week. Both halves are needed: whether the child is new is an identity
+  // question answered by the server, while whether a trial exists (and on which
+  // date) rides on the group, because only the group knows its school year.
+  const [isFirstTimer, setIsFirstTimer] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const firstName = getValues('childFirstName')
+    const lastName = getValues('childLastName')
+    const dateOfBirth = getValues('childDateOfBirth')
+    const parentEmail = getValues('parentEmail')
+    if (!firstName || !lastName || !dateOfBirth || !parentEmail) {
+      setIsFirstTimer(null)
+      return
+    }
+    let cancelled = false
+    checkTrialEligibility({
+      childFirstName: firstName,
+      childLastName: lastName,
+      childDateOfBirth: dateOfBirth,
+      parentEmail,
+    })
+      .then((res) => {
+        if (!cancelled) setIsFirstTimer(res.eligible)
+      })
+      // Fail closed: no offer beats an offer we cannot stand behind.
+      .catch(() => {
+        if (!cancelled) setIsFirstTimer(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [getValues])
+
+  const selectedGroup =
+    selectedGroupKey && selectedGroupKey !== NO_SUITABLE_TERMIN_VALUE
+      ? programs
+          .find((p) => p.id === selectedGroupKey.split('|')[0])
+          ?.groups.find((g) => g.id === selectedGroupKey.split('|')[1])
+      : undefined
+
+  const trialDate = isFirstTimer ? (selectedGroup?.trialDate ?? null) : null
+
+  useEffect(() => {
+    // The offer went away — a different termin, a returning child, a group whose
+    // trial a holiday took. Drop the answer with it, so an inquiry can never
+    // claim a probni sat that was never on screen.
+    if (!trialDate && getValues('wantsTrial')) setValue('wantsTrial', false)
+  }, [trialDate, getValues, setValue])
 
   useEffect(() => {
     // The escape hatch went away with the program that offered it (a city
@@ -273,6 +325,26 @@ export function InquiryStep3({
             Javit ćemo vam se i pokušati dogovoriti termin koji vam odgovara. Ako imate željeni dan
             ili sat, upišite ga u poruku.
           </p>
+        )}
+        {trialDate && (
+          <div className="mt-3 rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-3">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                {...register('wantsTrial')}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+              />
+              <span className="text-sm text-gray-800">
+                <span className="font-medium">
+                  Želim doći na besplatni probni sat ({formatDateKey(trialDate)})
+                </span>
+                <span className="mt-0.5 block text-gray-600">
+                  Probni sat je u istom terminu kao i odabrana grupa. Dijete dolazi, isproba i tek
+                  se nakon toga odlučujete za upis.
+                </span>
+              </span>
+            </label>
+          </div>
         )}
       </div>
 

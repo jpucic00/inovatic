@@ -311,6 +311,37 @@ model CourseSeason {
   @@index([schoolYear])
 }
 
+/// The week of free trial lessons ("probni sat") that opens a school year.
+///
+/// One row per city per year — the association picks ONE week and every standard
+/// SLR group runs its trial inside it, on that group's own weekday and time. So
+/// nothing is stored per group: a week contains exactly one occurrence of each
+/// weekday, and `computeTrialSession` derives the date from the group's existing
+/// `dayOfWeek`.
+///
+/// An ABSENT row is the "no probni sat this year" state, following the
+/// `CourseGradeRule` doctrine — which also means the feature is dark on deploy
+/// until an admin sets a week. Both dates are NOT NULL, unlike CourseSeason's:
+/// a half-set trial week is not a trial week, and the row's absence already
+/// expresses "none".
+///
+/// The trial session is an EXTRA session before module 1, not part of the 4×7
+/// arc — module 1 keeps its full seven, and the trial is free for the child
+/// (payment is per module) while still being a normal paid session for the
+/// teacher, because it books TeacherAttendance like any other date.
+model TrialWeek {
+  id         String   @id @default(cuid())
+  schoolYear String
+  city       City
+  startDate  DateTime @db.Date
+  endDate    DateTime @db.Date
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([schoolYear, city])
+  @@index([schoolYear])
+}
+
 model CourseModule {
   id          String  @id @default(cuid())
   courseId    String
@@ -461,6 +492,17 @@ model Inquiry {
   // scheduledGroupId. Offered on the competitive program's invitation link only
   // (its few weekly slots are negotiable), so it stays false everywhere else.
   noSuitableTermin   Boolean       @default(false)
+  /// The parent asked to come to a probni sat first. Offered only to children
+  /// with no earlier account (the two-tier identity match), and re-checked
+  /// server-side on submit — a payload cannot claim it for a returning child.
+  /// Mirrors `noSuitableTermin` above: an answer to a question the form asked.
+  wantsTrial         Boolean       @default(false)
+  /// The concrete date the parent was promised, derived at submit from the
+  /// chosen group's weekday and that year's TrialWeek. STORED rather than
+  /// derived on read (mirroring `partyConfirmedDate`): it was put in writing in
+  /// the confirmation e-mail, and an admin can move one child without moving
+  /// the whole week. Null when no group was booked — the admin then arranges it.
+  trialDate          DateTime?     @db.Date
   message            String?       @db.Text
   referralSource     String?
   // PARTY only: parent's optional preferred date from the public form.

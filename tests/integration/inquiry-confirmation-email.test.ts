@@ -97,7 +97,7 @@ describe('radionica sign-up confirmation quotes the payment plan', () => {
 
     expect(
       await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id })),
-    ).toEqual({ success: true })
+    ).toMatchObject({ success: true })
     expect(paymentQuoted()).toEqual({
       deposit: '30,00',
       remainder: '120,00',
@@ -115,7 +115,7 @@ describe('radionica sign-up confirmation quotes the payment plan', () => {
 
     expect(
       await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id })),
-    ).toEqual({ success: true })
+    ).toMatchObject({ success: true })
     expect(paymentQuoted()).toBeUndefined()
   })
 
@@ -125,7 +125,7 @@ describe('radionica sign-up confirmation quotes the payment plan', () => {
 
     expect(
       await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id })),
-    ).toEqual({ success: true })
+    ).toMatchObject({ success: true })
     expect(paymentQuoted()).toBeUndefined()
   })
 
@@ -142,7 +142,7 @@ describe('radionica sign-up confirmation quotes the payment plan', () => {
       dateEnd: relativeDateKey(-25),
     })
 
-    expect(await submitInquiry(inquiryFor({ courseId: course.id }))).toEqual({ success: true })
+    expect(await submitInquiry(inquiryFor({ courseId: course.id }))).toMatchObject({ success: true })
     expect(paymentQuoted()).toBeUndefined()
   })
 
@@ -155,7 +155,7 @@ describe('radionica sign-up confirmation quotes the payment plan', () => {
 
     expect(
       await submitInquiry(inquiryFor({ courseId: standard.id, scheduledGroupId: group.id })),
-    ).toEqual({ success: true })
+    ).toMatchObject({ success: true })
     expect(paymentQuoted()).toMatchObject({ deposit: '12,00', remainder: '48,00' })
   })
 })
@@ -174,7 +174,7 @@ describe('the confirmation carries the child’s data readably', () => {
 
     expect(
       await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id })),
-    ).toEqual({ success: true })
+    ).toMatchObject({ success: true })
     expect(confirmationSent().childDateOfBirth).toBe('12.06.2015.')
   })
 })
@@ -209,7 +209,7 @@ describe('confirmation says what actually happens next', () => {
 
     expect(
       await submitInquiry(inquiryFor({ courseId: course.id, noSuitableTermin: true })),
-    ).toEqual({ success: true })
+    ).toMatchObject({ success: true })
     expect(confirmationSent().nextStep).toBe('TERMIN_TO_ARRANGE')
   })
 })

@@ -33,6 +33,12 @@ const step3Schema = z.object({
   // on the competitive program's signup link only; `submitInquiry` is what
   // enforces that, since a payload can claim it anywhere.
   noSuitableTermin: z.boolean().optional(),
+  // "Želim doći na besplatni probni sat." Offered only to first-timers on a
+  // standard program, but like every other client-supplied answer it is
+  // re-decided server-side: `submitInquiry` drops it for a child the two-tier
+  // identity match already knows, so ticking it in a crafted payload buys
+  // nothing.
+  wantsTrial: z.boolean().optional(),
   message: z.string().max(1000, 'Poruka može imati najviše 1000 znakova').optional(),
   referralSource: z.string().max(200).optional(),
   consent: z.literal(true, {

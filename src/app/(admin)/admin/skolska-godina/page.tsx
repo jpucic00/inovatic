@@ -12,6 +12,8 @@ import { toDateKey } from '@/lib/session-dates'
 import { formatDateKey } from '@/lib/format'
 import type { PartyEvent } from '@/lib/school-year-planner'
 import { HolidayImportDialog } from '@/components/admin/school-year/holiday-import-dialog'
+import { TrialWeekEditor } from '@/components/admin/school-year/trial-week-editor'
+import { getTrialWeek } from '@/actions/admin/trial-week'
 import {
   SchoolYearPlannerView,
   type SchoolYearCourseInput,
@@ -29,6 +31,7 @@ export default async function SchoolYearPage() {
 
   const schoolYear = await getSelectedSchoolYear()
   const archived = isArchivedYear(schoolYear)
+  const trialWeek = await getTrialWeek(schoolYear)
 
   // Calendar shows holidays + module markers (standard programs) + workshop
   // labels (radionice groups whose [dateStart, dateEnd] range covers the day).
@@ -177,6 +180,15 @@ export default async function SchoolYearPage() {
       </header>
 
       {archived && <ArchivedYearBanner year={schoolYear} />}
+
+      {/* Sits above the module planner: the probni tjedan runs BEFORE module 1,
+          so it is the first thing set up for a year. */}
+      <TrialWeekEditor
+        schoolYear={schoolYear}
+        startDate={trialWeek?.startDate ?? null}
+        endDate={trialWeek?.endDate ?? null}
+        editable={!archived}
+      />
 
       <SchoolYearPlannerView
         schoolYear={schoolYear}

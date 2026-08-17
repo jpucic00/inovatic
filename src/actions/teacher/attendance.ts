@@ -23,6 +23,7 @@ import {
   type MarkingWindow,
 } from '@/lib/attendance-window'
 import { loadHolidayDateKeys } from '@/lib/holidays'
+import { resolveTrialDateForGroup } from '@/lib/trial-week'
 import {
   bulkMarkSessionSchema,
   type BulkMarkSessionInput,
@@ -317,6 +318,7 @@ function buildStandardAttendance(
   holidayDates: HolidayDateKeys,
   enrollments: AttendanceEnrollment[],
   records: AttendanceRecord[],
+  trialDate: Date | null,
 ): GroupAttendance {
   const modulesForArc = group.course.modules.map((m) => {
     const schedule = m.schedules.find(
@@ -362,6 +364,30 @@ function buildStandardAttendance(
     }
   })
 
+  // The probni sat: one extra session BEFORE module 1, prepended as its own
+  // section. It is not part of the 4×7 arc — module 1 keeps its full seven — but
+  // it is an ordinary session in every other respect: marking it writes the same
+  // Attendance and TeacherAttendance rows, so the teacher is paid for it and it
+  // shows up in Evidencija rada like any other date.
+  //
+  // `moduleScheduleId` is null (there is no ModuleEnrollment to bill against)
+  // and the whole roster is listed, since the trial predates any per-module
+  // enrollment. That is also why it must come before `bucketAdhocDates`: without
+  // a section owning the date, a marked trial would fall into "Ostali termini".
+  if (trialDate) {
+    sections.unshift({
+      moduleScheduleId: null,
+      moduleId: TRIAL_SECTION_ID,
+      moduleIndex: 0,
+      moduleTitle: 'Probni sat',
+      expectedSessions: [toDateKey(trialDate)],
+      adhocSessions: [],
+      enrolledEnrollmentIds: enrollments.map((e) => e.id),
+      firstSession: toDateKey(trialDate),
+      lastSession: toDateKey(trialDate),
+    })
+  }
+
   const otherDates = bucketAdhocDates(sections, records)
 
   return {
@@ -372,6 +398,12 @@ function buildStandardAttendance(
     defaultSelectedDate: pickDefaultSelectedDate(arc, sections),
   }
 }
+
+/**
+ * Stands in for `moduleId` on the probni sat section, which belongs to no
+ * CourseModule. Prefixed so it can never collide with a cuid.
+ */
+const TRIAL_SECTION_ID = '__trial__'
 
 /**
  * Returns everything the Dolazak tab needs.
@@ -452,7 +484,24 @@ export async function getGroupAttendance(
     )
   }
 
-  return buildStandardAttendance(base, group, schoolYear, holidayDates, enrollments, records)
+  // Resolved against the GROUP'S own year — the trial week belongs to the year
+  // the group runs in, not to whatever year today happens to fall in.
+  const trialDate = await resolveTrialDateForGroup({
+    dayOfWeek: group.dayOfWeek,
+    schoolYear,
+    city: group.city,
+    course: { kind: group.course.kind },
+  })
+
+  return buildStandardAttendance(
+    base,
+    group,
+    schoolYear,
+    holidayDates,
+    enrollments,
+    records,
+    trialDate,
+  )
 }
 
 /**

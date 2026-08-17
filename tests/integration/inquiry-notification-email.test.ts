@@ -120,7 +120,7 @@ describe('every course inquiry announces itself to the city inbox', () => {
     })
 
     const data = inquiryFor({ city: 'SIBENIK', courseId: course.id, scheduledGroupId: group.id })
-    expect(await submitInquiry(data)).toEqual({ success: true })
+    expect(await submitInquiry(data)).toMatchObject({ success: true })
 
     const stored = await db.inquiry.findFirstOrThrow({
       where: { parentEmail: data.parentEmail },
@@ -169,7 +169,7 @@ describe('every course inquiry announces itself to the city inbox', () => {
 
     expect(
       await submitInquiry(inquiryFor({ courseId: course.id, noSuitableTermin: true })),
-    ).toEqual({ success: true })
+    ).toMatchObject({ success: true })
     expect(notified().terminLabel).toBe('Ne odgovara mi predloženi termin')
   })
 
@@ -255,7 +255,7 @@ describe('every course inquiry announces itself to the city inbox', () => {
     const group = await fx.group({ courseId: course.id, city: 'SPLIT', schoolYear: YEAR })
 
     const data = inquiryFor({ courseId: course.id, scheduledGroupId: group.id })
-    expect(await submitInquiry(data)).toEqual({ success: true })
+    expect(await submitInquiry(data)).toMatchObject({ success: true })
     expect(
       await db.inquiry.count({ where: { parentEmail: data.parentEmail } }),
     ).toBe(1)
@@ -282,7 +282,7 @@ describe('every proslava inquiry announces itself too', () => {
       partyProposedDate: '2026-09-12',
       consent: true,
     }
-    expect(await submitPartyInquiry(data)).toEqual({ success: true })
+    expect(await submitPartyInquiry(data)).toMatchObject({ success: true })
 
     const stored = await db.inquiry.findFirstOrThrow({
       where: { parentEmail: data.parentEmail },
@@ -317,7 +317,7 @@ describe('every proslava inquiry announces itself too', () => {
       partyProposedDate: '2026-10-03',
       consent: true,
     }
-    expect(await submitPartyInquiry(data)).toEqual({ success: true })
+    expect(await submitPartyInquiry(data)).toMatchObject({ success: true })
 
     expect(sendPartyInquiryNotificationEmail).toHaveBeenCalledTimes(1)
     expect(

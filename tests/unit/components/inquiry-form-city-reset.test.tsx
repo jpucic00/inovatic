@@ -38,7 +38,7 @@ function makeProgram(id: string, groupId: string, groupName: string): ActiveProg
         startTime: '17:00',
         endTime: '18:00',
         availableSpots: 5,
-        isFull: false,
+        isFull: false, trialDate: null,
       },
     ],
   }

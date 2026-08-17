@@ -206,7 +206,7 @@ describe('submitInquiry re-checks the cutoff', () => {
     })
     const form = inquiryFor({ courseId: course.id, scheduledGroupId: group.id })
 
-    expect(await submitInquiry(form)).toEqual({ success: true })
+    expect(await submitInquiry(form)).toMatchObject({ success: true })
     const created = await db.inquiry.findFirst({ where: { parentEmail: form.parentEmail } })
     expect(created?.scheduledGroupId).toBe(group.id)
   })
@@ -220,7 +220,7 @@ describe('submitInquiry re-checks the cutoff', () => {
     })
     const form = inquiryFor({ courseId: course.id })
 
-    expect(await submitInquiry(form)).toEqual({ success: true })
+    expect(await submitInquiry(form)).toMatchObject({ success: true })
     const created = await db.inquiry.findFirst({ where: { parentEmail: form.parentEmail } })
     expect(created?.scheduledGroupId).toBeNull()
   })

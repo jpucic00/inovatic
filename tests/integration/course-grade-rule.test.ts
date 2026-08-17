@@ -289,7 +289,7 @@ describe('submitInquiry honours the razred rule', () => {
     })
 
     const form = inquiryFor({ grade: '8', courseId: course.id, scheduledGroupId: group.id })
-    expect(await submitInquiry(form)).toEqual({ success: true })
+    expect(await submitInquiry(form)).toMatchObject({ success: true })
 
     const inquiry = await db.inquiry.findFirst({ where: { parentEmail: form.parentEmail } })
     expect(inquiry?.scheduledGroupId).toBe(group.id)
@@ -335,7 +335,7 @@ describe('submitInquiry honours the razred rule', () => {
     await createCourseGradeRule(course.id, ['7'], { schoolYear: YEAR, city: 'SIBENIK' })
 
     const form = inquiryFor({ grade: '8' })
-    expect(await submitInquiry(form)).toEqual({ success: true })
+    expect(await submitInquiry(form)).toMatchObject({ success: true })
     const inquiry = await db.inquiry.findFirst({ where: { parentEmail: form.parentEmail } })
     expect(inquiry?.scheduledGroupId).toBeNull()
   })
@@ -347,7 +347,7 @@ describe('submitInquiry honours the razred rule', () => {
 
     const res = await submitInquiry(inquiryFor({ city: 'SPLIT', grade: '8' }))
 
-    expect(res).toEqual({ success: true })
+    expect(res).toMatchObject({ success: true })
     expect(await getCourseGradeRules('SPLIT')).not.toHaveProperty(course.id)
   })
 

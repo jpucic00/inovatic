@@ -164,6 +164,33 @@ export function computeExpectedSessions(input: {
 }
 
 /**
+ * The group's probni sat date — the single occurrence of its weekday inside the
+ * trial week, or none.
+ *
+ * A one-line delegate to {@link computeExpectedSessions}, exactly how
+ * `computeSeasonSessions` is written. A calendar week contains exactly one of
+ * each weekday, so the result is 0 or 1 date, and holiday-awareness comes free:
+ * a public holiday landing on the group's day removes its trial rather than
+ * moving it, which matches how the rest of the app treats a lost week.
+ *
+ * Returns null when the year has no trial week, the group has no weekday
+ * (radionice), or a holiday took it.
+ */
+export function computeTrialSession(input: {
+  dayOfWeek: string | null
+  startDate: Date | null
+  endDate: Date | null
+  holidayDates?: ReadonlySet<string>
+}): Date | null {
+  const [date] = computeExpectedSessions({
+    dayOfWeek: input.dayOfWeek,
+    moduleWindows: [{ startDate: input.startDate, endDate: input.endDate }],
+    holidayDates: input.holidayDates,
+  })
+  return date ?? null
+}
+
+/**
  * Weekly sessions for a COMPETITION group: every occurrence of `dayOfWeek`
  * inside the program's season, minus holidays.
  *
