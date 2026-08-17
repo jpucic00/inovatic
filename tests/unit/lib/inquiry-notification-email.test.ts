@@ -11,6 +11,8 @@
  *    those labels with nothing under them
  *  - the association's own contact card is suppressed — this is a mail TO the
  *    association, not from it
+ *  - a returning child is called out, because "already a polaznik" changes what
+ *    the reader does next, and the cross-city variant stays masked
  */
 import { createElement } from 'react'
 import { render } from '@react-email/components'
@@ -85,6 +87,37 @@ describe('course inquiry notification', () => {
     expect(html).not.toContain('Željeni termin')
     expect(html).not.toContain('Poruka')
     expect(html).not.toContain('Izvor saznanja')
+  })
+
+  it('does not flag a first-time child as a returning one', async () => {
+    // No marker means "we have never seen this child" — printing the callout
+    // unconditionally would make it worthless.
+    const html = await render(createElement(InquiryNotificationEmail, courseProps))
+
+    expect(html).not.toContain('Ponovni upis')
+  })
+
+  it('calls out a returning child, same as the badge in the upit list', async () => {
+    const html = await render(
+      createElement(InquiryNotificationEmail, { ...courseProps, returning: 'SAME_CITY' as const }),
+    )
+
+    expect(html).toContain('Ponovni upis')
+    expect(html).toContain('dijete je već u sustavu')
+    // Also in the preheader, which is what Outlook shows beside the subject.
+    expect(html).toContain('(Šibenik) · Ponovni upis')
+  })
+
+  it('keeps the cross-city match masked', async () => {
+    // A match that lives only in the other city may say that it exists and
+    // nothing else — no name, no DOB, no history, same as /admin/upiti/[id].
+    const html = await render(
+      createElement(InquiryNotificationEmail, { ...courseProps, returning: 'OTHER_CITY' as const }),
+    )
+
+    expect(html).toContain('postojeći polaznik (druga lokacija)')
+    expect(html).toContain('već postoji u drugom gradu')
+    expect(html).not.toContain('dijete je već u sustavu')
   })
 
   it('does not close with the association’s own contact card', async () => {

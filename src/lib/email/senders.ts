@@ -7,7 +7,9 @@ import type { InquiryNextStep } from '@/lib/inquiry-next-step'
 import type { RadionicaPaymentPlan } from '@/lib/radionica-deposit'
 import { CITY_LABELS } from '@/lib/city'
 import InquiryConfirmationEmail from '../../../emails/inquiry-confirmation'
-import InquiryNotificationEmail from '../../../emails/inquiry-notification'
+import InquiryNotificationEmail, {
+  type ReturningMarker,
+} from '../../../emails/inquiry-notification'
 import PartyInquiryConfirmationEmail from '../../../emails/party-inquiry-confirmation'
 import StemEducationInquiryEmail from '../../../emails/stem-education-inquiry'
 import StemEducationConfirmationEmail from '../../../emails/stem-education-confirmation'
@@ -120,6 +122,12 @@ export function sendInquiryNotificationEmail(params: {
   programName?: string
   /** Booked group, or the competitive program's "nijedan termin ne odgovara". */
   terminLabel?: string
+  /**
+   * The admin's "Ponovni upis" marker, so the inbox sees what the upit list
+   * shows: this child is already a polaznik. Resolved by the caller, which is
+   * where the identity match runs.
+   */
+  returning?: ReturningMarker
   message?: string
   referralSource?: string
 }): Promise<boolean> {

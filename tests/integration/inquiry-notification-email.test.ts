@@ -10,7 +10,7 @@
  */
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { relativeDateKey } from './helpers/factory'
+import { createStudent, relativeDateKey } from './helpers/factory'
 import { fixtureScope } from './helpers/cleanup'
 import type { InquiryFormData, PartyInquiryFormData } from '@/lib/validators/inquiry'
 
@@ -36,6 +36,7 @@ const { submitInquiry, submitPartyInquiry } = await import('@/actions/inquiry')
 const YEAR = '2026/2027'
 const fx = fixtureScope()
 const parentEmails: string[] = []
+const studentIds: string[] = []
 let emailCounter = 0
 
 beforeEach(() => {
@@ -47,8 +48,34 @@ beforeEach(() => {
 
 afterAll(async () => {
   await db.inquiry.deleteMany({ where: { parentEmail: { in: parentEmails } } })
+  await db.user.deleteMany({ where: { id: { in: studentIds } } })
   await fx.cleanup()
 })
+
+/**
+ * An existing polaznik with a fixed identity — what makes a later upit for the
+ * same child read as "Ponovni upis". Tracked for teardown: identity matching is
+ * global, so a leftover student would flag another file's inquiries too.
+ */
+async function existingStudent(overrides: {
+  firstName: string
+  lastName: string
+  dateOfBirth: string
+  city?: 'SPLIT' | 'SIBENIK'
+}) {
+  const student = await createStudent(overrides)
+  studentIds.push(student.id)
+  return student
+}
+
+/**
+ * Suffix that keeps a child's name unique. Identity matching is global and the
+ * tier shares one database, so a fixed name would let a neighbouring file's
+ * student decide whether this file's upit reads as returning.
+ */
+function uniqueTag(): string {
+  return `${Date.now().toString(36)}-${++emailCounter}`
+}
 
 function nextParentEmail(): string {
   const parentEmail = `upit-notif-${Date.now().toString(36)}-${++emailCounter}@test.local`
@@ -160,6 +187,64 @@ describe('every course inquiry announces itself to the city inbox', () => {
 
     await submitInquiry(inquiryFor({ courseId: course.id }))
     expect(notified().terminLabel).toBeUndefined()
+  })
+
+  it('marks the upit as a ponovni upis when the child is already a polaznik', async () => {
+    // The same marker the upit list badges. Staff triaging from Outlook need it
+    // before they open the admin: a returning child is enrolled into the next
+    // level, not signed up from scratch.
+    const child = { firstName: 'Petra', lastName: `Povratnik-${uniqueTag()}` }
+    await existingStudent({ ...child, dateOfBirth: '2015-04-21', city: 'SPLIT' })
+
+    const course = await fx.course({ kind: 'STANDARD' })
+    const group = await fx.group({ courseId: course.id, city: 'SPLIT', schoolYear: YEAR })
+    await submitInquiry(
+      inquiryFor({
+        childFirstName: child.firstName,
+        childLastName: child.lastName,
+        childDateOfBirth: '2015-04-21',
+        courseId: course.id,
+        scheduledGroupId: group.id,
+      }),
+    )
+
+    expect(notified().returning).toBe('SAME_CITY')
+  })
+
+  it('masks a match that exists only in the other city', async () => {
+    // Identity matching is global, but the account itself is the other tenant's:
+    // the mail may say a polaznik exists and nothing more, exactly as much as
+    // /admin/upiti/[id] shows.
+    const child = { firstName: 'Ivan', lastName: `Prekograd-${uniqueTag()}` }
+    await existingStudent({ ...child, dateOfBirth: '2014-11-02', city: 'SIBENIK' })
+
+    const course = await fx.course({ kind: 'STANDARD' })
+    const group = await fx.group({ courseId: course.id, city: 'SPLIT', schoolYear: YEAR })
+    await submitInquiry(
+      inquiryFor({
+        childFirstName: child.firstName,
+        childLastName: child.lastName,
+        childDateOfBirth: '2014-11-02',
+        courseId: course.id,
+        scheduledGroupId: group.id,
+      }),
+    )
+
+    expect(notified().returning).toBe('OTHER_CITY')
+  })
+
+  it('leaves the marker off a child nobody has seen before', async () => {
+    const course = await fx.course({ kind: 'STANDARD' })
+    const group = await fx.group({ courseId: course.id, city: 'SPLIT', schoolYear: YEAR })
+    await submitInquiry(
+      inquiryFor({
+        childLastName: `Novak-${uniqueTag()}`,
+        courseId: course.id,
+        scheduledGroupId: group.id,
+      }),
+    )
+
+    expect(notified().returning).toBeUndefined()
   })
 
   it('still reports success when the notification fails to send', async () => {

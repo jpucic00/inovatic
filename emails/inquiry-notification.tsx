@@ -1,6 +1,27 @@
-import { Button, Heading, Hr, Link, Text } from '@react-email/components'
+import { Button, Heading, Hr, Link, Section, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
 import { Field } from './components/notification-field'
+// `emails/` sits outside the `@/*` alias, so the label the admin badge renders
+// is pulled in relatively — the inbox and the app must call this the same thing.
+import { RETURNING_INQUIRY_LABEL } from '../src/lib/inquiry-status'
+
+/**
+ * The admin's derived "Ponovni upis" marker, as the notification carries it.
+ * `OTHER_CITY` is the masked cross-city variant: it says only that a matching
+ * child exists elsewhere, exactly as much as `/admin/upiti/[id]` reveals.
+ */
+export type ReturningMarker = 'SAME_CITY' | 'OTHER_CITY'
+
+const RETURNING_COPY: Record<ReturningMarker, { title: string; body: string }> = {
+  SAME_CITY: {
+    title: `${RETURNING_INQUIRY_LABEL} — dijete je već u sustavu`,
+    body: 'Prije upisa u novu grupu provjerite u koje je grupe dijete već upisano.',
+  },
+  OTHER_CITY: {
+    title: `${RETURNING_INQUIRY_LABEL} — postojeći polaznik (druga lokacija)`,
+    body: 'Dijete s ovim podacima već postoji u drugom gradu. Račun se ne preuzima automatski — obratite se vlasniku udruge.',
+  },
+}
 
 interface InquiryNotificationProps {
   /** Which public form fired this — decides the heading and which fields exist. */
@@ -22,12 +43,41 @@ interface InquiryNotificationProps {
    * termin was on the table.
    */
   terminLabel?: string
+  /**
+   * COURSE only — the child already exists as a student. Absent when this is a
+   * first-time sign-up (and always on PARTY, which carries no child).
+   */
+  returning?: ReturningMarker
   /** PARTY only, already formatted dd.MM.yyyy. */
   partyProposedDate?: string
   message?: string
   referralSource?: string
   /** Absolute link to this upit in the admin. */
   adminUrl: string
+}
+
+// Violet callout mirroring the admin's own "Ponovni upis" panel (violet-50/200
+// on violet-900/800), literal hex because mail clients have no Tailwind.
+const returningBoxStyle = {
+  backgroundColor: '#f5f3ff',
+  border: '1px solid #ddd6fe',
+  borderRadius: '8px',
+  margin: '0 0 16px',
+  padding: '12px 16px',
+}
+
+const returningTitleStyle = {
+  color: '#4c1d95',
+  fontSize: '14px',
+  fontWeight: '700' as const,
+  margin: '0 0 4px',
+}
+
+const returningTextStyle = {
+  color: '#5b21b6',
+  fontSize: '13px',
+  lineHeight: '1.5',
+  margin: '0',
 }
 
 const buttonStyle = {
@@ -62,6 +112,7 @@ function InquiryNotificationEmail({
   gradeLabel,
   programName,
   terminLabel,
+  returning,
   partyProposedDate,
   message,
   referralSource,
@@ -70,14 +121,27 @@ function InquiryNotificationEmail({
   const isParty = kind === 'PARTY'
   const heading = isParty ? 'Novi upit za proslavu' : 'Novi upit za upis'
   const subject = isParty ? parentName : (childName ?? parentName)
+  const returningCopy = returning ? RETURNING_COPY[returning] : null
 
   return (
-    <EmailLayout preview={`${heading} – ${subject} (${cityLabel})`} showSignature={false}>
+    <EmailLayout
+      // The marker rides in the preheader too: Outlook shows it beside the
+      // subject, which is where a returning child gets spotted before anyone
+      // opens the mail.
+      preview={`${heading} – ${subject} (${cityLabel})${returning ? ` · ${RETURNING_INQUIRY_LABEL}` : ''}`}
+      showSignature={false}
+    >
       <Heading style={emailStyles.h1}>{heading}</Heading>
       <Text style={emailStyles.textSmall}>
         Zaprimljeno putem obrasca na udruga-inovatic.hr. Odgovorom na ovaj e-mail pišete
         izravno roditelju.
       </Text>
+      {returningCopy && (
+        <Section style={returningBoxStyle}>
+          <Text style={returningTitleStyle}>{returningCopy.title}</Text>
+          <Text style={returningTextStyle}>{returningCopy.body}</Text>
+        </Section>
+      )}
       <Hr style={emailStyles.hr} />
 
       <Field label="Grad">{cityLabel}</Field>
@@ -136,6 +200,7 @@ InquiryNotificationEmail.PreviewProps = {
   gradeLabel: '3. razred',
   programName: 'Svijet LEGO robotike 2',
   terminLabel: 'SLR 2 · Utorak · 17:00–18:30 · Trokut inkubator',
+  returning: 'SAME_CITY',
   message: 'Marko je prošle godine završio SLR 1 i jako bi volio nastaviti.',
   referralSource: 'Preporuka prijateljice',
   adminUrl: 'https://udruga-inovatic.hr/admin/upiti/clx123',

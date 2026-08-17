@@ -33,6 +33,7 @@ import { GRADE_LABELS, NO_SUITABLE_TERMIN_LABEL, isHighSchoolGrade } from '@/lib
 import { inquiryNextStep } from '@/lib/inquiry-next-step'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
 import { radionicaPaymentPlan } from '@/lib/radionica-deposit'
+import { flagReturningInquiries } from '@/lib/returning-inquiry'
 import { isRadionicaOpenForSignup } from '@/lib/session-dates'
 
 // Thrown when a submitted group does not belong to the submitted city — a
@@ -127,6 +128,32 @@ async function resolveTerminLabel(
     endTime: group.endTime,
   })
   return [group.name, schedule, group.location.name].filter(Boolean).join(' · ')
+}
+
+/**
+ * The "Ponovni upis" marker for the freshly filed upit, run through the very
+ * detection the admin list and the dashboard use — the badge and the mail must
+ * never disagree about whether a child is already a polaznik.
+ *
+ * `studentId: null` because a brand-new upit has created no student yet, so
+ * every identity match is by definition a pre-existing account. A same-city
+ * match is the full marker; a match living only in the other city collapses to
+ * the masked variant, revealing no more than `/admin/upiti/[id]` does.
+ *
+ * Read after the transaction commits (one query, and only ever informational),
+ * so a slow lookup can never hold the capacity guard open.
+ */
+async function resolveReturningMarker(inquiry: {
+  childFirstName: string
+  childLastName: string
+  childDateOfBirth: string
+  parentEmail: string
+  city: City
+}): Promise<'SAME_CITY' | 'OTHER_CITY' | undefined> {
+  const [flagged] = await flagReturningInquiries([{ ...inquiry, studentId: null }])
+  if (flagged.isReturning) return 'SAME_CITY'
+  if (flagged.isReturningOtherCity) return 'OTHER_CITY'
+  return undefined
 }
 
 type InquiryActionResult =
@@ -385,6 +412,13 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       gradeLabel: GRADE_LABELS[grade],
       programName: targetCourse?.title,
       terminLabel: await resolveTerminLabel(scheduledGroupId, noSuitableTermin),
+      returning: await resolveReturningMarker({
+        childFirstName,
+        childLastName,
+        childDateOfBirth,
+        parentEmail,
+        city,
+      }),
       message: message || undefined,
       referralSource: referralSource || undefined,
     })
