@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { render } from '@react-email/components'
 import type { City } from '@prisma/client'
 import type { EvaluationCard } from '@/lib/evaluation-email-cards'
+import type { CredentialsCard } from '@/lib/credentials-email-recipients'
 import { ASSOCIATION_EMAIL, cityInboxEmail, sendTransactionalEmail } from './client'
 import type { InquiryNextStep } from '@/lib/inquiry-next-step'
 import type { RadionicaPaymentPlan } from '@/lib/radionica-deposit'
@@ -51,6 +52,8 @@ export function sendInquiryConfirmationEmail(params: {
   childDateOfBirth: string
   /** Which "what happens next" paragraph closes the body. */
   nextStep?: InquiryNextStep
+  /** The promised probni sat date (dd.MM.yyyy.) — named by the TRIAL_BOOKED arm. */
+  trialDateLabel?: string
   /**
    * Already-formatted akontacija + ostatak figures, which add the payment
    * instruction to the body. Radionica sign-ups only — the caller decides,
@@ -70,6 +73,7 @@ export function sendInquiryConfirmationEmail(params: {
       // body and the office in the From line are the same fact.
       cityLabel: CITY_LABELS[params.city],
       nextStep: params.nextStep,
+      trialDateLabel: params.trialDateLabel,
       payment: params.payment,
     }),
   })
@@ -122,6 +126,13 @@ export function sendInquiryNotificationEmail(params: {
   programName?: string
   /** Booked group, or the competitive program's "nijedan termin ne odgovara". */
   terminLabel?: string
+  /**
+   * The promised probni sat: its date, or a note that one is still to be
+   * arranged. Absent when no trial was requested or the child is a returning
+   * polaznik, so its presence is the signal that staff owe this family a
+   * free lesson before the upis.
+   */
+  trialLabel?: string
   /**
    * The admin's "Ponovni upis" marker, so the inbox sees what the upit list
    * shows: this child is already a polaznik. Resolved by the caller, which is
@@ -333,6 +344,12 @@ type BulkMessageParams = {
    * campaign content that differs for every recipient.
    */
   cards?: EvaluationCard[]
+  /**
+   * The child's portal login — CREDENTIALS campaigns only, and always exactly
+   * one child, the one named in `subject`. Same per-call rule as `cards`: it is
+   * per-recipient content, so it never lives on the campaign.
+   */
+  credentials?: CredentialsCard
 }
 
 function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>) {
@@ -341,6 +358,7 @@ function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>)
     bodyText: params.bodyText,
     options: params.options,
     cards: params.cards,
+    credentials: params.credentials,
     signupUrl: params.signupPath ? `${publicBaseUrl()}${params.signupPath}` : undefined,
   })
 }

@@ -186,17 +186,13 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
             : undefined,
       })
       if (res.success) {
-        if (res.emailFailed) {
-          toast.warning(
-            'Račun kreiran, ali slanje e-maila nije uspjelo — pristupni podaci su dostupni na profilu učenika.',
-          )
-        } else {
-          toast.success(
-            res.isExisting
-              ? 'Postojeći učenik pronađen i ažuriran.'
-              : 'Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.',
-          )
-        }
+        // Nothing is mailed here any more — say so plainly, or the admin will
+        // assume the parent has the login and never run the campaign.
+        toast.success(
+          res.isExisting
+            ? 'Postojeći učenik pronađen i ažuriran. Pristupni podaci nisu poslani roditelju.'
+            : 'Račun učenika kreiran. Pristupni podaci nisu poslani roditelju — pošaljite ih preko E-mail → Pristupni podaci ili ih pročitajte na profilu učenika.',
+        )
         setOpen(false)
         router.refresh()
       } else {

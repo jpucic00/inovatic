@@ -977,13 +977,13 @@ describe('preporuka selection mode', () => {
       sourceGroupIds: [group.id],
       recommendations: ['COMPETITION_PREP'],
     })
-    expect(both).toEqual({ success: false, error: 'Odaberite grupe ili preporuku.' })
+    expect(both).toEqual({ success: false, error: 'Odaberite grupe, preporuku ili pojedinačnu djecu.' })
 
     const neither = await previewEmailRecipients({
       kind: 'CUSTOM',
       sourceSchoolYear: SOURCE_YEAR,
     })
-    expect(neither).toEqual({ success: false, error: 'Odaberite grupe ili preporuku.' })
+    expect(neither).toEqual({ success: false, error: 'Odaberite grupe, preporuku ili pojedinačnu djecu.' })
   })
 })
 

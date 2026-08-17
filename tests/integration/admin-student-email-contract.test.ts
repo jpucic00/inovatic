@@ -51,12 +51,15 @@ async function makeRadionicaGroup() {
   return { radionica, group }
 }
 
-describe('createStudentFromInquiry — email failure is non-fatal', () => {
-  it('send throws → success:true + emailFailed:true, account + enrollment committed, inquiry ACCOUNT_CREATED', async () => {
-    sendMock.mockRejectedValue(new Error('resend down'))
+// Since 2026-08-17 neither creation path mails anything: credentials leave the
+// building ONLY through the CREDENTIALS e-mail campaign, run once contracts are
+// signed. These two tests are the guard on that — the mocked Resend client is
+// armed and configured, so a single stray send would show up as a call.
+describe('createStudentFromInquiry — mails nothing', () => {
+  it('creates the account + enrollment and sends NO e-mail', async () => {
     const admin = await createAdmin()
     const { radionica, group } = await makeRadionicaGroup()
-    const marker = `EMAILFAIL${Date.now().toString(36)}`
+    const marker = `NOMAIL${Date.now().toString(36)}`
 
     const inquiry = await createInquiry({
       parentName: `${marker} Roditelj`,
@@ -71,18 +74,18 @@ describe('createStudentFromInquiry — email failure is non-fatal', () => {
 
     expect(res.success).toBe(true)
     if (res.success) {
-      expect(res.emailFailed).toBe(true)
-
-      // The tx committed before the send — the failure must not undo it.
       const user = await db.user.findUnique({ where: { id: res.studentId } })
       expect(user).not.toBeNull()
       expect(user?.role).toBe('STUDENT')
+      // The password is minted and stored — readable on the profile — it is
+      // just never mailed from here.
+      expect(user?.plainPassword).toBeTruthy()
       const enrollments = await db.enrollment.count({
         where: { userId: res.studentId, scheduledGroupId: group.id },
       })
       expect(enrollments).toBe(1)
     }
-    expect(sendMock).toHaveBeenCalledTimes(1)
+    expect(sendMock).not.toHaveBeenCalled()
 
     const refreshed = await db.inquiry.findUnique({ where: { id: inquiry.id } })
     expect(refreshed?.status).toBe('ACCOUNT_CREATED')
@@ -90,12 +93,11 @@ describe('createStudentFromInquiry — email failure is non-fatal', () => {
   })
 })
 
-describe('createStudentManually — email failure is non-fatal', () => {
-  it('send throws → success:true + emailFailed:true, student + enrollment committed', async () => {
-    sendMock.mockRejectedValue(new Error('resend down'))
+describe('createStudentManually — mails nothing', () => {
+  it('creates the student + enrollment and sends NO e-mail', async () => {
     const admin = await createAdmin()
     const { group } = await makeRadionicaGroup()
-    const marker = `MANUALFAIL${Date.now().toString(36)}`
+    const marker = `MANUALNOMAIL${Date.now().toString(36)}`
 
     mockSession({ id: admin.id, role: 'ADMIN' })
     const res = await createStudentManually({
@@ -112,16 +114,15 @@ describe('createStudentManually — email failure is non-fatal', () => {
 
     expect(res.success).toBe(true)
     if (res.success) {
-      expect(res.emailFailed).toBe(true)
-
       const user = await db.user.findUnique({ where: { id: res.studentId } })
       expect(user).not.toBeNull()
+      expect(user?.plainPassword).toBeTruthy()
       const enrollments = await db.enrollment.count({
         where: { userId: res.studentId, scheduledGroupId: group.id },
       })
       expect(enrollments).toBe(1)
     }
-    expect(sendMock).toHaveBeenCalledTimes(1)
+    expect(sendMock).not.toHaveBeenCalled()
   })
 })
 

@@ -23,12 +23,10 @@ import {
   assertGroupHasAvailableSpot,
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
-import { sendStudentCredentialsEmail } from '@/lib/email'
 import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
-import { formatGroupSchedule } from '@/lib/format'
 import { computeSchoolYear } from '@/lib/school-year'
-import { isMonthlyBilled, isRadionica } from '@/lib/program-kind'
+import { isMonthlyBilled } from '@/lib/program-kind'
 import { seasonMonths } from '@/lib/monthly-charges'
 import {
   computeStudentPaymentStatus,
@@ -140,11 +138,9 @@ type CreateStudentResult =
       password: string
       isExisting: boolean
       studentId: string
-      // Set only when a credentials email was attempted (RESEND_API_KEY present
-      // + recipient/group known) but the send threw. The account is created
-      // regardless; the dialog uses this to warn the admin that the password
-      // must be read off the student profile.
-      emailFailed?: true
+      // No `emailFailed`: since 2026-08-17 neither creation path mails anything.
+      // Credentials leave only through the CREDENTIALS e-mail campaign, so there
+      // is no send here that could fail.
     }
   | { success: false; error: string; code?: 'GROUP_FULL' }
 
@@ -267,6 +263,11 @@ async function findOrCreateStudent(
     if (!existingStudent.plainPassword) {
       backfill.plainPassword = password
       backfill.passwordHash = await hashPassword(password)
+      // Rotating the password always invalidates anything a campaign mailed.
+      // A no-op today (a null plainPassword means nothing was ever sendable),
+      // written so the invariant stays local to the rotation rather than
+      // depending on that coincidence holding.
+      backfill.credentialsSentAt = null
     }
     if (Object.keys(backfill).length > 0) {
       await tx.user.update({
@@ -490,7 +491,6 @@ export async function createStudentFromInquiry(
   if (archived) return archived
 
   let core: CoreResult
-  let inquiry: typeof inquiryPreview
   try {
     const result = await runWithGroupCapacityGuard(async (tx) => {
       const fresh = await tx.inquiry.findUnique({ where: { id: inquiryId } })
@@ -542,10 +542,9 @@ export async function createStudentFromInquiry(
         data: { studentId: created.user.id, assignedGroupId: groupId },
       })
 
-      return { core: created, inquiry: fresh }
+      return { core: created }
     })
     core = result.core
-    inquiry = result.inquiry
   } catch (err) {
     const mapped = mapStudentCreationError(err)
     if (mapped) return mapped
@@ -557,22 +556,11 @@ export async function createStudentFromInquiry(
     return { success: false, error: 'Grupa nije pronađena.' }
   }
 
-  // The account is already committed (the tx above). A credentials-email
-  // failure must NOT be reported as a creation failure: the admin would see an
-  // error, be unable to retry (the inquiry is already ACCOUNT_CREATED), and the
-  // student would be orphaned. Swallow, flag, and fall through to the success
-  // path — the password stays readable on the student profile.
-  let emailFailed = false
-  try {
-    await sendInquiryCredentialsEmail(inquiry, core)
-  } catch (err) {
-    emailFailed = true
-    console.error(
-      'createStudentFromInquiry: credentials email failed (account still created):',
-      describeEmailError(err),
-    )
-  }
-
+  // Accepting an inquiry deliberately mails NOTHING (2026-08-17). Credentials
+  // leave the building only through the CREDENTIALS e-mail campaign, which the
+  // admin runs once the contracts are signed — see `/admin/email`. The password
+  // stays readable on the student profile, which is now the primary way to hand
+  // it over early rather than a fallback.
   revalidatePath('/admin/upiti')
   // Creating this student may make OTHER inquiries with the same child identity
   // read as "Ponovni upis", so revalidate every inquiry detail page, not just
@@ -586,73 +574,7 @@ export async function createStudentFromInquiry(
     password: core.password,
     isExisting: core.isExisting,
     studentId: core.user.id,
-    ...(emailFailed ? { emailFailed: true } : {}),
   }
-}
-
-/**
- * Reduce a thrown email error to a safe log token. Resend rejections can carry
- * request context (recipient, rendered body); we never want the API key or any
- * email content in logs, so surface only the error's name.
- */
-function describeEmailError(err: unknown): string {
-  return err instanceof Error ? err.name : 'UnknownError'
-}
-
-type InquiryEmailContext = {
-  childFirstName: string | null
-  childLastName: string | null
-  parentName: string
-  parentEmail: string
-  city: City
-}
-
-async function dispatchStudentCredentials(
-  to: string,
-  city: City,
-  parentName: string,
-  childName: string,
-  core: CoreResult,
-): Promise<void> {
-  if (!core.group) return
-
-  const schedule = formatGroupSchedule({
-    dateRange: isRadionica(core.group.course.kind),
-    dayOfWeek: core.group.dayOfWeek,
-    dateStart: core.group.dateStart,
-    dateEnd: core.group.dateEnd,
-    startTime: core.group.startTime,
-    endTime: core.group.endTime,
-  })
-
-  await sendStudentCredentialsEmail({
-    to,
-    city,
-    parentName,
-    childName,
-    username: core.user.username ?? '',
-    password: core.password,
-    groupName: core.group.name ?? core.group.course.title,
-    schedule,
-    locationName: core.group.location.name,
-    locationAddress: core.group.location.address,
-  })
-}
-
-async function sendInquiryCredentialsEmail(
-  inquiry: InquiryEmailContext,
-  core: CoreResult,
-): Promise<void> {
-  const childName = `${inquiry.childFirstName ?? ''} ${inquiry.childLastName ?? ''}`.trim()
-  // The inquiry's own city — the office the parent applied to, and (per the
-  // pre-flight check) the admin's city too.
-  await dispatchStudentCredentials(
-    inquiry.parentEmail,
-    inquiry.city,
-    inquiry.parentName,
-    childName,
-    core,
-  )
 }
 
 export async function createStudentManually(
@@ -697,25 +619,8 @@ export async function createStudentManually(
     return { success: false, error: 'Greška pri kreiranju učenika.' }
   }
 
-  // Send credentials email only when there is an initial group assignment.
-  // For new accounts only (skip deduped existing). The student row is already
-  // committed (the tx above), so a send failure is swallowed-and-flagged
-  // rather than surfaced as a creation failure.
-  let emailFailed = false
-  const parentEmail = data.parentEmail
-  if (!core.isExisting && core.group) {
-    try {
-      const childName = `${data.firstName} ${data.lastName}`.trim()
-      await dispatchStudentCredentials(parentEmail, city, data.parentName ?? '', childName, core)
-    } catch (err) {
-      emailFailed = true
-      console.error(
-        'createStudentManually: credentials email failed (student still created):',
-        describeEmailError(err),
-      )
-    }
-  }
-
+  // Creating a student deliberately mails NOTHING (2026-08-17) — same rule as
+  // inquiry acceptance. Credentials go out through the CREDENTIALS campaign.
   revalidatePath('/admin/ucenici')
   revalidatePath(`/admin/ucenici/${core.user.id}`)
   // A newly created student can flip matching inquiries to "Ponovni upis".
@@ -728,7 +633,6 @@ export async function createStudentManually(
     password: core.password,
     isExisting: core.isExisting,
     studentId: core.user.id,
-    ...(emailFailed ? { emailFailed: true } : {}),
   }
 }
 
@@ -999,14 +903,19 @@ export async function getStudent(id: string) {
 /**
  * Regenerates a student's login password and reveals it to the admin.
  *
- * Display-only by design — unlike the teacher reset, nothing is emailed: a
- * child's `email` is the synthetic @student.inovatic.local address, and
- * `sendStudentCredentialsEmail` is an enrollment email that hard-requires
- * group/schedule/location. The admin hands the password over directly.
+ * Display-only by design — nothing is emailed here: a child's `email` is the
+ * synthetic @student.inovatic.local address, and credentials reach a parent only
+ * through the CREDENTIALS e-mail campaign. The admin hands the new password over
+ * directly, or runs that campaign.
  *
- * This is also the only way to unlock a historically-imported account, which
- * is created with an unusable hash and no `plainPassword` — see the promise
- * made in src/lib/import-history/apply.ts.
+ * Clearing `credentialsSentAt` is the point of that column: any password a
+ * previous campaign mailed no longer works, so the child must read as "not sent"
+ * again rather than as a parent who already has working details.
+ *
+ * This is also one way to unlock a historically-imported account, which is
+ * created with an unusable hash and no `plainPassword` — see the promise made in
+ * src/lib/import-history/apply.ts. (The credentials campaign mints one too, for
+ * every such child in its cohort.)
  */
 export async function resetStudentPassword(
   studentId: string,
@@ -1030,7 +939,7 @@ export async function resetStudentPassword(
 
     await db.user.update({
       where: { id: studentId },
-      data: { passwordHash, plainPassword: password },
+      data: { passwordHash, plainPassword: password, credentialsSentAt: null },
     })
 
     revalidatePath(`/admin/ucenici/${studentId}`)

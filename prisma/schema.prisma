@@ -107,6 +107,16 @@ enum EmailCampaignKind {
   /// That makes "someone else's evaluation in my inbox" structurally
   /// impossible instead of merely checked.
   EVALUATION
+  /// Login details for a child's portal account. Like EVALUATION a row is ONE
+  /// CHILD rather than one inbox — two siblings on the same address have two
+  /// different usernames and passwords, so a merged mail would carry two
+  /// people's login secrets. It is one child ACCOUNT rather than one enrollment:
+  /// a password is an account fact, so a child in two selected groups is still
+  /// exactly one mail listing both groups.
+  ///
+  /// Since 2026-08-17 this is the ONLY way credentials leave the building —
+  /// neither inquiry acceptance nor manual student creation mails anything.
+  CREDENTIALS
 }
 
 enum EmailRecipientStatus {
@@ -152,6 +162,15 @@ model User {
   // wrong number. Admin-only — the payout action is the sole reader, and no
   // teacher- or student-facing query may select it.
   hourlyRateCents Int?
+  /// When this child's parent was last mailed working login details by a
+  /// CREDENTIALS campaign. Means "the parent holds a password that currently
+  /// works", so it is CLEARED by `resetStudentPassword` and by the mint-on-reuse
+  /// path in `findOrCreateStudent` — a rotated password makes any previous mail
+  /// wrong. Deliberately NOT backfilled from history: stamping it from account
+  /// creation would mark every send that FAILED as sent (exactly the families
+  /// that still need reaching) and mis-date every returning child, presenting a
+  /// guess as an audit trail. Null therefore means "not sent by this system".
+  credentialsSentAt DateTime?
   gdprConsentAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -779,6 +798,11 @@ model EmailCampaign {
   // Labels rather than ids so history stays readable after course deletion.
   // Empty in group mode.
   sourceRecommendations String[] @default([])
+  /// CREDENTIALS only: audit snapshot of the individually picked children (the
+  /// third selection mode). No FK — students may be deleted later, and the
+  /// recipient rows' `childNames` keep the history readable. Empty in the group
+  /// and preporuka modes.
+  sourceStudentIds String[] @default([])
   targetSchoolYear String?
   targetCourseId   String?
   /// The termini offered in an invitation. Audit-only (no FK — groups may be
@@ -838,6 +862,15 @@ model EmailCampaignRecipient {
   /// each send (`assertCardsBelongTo`), so a card cannot reach another inbox
   /// even if cohort resolution were wrong. Empty for CUSTOM/REENROLLMENT.
   assessmentIds String[] @default([])
+  /// CREDENTIALS only: the child account(s) this row is mailed — always exactly
+  /// one, since a CREDENTIALS row is one child. A deliberately separate column
+  /// from `assessmentIds` rather than an overload of it: the two are read by
+  /// different guards, and conflating them would let an evaluation guard pass a
+  /// credentials row. Re-verified against the student's current parentEmail
+  /// immediately before each send (`assertCredentialsBelongTo`), which fails
+  /// closed, so a password cannot reach another inbox even if cohort resolution
+  /// were wrong. Empty for every other kind.
+  studentIds String[] @default([])
   /// Why a FAILED send failed, or why a SKIPPED child had no usable address.
   failureReason String?
 

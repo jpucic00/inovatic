@@ -1,8 +1,10 @@
 import { Hr, Link, Section, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
 import { EvaluationCardBlock } from './components/evaluation-card'
+import { CredentialsCardBlock } from './components/credentials-card'
 import type { GroupOption } from './schedule-options'
 import type { EvaluationCard } from '../src/lib/evaluation-email-cards'
+import type { CredentialsCard } from '../src/lib/credentials-email-recipients'
 
 interface BulkMessageProps {
   /** Admin-authored plain text; newline-separated paragraphs. Sent exactly as
@@ -21,6 +23,12 @@ interface BulkMessageProps {
    * (`assessmentIds`) and the guard that fills it works on sets.
    */
   cards?: EvaluationCard[]
+  /**
+   * When present, renders this child's portal login — the CREDENTIALS kind.
+   * Exactly one child per mail, always: two siblings on one address have two
+   * different logins, so merging would put someone else's account in the mail.
+   */
+  credentials?: CredentialsCard
   /** Admin-authored subject — reused as the inbox preview line. */
   subject: string
 }
@@ -30,7 +38,14 @@ interface BulkMessageProps {
  * bodyText; the REENROLLMENT invitation adds `options` + `signupUrl`; the
  * EVALUATION send adds `cards`.
  */
-function BulkMessageEmail({ bodyText, options, signupUrl, cards, subject }: BulkMessageProps) {
+function BulkMessageEmail({
+  bodyText,
+  options,
+  signupUrl,
+  cards,
+  credentials,
+  subject,
+}: BulkMessageProps) {
   const paragraphs = bodyText
     .split('\n')
     .map((line) => line.trim())
@@ -73,6 +88,19 @@ function BulkMessageEmail({ bodyText, options, signupUrl, cards, subject }: Bulk
           <Text style={emailStyles.textSmall}>
             Evaluacija je uvijek dostupna u polazničkom portalu, pod
             &nbsp;<strong>Evaluacija</strong>.
+          </Text>
+        </>
+      )}
+      {credentials && (
+        <>
+          <Hr style={emailStyles.hr} />
+          <CredentialsCardBlock card={credentials} />
+          <Text style={emailStyles.textSmall}>
+            Prijava je na&nbsp;
+            <Link href="https://udruga-inovatic.hr/portal" style={{ color: '#0891b2' }}>
+              udruga-inovatic.hr/portal
+            </Link>
+            . Lozinku možete zatražiti ponovno u bilo kojem trenutku — javite nam se.
           </Text>
         </>
       )}

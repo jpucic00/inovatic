@@ -17,6 +17,7 @@ import {
   isCompleteAssessment,
 } from '@/lib/assessment-rubric'
 import {
+  buildCredentialsRecipients,
   buildEmailRecipients,
   buildEvaluationRecipients,
   normalizeParentEmail,
@@ -30,6 +31,16 @@ import {
   toEvaluationCard,
   type EvaluationCard,
 } from '@/lib/evaluation-email-cards'
+import {
+  assertCredentialsBelongTo,
+  type CredentialsCard,
+} from '@/lib/credentials-email-recipients'
+import { formatGroupSchedule } from '@/lib/format'
+import { isRadionica } from '@/lib/program-kind'
+import { generateSimplePassword, hashPassword } from '@/lib/password'
+// Credentials ride the campaign template (`credentials` on sendBulkMessageEmail),
+// not the standalone `sendStudentCredentialsEmail` — that one owns its own
+// subject and hard-requires a single group, neither of which fits a campaign.
 import { renderBulkMessageHtml, sendBulkMessageEmail } from '@/lib/email'
 import {
   previewEmailSchema,
@@ -72,6 +83,55 @@ function sleep(ms: number) {
  */
 const NOT_RADIONICA = { kind: { not: 'RADIONICA' } } as const
 const GROUP_NOT_RADIONICA = { course: NOT_RADIONICA } as const
+
+/**
+ * Feed for the CREDENTIALS "pojedinačna djeca" picker: every student enrolled in
+ * `sourceYear` in the admin's city, with their groups and their credentials
+ * state, so the admin can see at a glance who still needs a password minted and
+ * who has already been sent working details.
+ *
+ * City-scoped like every other feed here. The send re-resolves and re-validates
+ * whatever comes back, so this is a convenience list, not a trust boundary.
+ */
+export async function getEmailStudentOptions(sourceYear: string) {
+  const { city } = await requireAdminCtx()
+  if (!SCHOOL_YEAR_RE.test(sourceYear)) return []
+
+  const students = await db.user.findMany({
+    where: {
+      role: 'STUDENT',
+      deletedAt: null,
+      city,
+      enrollments: { some: { schoolYear: sourceYear } },
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      parentEmail: true,
+      plainPassword: true,
+      credentialsSentAt: true,
+      enrollments: {
+        where: { schoolYear: sourceYear },
+        select: { scheduledGroup: { select: { name: true, course: { select: { title: true } } } } },
+      },
+    },
+    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+  })
+
+  return students.map((s) => ({
+    id: s.id,
+    name: `${s.firstName} ${s.lastName}`.trim(),
+    groupLabel: s.enrollments
+      .map((e) =>
+        [e.scheduledGroup.name, e.scheduledGroup.course.title].filter(Boolean).join(' · '),
+      )
+      .join(' | '),
+    hasEmail: normalizeParentEmail(s.parentEmail) !== null,
+    needsPassword: !s.plainPassword,
+    alreadySent: s.credentialsSentAt !== null,
+  }))
+}
 
 /**
  * Feed for the step-2 grouped multi-select: every course that actually had
@@ -171,11 +231,12 @@ type CohortFilters = {
   sourceSchoolYear: string
   sourceGroupIds?: string[]
   recommendations?: string[]
+  sourceStudentIds?: string[]
 }
 
 /**
  * Resolve the campaign audience from the source filters — exactly one of the
- * two selection modes (the validator enforces it; re-checked here). The client
+ * three selection modes (the validator enforces it; re-checked here). The client
  * never supplies recipients directly.
  */
 async function resolveCohort(
@@ -187,6 +248,16 @@ async function resolveCohort(
     // Groups only — the validator rejects a preporuka selection for this kind,
     // since a preporuka names children rather than the cards being sent.
     return resolveEvaluationCohort(city, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
+  }
+  if (kind === 'CREDENTIALS') {
+    // Groups or explicitly named children — never a preporuka, which says
+    // nothing about which ACCOUNT is being credentialed.
+    return resolveCredentialsCohort(
+      city,
+      filters.sourceSchoolYear,
+      filters.sourceGroupIds ?? [],
+      filters.sourceStudentIds ?? [],
+    )
   }
   if (filters.recommendations?.length) {
     return resolveRecommendationCohort(city, kind, filters.sourceSchoolYear, [
@@ -305,6 +376,100 @@ async function resolveEvaluationCohort(
     ok: true,
     recipients: built.recipients,
     skipped: [...built.skipped, ...ungraded.values()],
+  }
+}
+
+/**
+ * Credentials mode: one recipient per child ACCOUNT, from either selected groups
+ * or explicitly named children.
+ *
+ * The unit is the account, so a child in two selected groups produces one row
+ * listing both groups — unlike EVALUATION, where two groups mean two documents
+ * and therefore two mails.
+ *
+ * Both selection modes validate the same way every other cohort does: a smuggled
+ * or cross-city id invalidates the whole request rather than being silently
+ * dropped. Children are resolved to their CURRENT groups in the source year for
+ * the label, so a row reads the way the mail will.
+ */
+async function resolveCredentialsCohort(
+  city: City,
+  sourceSchoolYear: string,
+  sourceGroupIds: string[],
+  sourceStudentIds: string[],
+): Promise<ResolvedCohort> {
+  let studentIds: string[]
+
+  if (sourceStudentIds.length > 0) {
+    const ids = [...new Set(sourceStudentIds)]
+    const found = await db.user.findMany({
+      where: { id: { in: ids }, role: 'STUDENT', deletedAt: null, city },
+      select: { id: true },
+    })
+    if (found.length !== ids.length) return { ok: false, error: INVALID_DATA }
+    studentIds = ids
+  } else {
+    const validated = await validateSourceGroups(
+      city,
+      'CREDENTIALS',
+      sourceSchoolYear,
+      sourceGroupIds,
+    )
+    if (!validated.ok) return validated
+    const enrollments = await db.enrollment.findMany({
+      where: {
+        schoolYear: sourceSchoolYear,
+        scheduledGroupId: { in: validated.ids },
+        user: { role: 'STUDENT', deletedAt: null },
+      },
+      select: { userId: true },
+    })
+    studentIds = [...new Set(enrollments.map((e) => e.userId))]
+  }
+
+  if (studentIds.length === 0) return { ok: true, recipients: [], skipped: [] }
+
+  const students = await db.user.findMany({
+    where: { id: { in: studentIds }, role: 'STUDENT', deletedAt: null, city },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      parentEmail: true,
+      plainPassword: true,
+      username: true,
+      credentialsSentAt: true,
+      enrollments: {
+        where: { schoolYear: sourceSchoolYear },
+        select: {
+          scheduledGroup: {
+            select: { name: true, course: { select: { title: true } } },
+          },
+        },
+      },
+    },
+  })
+
+  return {
+    ok: true,
+    ...buildCredentialsRecipients(
+      students.map((s) => ({
+        studentId: s.id,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        parentEmail: s.parentEmail,
+        groupLabel: s.enrollments
+          .map((e) =>
+            [e.scheduledGroup.name, e.scheduledGroup.course.title].filter(Boolean).join(' · '),
+          )
+          .join(' | '),
+        // A null plainPassword means the account has an unusable hash (the Excel
+        // importer's doing) — nobody can log in with it, so minting a fresh one
+        // at campaign creation destroys nothing.
+        needsPassword: !s.plainPassword || !s.username,
+        alreadySent: s.credentialsSentAt !== null,
+      })),
+    ),
   }
 }
 
@@ -673,6 +838,26 @@ const SAMPLE_EVALUATION_CARD: EvaluationCard = {
   updatedAtLabel: '30.06.2026.',
 }
 
+/**
+ * Stand-in login for the step-1 layout preview. Invented for the same reason as
+ * the sample card above, plus a sharper one: the preview is about the template,
+ * and rendering a real child's working password into a preview iframe would put
+ * a live credential on screen for no benefit.
+ */
+const SAMPLE_CREDENTIALS_CARD: CredentialsCard = {
+  childName: 'Ana Anić (primjer)',
+  username: 'ana_anic',
+  password: 'a1b2c3',
+  groups: [
+    {
+      label: 'SLR 2 – utorkom · Svijet LEGO robotike 2',
+      schedule: 'Utorak, 17:00–18:30',
+      locationName: 'Velebitska 32',
+      locationAddress: 'Velebitska 32, Split',
+    },
+  ],
+}
+
 /** Renders the exact email (fixed sample parent name) for the step-1 preview iframe. */
 export async function previewEmailHtml(input: PreviewEmailInput): Promise<PreviewEmailHtmlResult> {
   const { city } = await requireAdminCtx()
@@ -687,6 +872,8 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
     let signupPath: string | undefined
     const cards =
       parsed.data.kind === 'EVALUATION' ? [SAMPLE_EVALUATION_CARD] : undefined
+    const credentials =
+      parsed.data.kind === 'CREDENTIALS' ? SAMPLE_CREDENTIALS_CARD : undefined
     if (parsed.data.kind === 'REENROLLMENT') {
       const targetYear = await getSelectedSchoolYear()
       const built = await buildTargetOptions(
@@ -700,15 +887,23 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
       signupPath = built.signupPath
     }
 
+    // Both per-child kinds append the child's name to the subject at send time,
+    // so the preview shows the sample child's — otherwise the preview subject
+    // and the delivered one would differ in shape.
+    let previewSubject = parsed.data.subject
+    if (parsed.data.kind === 'EVALUATION') {
+      previewSubject = `${parsed.data.subject} – ${SAMPLE_EVALUATION_CARD.childName}`
+    } else if (parsed.data.kind === 'CREDENTIALS') {
+      previewSubject = `${parsed.data.subject} – ${SAMPLE_CREDENTIALS_CARD.childName}`
+    }
+
     const html = await renderBulkMessageHtml({
-      subject:
-        parsed.data.kind === 'EVALUATION'
-          ? `${parsed.data.subject} – ${SAMPLE_EVALUATION_CARD.childName}`
-          : parsed.data.subject,
+      subject: previewSubject,
       bodyText: parsed.data.bodyText,
       options,
       signupPath,
       cards,
+      credentials,
     })
     return { success: true, html }
   } catch (err) {
@@ -785,6 +980,59 @@ function partitionRecipients(
   return { toSend, excluded, alreadySent }
 }
 
+/**
+ * The unchecked rows, keyed the way this kind's `rowKey` is keyed.
+ *
+ * Per-child kinds cannot exclude by address: two siblings share one, so
+ * unchecking a child would silently drop their sibling too. EVALUATION keys on
+ * the report card (two groups = two documents = two rows) and CREDENTIALS on the
+ * student (one account, however many groups).
+ */
+function buildExcludedSet(data: SendEmailCampaignInput): Set<string> {
+  if (data.kind === 'EVALUATION') return new Set(data.excludedAssessmentIds ?? [])
+  if (data.kind === 'CREDENTIALS') return new Set(data.excludedStudentIds ?? [])
+  return new Set(
+    (data.excludedParentEmails ?? [])
+      .map((e) => normalizeParentEmail(e))
+      .filter((e): e is string => e !== null),
+  )
+}
+
+/**
+ * Give every credentialed child a usable password before the send starts.
+ *
+ * Runs once, inside the campaign-creation transaction. That placement is the
+ * whole point: minting inside the send loop would mean a resumed run rotates a
+ * password a second time, invalidating the one the first run already mailed —
+ * the parent would hold a password that no longer works and nothing would say so.
+ *
+ * Only accounts with no usable password are touched. A null `plainPassword`
+ * means an unusable hash (every historically-imported account), so nobody can
+ * log in with it today and replacing it destroys nothing. Accounts that already
+ * have one keep it — a parent who was handed the password in person must not
+ * find it silently rotated.
+ */
+async function mintMissingPasswords(
+  tx: Prisma.TransactionClient,
+  recipients: EmailRecipient[],
+): Promise<void> {
+  const studentIds = recipients.flatMap((r) => r.studentIds)
+  if (studentIds.length === 0) return
+
+  const needing = await tx.user.findMany({
+    where: { id: { in: studentIds }, role: 'STUDENT', plainPassword: null },
+    select: { id: true },
+  })
+
+  for (const student of needing) {
+    const password = generateSimplePassword(6)
+    await tx.user.update({
+      where: { id: student.id },
+      data: { passwordHash: await hashPassword(password), plainPassword: password },
+    })
+  }
+}
+
 export async function sendEmailCampaign(
   input: SendEmailCampaignInput,
 ): Promise<SendEmailCampaignResult> {
@@ -806,17 +1054,7 @@ export async function sendEmailCampaign(
     const cohort = await resolveCohort(city, data.kind, data)
     if (!cohort.ok) return { success: false, error: cohort.error }
 
-    // Matched against `rowKey`, which is the parent inbox for CUSTOM/REENROLLMENT
-    // and the individual report card for EVALUATION — unchecking one child there
-    // must not drop their sibling on the same address.
-    const excludedSet =
-      data.kind === 'EVALUATION'
-        ? new Set(data.excludedAssessmentIds ?? [])
-        : new Set(
-            (data.excludedParentEmails ?? [])
-              .map((e) => normalizeParentEmail(e))
-              .filter((e): e is string => e !== null),
-          )
+    const excludedSet = buildExcludedSet(data)
 
     const { toSend, excluded, alreadySent } = partitionRecipients(
       cohort.recipients,
@@ -840,6 +1078,7 @@ export async function sendEmailCampaign(
           sourceSchoolYear: data.sourceSchoolYear,
           sourceGroupIds: data.sourceGroupIds ?? [],
           sourceRecommendations,
+          sourceStudentIds: data.sourceStudentIds ?? [],
           targetSchoolYear: data.kind === 'REENROLLMENT' ? targetYear : null,
           targetCourseId: data.kind === 'REENROLLMENT' ? data.targetCourseId : null,
           targetGroupIds: data.kind === 'REENROLLMENT' ? data.targetGroupIds : [],
@@ -881,8 +1120,19 @@ export async function sendEmailCampaign(
             c.groupLabel ? `${c.name} · ${c.groupLabel}` : c.name,
           ),
           assessmentIds: r.assessmentIds,
+          studentIds: r.studentIds,
         })),
       })
+
+      // Mint the missing passwords HERE, in the same transaction that claims the
+      // cohort — never inside the send loop, where a resumed run would rotate a
+      // second time and invalidate the password the first mail already
+      // delivered. Only accounts with no usable password are touched: a null
+      // `plainPassword` means an unusable hash (the Excel importer's doing), so
+      // nobody can log in with it and nothing is destroyed.
+      if (data.kind === 'CREDENTIALS') {
+        await mintMissingPasswords(tx, toSend)
+      }
 
       return created
     })
@@ -901,6 +1151,7 @@ export async function sendEmailCampaign(
       options,
       signupPath,
       sentKey,
+      sourceSchoolYear: data.sourceSchoolYear,
     })
 
     revalidatePath('/admin/email')
@@ -956,6 +1207,12 @@ type SendJob = {
   /** Where the invitation's CTA points — `/prijava/<target-slug>`. */
   signupPath: string | undefined
   sentKey: string | null
+  /**
+   * Which year's groups a CREDENTIALS mail lists. A plain scalar, and safe to
+   * live here: it is the same for every recipient. The per-child content it
+   * helps build is still constructed inside the loop.
+   */
+  sourceSchoolYear: string
 }
 
 /** Everything `toEvaluationCard` and the ownership guard read off a card row. */
@@ -1024,8 +1281,107 @@ async function markRecipientFailed(
     .catch(() => {})
 }
 
+/** Everything the credentials card and its ownership guard read off a student. */
+const CREDENTIALS_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  parentEmail: true,
+  city: true,
+  username: true,
+  plainPassword: true,
+  deletedAt: true,
+} as const
+
+type BuiltCredentials =
+  | { ok: true; card: CredentialsCard; childName: string; studentId: string }
+  | { ok: false; reason: string }
+
+/**
+ * Load the login one recipient row is owed, and prove it may go to that address
+ * before returning it.
+ *
+ * The sibling of `buildCardsForRecipient`, and the same discipline: the row's
+ * `studentIds` were written when the cohort was resolved, so this re-derives
+ * ownership from the student's CURRENT `parentEmail` and refuses on any
+ * disagreement (`assertCredentialsBelongTo`). Called once per recipient from
+ * inside the send loop — never hoisted, so a password cannot outlive its
+ * iteration.
+ *
+ * The group list is loaded separately from the ownership row: it is display
+ * content, and an empty list is fine (a child credentialed before enrollment
+ * still gets a working login).
+ */
+async function buildCredentialsForRecipient(
+  recipient: { parentEmail: string; studentIds: string[] },
+  city: City,
+  sourceSchoolYear: string,
+): Promise<BuiltCredentials> {
+  const rows = await db.user.findMany({
+    where: { id: { in: recipient.studentIds }, role: 'STUDENT' },
+    select: CREDENTIALS_SELECT,
+  })
+
+  const verdict = assertCredentialsBelongTo(
+    { parentEmail: recipient.parentEmail, city, studentIds: recipient.studentIds },
+    rows,
+  )
+  if (!verdict.ok) return { ok: false, reason: verdict.reason }
+
+  const student = rows[0]
+  const enrollments = await db.enrollment.findMany({
+    where: { userId: student.id, schoolYear: sourceSchoolYear },
+    select: {
+      scheduledGroup: {
+        select: {
+          name: true,
+          dayOfWeek: true,
+          dateStart: true,
+          dateEnd: true,
+          startTime: true,
+          endTime: true,
+          course: { select: { title: true, kind: true } },
+          location: { select: { name: true, address: true } },
+        },
+      },
+    },
+  })
+
+  const childName = `${student.firstName} ${student.lastName}`.trim()
+  return {
+    ok: true,
+    studentId: student.id,
+    childName,
+    card: {
+      childName,
+      // The guard above already refused a null username/password, so these are
+      // non-null here.
+      username: student.username ?? '',
+      password: student.plainPassword ?? '',
+      groups: enrollments.map(({ scheduledGroup: g }) => ({
+        label: [g.name, g.course.title].filter(Boolean).join(' · '),
+        schedule: formatGroupSchedule({
+          dateRange: isRadionica(g.course.kind),
+          dayOfWeek: g.dayOfWeek,
+          dateStart: g.dateStart,
+          dateEnd: g.dateEnd,
+          startTime: g.startTime,
+          endTime: g.endTime,
+        }),
+        locationName: g.location.name,
+        locationAddress: g.location.address,
+      })),
+    },
+  }
+}
+
 /** One PENDING row as the send loop reads it. */
-type PendingRecipient = { id: string; parentEmail: string; assessmentIds: string[] }
+type PendingRecipient = {
+  id: string
+  parentEmail: string
+  assessmentIds: string[]
+  studentIds: string[]
+}
 
 /**
  * One recipient, start to finish: prove the content (EVALUATION), claim the
@@ -1039,6 +1395,8 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
   // recipient and must not be able to survive into the next iteration. See
   // SendJob.
   let cards: EvaluationCard[] | undefined
+  let credentials: CredentialsCard | undefined
+  let credentialedStudentId: string | undefined
   let subject = job.subject
   if (job.kind === 'EVALUATION') {
     const built = await buildCardsForRecipient(recipient, job.city)
@@ -1051,6 +1409,21 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
     cards = built.cards
     // Naming the child in the subject keeps two mails to one inbox apart, and
     // makes a misdirected card obvious to the person best placed to notice.
+    subject = `${job.subject} – ${built.childName}`
+  } else if (job.kind === 'CREDENTIALS') {
+    const built = await buildCredentialsForRecipient(
+      recipient,
+      job.city,
+      job.sourceSchoolYear,
+    )
+    if (!built.ok) {
+      // Fail closed, for the same reason and with more at stake: an unprovable
+      // login is never mailed.
+      await markRecipientFailed(claimId, job.campaignId, built.reason)
+      return
+    }
+    credentials = built.card
+    credentialedStudentId = built.studentId
     subject = `${job.subject} – ${built.childName}`
   }
 
@@ -1097,7 +1470,19 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
       options: job.options,
       signupPath: job.signupPath,
       cards,
+      credentials,
     })
+    // "This parent holds a password that currently works." Stamped only after a
+    // non-throwing send, and cleared again by resetStudentPassword — so it never
+    // claims a rotated password was delivered.
+    if (credentialedStudentId) {
+      await db.user
+        .update({
+          where: { id: credentialedStudentId },
+          data: { credentialsSentAt: new Date() },
+        })
+        .catch(() => {})
+    }
     // Counts increment per recipient so progress polling is live and an
     // interrupted campaign still reports exactly what went out.
     await db.emailCampaign
@@ -1133,7 +1518,7 @@ async function runSendJob(job: SendJob): Promise<void> {
   // run left behind; on a first run it is the whole cohort.
   const pending = await db.emailCampaignRecipient.findMany({
     where: { campaignId: job.campaignId, status: 'PENDING' },
-    select: { id: true, parentEmail: true, assessmentIds: true },
+    select: { id: true, parentEmail: true, assessmentIds: true, studentIds: true },
   })
 
   for (let i = 0; i < pending.length; i++) {
@@ -1193,6 +1578,7 @@ export async function resumeEmailCampaign(
       kind: true,
       subject: true,
       bodyText: true,
+      sourceSchoolYear: true,
       targetCourseId: true,
       targetSchoolYear: true,
       targetGroupIds: true,
@@ -1236,6 +1622,7 @@ export async function resumeEmailCampaign(
     city,
     subject: campaign.subject,
     bodyText: campaign.bodyText,
+    sourceSchoolYear: campaign.sourceSchoolYear,
     options,
     signupPath,
     sentKey,

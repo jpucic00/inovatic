@@ -1,0 +1,11 @@
+-- Enum value added ALONE, in its own migration.
+-- Postgres cannot USE a value added by ALTER TYPE inside the same transaction
+-- that adds it, and Prisma wraps each migration file in one transaction. Keeping
+-- this separate means any later DML referencing 'CREDENTIALS' can be added to the
+-- companion migration without failing on deploy only. Same split the EVALUATION
+-- kind effectively used.
+--
+-- Irreversible: removing an enum value needs the full type-rewrite dance (see
+-- 20260401000000). If this feature is reverted, leave the value in place and
+-- stop writing it.
+ALTER TYPE "EmailCampaignKind" ADD VALUE 'CREDENTIALS';

@@ -17,6 +17,7 @@ import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import {
   getCampaignProgress,
   getEmailGroupTree,
+  getEmailStudentOptions,
   previewEmailHtml,
   previewEmailRecipients,
   previewEvaluationEmailForRecipient,
@@ -100,9 +101,11 @@ function SendProgressPanel({ result }: Readonly<{ result: StartedSend }>) {
   )
 }
 
-type Kind = 'CUSTOM' | 'REENROLLMENT' | 'EVALUATION'
-type SelectionMode = 'GROUPS' | 'RECOMMENDATION'
+type Kind = 'CUSTOM' | 'REENROLLMENT' | 'EVALUATION' | 'CREDENTIALS'
+/** STUDENTS is CREDENTIALS-only — see the validator's requireExactlyOneSelection. */
+type SelectionMode = 'GROUPS' | 'RECOMMENDATION' | 'STUDENTS'
 type GroupTree = Awaited<ReturnType<typeof getEmailGroupTree>>
+type StudentOption = Awaited<ReturnType<typeof getEmailStudentOptions>>[number]
 type RecipientData = Extract<PreviewRecipientsResult, { success: true }>
 type SendSuccess = Extract<SendEmailCampaignResult, { success: true }>
 
@@ -134,6 +137,12 @@ const DEFAULT_EVALUATION_BODY = [
   'Poštovani,',
   'U nastavku se nalazi evaluacija Vašeg djeteta po završetku programa. Opisuje napredak kroz praktične i timske vještine te preporuku mentora za nastavak.',
   'Evaluacija je uvijek dostupna u polazničkom portalu. Za sva pitanja slobodno nam odgovorite na ovu poruku.',
+].join('\n')
+
+const DEFAULT_CREDENTIALS_BODY = [
+  'Poštovani,',
+  'U nastavku se nalaze pristupni podaci Vašeg djeteta za polaznički portal. Ondje su dostupni materijali s radionica, fotografije i evaluacija.',
+  'Podatke čuvajte — vrijede za tekuću školsku godinu. Za sva pitanja slobodno nam odgovorite na ovu poruku.',
 ].join('\n')
 
 const SELECT_CLASS =
@@ -173,6 +182,10 @@ export function EmailWizard({
   const [sourceYear, setSourceYear] = useState(selectedYear)
   const [selectionMode, setSelectionMode] = useState<SelectionMode>('GROUPS')
   const [recommendations, setRecommendations] = useState<string[]>([])
+  const [sourceStudentIds, setSourceStudentIds] = useState<string[]>([])
+  const [studentOptions, setStudentOptions] = useState<StudentOption[]>([])
+  const [loadingStudents, setLoadingStudents] = useState(false)
+  const [studentSearch, setStudentSearch] = useState('')
   const [tree, setTree] = useState<GroupTree>(initialTree)
   const [loadingTree, setLoadingTree] = useState(false)
   const [sourceGroupIds, setSourceGroupIds] = useState<string[]>([])
@@ -200,9 +213,11 @@ export function EmailWizard({
     setTargetCourseId('')
     setTargetGroups([])
     setTargetGroupIds([])
-    // An evaluation is always about a year already taught, so it never uses the
-    // preporuka cohort (the server rejects it too).
-    if (next === 'EVALUATION') setSelectionMode('GROUPS')
+    setSourceStudentIds([])
+    // Neither of the per-child kinds can use a preporuka cohort (the server
+    // rejects it too): a preporuka names children, not the card or the account
+    // being sent. Both start on groups.
+    if (next === 'EVALUATION' || next === 'CREDENTIALS') setSelectionMode('GROUPS')
     if (next === 'REENROLLMENT') {
       setSubject(`Upisi u školsku godinu ${selectedYear} – Inovatic`)
       setBodyText(DEFAULT_INVITATION_BODY)
@@ -211,6 +226,11 @@ export function EmailWizard({
       // No child name here — the send appends it per recipient.
       setSubject('Evaluacija po završetku programa – Inovatic')
       setBodyText(DEFAULT_EVALUATION_BODY)
+      setSourceYear(selectedYear)
+    } else if (next === 'CREDENTIALS') {
+      // No child name here either — the send appends it per recipient.
+      setSubject('Pristupni podaci za polaznički portal – Inovatic')
+      setBodyText(DEFAULT_CREDENTIALS_BODY)
       setSourceYear(selectedYear)
     } else {
       setSubject('')
@@ -246,10 +266,36 @@ export function EmailWizard({
     }
   }, [kind, sourceYear])
 
+  // The individual-children picker's feed. Loaded only when that mode is open,
+  // and reloaded on a year change like the group tree.
+  useEffect(() => {
+    if (selectionMode !== 'STUDENTS') return
+    let cancelled = false
+    setLoadingStudents(true)
+    getEmailStudentOptions(sourceYear)
+      .then((rows) => {
+        if (!cancelled) setStudentOptions(rows)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStudentOptions([])
+          toast.error('Greška pri dohvaćanju djece.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingStudents(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectionMode, sourceYear])
+
   // Live recipient resolution; the request id drops stale responses.
   const requestIdRef = useRef(0)
-  const hasSelection =
-    selectionMode === 'GROUPS' ? sourceGroupIds.length > 0 : recommendations.length > 0
+  let hasSelection: boolean
+  if (selectionMode === 'GROUPS') hasSelection = sourceGroupIds.length > 0
+  else if (selectionMode === 'STUDENTS') hasSelection = sourceStudentIds.length > 0
+  else hasSelection = recommendations.length > 0
   useEffect(() => {
     if (!hasSelection) {
       setRecipientData(null)
@@ -262,6 +308,7 @@ export function EmailWizard({
       sourceSchoolYear: sourceYear,
       sourceGroupIds: selectionMode === 'GROUPS' ? sourceGroupIds : undefined,
       recommendations: selectionMode === 'RECOMMENDATION' ? recommendations : undefined,
+      sourceStudentIds: selectionMode === 'STUDENTS' ? sourceStudentIds : undefined,
       targetCourseId: kind === 'REENROLLMENT' && targetCourseId ? targetCourseId : undefined,
     })
       .then((res) => {
@@ -282,11 +329,21 @@ export function EmailWizard({
       .finally(() => {
         if (requestIdRef.current === id) setLoadingRecipients(false)
       })
-  }, [kind, sourceYear, sourceGroupIds, recommendations, selectionMode, hasSelection, targetCourseId])
+  }, [
+    kind,
+    sourceYear,
+    sourceGroupIds,
+    recommendations,
+    sourceStudentIds,
+    selectionMode,
+    hasSelection,
+    targetCourseId,
+  ])
 
   const handleSourceYearChange = (year: string) => {
     setSourceYear(year)
     setSourceGroupIds([])
+    setSourceStudentIds([])
     setRecipientData(null)
     setExcluded(new Set())
     setConfirming(false)
@@ -297,8 +354,16 @@ export function EmailWizard({
     setSelectionMode(mode)
     setSourceGroupIds([])
     setRecommendations([])
+    setSourceStudentIds([])
     setRecipientData(null)
     setExcluded(new Set())
+    setConfirming(false)
+  }
+
+  const toggleSourceStudent = (id: string) => {
+    setSourceStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    )
     setConfirming(false)
   }
 
@@ -490,6 +555,8 @@ export function EmailWizard({
       input = { kind: 'REENROLLMENT' as const, subject, bodyText, targetCourseId, targetGroupIds }
     } else if (kind === 'EVALUATION') {
       input = { kind: 'EVALUATION' as const, subject, bodyText }
+    } else if (kind === 'CREDENTIALS') {
+      input = { kind: 'CREDENTIALS' as const, subject, bodyText }
     } else {
       input = { kind: 'CUSTOM' as const, subject, bodyText }
     }
@@ -519,6 +586,7 @@ export function EmailWizard({
         sourceSchoolYear: sourceYear,
         sourceGroupIds: selectionMode === 'GROUPS' ? sourceGroupIds : undefined,
         recommendations: selectionMode === 'RECOMMENDATION' ? recommendations : undefined,
+        sourceStudentIds: selectionMode === 'STUDENTS' ? sourceStudentIds : undefined,
         subject,
         bodyText,
       }
@@ -534,6 +602,10 @@ export function EmailWizard({
       } else if (kind === 'EVALUATION') {
         // Excluded rows are report cards here, not inboxes — see toggleRecipient.
         input = { kind: 'EVALUATION' as const, ...base, excludedAssessmentIds: [...excluded] }
+      } else if (kind === 'CREDENTIALS') {
+        // Excluded rows are child accounts here, not inboxes — a sibling on the
+        // same address must survive unchecking their brother or sister.
+        input = { kind: 'CREDENTIALS' as const, ...base, excludedStudentIds: [...excluded] }
       } else {
         input = { kind: 'CUSTOM' as const, ...base, excludedParentEmails: [...excluded] }
       }
@@ -748,6 +820,9 @@ export function EmailWizard({
                 if (kind === 'EVALUATION') {
                   return 'Jedan red = jedno dijete i njegova kartica. Radionice se ne ocjenjuju pa nisu na popisu.'
                 }
+                if (kind === 'CREDENTIALS') {
+                  return 'Jedan red = jedno dijete i njegov račun. Dvoje djece na istoj adresi dobiva dvije poruke.'
+                }
                 return 'Roditelji polaznika odabranih grupa iz odabrane školske godine.'
               })()}
             </p>
@@ -772,18 +847,24 @@ export function EmailWizard({
             </div>
 
             {/* An evaluation is always a group's own report cards, so there is no
-                mode to pick — a preporuka cohort names children, not cards. */}
+                mode to pick — a preporuka cohort names children, not cards.
+                Credentials swap the preporuka mode for naming children outright:
+                a preporuka says nothing about which ACCOUNT is being sent. */}
             {kind !== 'EVALUATION' && (
               <div className="mt-4">
                 <span className="block text-sm font-medium text-gray-700 mb-1.5">
                   Način odabira
                 </span>
                 <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
-                  {(
-                    [
-                      { value: 'GROUPS', label: 'Po grupama' },
-                      { value: 'RECOMMENDATION', label: 'Po preporuci' },
-                    ] as const
+                  {(kind === 'CREDENTIALS'
+                    ? ([
+                        { value: 'GROUPS', label: 'Po grupama' },
+                        { value: 'STUDENTS', label: 'Pojedinačna djeca' },
+                      ] as const)
+                    : ([
+                        { value: 'GROUPS', label: 'Po grupama' },
+                        { value: 'RECOMMENDATION', label: 'Po preporuci' },
+                      ] as const)
                   ).map((option) => (
                     <button
                       key={option.value}
@@ -819,6 +900,87 @@ export function EmailWizard({
                 <p className="text-xs text-gray-500 pt-1">
                   Svi polaznici odabrane godine s odabranom preporukom u izvještaju — neovisno o
                   grupi i programu.
+                </p>
+              </div>
+            )}
+
+            {selectionMode === 'STUDENTS' && (
+              <div className="mt-4 rounded-lg border border-gray-100 p-3">
+                <input
+                  type="text"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  placeholder="Pretraži djecu…"
+                  className={INPUT_CLASS}
+                />
+                {(() => {
+                  if (loadingStudents) {
+                    return <p className="mt-3 text-sm text-gray-500">Učitavanje…</p>
+                  }
+                  if (studentOptions.length === 0) {
+                    return (
+                      <p className="mt-3 text-sm text-gray-500">
+                        Nema upisane djece u školskoj godini {sourceYear}.
+                      </p>
+                    )
+                  }
+                  const term = studentSearch.trim().toLowerCase()
+                  const shown = term
+                    ? studentOptions.filter(
+                        (s) =>
+                          s.name.toLowerCase().includes(term) ||
+                          s.groupLabel.toLowerCase().includes(term),
+                      )
+                    : studentOptions
+                  if (shown.length === 0) {
+                    return <p className="mt-3 text-sm text-gray-500">Nema rezultata.</p>
+                  }
+                  return (
+                    <div className="mt-3 max-h-80 space-y-0.5 overflow-y-auto">
+                      {shown.map((s) => (
+                        <label
+                          key={s.id}
+                          className="flex items-start gap-2.5 py-1.5 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={sourceStudentIds.includes(s.id)}
+                            onChange={() => toggleSourceStudent(s.id)}
+                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm text-gray-800">
+                              {s.name}
+                              {/* Both badges answer questions the admin would
+                                  otherwise have to open each profile for. */}
+                              {s.needsPassword && (
+                                <span className="ml-2 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
+                                  nova lozinka
+                                </span>
+                              )}
+                              {s.alreadySent && (
+                                <span className="ml-2 rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[11px] text-gray-600">
+                                  već poslano
+                                </span>
+                              )}
+                              {!s.hasEmail && (
+                                <span className="ml-2 rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700">
+                                  nema e-mail
+                                </span>
+                              )}
+                            </span>
+                            {s.groupLabel && (
+                              <span className="block text-xs text-gray-500">{s.groupLabel}</span>
+                            )}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )
+                })()}
+                <p className="pt-2 text-xs text-gray-500">
+                  Svako dijete dobiva zaseban e-mail sa svojim podacima — dvoje djece na istoj
+                  adresi znači dvije poruke.
                 </p>
               </div>
             )}
@@ -961,9 +1123,15 @@ export function EmailWizard({
 
             {!hasSelection && (
               <p className="text-sm text-gray-400 italic py-4 text-center">
-                {selectionMode === 'GROUPS'
-                  ? 'Odaberite grupe iznad da biste vidjeli primatelje.'
-                  : 'Odaberite preporuku iznad da biste vidjeli primatelje.'}
+                {(() => {
+                  if (selectionMode === 'GROUPS') {
+                    return 'Odaberite grupe iznad da biste vidjeli primatelje.'
+                  }
+                  if (selectionMode === 'STUDENTS') {
+                    return 'Odaberite djecu iznad da biste vidjeli primatelje.'
+                  }
+                  return 'Odaberite preporuku iznad da biste vidjeli primatelje.'
+                })()}
               </p>
             )}
 

@@ -5,7 +5,7 @@ const schoolYearField = z
   .string()
   .regex(/^\d{4}\/\d{4}$/, 'Nevaljana školska godina.')
 
-// Cohort selection — exactly ONE of the two modes per request (enforced by
+// Cohort selection — exactly ONE of the three modes per request (enforced by
 // requireExactlyOneSelection, applied on every schema embedding these fields;
 // discriminatedUnion members must stay plain ZodObjects, so the refine lives
 // on the outer schema):
@@ -14,6 +14,9 @@ const schoolYearField = z
 //    (`course:<id>` or a special-track kind, the encodeRecommendation format);
 //    every student of the year whose report card matches one of them,
 //    regardless of group or program
+//  - pojedinačna djeca: `sourceStudentIds` — explicitly picked children.
+//    CREDENTIALS only, because it is the only kind whose unit is an account
+//    rather than a document or an inbox.
 const selectionFields = {
   sourceSchoolYear: schoolYearField,
   // The cap bounds the query, it is not a business rule: "Odaberi sve grupe"
@@ -33,18 +36,29 @@ const selectionFields = {
     )
     .max(20, 'Najviše 20 preporuka.')
     .optional(),
+  sourceStudentIds: z
+    .array(z.string().min(1).max(50))
+    .max(500, 'Najviše 500 djece.')
+    .optional(),
 }
 
 function requireExactlyOneSelection(
-  value: { kind?: string; sourceGroupIds?: string[]; recommendations?: unknown[] },
+  value: {
+    kind?: string
+    sourceGroupIds?: string[]
+    recommendations?: unknown[]
+    sourceStudentIds?: string[]
+  },
   ctx: z.RefinementCtx,
 ) {
   const hasGroups = (value.sourceGroupIds?.length ?? 0) > 0
   const hasRecommendations = (value.recommendations?.length ?? 0) > 0
-  if (hasGroups === hasRecommendations) {
+  const hasStudents = (value.sourceStudentIds?.length ?? 0) > 0
+  const modes = [hasGroups, hasRecommendations, hasStudents].filter(Boolean).length
+  if (modes !== 1) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Odaberite grupe ili preporuku.',
+      message: 'Odaberite grupe, preporuku ili pojedinačnu djecu.',
     })
     return
   }
@@ -55,6 +69,24 @@ function requireExactlyOneSelection(
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Evaluacije se šalju odabirom grupa.',
+    })
+  }
+  // Same reasoning one step further: a preporuka says nothing about which
+  // ACCOUNT is being credentialed, so credentials are selected by group or by
+  // naming the children outright.
+  if (value.kind === 'CREDENTIALS' && hasRecommendations) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Pristupni podaci šalju se odabirom grupa ili pojedinačne djece.',
+    })
+  }
+  // The individual-children mode exists for CREDENTIALS only. Every other
+  // resolver keys its content off a group or a report card and has nothing to
+  // build from a bare student id.
+  if (hasStudents && value.kind !== 'CREDENTIALS') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Odabir pojedinačne djece moguć je samo za pristupne podatke.',
     })
   }
 }
@@ -108,6 +140,28 @@ const evaluationContent = {
   bodyText: bodyTextField,
 }
 
+/**
+ * CREDENTIALS' exclusion key. Like EVALUATION it cannot be the parent's e-mail —
+ * a credentials row is one child, so two siblings share an address. The STUDENT
+ * is the identifier that names exactly one row (not the enrollment: a child in
+ * two selected groups is still a single account, hence a single mail).
+ */
+const excludedStudentIdsField = z
+  .array(z.string().min(1).max(50))
+  .max(1000, 'Previše isključenih primatelja.')
+  .optional()
+
+/**
+ * The credentials send carries no target program and no CTA — the content is the
+ * child's own username/password plus their current groups, resolved per
+ * recipient at send time.
+ */
+const credentialsContent = {
+  kind: z.literal('CREDENTIALS'),
+  subject: subjectField,
+  bodyText: bodyTextField,
+}
+
 const reenrollmentContent = {
   kind: z.literal('REENROLLMENT'),
   subject: subjectField,
@@ -136,6 +190,11 @@ export const sendEmailCampaignSchema = z
       ...selectionFields,
       excludedAssessmentIds: excludedAssessmentIdsField,
     }),
+    z.object({
+      ...credentialsContent,
+      ...selectionFields,
+      excludedStudentIds: excludedStudentIdsField,
+    }),
   ])
   .superRefine(requireExactlyOneSelection)
 
@@ -143,7 +202,7 @@ export const sendEmailCampaignSchema = z
 // kind compute its "već poslano" skip-set alongside the cohort.
 export const previewRecipientsSchema = z
   .object({
-    kind: z.enum(['CUSTOM', 'REENROLLMENT', 'EVALUATION']),
+    kind: z.enum(['CUSTOM', 'REENROLLMENT', 'EVALUATION', 'CREDENTIALS']),
     ...selectionFields,
     targetCourseId: z.string().min(1).optional(),
   })
@@ -154,6 +213,7 @@ export const previewEmailSchema = z.discriminatedUnion('kind', [
   z.object(customContent),
   z.object(reenrollmentContent),
   z.object(evaluationContent),
+  z.object(credentialsContent),
 ])
 
 /**
