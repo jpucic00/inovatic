@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { CITIES, LOCATIONS } from '@/lib/locations'
 
 const inter = Inter({
   subsets: ['latin', 'latin-ext'],
@@ -108,10 +109,12 @@ const localBusinessJsonLd = {
       geo: { '@type': 'GeoCoordinates', latitude: 43.71615, longitude: 15.90774 },
     },
   ],
-  sameAs: [
-    'https://facebook.com/udrugainovatic',
-    'https://instagram.com/udruga_inovatic',
-  ],
+  // Both cities' pages — Google reads sameAs as "this organisation's own
+  // profiles", and leaving Šibenik's out leaves them unattributed.
+  sameAs: CITIES.flatMap((c) => [
+    LOCATIONS[c.slug].social.facebook,
+    LOCATIONS[c.slug].social.instagram,
+  ]),
 }
 
 export default function RootLayout({

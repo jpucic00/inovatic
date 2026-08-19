@@ -30,6 +30,11 @@ interface Venue {
   coordinator: Coordinator
 }
 
+interface CitySocial {
+  facebook: string
+  instagram: string
+}
+
 interface CityContact {
   slug: CitySlug
   label: string
@@ -43,6 +48,12 @@ interface CityContact {
    * lists). Display format; strip spaces for the tel: href.
    */
   phone: string
+  /**
+   * The city's own Facebook/Instagram pages. Šibenik runs separate accounts —
+   * a follower there wants that office's termini, not Split's — so these are
+   * per-city like `upisi` and `phone`, never one shared pair.
+   */
+  social: CitySocial
   venues: Venue[]
 }
 
@@ -65,6 +76,10 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
       'Nastava u Splitu odvija se na dvije lokacije — redovni program u Velebitskoj i natjecateljski programi na Prirodoslovno-matematičkom fakultetu.',
     upisi: 'prijave@udruga-inovatic.hr',
     phone: '+385 99 393 6993',
+    social: {
+      facebook: 'https://facebook.com/udrugainovatic',
+      instagram: 'https://instagram.com/udruga_inovatic',
+    },
     venues: [
       {
         name: 'Velebitska 32',
@@ -113,6 +128,10 @@ export const LOCATIONS: Record<CitySlug, CityContact> = {
       'Naša nova lokacija (2026.) — isti kurikulum Svijet LEGO Robotike.',
     upisi: 'prijave.sibenik@udruga-inovatic.hr',
     phone: '+385 92 168 9987',
+    social: {
+      facebook: 'https://www.facebook.com/profile.php?id=61593303836422',
+      instagram: 'https://www.instagram.com/udruga_inovatic_sibenik',
+    },
     venues: [
       {
         name: 'Trokut inkubator',

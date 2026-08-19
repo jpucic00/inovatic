@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Mail, Phone, MapPin } from 'lucide-react'
 import { FacebookIcon, InstagramIcon } from '@/components/shared/social-icons'
 import { Logo } from '@/components/shared/logo'
+import { CITIES, LOCATIONS } from '@/lib/locations'
 
 const quickLinks = [
   { href: '/programi', label: 'Programi' },
@@ -26,25 +27,33 @@ export function Footer() {
               Udruga za robotiku koja potiče djecu na istraživanje, kreativnost
               i razvoj STEM vještina kroz LEGO robotiku. U Splitu od 2014., u Šibeniku od 2026.
             </p>
-            <div className="flex gap-3">
-              <a
-                href="https://facebook.com/udrugainovatic"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-cyan-500 hover:text-white transition-colors"
-                aria-label="Facebook"
-              >
-                <FacebookIcon className="w-4 h-4" />
-              </a>
-              <a
-                href="https://instagram.com/udruga_inovatic"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-cyan-500 hover:text-white transition-colors"
-                aria-label="Instagram"
-              >
-                <InstagramIcon className="w-4 h-4" />
-              </a>
+            {/* One row per city — Šibenik runs its own pages, and an unlabelled
+                second pair of icons reads as a duplicate rather than a second
+                office (same reasoning as the two phone numbers below). */}
+            <div className="space-y-2">
+              {CITIES.map((c) => (
+                <div key={c.slug} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500 w-16 flex-shrink-0">{c.label}</span>
+                  <a
+                    href={LOCATIONS[c.slug].social.facebook}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-cyan-500 hover:text-white transition-colors"
+                    aria-label={`Facebook – ${c.label}`}
+                  >
+                    <FacebookIcon className="w-4 h-4" />
+                  </a>
+                  <a
+                    href={LOCATIONS[c.slug].social.instagram}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-cyan-500 hover:text-white transition-colors"
+                    aria-label={`Instagram – ${c.label}`}
+                  >
+                    <InstagramIcon className="w-4 h-4" />
+                  </a>
+                </div>
+              ))}
             </div>
           </div>
 

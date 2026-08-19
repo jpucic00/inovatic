@@ -125,7 +125,7 @@ export default async function CityLocationPage({ params }: PageProps) {
                 <h3 className="text-sm font-bold text-gray-900 mb-3">Pratite nas</h3>
                 <div className="flex gap-3">
                   <a
-                    href="https://facebook.com/udrugainovatic"
+                    href={city.social.facebook}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm text-gray-600 hover:text-cyan-600 transition-colors bg-white border border-gray-200 rounded-xl px-4 py-2"
@@ -133,7 +133,7 @@ export default async function CityLocationPage({ params }: PageProps) {
                     <FacebookIcon className="w-4 h-4" /> Facebook
                   </a>
                   <a
-                    href="https://instagram.com/udruga_inovatic"
+                    href={city.social.instagram}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm text-gray-600 hover:text-cyan-600 transition-colors bg-white border border-gray-200 rounded-xl px-4 py-2"
