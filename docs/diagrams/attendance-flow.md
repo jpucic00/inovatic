@@ -6,6 +6,8 @@ There is no `ClassSession` model. Expected session dates are derived on the fly 
 - **Radionice** (`isRadionica`) — `computeRadionicaSessions` enumerates every day in the `[dateStart, dateEnd]` range, skipping Sundays and holidays. The flat list is preserved (no module sections).
 - **Natjecateljski program** (`isCompetition`) — `computeSeasonSessions({ dayOfWeek, startDate, endDate, holidayDates })` yields one session a week on the group's weekday inside the program's `CourseSeason` `[startDate, endDate]` for this `(schoolYear, city)`. Holiday weeks are dropped outright — **no session-count target, no make-up** — and an unplanned season (or missing weekday) yields `[]`. Flat list, like radionice.
 
+- **Probni sat** (STANDARD only) — `computeTrialSession` yields the single occurrence of the group's weekday inside that year's `TrialWeek`. Not a fourth per-kind derivation but an **extra date prepended to the standard branch**: one free trial session before module 1, which keeps its full seven.
+
 > A holiday is pre-filtered out of the expected set so attendance never shows a slot for it. Any further cancellation (snow day, ad-hoc) is the teacher's call — they leave the row unmarked or write a note.
 
 Since 2026-07 there are **two** record tables sharing that derived session date: `Attendance`, keyed `(enrollmentId, sessionDate)`, for students; and `TeacherAttendance`, keyed `(userId, scheduledGroupId, sessionDate)`, for teaching hours. Both are written by the same `bulkMarkSession` transaction. `TeacherAttendance` is keyed on the **group**, not on `TeacherAssignment`, so the rows outlive an unassignment — they are the sole source of **hours** for the payout report (`getTeacherWorkReport` → `src/lib/teacher-work-report.ts`, each present row worth the group's `endTime − startTime`), which prices those hours at the teacher's current `User.hourlyRateCents` — a null rate makes every amount null rather than 0, and there is deliberately no six-month total. Marking a date as a holiday after the fact deletes **both** tables' rows for that date, city-filtered, so a cancelled class is never still billed.
@@ -23,12 +25,19 @@ flowchart TD
     E --> F{"Module has a schedule and 7 sessions fit?"}
     F -->|No| G["Arc stops early → that module and later ones get an empty section, moduleScheduleId null"]
     F -->|Yes| H["Section: expectedSessions = arc 7 dates; enrolledEnrollmentIds from ModuleEnrollment on this moduleScheduleId"]
-    H --> I["Record-only dates not in any section → assignAdhocDateToSection: matching module's adhocSessions, else 'Ostali termini' (otherDates)"]
+    H --> T{"resolveTrialDateForGroup(group) → a trial date?"}
+    T -->|Yes| TS["sections.unshift('Probni sat'): moduleScheduleId null,<br/>one expectedSession, the WHOLE roster listed"]
+    T -->|No| I
+    TS --> I
+    I["Record-only dates not in any section → assignAdhocDateToSection: matching module's adhocSessions, else 'Ostali termini' (otherDates)"]
 
+    style TS fill:#fef3c7
     style G fill:#fee2e2
     style H fill:#d1fae5
     style E fill:#e0f2fe
 ```
+
+> **The trial section is unshifted BEFORE the ad-hoc bucketing, on purpose.** With no section owning the date, a marked probni sat would fall into "Ostali termini". `moduleScheduleId` is null (there is no `ModuleEnrollment` to bill it against) and the whole roster is listed, because the trial predates any per-module enrollment. Marking it writes ordinary `Attendance` **and** `TeacherAttendance` rows — the trial is free for the child but a paid hour for the teacher, so it appears in Evidencija rada like any other date. Source: `resolveTrialDateForGroup` (`src/lib/trial-week.ts`) → `computeTrialSession` (`src/lib/session-dates.ts`), keyed on the **group's own** `schoolYear`; an absent `TrialWeek` row is the "no probni sat this year" state, and a holiday on the group's weekday **removes** that group's trial rather than moving it.
 
 > **Per-group, race-ahead — not `ModuleSchedule` windows.** Source: `getGroupModuleArc` in `src/lib/group-module-arc.ts`. Module N+1 starts on the group's next weekday occurrence after Module N's 7th session, so two groups in the same course on different weekdays (or with different holiday counts) sit on different modules on the same calendar date. The `ModuleSchedule.startDate/endDate` rows stay the slowest-weekday reference for calendar headers and admin pages; the arc reads only M1's `startDate` (the kickoff) and models per-group breaks via the holiday set, not via gaps between module windows.
 

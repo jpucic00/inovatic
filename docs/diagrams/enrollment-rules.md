@@ -59,7 +59,8 @@ stateDiagram-v2
         EnrollmentMonth rows (join month → season end) for the
         Natjecateljski program instead — it is billed monthly
         Inquiry.studentId + assignedGroupId set
-        Email: AccountCredentialsEmail to parent
+        NO e-mail is sent (2026-08-17). Credentials leave
+        only through a CREDENTIALS campaign on /admin/email
         TERMINAL STATE (COURSE only)
     end note
 
@@ -84,7 +85,7 @@ stateDiagram-v2
 | From | To | Action | Guard | Side effects |
 |------|-----|--------|-------|-------------|
 | — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation (`inquirySchema` rejects `scheduledGroupId` + `noSuitableTermin` together); COURSE: high-school grade / `noSuitableTermin` only on a COMPETITION target (`competitionOnlyAnswerError`); with group: `group.city === submitted city`, radionica termin not yet started; **without** group **and** without `noSuitableTermin`: `!isTerminRequired(programs, grade, courseId)` against `loadProgramsForCheck` | Inquiry created with `city`; confirmation email to the parent **and** a notification to the city's staff inbox (reply-to = parent, swallow-and-log after the row is committed); spot reserved if group selected (COURSE) |
-| `NEW` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED && status !== DECLINED`; `type === COURSE` | User + Enrollment + ModuleEnrollments; credentials email; `studentId` + `assignedGroupId` set |
+| `NEW` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED && status !== DECLINED`; `type === COURSE` | User + Enrollment + ModuleEnrollments; **no e-mail**; `studentId` + `assignedGroupId` set |
 | `NEW` | `PARTY_SCHEDULED` | `schedulePartyInquiry` | `type === PARTY` | `partyConfirmedDate` + `partyStartTime` set; appears on Kalendar |
 | `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000) | `declineReason` persisted; spot freed |
 | `PARTY_SCHEDULED` | `DECLINED` | `declineInquiry` | — (no status guard on decline) | `declineReason` persisted |
@@ -496,6 +497,7 @@ flowchart TD
 - **`ModuleEnrollment`** — to remove a student from a module, delete the row. Removing module N does **not** cascade to N+1, N+2 — each row is an independent fact.
 - **A module is "done"** when `ModuleSchedule.endDate < now`. No per-enrollment status update needed — every `ModuleEnrollment` for that schedule is automatically treated as past once the date is past.
 - **`Enrollment`** — a group-membership row per school year. No status, no lifecycle. Deleting it (`onDelete: Cascade`) removes its `ModuleEnrollment` rows.
+- **`Enrollment.contractSignedAt` is not a status either (2026-08-17).** An account and enrollment exist as soon as an admin accepts an inquiry, so a child is visible in the group before anyone has committed to anything; "Ugovor potpisan" plus the paid marks are what "actually signed up" means. A nullable timestamp, not a state machine. It is the **only** enrollment mark a TEACHER may see and set — teachers collect the signed contracts at the group — and even they are limited to their **own groups in the current school year** (`setEnrollmentContractSignedByTeacher`, `src/actions/teacher/contract.ts`); a past year is a correction and corrections are the admin's job, the same split `teacherMarkingWindow` draws for attendance. The admin twin is `setEnrollmentContractSigned`, and both funnel through `writeContractSigned` in **`src/lib/enrollment-contract.ts`** — a plain module, deliberately not `src/actions/**`, because every export from a `'use server'` file becomes its own callable endpoint.
 - **Cancellations are deletes.** For a radionica: `deleteEnrollment`. For a single module in a standard course: `deleteModuleEnrollment`.
 - **History is whatever rows still exist.** Past `ModuleEnrollment` rows stay in the DB as the record of what the student participated in. There is no "COMPLETED" status to set.
 
@@ -551,7 +553,8 @@ sequenceDiagram
 
     Note over Parent, Admin: PHASE 2 — Admin Reviews Inquiry
 
-    Admin->>Server: Views /admin/upiti inquiry list
+    Admin->>Server: Views /admin/upiti inquiry list (status, vrsta, program, razred, search, Ponovni upis)
+    Note right of Server: The "Ponovni upis" narrowing cannot go into the where clause - the marker comes from flagReturningInquiries (two-tier identity matching in src/lib/student-match.ts), not from a column. So the whole filtered set is flagged once and the paginated query is narrowed by the surviving ids, which keeps total and the page slice in agreement. PARTY rows carry no child and drop out of BOTH directions.
     Server-->>Admin: Inquiries with search, status filter, type filter, pagination
 
     Note over Parent, Admin: OPTIONAL — Admin Sends Schedule Options
@@ -584,8 +587,7 @@ sequenceDiagram
     Server->>Server: Create Enrollment (and ModuleEnrollments for standard courses)
     Note right of Server: Monthly-billed COMPETITION groups instead get EnrollmentMonth rows (createSeasonMonths in ensureEnrollment) - join month through season end, skipDuplicates. An unplanned season writes nothing. Setting dates later backfills via upsertCourseSeason, whose same-transaction syncSeasonMonths adds newly covered months and deletes only unpaid out-of-range ones.
     Server->>Server: Update Inquiry status ACCOUNT_CREATED, studentId, assignedGroupId
-    Server->>Email: Send AccountCredentialsEmail
-    Email-->>Parent: Pristupni podaci za childName
+    Note right of Server: NO e-mail is sent on acceptance (2026-08-17). Credentials leave only through a CREDENTIALS campaign on /admin/email, run once contracts are signed - one mail per CHILD, ownership re-derived per recipient by assertCredentialsBelongTo. Passwords for accounts that have none are minted up front at campaign creation (hashed outside the transaction), and User.credentialsSentAt records the delivery. The password also stays readable on the student profile, which is the primary early hand-over.
 
     Note over Parent, Admin: ALTERNATE ENTRY PATHS
 

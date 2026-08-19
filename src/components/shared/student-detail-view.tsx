@@ -76,6 +76,8 @@ interface Props {
   onClearAssessment: ClearAssessmentAction
   /** Admin or teacher variant — unlike the paid marks, both roles may set this. */
   onSetContractSigned: SetContractSignedAction
+  /** Groups whose contract mark this viewer may change; undefined = unrestricted (admin). */
+  contractEditableGroupIds?: readonly string[]
 }
 
 function DetailRow({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
@@ -104,6 +106,7 @@ export function StudentDetailView({
   onSaveAssessment,
   onClearAssessment,
   onSetContractSigned,
+  contractEditableGroupIds,
 }: Readonly<Props>) {
   const isAdmin = viewerRole === 'ADMIN'
   const fullName = `${student.firstName} ${student.lastName}`
@@ -267,6 +270,7 @@ export function StudentDetailView({
         onSaveAssessment={onSaveAssessment}
         onClearAssessment={onClearAssessment}
         onSetContractSigned={onSetContractSigned}
+        contractEditableGroupIds={contractEditableGroupIds}
       />
 
       {/* Danger zone — admin only */}

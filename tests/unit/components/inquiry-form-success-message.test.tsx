@@ -24,9 +24,8 @@ const submitMock = vi.mocked(submitInquiry)
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
   submitMock.mockReset()
-  // The server now decides which sentence the success screen shows (only it
-  // knows whether a probni sat survived the eligibility re-check and on which
-  // date), so each test mocks the step it is asserting on.
+  // The server decides which sentence the success screen shows, so each test
+  // mocks the step it is asserting on.
   submitMock.mockResolvedValue({ success: true, nextStep: 'TERMIN_TO_OFFER' })
 })
 
@@ -49,8 +48,7 @@ const program: ActiveProgram = {
       startTime: '17:00',
       endTime: '18:00',
       availableSpots: 5,
-      isFull: false, trialDate: null,
-    },
+      isFull: false,    },
   ],
 }
 
@@ -107,17 +105,4 @@ describe('InquiryForm success screen', () => {
     expect(screen.queryByText(/Vaš odabrani termin je zabilježen/)).not.toBeInTheDocument()
   })
 
-  it('names the promised probni sat date when the server granted one', async () => {
-    submitMock.mockResolvedValue({
-      success: true,
-      nextStep: 'TRIAL_BOOKED',
-      trialDateLabel: '15.09.2026.',
-    })
-    const user = await reachStep3([program])
-    await user.selectOptions(screen.getByLabelText(/Željeni termin/), 'course-1|grp-1')
-
-    await submitAndAwaitSuccess(user)
-
-    expect(screen.getByText(/besplatnom probnom satu 15\.09\.2026\./)).toBeInTheDocument()
-  })
 })

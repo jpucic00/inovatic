@@ -2,10 +2,11 @@
 
 import { db } from '@/lib/db'
 import type { AdminActionResult } from '@/lib/action-types'
-import { writeContractSigned } from '@/actions/admin/payment'
+import { writeContractSigned } from '@/lib/enrollment-contract'
 import { setEnrollmentContractSignedSchema } from '@/lib/validators/admin/payment'
 import { requireTeacher } from '@/lib/auth-guard'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
+import { computeSchoolYear } from '@/lib/school-year'
 
 /**
  * Teacher twin of `setEnrollmentContractSigned`. Teachers collect the signed
@@ -33,13 +34,26 @@ export async function setEnrollmentContractSignedByTeacher(
 
   const enrollment = await db.enrollment.findUnique({
     where: { id: parsed.data.enrollmentId },
-    select: { userId: true, scheduledGroupId: true },
+    select: { userId: true, scheduledGroupId: true, schoolYear: true },
   })
   // A missing enrollment answers like a foreign one — neither tells the caller
   // whether the id exists.
   if (!enrollment) return { success: false, error: 'Upis nije pronađen.' }
 
-  await assertTeacherOwnsGroup(enrollment.scheduledGroupId)
+  const { isAdmin } = await assertTeacherOwnsGroup(enrollment.scheduledGroupId)
+
+  // A past year's contracts are settled. Marking one now is a correction, and
+  // corrections are the admin's job everywhere else in this app — the same
+  // split `teacherMarkingWindow` draws for attendance, where a teacher may only
+  // record the current month and an admin is unrestricted. A teaching admin
+  // (Slavica) passes through here as an admin, not as the group's teacher.
+  if (!isAdmin && enrollment.schoolYear !== computeSchoolYear()) {
+    return {
+      success: false,
+      error:
+        'Ugovor možete označiti samo za tekuću školsku godinu. Za raniju godinu javite se administratoru.',
+    }
+  }
 
   return writeContractSigned(parsed.data.enrollmentId, enrollment.userId, parsed.data.signed)
 }

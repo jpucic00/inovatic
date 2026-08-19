@@ -21,6 +21,18 @@ interface Props {
    * the shared view never imports a role-specific action itself.
    */
   onSetContractSigned: SetContractSignedAction
+  /**
+   * Show the state without offering to change it.
+   *
+   * A teacher's student profile lists ALL of a child's enrollments — the roster
+   * only has to share ONE group for the profile to open — so it routinely shows
+   * groups a colleague teaches and years that are already settled. Rendering a
+   * live button there was worse than useless: the action refuses through
+   * `assertTeacherOwnsGroup`, which THROWS `notFound()`, so the click replaced
+   * the whole profile with a 404 instead of reaching the toast below. The server
+   * is still the gate; this only stops offering what it will refuse.
+   */
+  readOnly?: boolean
 }
 
 /**
@@ -36,6 +48,7 @@ export function EnrollmentContractToggle({
   enrollmentId,
   contractSignedAt,
   onSetContractSigned,
+  readOnly = false,
 }: Readonly<Props>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -55,37 +68,54 @@ export function EnrollmentContractToggle({
     })
   }
 
+  // The signed badge is identical in both modes, so it is written once.
+  const badge = (
+    <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700">
+      <FileCheck className="w-3 h-3" />
+      Ugovor potpisan · {formatDate(contractSignedAt)}
+    </span>
+  )
+
   return (
     <div className="mt-3 pt-3 border-t border-gray-200">
       <p className="text-xs font-medium text-gray-500 mb-1.5">Ugovor</p>
       <div className="flex flex-wrap items-center gap-2">
-        {signed ? (
-          <>
-            <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700">
-              <FileCheck className="w-3 h-3" />
-              Ugovor potpisan · {formatDate(contractSignedAt)}
-            </span>
-            <button
-              type="button"
-              onClick={toggle}
-              disabled={isPending}
-              className="text-xs text-gray-400 hover:text-red-600 disabled:opacity-50"
-            >
-              {isPending ? '...' : 'Poništi'}
-            </button>
-          </>
-        ) : (
+        {renderBody()}
+      </div>
+    </div>
+  )
+
+  function renderBody() {
+    // Read-only: the same badge with no controls, and an explicit em dash
+    // rather than an empty row, so "not signed" is never read as missing data.
+    if (readOnly) return signed ? badge : <span className="text-xs text-gray-400">—</span>
+
+    if (signed) {
+      return (
+        <>
+          {badge}
           <button
             type="button"
             onClick={toggle}
             disabled={isPending}
-            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-dashed border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-700 disabled:opacity-50"
+            className="text-xs text-gray-400 hover:text-red-600 disabled:opacity-50"
           >
-            {isPending ? <span className="text-[10px]">...</span> : <FilePlus className="w-3 h-3" />}
-            Označi ugovor potpisanim
+            {isPending ? '...' : 'Poništi'}
           </button>
-        )}
-      </div>
-    </div>
-  )
+        </>
+      )
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={isPending}
+        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-dashed border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-700 disabled:opacity-50"
+      >
+        {isPending ? <span className="text-[10px]">...</span> : <FilePlus className="w-3 h-3" />}
+        Označi ugovor potpisanim
+      </button>
+    )
+  }
 }

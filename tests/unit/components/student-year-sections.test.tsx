@@ -54,9 +54,28 @@ vi.mock('@/components/admin/students/enrollment-payment-panel', () => ({
   ),
 }))
 
+// The stub SURFACES the props it is given. Reduced to a bare <div> keyed on the
+// id, the assertions below could only prove "an element rendered" — they would
+// not notice `onSetContractSigned` being dropped, `contractSignedAt` not being
+// threaded, or the read-only decision inverting, which is what they are for.
 vi.mock('@/components/shared/enrollment-contract-toggle', () => ({
-  EnrollmentContractToggle: ({ enrollmentId }: Readonly<{ enrollmentId: string }>) => (
-    <div data-testid={`contract-toggle-${enrollmentId}`} />
+  EnrollmentContractToggle: ({
+    enrollmentId,
+    contractSignedAt,
+    onSetContractSigned,
+    readOnly,
+  }: Readonly<{
+    enrollmentId: string
+    contractSignedAt: Date | null
+    onSetContractSigned: unknown
+    readOnly?: boolean
+  }>) => (
+    <div
+      data-testid={`contract-toggle-${enrollmentId}`}
+      data-has-action={String(typeof onSetContractSigned === 'function')}
+      data-signed={String(contractSignedAt !== null)}
+      data-readonly={String(readOnly === true)}
+    />
   ),
 }))
 
@@ -289,7 +308,11 @@ describe('StudentYearSections — admin vs teacher affordances', () => {
     expect(screen.getByTestId('payment-panel-e1')).toBeInTheDocument()
     // Admin gets the editable module manager, not the read-only list.
     expect(screen.queryByText('Upisani moduli')).not.toBeInTheDocument()
-    expect(screen.getByTestId('contract-toggle-e1')).toBeInTheDocument()
+    // The action must actually reach the toggle, not just the element render.
+    const adminToggle = screen.getByTestId('contract-toggle-e1')
+    expect(adminToggle).toHaveAttribute('data-has-action', 'true')
+    // No editable-set given ⇒ unrestricted, which is what an admin gets.
+    expect(adminToggle).toHaveAttribute('data-readonly', 'false')
   })
 
   it('teacher mode is read-only: no dialog, no hint, no delete/manage — just the module list', () => {
@@ -307,6 +330,35 @@ describe('StudentYearSections — admin vs teacher affordances', () => {
     expect(screen.getByText('• Osnove robotike')).toBeInTheDocument()
     // ...but the contract toggle IS theirs — the deliberate exception to the
     // otherwise admin-only enrollment marks.
-    expect(screen.getByTestId('contract-toggle-e1')).toBeInTheDocument()
+    const teacherToggle = screen.getByTestId('contract-toggle-e1')
+    expect(teacherToggle).toHaveAttribute('data-has-action', 'true')
+    expect(teacherToggle).toHaveAttribute('data-readonly', 'false')
+  })
+
+  /**
+   * A teacher's profile lists every enrollment a child has, including groups a
+   * colleague teaches and years already settled. The page names the groups this
+   * viewer may write to; everything else must render read-only, because the
+   * server refuses those by throwing `notFound()` and would take the whole
+   * profile down rather than show a toast.
+   */
+  it('renders the contract toggle read-only for a group outside the editable set', () => {
+    renderSections({
+      ...adminProps,
+      isAdmin: false,
+      contractEditableGroupIds: ['some-other-group'],
+    })
+
+    expect(screen.getByTestId('contract-toggle-e1')).toHaveAttribute('data-readonly', 'true')
+  })
+
+  it('keeps it editable for a group inside the editable set', () => {
+    renderSections({
+      ...adminProps,
+      isAdmin: false,
+      contractEditableGroupIds: ['sg-e1'],
+    })
+
+    expect(screen.getByTestId('contract-toggle-e1')).toHaveAttribute('data-readonly', 'false')
   })
 })

@@ -52,8 +52,6 @@ export function sendInquiryConfirmationEmail(params: {
   childDateOfBirth: string
   /** Which "what happens next" paragraph closes the body. */
   nextStep?: InquiryNextStep
-  /** The promised probni sat date (dd.MM.yyyy.) — named by the TRIAL_BOOKED arm. */
-  trialDateLabel?: string
   /**
    * Already-formatted akontacija + ostatak figures, which add the payment
    * instruction to the body. Radionica sign-ups only — the caller decides,
@@ -73,7 +71,6 @@ export function sendInquiryConfirmationEmail(params: {
       // body and the office in the From line are the same fact.
       cityLabel: CITY_LABELS[params.city],
       nextStep: params.nextStep,
-      trialDateLabel: params.trialDateLabel,
       payment: params.payment,
     }),
   })
@@ -126,13 +123,6 @@ export function sendInquiryNotificationEmail(params: {
   programName?: string
   /** Booked group, or the competitive program's "nijedan termin ne odgovara". */
   terminLabel?: string
-  /**
-   * The promised probni sat: its date, or a note that one is still to be
-   * arranged. Absent when no trial was requested or the child is a returning
-   * polaznik, so its presence is the signal that staff owe this family a
-   * free lesson before the upis.
-   */
-  trialLabel?: string
   /**
    * The admin's "Ponovni upis" marker, so the inbox sees what the upit list
    * shows: this child is already a polaznik. Resolved by the caller, which is
@@ -255,7 +245,27 @@ export function sendScheduleOptionsEmail(params: {
   })
 }
 
-/** Student account credentials + enrollment details → the student's parent. */
+/**
+ * Student account credentials + enrollment details → the student's parent.
+ *
+ * **Currently has NO caller, and that is deliberate (2026-08-18).** Until
+ * 2026-08-17 this fired automatically from `createStudentFromInquiry` and
+ * `createStudentManually`; that automatic send was removed on purpose, and
+ * credentials now leave only through a CREDENTIALS e-mail campaign, which
+ * re-verifies ownership per child with `assertCredentialsBelongTo` before every
+ * send. The sender is kept because the owner may want a single-child send back
+ * (e.g. off `resetStudentPassword`), not because anything uses it.
+ *
+ * Two consequences worth knowing before you touch it:
+ * - `knip` stays green only because `tests/unit/lib/email.test.ts` and
+ *   `tests/unit/components/emails-venue-address.test.tsx` reference it. Dead
+ *   production code kept alive by its own tests will not be reported.
+ * - If you are here to "restore the credentials e-mail", do not simply call
+ *   this. It owns its own subject and hard-requires a single group, and it has
+ *   none of the campaign's per-child ownership check — wiring it back into an
+ *   account-creation path would reintroduce exactly the automatic send that was
+ *   removed, without the guard that replaced it.
+ */
 export function sendStudentCredentialsEmail(params: {
   to: string
   /** The city the child was enrolled in. */

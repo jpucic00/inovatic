@@ -30,49 +30,14 @@ describe('inquiryNextStep', () => {
     expect(inquiryNextStep({})).toBe('TERMIN_TO_OFFER')
     expect(inquiryNextStep({ noSuitableTermin: false })).toBe('TERMIN_TO_OFFER')
   })
-
-  /**
-   * The probni sat outranks the termin arms: it is the next thing that actually
-   * happens to this family, and the upis is what follows it rather than what
-   * this form produced.
-   */
-  it('leads with the probni sat when one was granted with a date', () => {
-    expect(
-      inquiryNextStep({
-        scheduledGroupId: 'group-1',
-        wantsTrial: true,
-        trialDateLabel: '15.09.2026.',
-      }),
-    ).toBe('TRIAL_BOOKED')
-  })
-
-  it('promises to arrange the probni sat when no date could be derived', () => {
-    expect(inquiryNextStep({ wantsTrial: true })).toBe('TRIAL_TO_ARRANGE')
-    // A booked group whose year has no trial week lands here too.
-    expect(
-      inquiryNextStep({ scheduledGroupId: 'group-1', wantsTrial: true }),
-    ).toBe('TRIAL_TO_ARRANGE')
-  })
-
-  it('ignores a trial that was not granted', () => {
-    expect(
-      inquiryNextStep({ scheduledGroupId: 'group-1', wantsTrial: false }),
-    ).toBe('TERMIN_CHOSEN')
-  })
 })
 
 describe('inquiryNextStepText', () => {
-  const steps: InquiryNextStep[] = [
-    'TRIAL_BOOKED',
-    'TRIAL_TO_ARRANGE',
-    'TERMIN_CHOSEN',
-    'TERMIN_TO_ARRANGE',
-    'TERMIN_TO_OFFER',
-  ]
+  const steps: InquiryNextStep[] = ['TERMIN_CHOSEN', 'TERMIN_TO_ARRANGE', 'TERMIN_TO_OFFER']
 
   it('has distinct, non-empty copy for every step', () => {
-    const texts = steps.map((s) => inquiryNextStepText(s, { trialDateLabel: '15.09.2026.' }))
-    expect(texts.every((t) => t.length > 0)).toBe(true)
+    const texts = steps.map((s) => inquiryNextStepText(s))
+    expect(texts.every((t) => t.trim().length > 0)).toBe(true)
     expect(new Set(texts).size).toBe(steps.length)
   })
 
@@ -85,20 +50,14 @@ describe('inquiryNextStepText', () => {
     expect(inquiryNextStepText('TERMIN_TO_OFFER')).toContain('dostupnim terminima')
   })
 
-  it('names the promised date in the booked-trial sentence', () => {
-    expect(inquiryNextStepText('TRIAL_BOOKED', { trialDateLabel: '15.09.2026.' })).toContain(
-      '15.09.2026.',
-    )
-  })
-
   /**
-   * Unreachable through `inquiryNextStep`, but handled rather than trusted: a
-   * missing date must degrade to the "we'll arrange it" sentence, never print an
-   * empty gap where a date should be.
+   * The probni sat left the signup form (Flux `rgyemhz`) — the parent no longer
+   * asks for one here, so no sentence this module produces may promise one. A
+   * regression would mean telling a family about a trial nobody scheduled.
    */
-  it('degrades to the arrange-it sentence when the date is missing', () => {
-    expect(inquiryNextStepText('TRIAL_BOOKED')).toBe(
-      inquiryNextStepText('TRIAL_TO_ARRANGE'),
-    )
+  it('never mentions the probni sat', () => {
+    for (const step of steps) {
+      expect(inquiryNextStepText(step).toLowerCase()).not.toContain('probni')
+    }
   })
 })

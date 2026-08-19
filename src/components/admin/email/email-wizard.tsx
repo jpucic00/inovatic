@@ -218,6 +218,11 @@ export function EmailWizard({
     // rejects it too): a preporuka names children, not the card or the account
     // being sent. Both start on groups.
     if (next === 'EVALUATION' || next === 'CREDENTIALS') setSelectionMode('GROUPS')
+    // Individual children are a CREDENTIALS-only cohort (the validator refuses
+    // them elsewhere). Leaving the kind without resetting the mode left the
+    // picker on screen with neither pill highlighted, since the other kinds
+    // render a different pair.
+    if (next !== 'CREDENTIALS' && selectionMode === 'STUDENTS') setSelectionMode('GROUPS')
     if (next === 'REENROLLMENT') {
       setSubject(`Upisi u školsku godinu ${selectedYear} – Inovatic`)
       setBodyText(DEFAULT_INVITATION_BODY)
@@ -243,8 +248,10 @@ export function EmailWizard({
   // CUSTOM + selected-year tree comes preloaded from the server).
   const treeKeyRef = useRef(`${selectedYear}:false`)
   useEffect(() => {
-    // Radionice are never graded and are not a re-enrolment cohort either.
-    const excludeRadionice = kind !== 'CUSTOM'
+    // Radionice are never graded and are not a re-enrolment cohort either — but
+    // a workshop child does get a portal account, so CREDENTIALS must see them.
+    // Mirrors `kindExcludesRadionice` on the server; the send re-validates.
+    const excludeRadionice = kind === 'REENROLLMENT' || kind === 'EVALUATION'
     const key = `${sourceYear}:${excludeRadionice}`
     if (treeKeyRef.current === key) return
     treeKeyRef.current = key
@@ -869,6 +876,7 @@ export function EmailWizard({
                     <button
                       key={option.value}
                       type="button"
+                      aria-pressed={selectionMode === option.value}
                       onClick={() => applySelectionMode(option.value)}
                       className={[
                         'px-3 py-1.5 text-sm rounded-md transition-colors',
@@ -906,7 +914,11 @@ export function EmailWizard({
 
             {selectionMode === 'STUDENTS' && (
               <div className="mt-4 rounded-lg border border-gray-100 p-3">
+                <label htmlFor="credentials-student-search" className="sr-only">
+                  Pretraži djecu
+                </label>
                 <input
+                  id="credentials-student-search"
                   type="text"
                   value={studentSearch}
                   onChange={(e) => setStudentSearch(e.target.value)}

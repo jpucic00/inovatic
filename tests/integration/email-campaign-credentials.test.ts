@@ -59,9 +59,9 @@ const CONTENT = {
   bodyText: 'U nastavku se nalaze pristupni podaci za polaznički portal.',
 }
 
-async function makeGroup(city: City = 'SPLIT') {
+async function makeGroup(city: City = 'SPLIT', kind: 'STANDARD' | 'RADIONICA' = 'STANDARD') {
   const location = await createLocation({ city })
-  const course = await createCourse({ kind: 'STANDARD' })
+  const course = await createCourse({ kind })
   return createGroup({
     courseId: course.id,
     locationId: location.id,
@@ -121,6 +121,115 @@ describe('CREDENTIALS campaign — one mail per child', () => {
     expect(rows.every((r) => r.parentEmail === shared)).toBe(true)
     expect(rows.flatMap((r) => r.studentIds).sort()).toEqual([ana.id, marko.id].sort())
     expect(rows.every((r) => r.studentIds.length === 1)).toBe(true)
+  })
+
+  /**
+   * The row-level assertions above prove the COHORT is one row per child. This
+   * one proves the WIRE is too, which is a different claim: hoisting
+   * `credentials` out of `sendToRecipient`'s per-recipient scope would leave
+   * those rows byte-identical and still deliver the second child's password to
+   * the first mail. That is the classic mail-merge leak the whole design exists
+   * to make impossible, so it is asserted on what actually left the building.
+   *
+   * Needs `RESEND_API_KEY`: `sendTransactionalEmail` returns false on its first
+   * line without one, so the resend mock is never reached and every assertion
+   * on it passes vacuously.
+   */
+  it('gives each sibling their OWN login on the wire, not the other one\u2019s', async () => {
+    process.env.RESEND_API_KEY = 'test_resend_key'
+    process.env.EMAIL_SEND_THROTTLE_MS = '0'
+    try {
+      const admin = await createAdmin({ city: 'SPLIT' })
+      mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+      const group = await makeGroup()
+      const shared = uniqEmail('obitelj')
+      const ana = await enrolledChild(group.id, { parentEmail: shared })
+      const marko = await enrolledChild(group.id, { parentEmail: shared })
+
+      const res = await sendEmailCampaign({
+        kind: 'CREDENTIALS',
+        ...CONTENT,
+        sourceSchoolYear: YEAR,
+        sourceGroupIds: [group.id],
+      })
+      expect(res.success).toBe(true)
+      if (!res.success) return
+      const done = await settle(res.campaignId)
+      expect(done.sent).toBe(2)
+
+      // Positive control: without the key this is 0 and everything below is vacuous.
+      expect(sendMock).toHaveBeenCalledTimes(2)
+
+      const accounts = await db.user.findMany({
+        where: { id: { in: [ana.id, marko.id] } },
+        select: { id: true, firstName: true, username: true, plainPassword: true },
+      })
+      const byId = new Map(accounts.map((a) => [a.id, a]))
+
+      const sent = sendMock.mock.calls.map(([payload]) => ({
+        to: payload.to,
+        subject: payload.subject as string,
+        username: payload.react?.props?.credentials?.username as string | undefined,
+        password: payload.react?.props?.credentials?.password as string | undefined,
+      }))
+
+      // Both went to the one shared inbox — that is the whole hazard.
+      expect(sent.every((m) => m.to === shared)).toBe(true)
+
+      for (const child of [ana, marko]) {
+        const account = byId.get(child.id)
+        const mine = sent.find((m) => m.username === account?.username)
+        expect(mine, `no mail carried ${account?.username}`).toBeDefined()
+        // Its own password, and the subject names its own child.
+        expect(mine?.password).toBe(account?.plainPassword)
+        expect(mine?.subject).toContain(account?.firstName)
+        // And the sibling's credentials are nowhere in it.
+        const sibling = byId.get(child.id === ana.id ? marko.id : ana.id)
+        expect(mine?.username).not.toBe(sibling?.username)
+      }
+
+      // Two DIFFERENT logins left the building, not one repeated twice.
+      expect(new Set(sent.map((m) => m.username)).size).toBe(2)
+    } finally {
+      delete process.env.RESEND_API_KEY
+      delete process.env.EMAIL_SEND_THROTTLE_MS
+    }
+  })
+
+  /**
+   * A workshop child gets a real portal account like anyone else — their login
+   * works from the workshop until the end of the school year — so a CREDENTIALS
+   * campaign must be able to reach them. The radionica exclusion is right for
+   * REENROLLMENT (you do not invite a workshop's parents to re-enrol in it) and
+   * for EVALUATION (workshops are never graded), and applying it here only hid
+   * the group from the composer with no error and no explanation: the families
+   * most likely to be forgotten were the ones the campaign could not reach.
+   */
+  it('reaches a radionica group, which REENROLLMENT and EVALUATION exclude', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    const workshop = await makeGroup('SPLIT', 'RADIONICA')
+    const child = await enrolledChild(workshop.id)
+
+    const res = await sendEmailCampaign({
+      kind: 'CREDENTIALS',
+      ...CONTENT,
+      sourceSchoolYear: YEAR,
+      sourceGroupIds: [workshop.id],
+    })
+
+    expect(res.success).toBe(true)
+    if (!res.success) return
+    expect(res.total).toBe(1)
+    await settle(res.campaignId)
+
+    const rows = await db.emailCampaignRecipient.findMany({
+      where: { campaignId: res.campaignId },
+      select: { studentIds: true, status: true },
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0].studentIds).toEqual([child.id])
+    expect(rows[0].status).toBe('SENT')
   })
 
   it('sends ONE mail to a child enrolled in two selected groups', async () => {

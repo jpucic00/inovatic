@@ -1,7 +1,12 @@
 import bcrypt from 'bcryptjs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { createTeacher } from '../helpers/factory'
+import { createAdmin, createTeacher } from '../helpers/factory'
+import { mockSession } from '../setup'
+
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+
+const { deleteTeacher, getTeachers } = await import('@/actions/admin/teacher')
 
 // 3 of 5 tests migrated from tests/phase3/30-teacher-soft-delete.spec.ts:
 //   - deletedAt write (admin can soft-delete teacher with prior content)
@@ -37,12 +42,13 @@ describe('Teacher soft-delete', () => {
       },
     })
 
-    // Soft-delete (the same shape the admin server action uses).
-    const deletedAt = new Date()
-    await db.user.update({
-      where: { id: teacher.id },
-      data: { deletedAt },
-    })
+    // Drive the REAL action. Writing `deletedAt` by hand here tested Prisma,
+    // not `deleteTeacher` — a change that started hard-deleting, or stopped
+    // soft-deleting at all, would have left this green.
+    const admin = await createAdmin({ city: 'SPLIT' })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    const res = await deleteTeacher(teacher.id)
+    expect(res.success).toBe(true)
 
     // Verify FK relations survived (the previous bug was a hard FK constraint
     // that blocked the soft-delete when prior content existed).
@@ -58,25 +64,31 @@ describe('Teacher soft-delete', () => {
       where: { id: teacher.id },
       select: { deletedAt: true },
     })
-    expect(userRow?.deletedAt?.getTime()).toBe(deletedAt.getTime())
+    expect(userRow?.deletedAt).not.toBeNull()
   })
 
-  it('soft-deleted teacher is hidden from active-only queries (admin list query shape)', async () => {
-    const active = await createTeacher()
-    const deleted = await createTeacher()
-    await db.user.update({
-      where: { id: deleted.id },
-      data: { deletedAt: new Date() },
-    })
+  it('soft-deleted teacher drops out of the admin list', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
 
-    // Active-only query (the shape used in admin teacher list code).
-    const list = await db.user.findMany({
-      where: { role: 'TEACHER', deletedAt: null },
-      select: { id: true },
-    })
-    const ids = list.map((u) => u.id)
-    expect(ids, 'active teacher is in the active-only list').toContain(active.id)
-    expect(ids, 'soft-deleted teacher is NOT in the active-only list').not.toContain(deleted.id)
+    // One shared surname so a single search returns exactly this pair — the
+    // tier shares a database, so an unfiltered list would be everyone's.
+    const marker = `Softdel${Date.now().toString(36)}`
+    const active = await createTeacher({ city: 'SPLIT', lastName: marker })
+    const deleted = await createTeacher({ city: 'SPLIT', lastName: marker })
+
+    // Both present before the delete — the positive control. Without it, a
+    // list that returned nothing at all would read as a passing test.
+    const before = (await getTeachers({ search: marker, pageSize: 100 })).data.map((t) => t.id)
+    expect(before).toContain(active.id)
+    expect(before).toContain(deleted.id)
+
+    expect((await deleteTeacher(deleted.id)).success).toBe(true)
+
+    // `getTeachers` itself, not a hand-written copy of its where clause.
+    const after = (await getTeachers({ search: marker, pageSize: 100 })).data.map((t) => t.id)
+    expect(after, 'active teacher is still listed').toContain(active.id)
+    expect(after, 'soft-deleted teacher is gone').not.toContain(deleted.id)
   })
 
   it('a soft-deleted teacher keeps a usable password hash — only deletedAt bars them', async () => {

@@ -150,6 +150,9 @@ describe('getInquiries — razred', () => {
 
     const res = await getInquiries({ grade: GRADE, pageSize: 100 })
 
+    // Positive control FIRST: every assertion below is vacuously true on an
+    // empty result, so a filter that matched nothing would read as correct.
+    expect(ourIds(res.data)).toHaveLength(3)
     expect(res.data.map((r) => r.id)).not.toContain(otherGrade.id)
     expect(res.data.every((r) => r.childGrade === GRADE)).toBe(true)
     expect(res.total).toBe(res.data.length)

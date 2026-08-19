@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { computeSchoolYear } from '@/lib/school-year'
+import { computeSchoolYear, getPreviousSchoolYear } from '@/lib/school-year'
 import { mockSession } from './setup'
 import {
   createAdmin,
@@ -18,6 +18,7 @@ const { setEnrollmentContractSigned } = await import('@/actions/admin/payment')
 const { setEnrollmentContractSignedByTeacher } = await import('@/actions/teacher/contract')
 
 const CY = computeSchoolYear()
+const PY = getPreviousSchoolYear(CY)
 
 async function contractSignedAt(enrollmentId: string): Promise<Date | null> {
   const row = await db.enrollment.findUnique({
@@ -28,11 +29,11 @@ async function contractSignedAt(enrollmentId: string): Promise<Date | null> {
 }
 
 /** Student + group + enrollment in one city, plus the enrollment id. */
-async function seedEnrollment(city: 'SPLIT' | 'SIBENIK' = 'SPLIT') {
+async function seedEnrollment(city: 'SPLIT' | 'SIBENIK' = 'SPLIT', schoolYear: string = CY) {
   const student = await createStudent({ city })
   const course = await createCourse()
-  const group = await createGroup({ courseId: course.id, city, schoolYear: CY })
-  const enrollment = await createEnrollment(student.id, group.id, { schoolYear: CY })
+  const group = await createGroup({ courseId: course.id, city, schoolYear })
+  const enrollment = await createEnrollment(student.id, group.id, { schoolYear })
   return { student, course, group, enrollment }
 }
 
@@ -94,6 +95,35 @@ describe('setEnrollmentContractSignedByTeacher', () => {
     const res2 = await setEnrollmentContractSignedByTeacher(enrollment.id, false)
     expect(res2.success).toBe(true)
     expect(await contractSignedAt(enrollment.id)).toBeNull()
+  })
+
+  /**
+   * A past year's contracts are settled, so marking one is a correction — and
+   * corrections are the admin's job everywhere else here (same split
+   * `teacherMarkingWindow` draws for attendance). The teacher OWNS this group;
+   * only the year refuses, which is what separates this from the guard below.
+   */
+  it('refuses an own group in a previous school year, and says why', async () => {
+    const teacher = await createTeacher({ city: 'SPLIT' })
+    const { group, enrollment } = await seedEnrollment('SPLIT', PY)
+    await createTeacherAssignment(teacher.id, group.id)
+    mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
+
+    const res = await setEnrollmentContractSignedByTeacher(enrollment.id, true)
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toMatch(/tekuću školsku godinu/)
+    expect(await contractSignedAt(enrollment.id)).toBeNull()
+  })
+
+  /** The admin is the correction path, so the year rule does not apply to them. */
+  it('lets an admin mark a previous school year through the teacher path', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    const { enrollment } = await seedEnrollment('SPLIT', PY)
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+
+    const res = await setEnrollmentContractSignedByTeacher(enrollment.id, true)
+    expect(res.success).toBe(true)
+    expect(await contractSignedAt(enrollment.id)).not.toBeNull()
   })
 
   it("rejects a teacher who is not assigned to the enrollment's group", async () => {

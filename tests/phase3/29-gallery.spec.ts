@@ -17,6 +17,7 @@ import {
   seedStudentInGroup,
 } from '../helpers/seed'
 
+import { cleanupRunFixtures } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Phase 3 — Gallery (consolidated)
 // 13 tests collapsed to 8:
@@ -30,6 +31,17 @@ import {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const RUN_ID = Date.now().toString().slice(-6)
+
+// Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
+// title, so one call removes exactly this run's rows and can reach no other.
+// Without it each run's groups stay for good, and `/admin/grupe` packs a
+// weekday's groups into one lane — past a few dozen leftovers the entries go
+// zero-width and specs that never changed start failing on the litter.
+// Best-effort by design: it swallows, so a teardown problem can never turn a
+// green run red.
+test.afterAll(async () => {
+  await cleanupRunFixtures(RUN_ID)
+})
 const SAMPLE_PNG = path.resolve(__dirname, '../fixtures/sample.png')
 
 const TEACHER: TeacherData = {

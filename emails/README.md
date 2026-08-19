@@ -6,7 +6,8 @@ All outbound mail goes through **Resend** + **React Email**, in two layers.
 
 - **`client.ts`** — the lazy Resend client + `sendTransactionalEmail({ to, subject, react })`.
   It applies the sender identity and a **no-op gate**: when `RESEND_API_KEY` is unset
-  (local dev, tests, preview builds) it sends nothing and returns `false`; on a real
+  (tests, preview builds — a developer's `.env.local` may well hold a working key) it
+  sends nothing and returns `false`; on a real
   Resend rejection it throws, so each caller keeps its own error policy.
 - **`senders.ts` / `index.ts`** — one typed sender per email, each owning its subject and
   mapping caller primitives onto a template. Import from `@/lib/email`:
@@ -18,8 +19,18 @@ All outbound mail goes through **Resend** + **React Email**, in two layers.
   | `sendPartyInquiryConfirmationEmail` | public party (proslava) inquiry submitted | parent |
   | `sendPartyInquiryNotificationEmail` | public party (proslava) inquiry submitted | `prijave@`, reply-to the parent |
   | `sendScheduleOptionsEmail` | admin sends group options for a NEW inquiry | parent |
-  | `sendStudentCredentialsEmail` | student account created (from inquiry or manually) | parent |
+  | `sendStudentCredentialsEmail` | **nothing — no caller since 2026-08-17** (see below) | parent |
   | `sendTeacherCredentialsEmail` | teacher account created / password reset (`variant: 'new' \| 'reset'`) | teacher |
+  | `sendBulkMessageEmail` | an admin runs a campaign from `/admin/email` | one mail per recipient row |
+  | `sendReleaseNotesEmail` | a new version in `src/lib/releases.ts` reaches production | every non-deleted ADMIN, once per version |
+
+**Student logins leave the building ONLY through a CREDENTIALS campaign (2026-08-17).** Creating
+a student account — from an inquiry or manually — now mails nothing at all. An admin sends the
+logins from `/admin/email` once contracts are signed, which is what makes the send deliberate,
+auditable per family, and repeatable. `sendStudentCredentialsEmail` is kept for a possible
+future single-child send but currently has no caller; do not wire it back into an account
+creation path, because it has none of the campaign's per-child ownership check
+(`assertCredentialsBelongTo`). Note `knip` cannot flag it — two unit tests reference it.
 
 Sender identity **follows the city**: a sender that takes `city` passes it to
 `sendTransactionalEmail`, which uses `cityInboxEmail(city)` as both the From address and the
@@ -31,9 +42,11 @@ address. The inbound notifications flip reply-to around — they go *to* an inbo
 person who submitted the form, so staff answer straight from Outlook.
 
 Server actions call the senders and never touch Resend directly. The **error policy lives at
-the call site**, not in the service: confirmations swallow-and-log, credentials emails
-swallow-and-flag (`emailFailed` / `emailSent`), and schedule-options surfaces a send failure to
-the admin.
+the call site**, not in the service: confirmations swallow-and-log, teacher credentials
+swallow-and-flag (`emailSent` — the account is already committed and the password stays readable
+in the UI), and schedule-options surfaces a send failure to the admin. Campaign sends record
+their outcome per recipient row instead, so a failure is visible on `/admin/email/[campaignId]`
+rather than thrown away.
 
 ## Templates — `emails/*.tsx`
 
@@ -67,3 +80,13 @@ options, the two teacher subjects, etc. Port 3001 keeps it clear of the Next dev
    `index.ts`.
 3. Call the sender from the relevant server action, wrapping it in the error policy that action
    needs.
+
+## The one email with no server action behind it
+
+`release-notes.tsx` is not triggered by anything a person clicks. It is sent by
+`src/lib/release-announce.ts` when the server starts and finds a version in
+`src/lib/releases.ts` that has no `ReleaseAnnouncement` row — i.e. by pushing a release.
+It is also the only template addressed to staff rather than families, which is why it
+sets `showSignature={false}`: a mail *to* the association must not close with the
+association's own contact card. Notes are written by the `/release` skill; preview it
+with `npm run email` like any other template.

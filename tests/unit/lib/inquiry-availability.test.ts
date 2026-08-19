@@ -21,7 +21,6 @@ function group(isFull = false): ActiveGroup {
     startTime: '17:00',
     endTime: '18:30',
     availableSpots: isFull ? 0 : 4,
-    trialDate: null,
     isFull,
   }
 }

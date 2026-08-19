@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 import { db } from '@/lib/db'
 
+import { cleanupRunFixtures } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 — School-year planner (/admin/skolska-godina, planning mode)
 // Uses a far-future school year (2030/2031) so the dev DB's current-year data
@@ -18,6 +19,17 @@ import { db } from '@/lib/db'
 const BASE = 'http://localhost:3000'
 
 const RUN_ID = Date.now().toString().slice(-8)
+
+// Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
+// title, so one call removes exactly this run's rows and can reach no other.
+// Without it each run's groups stay for good, and `/admin/grupe` packs a
+// weekday's groups into one lane — past a few dozen leftovers the entries go
+// zero-width and specs that never changed start failing on the litter.
+// Best-effort by design: it swallows, so a teardown problem can never turn a
+// green run red.
+test.afterAll(async () => {
+  await cleanupRunFixtures(RUN_ID)
+})
 
 const SY = '2030/2031'
 // Mon Sept 2, 2030 — picking a Monday so per-weekday assertions read cleanly.

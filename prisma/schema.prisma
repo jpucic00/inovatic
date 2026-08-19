@@ -492,17 +492,6 @@ model Inquiry {
   // scheduledGroupId. Offered on the competitive program's invitation link only
   // (its few weekly slots are negotiable), so it stays false everywhere else.
   noSuitableTermin   Boolean       @default(false)
-  /// The parent asked to come to a probni sat first. Offered only to children
-  /// with no earlier account (the two-tier identity match), and re-checked
-  /// server-side on submit — a payload cannot claim it for a returning child.
-  /// Mirrors `noSuitableTermin` above: an answer to a question the form asked.
-  wantsTrial         Boolean       @default(false)
-  /// The concrete date the parent was promised, derived at submit from the
-  /// chosen group's weekday and that year's TrialWeek. STORED rather than
-  /// derived on read (mirroring `partyConfirmedDate`): it was put in writing in
-  /// the confirmation e-mail, and an admin can move one child without moving
-  /// the whole week. Null when no group was booked — the admin then arranges it.
-  trialDate          DateTime?     @db.Date
   message            String?       @db.Text
   referralSource     String?
   // PARTY only: parent's optional preferred date from the public form.

@@ -19,10 +19,19 @@
  * planner uses, fed with the same city holiday set, so dev dates land exactly
  * where the planner would have put them.
  *
+ * IT ALSO OPENS THE ENROLLMENT WINDOWS. `getActivePrograms` gates on an open
+ * `CourseEnrollmentWindow` for the composite (courseId, schoolYear, city) key
+ * as well as on the module arc, and an absent or expired window hides a group
+ * just as thoroughly as a stale arc. Re-anchoring only the arc let this script
+ * report success while `/prijava` stayed empty — the exact confusion it exists
+ * to remove. Windows are opened wide rather than to the plan's bounds: in dev
+ * the question is always "can I sign somebody up right now".
+ *
  * SAFE TO RE-RUN, and safe on a database that was never planned: it upserts by
- * (moduleId, schoolYear, city) and never deletes. It touches nothing but
- * `ModuleSchedule` — groups, enrollments, attendance and materials are left
- * alone, so a dev database stays usable across a refresh.
+ * (moduleId, schoolYear, city) and (courseId, schoolYear, city) and never
+ * deletes. It touches nothing but `ModuleSchedule` and `CourseEnrollmentWindow`
+ * — groups, enrollments, attendance and materials are left alone, so a dev
+ * database stays usable across a refresh.
  *
  * NOT FOR PRODUCTION. Moving a live year's module windows would move every
  * expected session, every attendance screen and every parent-facing schedule.
@@ -43,6 +52,13 @@ import { toDateKey } from '../src/lib/session-dates'
 
 /** How far back Modul 1 starts. Two weeks in ⇒ it is running and M2–M4 are ahead. */
 const KICKOFF_WEEKS_AGO = 2
+
+/**
+ * How wide to open the upisi window. Deliberately generous — a dev database
+ * wants "signup is open", not a faithful reproduction of a real window.
+ */
+const WINDOW_OPEN = new Date('2020-01-01')
+const WINDOW_CLOSE = new Date('2099-12-31')
 
 const apply = process.argv.includes('--apply')
 const force = process.argv.includes('--force')
@@ -164,16 +180,35 @@ async function main(): Promise<void> {
         written++
       }
     }
+    let windows = 0
+    for (const courseId of byCourse.keys()) {
+      if (apply) {
+        await db.courseEnrollmentWindow.upsert({
+          where: { courseId_schoolYear_city: { courseId, schoolYear, city } },
+          create: {
+            courseId,
+            schoolYear,
+            city,
+            enrollmentStart: WINDOW_OPEN,
+            enrollmentEnd: WINDOW_CLOSE,
+          },
+          update: { enrollmentStart: WINDOW_OPEN, enrollmentEnd: WINDOW_CLOSE },
+        })
+      }
+      windows++
+    }
+
     console.log(
       `    ${apply ? 'Wrote' : 'Would write'} ${written} module window(s)` +
-        (skipped > 0 ? `, skipped ${skipped}` : ''),
+        (skipped > 0 ? `, skipped ${skipped}` : '') +
+        ` and ${apply ? 'opened' : 'would open'} ${windows} enrollment window(s)`,
     )
   }
 
   console.log('')
   console.log(
     apply
-      ? '✓ Module windows re-anchored. Standard groups are offered on /prijava again.'
+      ? '✓ Module arcs re-anchored and upisi opened. Standard groups are offered on /prijava again.'
       : 'Dry run — nothing written. Re-run with --apply to save.',
   )
 }

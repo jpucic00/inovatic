@@ -44,14 +44,6 @@ interface InquiryNotificationProps {
    */
   terminLabel?: string
   /**
-   * The promised probni sat — its date, or a note that the termin is still to be
-   * agreed. Present only when a free trial was actually granted, so its presence
-   * is the signal that this family is owed a lesson before the upis. Mutually
-   * exclusive with `returning` by construction: a trial is offered to
-   * first-timers only.
-   */
-  trialLabel?: string
-  /**
    * COURSE only — the child already exists as a student. Absent when this is a
    * first-time sign-up (and always on PARTY, which carries no child).
    */
@@ -120,7 +112,6 @@ function InquiryNotificationEmail({
   gradeLabel,
   programName,
   terminLabel,
-  trialLabel,
   returning,
   partyProposedDate,
   message,
@@ -176,12 +167,11 @@ function InquiryNotificationEmail({
         </>
       )}
 
-      {(programName ?? terminLabel ?? trialLabel ?? partyProposedDate) && (
+      {(programName ?? terminLabel ?? partyProposedDate) && (
         <>
           <Hr style={emailStyles.hr} />
           {programName && <Field label="Željeni program">{programName}</Field>}
           {terminLabel && <Field label="Željeni termin">{terminLabel}</Field>}
-          {trialLabel && <Field label="Probni sat">{trialLabel}</Field>}
           {partyProposedDate && <Field label="Željeni datum">{partyProposedDate}</Field>}
         </>
       )}

@@ -58,7 +58,9 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A["Student → /portal/grupa/:id/galerija"] --> B{Enrollment row<br/>for this student + group?}
+    A["Student → /portal/grupa/:id/galerija"] --> G{"requireActiveStudent():<br/>STUDENT with an enrollment<br/>in the active year window?"}
+    G -->|No| NF404["404 / notFound"]
+    G -->|Yes| B{Enrollment row<br/>for this student + group?}
     B -->|No| NF[404 / notFound]
     B -->|Yes| V["buildGroupGalleryView:<br/>loads ALL of the group's images +<br/>modules[] + activeModuleId<br/>(null unless STANDARD)"]
     V --> C{"GalleryTabsAndGrid (client):<br/>flatLayout = isRadionica(kind)?"}

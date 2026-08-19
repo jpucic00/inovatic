@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 
+import { cleanupRunFixtures } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 9 — Admin Teachers
 // Verifies the teacher account management flow: create via dialog, list page
@@ -12,6 +13,17 @@ import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 
 const BASE = 'http://localhost:3000'
 const RUN_ID = Date.now().toString().slice(-6)
+
+// Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
+// title, so one call removes exactly this run's rows and can reach no other.
+// Without it each run's groups stay for good, and `/admin/grupe` packs a
+// weekday's groups into one lane — past a few dozen leftovers the entries go
+// zero-width and specs that never changed start failing on the litter.
+// Best-effort by design: it swallows, so a teardown problem can never turn a
+// green run red.
+test.afterAll(async () => {
+  await cleanupRunFixtures(RUN_ID)
+})
 
 const TEACHER = {
   firstName: 'Ana',

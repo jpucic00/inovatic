@@ -51,7 +51,8 @@ function ProbniSatCallout({ className = '' }: { readonly className?: string }) {
         <h3 className="font-bold text-gray-900">Probni sat</h3>
         <p className="mt-1 text-sm text-gray-600 leading-relaxed">
           Novi polaznici mogu prije upisa doći na besplatni probni sat i isprobati program — bez
-          obveze. Probni sat zatražite u prijavnici, u istom terminu kao i odabrana grupa.
+          obveze. Nakon prijave javljamo se s terminom probnog sata, u istom terminu kao i
+          odabrana grupa.
         </p>
       </div>
     </div>

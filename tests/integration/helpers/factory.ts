@@ -7,6 +7,7 @@
  */
 import type { ProgramKind } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { computeSchoolYear } from '@/lib/school-year'
 import {
   type Attendance,
   type City,
@@ -41,6 +42,17 @@ let counter = 0
 const uniq = () => `${Date.now().toString(36)}${REGISTRY_ID}${(++counter).toString(36)}`
 
 const HASH_ROUNDS = 4 // low rounds — tests don't need production security
+
+/**
+ * The default school year for every fixture that does not name one.
+ *
+ * Derived, never pinned. It used to be the literal '2026/2027', which sat inside
+ * `activeSchoolYears()` only because that happened to be NEXT year — on the
+ * following 1 September it would have dropped out of the active window and
+ * silently made every default-year enrollment inactive, breaking the download
+ * route and every student-gate test at once, for no reason a reader could see.
+ */
+const DEFAULT_SCHOOL_YEAR = computeSchoolYear()
 
 /**
  * A `YYYY-MM-DD` key `days` from today. Radionica groups are only offered on the
@@ -204,7 +216,7 @@ export async function createGroup(overrides: CreateGroupOverrides = {}): Promise
       courseId,
       locationId,
       name: overrides.name ?? `Grupa ${id}`,
-      schoolYear: overrides.schoolYear ?? '2026/2027',
+      schoolYear: overrides.schoolYear ?? DEFAULT_SCHOOL_YEAR,
       maxStudents: overrides.maxStudents ?? 12,
       dayOfWeek: radionicaRange
         ? (overrides.dayOfWeek ?? null)
@@ -230,7 +242,7 @@ export async function createCourseSeason(
   return db.courseSeason.create({
     data: {
       courseId,
-      schoolYear: overrides.schoolYear ?? '2026/2027',
+      schoolYear: overrides.schoolYear ?? DEFAULT_SCHOOL_YEAR,
       city: overrides.city ?? 'SPLIT',
       startDate: overrides.startDate ?? new Date('2026-09-15T00:00:00.000Z'),
       endDate: overrides.endDate ?? new Date('2027-06-15T00:00:00.000Z'),
@@ -247,7 +259,7 @@ export async function createEnrollment(
     data: {
       userId: studentId,
       scheduledGroupId,
-      schoolYear: overrides.schoolYear ?? '2026/2027',
+      schoolYear: overrides.schoolYear ?? DEFAULT_SCHOOL_YEAR,
       fullYearPaidAt: overrides.fullYearPaidAt ?? null,
     },
   })
@@ -312,7 +324,7 @@ export async function createModuleSchedule(
   return db.moduleSchedule.create({
     data: {
       moduleId,
-      schoolYear: overrides.schoolYear ?? '2026/2027',
+      schoolYear: overrides.schoolYear ?? DEFAULT_SCHOOL_YEAR,
       startDate: overrides.startDate ?? null,
       endDate: overrides.endDate ?? null,
       city: overrides.city ?? 'SPLIT',
@@ -332,7 +344,7 @@ export async function createEnrollmentWindow(
   return db.courseEnrollmentWindow.create({
     data: {
       courseId,
-      schoolYear: overrides.schoolYear ?? '2026/2027',
+      schoolYear: overrides.schoolYear ?? DEFAULT_SCHOOL_YEAR,
       city: overrides.city ?? 'SPLIT',
       enrollmentStart: overrides.enrollmentStart ?? null,
       enrollmentEnd: overrides.enrollmentEnd ?? null,
@@ -349,7 +361,7 @@ export async function createCourseGradeRule(
     data: {
       courseId,
       grades,
-      schoolYear: overrides.schoolYear ?? '2026/2027',
+      schoolYear: overrides.schoolYear ?? DEFAULT_SCHOOL_YEAR,
       city: overrides.city ?? 'SPLIT',
     },
   })

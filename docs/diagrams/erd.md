@@ -39,6 +39,14 @@ erDiagram
         datetime endDate "nullable - @db.Date season upper bound"
     }
 
+    TrialWeek {
+        string id PK
+        string schoolYear "part of unique(schoolYear, city)"
+        City city "each city picks its own probni-sat week"
+        datetime startDate "@db.Date - NOT NULL, unlike CourseSeason's: a half-set week is not a week"
+        datetime endDate "@db.Date - NOT NULL; upsertTrialWeek refuses a span over 7 days"
+    }
+
     CourseGradeRule {
         string id PK
         string courseId FK
@@ -152,6 +160,7 @@ erDiagram
         string parentPhone "nullable - migrated from Inquiry"
         string childSchool "nullable - migrated from Inquiry"
         int hourlyRateCents "nullable - payout rate in euro CENTS per hour for a TEACHER or teaching ADMIN; admin-only - never selected into a teacher- or student-facing payload"
+        datetime credentialsSentAt "nullable - when a CREDENTIALS campaign last mailed working login details. Cleared by resetStudentPassword. Deliberately NOT backfilled: null means not sent BY THIS SYSTEM, never a guess"
         datetime gdprConsentAt "nullable"
         datetime deletedAt "nullable - soft-delete for teachers (migration 20260513101212)"
         City city "tenant - drives session scoping for all three roles"
@@ -163,6 +172,7 @@ erDiagram
         string scheduledGroupId FK
         string schoolYear
         datetime fullYearPaidAt "nullable - admin whole-year paid mark"
+        datetime contractSignedAt "nullable - Ugovor potpisan. The ONLY enrollment mark a TEACHER may see and set, and only for their own groups in the CURRENT year; an admin is unrestricted, being the correction path"
     }
 
     EnrollmentMonth {
@@ -236,7 +246,7 @@ erDiagram
     EmailCampaign {
         string id PK
         City city "tenant - the sending admin's city"
-        EmailCampaignKind kind "CUSTOM - REENROLLMENT - EVALUATION"
+        EmailCampaignKind kind "CUSTOM - REENROLLMENT - EVALUATION - CREDENTIALS"
         string sourceSchoolYear "cohort source year"
         string sourceGroupIds "String[] - audit-only snapshot, no FK; empty in preporuka mode"
         string sourceRecommendations "String[] - preporuka labels; empty in group mode"
@@ -398,7 +408,7 @@ erDiagram
 | RecommendationKind | `COURSE`, `COMPETITION_PREP`, `COMPETITION_PROGRAM`, `COMPETITION_FLL`, `COMPETITION_WRO` — `COURSE` pairs with `recommendedCourseId`; the rest are the `RECOMMENDATION_SPECIALS` tracks (the per-team FLL/WRO values let a mentor recommend the *team* a child should join, which no catalog entry can express) |
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
 | MaterialScope | `MODULE`, `COURSE`, `GROUP` |
-| EmailCampaignKind | `CUSTOM`, `REENROLLMENT`, `EVALUATION` — REENROLLMENT sends are idempotent per `(city, targetCourseId, targetSchoolYear)`; CUSTOM is deliberately repeatable; EVALUATION mails report cards with one recipient row per **child** (not per inbox) and never sets `sentKey`, so a corrected card stays re-sendable |
+| EmailCampaignKind | `CUSTOM`, `REENROLLMENT`, `EVALUATION`, `CREDENTIALS` — REENROLLMENT sends are idempotent per `(city, targetCourseId, targetSchoolYear)`; CUSTOM is deliberately repeatable; EVALUATION mails report cards with one recipient row per **child** (not per inbox) and never sets `sentKey`, so a corrected card stays re-sendable. **CREDENTIALS** is one row per child ACCOUNT (a child in two selected groups is still one mail) and, since 2026-08-17, the ONLY way a student login leaves the building — neither inquiry acceptance nor manual creation mails anything. Radionica groups are deliberately NOT excluded from it: a workshop child gets a real portal account too |
 | EmailRecipientStatus | `PENDING`, `SENT`, `FAILED`, `ALREADY_SENT`, `SKIPPED` — every intended recipient is written as `PENDING` upfront, so the detail view lists the whole cohort immediately and a resumed send knows exactly who is still owed a mail |
 
 > There are no `EnrollmentStatus` / `ModuleEnrollmentStatus` enums. Presence of a row means the student is in the group/module; deletion is the only way out.
@@ -419,6 +429,7 @@ erDiagram
 | User → Enrollment → ScheduledGroup | Student enrolled in group for a school year |
 | Enrollment → ModuleEnrollment → ModuleSchedule | Per-module opt-in within a group enrollment |
 | Course → CourseSeason | Per-`(courseId, schoolYear, city)` season range `[startDate, endDate]` for the COMPETITION program (`onDelete: Cascade`) — its replacement for module dates. Sessions are derived weekly on each group's own `dayOfWeek` via `computeSeasonSessions`: holiday weeks dropped outright, **no session-count target and no make-up**, so two weekdays legitimately finish with different totals. Edited via `<CourseSeasonEditor>` on `/admin/programi/[courseId]`. |
+| TrialWeek | **No relations at all.** A standalone `(schoolYear, city)` row like the `SchoolYear` registry — nothing is stored per group, because a calendar week contains exactly one occurrence of each weekday, so `computeTrialSession` (`src/lib/session-dates.ts`) derives the date from the group's existing `dayOfWeek`. An **ABSENT row is the "no probni sat this year" state**, the same doctrine as `CourseGradeRule`, which also means the feature is dark until an admin sets a week on `/admin/skolska-godina`. Read through `resolveTrialDateForGroup` (`src/lib/trial-week.ts`), always keyed on the GROUP'S own `schoolYear` — never `computeSchoolYear()`, the trap `getCourseGradeRules` documents. STANDARD only (`hasDatedModules`): a radionica is a one-off trial of its own and the competitive program is invitation-only. |
 | Enrollment → EnrollmentMonth | One payable month of a monthly-billed (COMPETITION) enrollment (`onDelete: Cascade`). Written up front by `ensureEnrollment` → `createSeasonMonths` from the **join month** through season end — a child joining in January never owes the autumn. A month becomes owed once `periodStart <= now`, so the 1st-of-month flip needs no cron. `upsertCourseSeason` re-syncs rows on a date edit (`syncSeasonMonths`, same transaction) and never deletes a paid month; `fullYearPaidAt` still works as the pay-upfront override. |
 | Material.scope → MODULE / COURSE / GROUP | Discriminated union - exactly one FK populated per scope |
 | Material → MaterialGroupHide → ScheduledGroup | Per-group visibility override for MODULE/COURSE-scoped materials |
@@ -448,6 +459,7 @@ erDiagram
 | CourseEnrollmentWindow | `(courseId, schoolYear, city)` |
 | CourseSeason | `(courseId, schoolYear, city)` |
 | CourseGradeRule | `(courseId, schoolYear, city)` |
+| TrialWeek | `(schoolYear, city)` |
 | SchoolYearHoliday | `(schoolYear, city, date)` |
 | Location | `(id, city)` — backstop target for the `ScheduledGroup(locationId, city)` composite FK |
 | Enrollment | `(userId, scheduledGroupId, schoolYear)` |
@@ -473,6 +485,7 @@ erDiagram
 | CourseEnrollmentWindow | `schoolYear` |
 | CourseSeason | `schoolYear` |
 | CourseGradeRule | `(schoolYear, city)` |
+| TrialWeek | `schoolYear` |
 | SchoolYearHoliday | `schoolYear` |
 | EnrollmentMonth | `periodStart` |
 | Material | `(scope, moduleId)`, `(scope, courseId)`, `(scope, scheduledGroupId)` |
@@ -489,7 +502,7 @@ erDiagram
 
 Split and Šibenik run as fully separated tenants inside one app. "City" is the tenant; `Location` stays the venue *within* a city (Trokut inkubator is a `Location` with `city = SIBENIK`).
 
-**Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `CourseSeason` (each city runs the shared competition program's season on its own dates), `CourseGradeRule` (each city offers the shared standard program to its own razredi), `SchoolYearHoliday`, `EmailCampaign` (the sending admin's city — the tenant boundary for both recipient resolution and the `/admin/email` history list), and `Course` (nullable — `null` = shared standard SLR program and the competition program, set = per-city radionica).
+**Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `CourseSeason` (each city runs the shared competition program's season on its own dates), `CourseGradeRule` (each city offers the shared standard program to its own razredi), `TrialWeek` (each city picks its own probni-sat week), `SchoolYearHoliday`, `EmailCampaign` (the sending admin's city — the tenant boundary for both recipient resolution and the `/admin/email` history list), and `Course` (nullable — `null` = shared standard SLR program and the competition program, set = per-city radionica).
 
 **Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`EnrollmentMonth`/`Attendance`/`TeacherAttendance`/`GalleryImage`/`TeacherAssignment`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `ArticleImage`/`ArticleTag` through their article, `EmailCampaignRecipient` through its campaign.
 

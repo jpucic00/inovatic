@@ -1,78 +1,57 @@
+/**
+ * Probni tjedan — the week itself.
+ *
+ * The parent-facing half of this feature is gone (Flux `rgyemhz`): there is no
+ * checkbox on the prijavnica, no public eligibility endpoint, and `Inquiry` no
+ * longer records a requested trial. Staff decide who is new and mail the termin
+ * when they schedule it. What remains — and what this file covers — is the week
+ * an admin plans, and the date each group derives from it.
+ */
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import type { Mock } from 'vitest'
 import { db } from '@/lib/db'
-import {
-  createCourse,
-  createEnrollmentWindow,
-  createGroup,
-  createLocation,
-  createModule,
-  createModuleSchedule,
-  createStudent,
-} from './helpers/factory'
-import { computeSchoolYear } from '@/lib/school-year'
+import { mockSession } from './setup'
+import { createAdmin, createLocation } from './helpers/factory'
+import { computeSchoolYear, getPreviousSchoolYear } from '@/lib/school-year'
 import { fromDateKey, toDateKey } from '@/lib/session-dates'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn() }))
 
-const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
-vi.mock('resend', () => ({
-  Resend: class {
-    emails = { send: sendMock }
-  },
-}))
-
-import { headers } from 'next/headers'
-const mockedHeaders = headers as unknown as Mock
-
 const YEAR = computeSchoolYear()
-// A week well inside the school year, Mon–Sat.
-const WEEK_START = '2026-09-07'
-const WEEK_END = '2026-09-12'
-const TUESDAY = '2026-09-08'
 
-const { submitInquiry } = await import('@/actions/inquiry')
-const { checkTrialEligibility } = await import('@/actions/trial-eligibility')
-const { isFirstTimeChild } = await import('@/lib/trial-eligibility')
+/**
+ * Dates are DERIVED FROM TODAY, never pinned. A hardcoded week silently rots
+ * past its own date and the failure then reads as a trial-week bug; the first
+ * version of this file pinned a window whose start was a Tuesday — the fixture
+ * group's own weekday — and would have gone red four weeks after it was written.
+ */
+const dayMs = 86_400_000
+const dateKey = (d: Date) => d.toISOString().slice(0, 10)
 
-beforeEach(() => {
-  sendMock.mockReset()
-  mockedHeaders.mockResolvedValue({ get: () => '203.0.113.10' })
-})
-
-let seq = 0
-const uniq = () => `${Date.now().toString(36)}${(++seq).toString(36)}`
-
-/** A standard SLR group on Tuesdays, with an open enrollment window. */
-async function standardGroup(opts: { city?: 'SPLIT' | 'SIBENIK' } = {}) {
-  const city = opts.city ?? 'SPLIT'
-  const location = await createLocation({ city })
-  const course = await createCourse({ kind: 'STANDARD' })
-  const mod = await createModule(course.id)
-  await createModuleSchedule(mod.id, {
-    schoolYear: YEAR,
-    city,
-    startDate: fromDateKey('2026-09-15'),
-    endDate: fromDateKey('2026-11-03'),
-  })
-  await createEnrollmentWindow(course.id, {
-    schoolYear: YEAR,
-    city,
-    enrollmentStart: new Date('2020-01-01'),
-    enrollmentEnd: new Date('2099-01-01'),
-  })
-  const group = await createGroup({
-    courseId: course.id,
-    locationId: location.id,
-    schoolYear: YEAR,
-    city,
-    dayOfWeek: 'Utorak',
-    startTime: '17:00',
-    endTime: '18:30',
-  })
-  return { course, group, city }
+/** The Monday of the week `weeks` ahead of the current one. */
+function mondayIn(weeks: number): Date {
+  const now = new Date()
+  const utc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  const dow = new Date(utc).getUTCDay() // 0 = Sunday
+  const toMonday = dow === 0 ? 1 : 1 - dow
+  return new Date(utc + (toMonday + weeks * 7) * dayMs)
 }
+
+// A whole Mon–Sat week three weeks out: always ahead, and it contains exactly
+// one Tuesday, which is the fixture group's day.
+const TRIAL_MONDAY = mondayIn(3)
+const WEEK_START = dateKey(TRIAL_MONDAY)
+const WEEK_END = dateKey(new Date(TRIAL_MONDAY.getTime() + 5 * dayMs))
+const TUESDAY = dateKey(new Date(TRIAL_MONDAY.getTime() + dayMs))
+
+const { resolveTrialDateForGroup } = await import('@/lib/trial-week')
+const { upsertTrialWeek, clearTrialWeek, getTrialWeek } = await import(
+  '@/actions/admin/trial-week'
+)
+
+beforeEach(async () => {
+  await db.trialWeek.deleteMany({ where: { schoolYear: { in: [YEAR, getPreviousSchoolYear(YEAR)] } } })
+})
 
 async function setTrialWeek(city: 'SPLIT' | 'SIBENIK' = 'SPLIT') {
   await db.trialWeek.upsert({
@@ -87,280 +66,191 @@ async function setTrialWeek(city: 'SPLIT' | 'SIBENIK' = 'SPLIT') {
   })
 }
 
-async function clearTrialWeeks() {
-  await db.trialWeek.deleteMany({})
-}
+const groupOn = (
+  kind: 'STANDARD' | 'RADIONICA' | 'COMPETITION',
+  overrides: { schoolYear?: string; city?: 'SPLIT' | 'SIBENIK'; dayOfWeek?: string | null } = {},
+) => ({
+  dayOfWeek: overrides.dayOfWeek === undefined ? 'Utorak' : overrides.dayOfWeek,
+  schoolYear: overrides.schoolYear ?? YEAR,
+  city: overrides.city ?? ('SPLIT' as const),
+  course: { kind },
+})
 
-function inquiryPayload(overrides: Record<string, unknown> = {}) {
-  const marker = uniq()
-  return {
-    city: 'SPLIT' as const,
-    parentName: `Roditelj ${marker}`,
-    parentEmail: `roditelj-${marker}@test.hr`,
-    parentPhone: '0911111111',
-    childFirstName: 'Novi',
-    childLastName: `Polaznik${marker}`,
-    childDateOfBirth: '2016-04-04',
-    grade: '3' as const,
-    consent: true as const,
-    ...overrides,
-  }
-}
-
-describe('isFirstTimeChild', () => {
-  it('is true for a child with no account', async () => {
-    expect(
-      await isFirstTimeChild({
-        firstName: 'Nepoznato',
-        lastName: `Dijete${uniq()}`,
-        dateOfBirth: '2016-01-01',
-        parentEmail: `x-${uniq()}@test.hr`,
-      }),
-    ).toBe(true)
-  })
-
-  it('is false on the strict tier — name + date of birth', async () => {
-    const marker = uniq()
-    await createStudent({ firstName: 'Ana', lastName: `Strict${marker}`, dateOfBirth: '2015-05-05' })
-
-    expect(
-      await isFirstTimeChild({
-        firstName: 'Ana',
-        lastName: `Strict${marker}`,
-        dateOfBirth: '2015-05-05',
-        parentEmail: `whatever-${marker}@test.hr`,
-      }),
-    ).toBe(false)
+describe('resolveTrialDateForGroup', () => {
+  it('resolves the weekday inside the trial week for a STANDARD group', async () => {
+    await setTrialWeek()
+    const date = await resolveTrialDateForGroup(groupOn('STANDARD'))
+    expect(date && toDateKey(date)).toBe(TUESDAY)
   })
 
   /**
-   * The tier that actually matters here: the Excel-imported cohort has no dates
-   * of birth, so the strict rule alone would read almost every returning child
-   * as new and hand out a free lesson to families of ten years' standing.
+   * The STANDARD-only rule. A radionica IS a one-off trial of its own and the
+   * competitive program is invitation-only, so neither offers one — and both
+   * fixtures carry the SAME weekday as the passing case above, so program kind
+   * is the only variable.
    */
-  it('is false on the legacy tier — name + parent e-mail against a DOB-less account', async () => {
-    const marker = uniq()
-    const parentEmail = `legacy-${marker}@test.hr`
-    await createStudent({
-      firstName: 'Marko',
-      lastName: `Legacy${marker}`,
-      dateOfBirth: null,
-      parentEmail,
-    })
-
-    expect(
-      await isFirstTimeChild({
-        firstName: 'Marko',
-        lastName: `Legacy${marker}`,
-        dateOfBirth: '2014-02-02',
-        parentEmail,
-      }),
-    ).toBe(false)
-  })
-
-  it('is false for a child who attended in the OTHER city', async () => {
-    const marker = uniq()
-    await createStudent({
-      firstName: 'Ivan',
-      lastName: `Cross${marker}`,
-      dateOfBirth: '2015-03-03',
-      city: 'SIBENIK',
-    })
-
-    expect(
-      await isFirstTimeChild({
-        firstName: 'Ivan',
-        lastName: `Cross${marker}`,
-        dateOfBirth: '2015-03-03',
-        parentEmail: `x-${marker}@test.hr`,
-      }),
-    ).toBe(false)
-  })
-})
-
-describe('checkTrialEligibility', () => {
-  it('answers true for a first-timer', async () => {
-    const marker = uniq()
-    const res = await checkTrialEligibility({
-      childFirstName: 'Novi',
-      childLastName: `Elig${marker}`,
-      childDateOfBirth: '2016-06-06',
-      parentEmail: `elig-${marker}@test.hr`,
-    })
-    expect(res.eligible).toBe(true)
-  })
-
-  it('answers false for a child who already has an account', async () => {
-    const marker = uniq()
-    await createStudent({
-      firstName: 'Stari',
-      lastName: `Elig${marker}`,
-      dateOfBirth: '2015-06-06',
-    })
-    const res = await checkTrialEligibility({
-      childFirstName: 'Stari',
-      childLastName: `Elig${marker}`,
-      childDateOfBirth: '2015-06-06',
-      parentEmail: `elig-${marker}@test.hr`,
-    })
-    expect(res.eligible).toBe(false)
-  })
-
-  it('fails closed on a malformed payload', async () => {
-    const res = await checkTrialEligibility({
-      childFirstName: '',
-      childLastName: '',
-      childDateOfBirth: 'not-a-date',
-      parentEmail: 'nope',
-    })
-    expect(res.eligible).toBe(false)
-  })
-})
-
-describe('submitInquiry — probni sat', () => {
-  it('grants the trial and stores the derived date for a first-timer', async () => {
+  it('refuses a radionica and the competitive program', async () => {
     await setTrialWeek()
-    const { course, group } = await standardGroup()
-
-    const res = await submitInquiry(
-      inquiryPayload({
-        courseId: course.id,
-        scheduledGroupId: group.id,
-        wantsTrial: true,
-      }) as Parameters<typeof submitInquiry>[0],
-    )
-
-    expect(res.success).toBe(true)
-    if (res.success) {
-      expect(res.nextStep).toBe('TRIAL_BOOKED')
-      expect(res.trialDateLabel).toBe('08.09.2026.')
-    }
-
-    const row = await db.inquiry.findFirst({
-      where: { scheduledGroupId: group.id },
-      orderBy: { createdAt: 'desc' },
-      select: { wantsTrial: true, trialDate: true },
-    })
-    expect(row?.wantsTrial).toBe(true)
-    expect(row?.trialDate && toDateKey(row.trialDate)).toBe(TUESDAY)
+    expect(await resolveTrialDateForGroup(groupOn('RADIONICA'))).toBeNull()
+    expect(await resolveTrialDateForGroup(groupOn('COMPETITION'))).toBeNull()
   })
 
-  /**
-   * The rule the owner asked for, enforced where it counts: the form hides the
-   * option from returning families, but the answer arrives in the payload, so a
-   * crafted request must not buy a free lesson either.
-   */
-  it('DROPS a trial claimed for a child who already has an account', async () => {
+  it('is keyed on the GROUP’s own school year, not today’s', async () => {
     await setTrialWeek()
-    const { course, group } = await standardGroup()
-    const marker = uniq()
-    await createStudent({
-      firstName: 'Vracam',
-      lastName: `Se${marker}`,
-      dateOfBirth: '2015-09-09',
-    })
-
-    const res = await submitInquiry(
-      inquiryPayload({
-        childFirstName: 'Vracam',
-        childLastName: `Se${marker}`,
-        childDateOfBirth: '2015-09-09',
-        courseId: course.id,
-        scheduledGroupId: group.id,
-        wantsTrial: true,
-      }) as Parameters<typeof submitInquiry>[0],
-    )
-
-    expect(res.success).toBe(true)
-    if (res.success) expect(res.nextStep).toBe('TERMIN_CHOSEN')
-
-    const row = await db.inquiry.findFirst({
-      where: { scheduledGroupId: group.id },
-      orderBy: { createdAt: 'desc' },
-      select: { wantsTrial: true, trialDate: true },
-    })
-    expect(row?.wantsTrial).toBe(false)
-    expect(row?.trialDate).toBeNull()
-  })
-
-  it('records the request without a date when the year has no trial week', async () => {
-    await clearTrialWeeks()
-    const { course, group } = await standardGroup()
-
-    const res = await submitInquiry(
-      inquiryPayload({
-        courseId: course.id,
-        scheduledGroupId: group.id,
-        wantsTrial: true,
-      }) as Parameters<typeof submitInquiry>[0],
-    )
-
-    expect(res.success).toBe(true)
-    if (res.success) {
-      expect(res.nextStep).toBe('TRIAL_TO_ARRANGE')
-      expect(res.trialDateLabel).toBeUndefined()
-    }
-
-    const row = await db.inquiry.findFirst({
-      where: { scheduledGroupId: group.id },
-      orderBy: { createdAt: 'desc' },
-      select: { wantsTrial: true, trialDate: true },
-    })
-    expect(row?.wantsTrial).toBe(true)
-    expect(row?.trialDate).toBeNull()
-  })
-
-  it('leaves an ordinary inquiry untouched', async () => {
-    await setTrialWeek()
-    const { course, group } = await standardGroup()
-
-    const res = await submitInquiry(
-      inquiryPayload({
-        courseId: course.id,
-        scheduledGroupId: group.id,
-      }) as Parameters<typeof submitInquiry>[0],
-    )
-
-    expect(res.success).toBe(true)
-    if (res.success) expect(res.nextStep).toBe('TERMIN_CHOSEN')
-
-    const row = await db.inquiry.findFirst({
-      where: { scheduledGroupId: group.id },
-      orderBy: { createdAt: 'desc' },
-      select: { wantsTrial: true, trialDate: true },
-    })
-    expect(row?.wantsTrial).toBe(false)
-    expect(row?.trialDate).toBeNull()
+    const other = groupOn('STANDARD', { schoolYear: '2019/2020' })
+    expect(await resolveTrialDateForGroup(other)).toBeNull()
+    expect(await resolveTrialDateForGroup(groupOn('STANDARD'))).not.toBeNull()
   })
 
   /** Šibenik plans its own week; Split's must not leak across the tenant line. */
-  it('does not use the other city trial week', async () => {
-    await clearTrialWeeks()
+  it('does not read the other city’s trial week', async () => {
     await setTrialWeek('SIBENIK')
-    const { course, group } = await standardGroup({ city: 'SPLIT' })
+    expect(await resolveTrialDateForGroup(groupOn('STANDARD', { city: 'SPLIT' }))).toBeNull()
+    expect(await resolveTrialDateForGroup(groupOn('STANDARD', { city: 'SIBENIK' }))).not.toBeNull()
+  })
 
-    const res = await submitInquiry(
-      inquiryPayload({
-        courseId: course.id,
-        scheduledGroupId: group.id,
-        wantsTrial: true,
-      }) as Parameters<typeof submitInquiry>[0],
-    )
+  it('yields nothing for a group with no weekday', async () => {
+    await setTrialWeek()
+    expect(await resolveTrialDateForGroup(groupOn('STANDARD', { dayOfWeek: null }))).toBeNull()
+  })
 
-    expect(res.success).toBe(true)
-    if (res.success) expect(res.nextStep).toBe('TRIAL_TO_ARRANGE')
+  /**
+   * An ABSENT row is the "no probni sat this year" state — the same doctrine as
+   * CourseGradeRule. It is also why the feature is dark until an admin sets a
+   * week, which is a deliberate default and not a bug.
+   */
+  it('yields nothing when the year has no trial week at all', async () => {
+    expect(await resolveTrialDateForGroup(groupOn('STANDARD'))).toBeNull()
+  })
+
+  /** A holiday on the group's day REMOVES its trial rather than moving it. */
+  it('drops the trial when a holiday lands on the group’s weekday', async () => {
+    await setTrialWeek()
+    await createLocation({ city: 'SPLIT' })
+    await db.schoolYear.upsert({ where: { label: YEAR }, create: { label: YEAR }, update: {} })
+    await db.schoolYearHoliday.create({
+      data: { schoolYear: YEAR, city: 'SPLIT', date: fromDateKey(TUESDAY), name: 'Test praznik' },
+    })
+    try {
+      expect(await resolveTrialDateForGroup(groupOn('STANDARD'))).toBeNull()
+      // Same date, other city: the holiday set is per-city, so Šibenik keeps it.
+      await setTrialWeek('SIBENIK')
+      expect(
+        await resolveTrialDateForGroup(groupOn('STANDARD', { city: 'SIBENIK' })),
+      ).not.toBeNull()
+    } finally {
+      await db.schoolYearHoliday.deleteMany({
+        where: { schoolYear: YEAR, city: 'SPLIT', date: fromDateKey(TUESDAY) },
+      })
+    }
   })
 })
 
-describe('public program feed', () => {
-  it('carries the trial date on standard groups and null on radionice', async () => {
-    await setTrialWeek()
-    const { group } = await standardGroup()
+describe('upsertTrialWeek / clearTrialWeek', () => {
+  async function asAdmin(city: 'SPLIT' | 'SIBENIK' = 'SPLIT') {
+    const admin = await createAdmin({ city })
+    mockSession({ id: admin.id, role: 'ADMIN', city })
+    return admin
+  }
 
-    const { getActivePrograms } = await import('@/actions/public/programs')
-    const programs = await getActivePrograms('SPLIT')
-    const found = programs.flatMap((p) => p.groups).find((g) => g.id === group.id)
+  it('stores a week an admin sets, under their own city', async () => {
+    await asAdmin('SPLIT')
+    const res = await upsertTrialWeek({
+      schoolYear: YEAR,
+      startDate: WEEK_START,
+      endDate: WEEK_END,
+    })
+    expect(res.success).toBe(true)
 
-    expect(found?.trialDate).toBe(TUESDAY)
+    const row = await db.trialWeek.findUnique({
+      where: { schoolYear_city: { schoolYear: YEAR, city: 'SPLIT' } },
+    })
+    expect(row).not.toBeNull()
+    // The city comes from the session, never from the payload.
+    expect(
+      await db.trialWeek.findUnique({
+        where: { schoolYear_city: { schoolYear: YEAR, city: 'SIBENIK' } },
+      }),
+    ).toBeNull()
+  })
+
+  /**
+   * "Probni tjedan" is a week because every group runs its trial on its own
+   * weekday inside it — an 8-day span would give some weekday two candidate
+   * dates and `computeTrialSession` would silently pick one.
+   */
+  it('refuses a span longer than 7 days, and writes nothing', async () => {
+    await asAdmin('SPLIT')
+    const res = await upsertTrialWeek({
+      schoolYear: YEAR,
+      startDate: WEEK_START,
+      endDate: dateKey(new Date(TRIAL_MONDAY.getTime() + 7 * dayMs)),
+    })
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toMatch(/najviše 7 dana/)
+    expect(
+      await db.trialWeek.findUnique({
+        where: { schoolYear_city: { schoolYear: YEAR, city: 'SPLIT' } },
+      }),
+    ).toBeNull()
+  })
+
+  it('refuses an end before the start', async () => {
+    await asAdmin('SPLIT')
+    const res = await upsertTrialWeek({
+      schoolYear: YEAR,
+      startDate: WEEK_END,
+      endDate: WEEK_START,
+    })
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toMatch(/prije početka/)
+  })
+
+  it('refuses an archived school year', async () => {
+    await asAdmin('SPLIT')
+    const past = getPreviousSchoolYear(YEAR)
+    const res = await upsertTrialWeek({
+      schoolYear: past,
+      startDate: WEEK_START,
+      endDate: WEEK_END,
+    })
+    expect(res.success).toBe(false)
+    expect(
+      await db.trialWeek.findUnique({
+        where: { schoolYear_city: { schoolYear: past, city: 'SPLIT' } },
+      }),
+    ).toBeNull()
+  })
+
+  it('rejects a non-admin caller', async () => {
+    mockSession({ id: 'nastavnik', role: 'TEACHER', city: 'SPLIT' })
+    await expect(
+      upsertTrialWeek({ schoolYear: YEAR, startDate: WEEK_START, endDate: WEEK_END }),
+    ).rejects.toThrow()
+  })
+
+  /** Clearing DELETES the row — absence is the "no trial this year" state. */
+  it('clears by deleting the row, not by blanking the dates', async () => {
+    await asAdmin('SPLIT')
+    await setTrialWeek('SPLIT')
+
+    const res = await clearTrialWeek({ schoolYear: YEAR })
+    expect(res.success).toBe(true)
+    expect(
+      await db.trialWeek.findUnique({
+        where: { schoolYear_city: { schoolYear: YEAR, city: 'SPLIT' } },
+      }),
+    ).toBeNull()
+    // And the public consequence: groups stop offering a date immediately.
+    expect(await resolveTrialDateForGroup(groupOn('STANDARD'))).toBeNull()
+  })
+
+  it('reads back only its own city’s week', async () => {
+    await setTrialWeek('SIBENIK')
+    await asAdmin('SPLIT')
+    expect(await getTrialWeek(YEAR)).toBeNull()
+
+    await asAdmin('SIBENIK')
+    expect(await getTrialWeek(YEAR)).not.toBeNull()
   })
 })

@@ -7,9 +7,7 @@ import { computeGroupCapacity } from '@/lib/group-capacity'
 import { hasDatedModules, isRadionica } from '@/lib/program-kind'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import {
-  computeTrialSession,
   isRadionicaOpenForSignup,
-  toDateKey,
 } from '@/lib/session-dates'
 import type { CourseGradeRules } from '@/lib/inquiry-availability'
 import type { Grade } from '@/lib/inquiry-status'
@@ -32,7 +30,6 @@ export type ActiveGroup = {
    * and because each group knows its own school year, which is the only year the
    * trial week may be looked up under.
    */
-  trialDate: string | null
 }
 
 export type ActiveProgram = {
@@ -68,7 +65,6 @@ function toActiveGroup(
   g: GroupRow,
   holidayDates: ReadonlySet<string>,
   now: Date,
-  trialWeek: { startDate: Date; endDate: Date } | null,
 ): ActiveGroup | null {
   const { availableSpots, isFull, nextEnrollingModule } = computeGroupCapacity(
     g,
@@ -97,20 +93,6 @@ function toActiveGroup(
     endTime: g.endTime,
     availableSpots,
     isFull,
-    // STANDARD only — a radionica IS a one-off trial of its own and the
-    // competitive program is invitation-only, so neither offers one.
-    trialDate:
-      trialWeek && hasDatedModules(g.course.kind)
-        ? (() => {
-            const date = computeTrialSession({
-              dayOfWeek: g.dayOfWeek,
-              startDate: trialWeek.startDate,
-              endDate: trialWeek.endDate,
-              holidayDates,
-            })
-            return date ? toDateKey(date) : null
-          })()
-        : null,
     ...(nextEnrollingModule ? { currentModuleName: nextEnrollingModule.title } : {}),
   }
 }
@@ -224,23 +206,6 @@ async function loadPrograms(
     }),
   )
 
-  // The probni sat weeks, fetched once for the same (year, city) key set. Keyed
-  // on the GROUP'S year rather than today's: upisi for next year open while the
-  // clock still names the year that is ending, so "now" would read the wrong
-  // year's setup — the trap `getCourseGradeRules` documents.
-  const trialWeeks = await db.trialWeek.findMany({
-    where: {
-      OR: Array.from(distinctKeys).map((key) => {
-        const [schoolYear, city] = key.split('::') as [string, (typeof groups)[number]['city']]
-        return { schoolYear, city }
-      }),
-    },
-    select: { schoolYear: true, city: true, startDate: true, endDate: true },
-  })
-  const trialWeekByYearCity = new Map(
-    trialWeeks.map((w) => [`${w.schoolYear}::${w.city}`, w]),
-  )
-
   const courseMap = new Map<string, ActiveProgram>()
   for (const g of groups) {
     // Gate on the group's own (course, year, city) window being open.
@@ -249,7 +214,6 @@ async function loadPrograms(
       g,
       holidaysByYearCity.get(`${g.schoolYear}::${g.city}`) ?? new Set(),
       now,
-      trialWeekByYearCity.get(`${g.schoolYear}::${g.city}`) ?? null,
     )
     if (!activeGroup) continue
 

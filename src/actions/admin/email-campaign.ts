@@ -77,12 +77,31 @@ function sleep(ms: number) {
  * re-enrol in it) and from an EVALUATION cohort (they are never graded, so they
  * have no cards) — one predicate, two reasons.
  *
+ * Deliberately NOT applied to CREDENTIALS: a workshop child gets a real portal
+ * account and reads materials and the gallery like anyone else, and their login
+ * is valid from the workshop until the end of the school year. Excluding those
+ * groups only hid them from the composer's tree — no error, no explanation — so
+ * the families most likely to be forgotten were the ones the campaign could not
+ * reach. The exclusion is now named per kind rather than "everything but CUSTOM".
+ *
  * Two forms because the filter is applied from both sides of the relation:
  * {@link NOT_RADIONICA} in a `course` query, {@link GROUP_NOT_RADIONICA} in a
  * `scheduledGroup` one.
  */
 const NOT_RADIONICA = { kind: { not: 'RADIONICA' } } as const
 const GROUP_NOT_RADIONICA = { course: NOT_RADIONICA } as const
+
+/**
+ * Which campaign kinds cannot target a radionica group. Listed positively so a
+ * new kind has to declare itself rather than inheriting an exclusion by default.
+ *
+ * NOT exported: this file is `'use server'`, so an export here would be
+ * published as its own Server Action endpoint. The wizard mirrors the rule
+ * client-side for its group tree; this copy is the one that decides.
+ */
+function kindExcludesRadionice(kind: string): boolean {
+  return kind === 'REENROLLMENT' || kind === 'EVALUATION'
+}
 
 /**
  * Feed for the CREDENTIALS "pojedinačna djeca" picker: every student enrolled in
@@ -285,7 +304,7 @@ async function validateSourceGroups(
       id: { in: ids },
       city,
       schoolYear: sourceSchoolYear,
-      ...(kind === 'CUSTOM' ? {} : GROUP_NOT_RADIONICA),
+      ...(kindExcludesRadionice(kind) ? GROUP_NOT_RADIONICA : {}),
     },
     select: { id: true },
   })
@@ -998,37 +1017,64 @@ function buildExcludedSet(data: SendEmailCampaignInput): Set<string> {
   )
 }
 
-/**
- * Give every credentialed child a usable password before the send starts.
- *
- * Runs once, inside the campaign-creation transaction. That placement is the
- * whole point: minting inside the send loop would mean a resumed run rotates a
- * password a second time, invalidating the one the first run already mailed —
- * the parent would hold a password that no longer works and nothing would say so.
- *
- * Only accounts with no usable password are touched. A null `plainPassword`
- * means an unusable hash (every historically-imported account), so nobody can
- * log in with it today and replacing it destroys nothing. Accounts that already
- * have one keep it — a parent who was handed the password in person must not
- * find it silently rotated.
- */
-async function mintMissingPasswords(
-  tx: Prisma.TransactionClient,
-  recipients: EmailRecipient[],
-): Promise<void> {
-  const studentIds = recipients.flatMap((r) => r.studentIds)
-  if (studentIds.length === 0) return
+/** One minted credential, hashed before the transaction opens. */
+type MintedPassword = { id: string; password: string; passwordHash: string }
 
-  const needing = await tx.user.findMany({
+/**
+ * Hash a new password for every credentialed child that has none — OUTSIDE any
+ * transaction.
+ *
+ * bcrypt at cost 12 costs ~200 ms per call and `bcryptjs` is pure JS, so doing
+ * this inside the campaign transaction put a CPU-bound loop under Prisma's
+ * 5 s interactive-transaction budget: about two dozen children exhausted it and
+ * the whole campaign rolled back with a generic error — no rows, no passwords,
+ * nothing sent, and identical on retry. Historically-imported accounts all have
+ * `plainPassword: null`, so a cohort of exactly those children is both the
+ * campaign's primary audience and the case that blew the budget. Hashing here
+ * and writing inside keeps the transaction to plain updates.
+ */
+async function mintPasswordsFor(recipients: EmailRecipient[]): Promise<MintedPassword[]> {
+  const studentIds = recipients.flatMap((r) => r.studentIds)
+  if (studentIds.length === 0) return []
+
+  const needing = await db.user.findMany({
     where: { id: { in: studentIds }, role: 'STUDENT', plainPassword: null },
     select: { id: true },
   })
 
-  for (const student of needing) {
-    const password = generateSimplePassword(6)
-    await tx.user.update({
-      where: { id: student.id },
-      data: { passwordHash: await hashPassword(password), plainPassword: password },
+  return Promise.all(
+    needing.map(async (student) => {
+      const password = generateSimplePassword(6)
+      return { id: student.id, password, passwordHash: await hashPassword(password) }
+    }),
+  )
+}
+
+/**
+ * Store the minted passwords, inside the campaign-creation transaction.
+ *
+ * That placement is the whole point: minting inside the send loop would mean a
+ * resumed run rotates a password a second time, invalidating the one the first
+ * run already mailed — the parent would hold a password that no longer works and
+ * nothing would say so.
+ *
+ * The `plainPassword: null` condition is repeated here, on the write, so it
+ * still holds against the read done before the transaction opened: a concurrent
+ * campaign (or a `resetStudentPassword`) that gave the child a password in
+ * between must win, rather than being overwritten by a hash computed earlier.
+ * Only accounts with no usable password are ever touched — a null
+ * `plainPassword` means an unusable hash, so nobody can log in with it today and
+ * replacing it destroys nothing, while a parent handed their password in person
+ * must never find it silently rotated.
+ */
+async function persistMintedPasswords(
+  tx: Prisma.TransactionClient,
+  minted: MintedPassword[],
+): Promise<void> {
+  for (const m of minted) {
+    await tx.user.updateMany({
+      where: { id: m.id, role: 'STUDENT', plainPassword: null },
+      data: { passwordHash: m.passwordHash, plainPassword: m.password },
     })
   }
 }
@@ -1065,6 +1111,11 @@ export async function sendEmailCampaign(
     const sourceRecommendations = data.recommendations?.length
       ? await labelRecommendations(data.recommendations, city)
       : []
+
+    // Hashed BEFORE the transaction opens — see `mintPasswordsFor`. Only the
+    // writes belong inside; bcrypt does not.
+    const mintedPasswords =
+      data.kind === 'CREDENTIALS' ? await mintPasswordsFor(toSend) : []
 
     // One transaction: the campaign row and its intended-recipient rows commit
     // together, so a crash here can't leave a campaign whose counters promise a
@@ -1131,7 +1182,7 @@ export async function sendEmailCampaign(
       // `plainPassword` means an unusable hash (the Excel importer's doing), so
       // nobody can log in with it and nothing is destroyed.
       if (data.kind === 'CREDENTIALS') {
-        await mintMissingPasswords(tx, toSend)
+        await persistMintedPasswords(tx, mintedPasswords)
       }
 
       return created

@@ -24,7 +24,6 @@ function makeGroup(id: string, name: string, isFull = false): ActiveGroup {
     startTime: '17:00',
     endTime: '18:00',
     availableSpots: isFull ? 0 : 5,
-    trialDate: null,
     isFull,
   }
 }

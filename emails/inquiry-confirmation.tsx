@@ -16,11 +16,6 @@ interface InquiryConfirmationProps {
   /** Defaults to the offer-them-termini wording — the pre-dropdown behaviour. */
   nextStep?: InquiryNextStep
   /**
-   * The promised probni sat date, already formatted dd.MM.yyyy. Only meaningful
-   * for the TRIAL_BOOKED step, which is the only sentence that names it.
-   */
-  trialDateLabel?: string
-  /**
    * The akontacija + ostatak figures for a radionica (see
    * `radionicaPaymentPlan`). Set on radionica sign-ups with a price and on
    * nothing else — SLR and natjecateljski confirmations carry no payment
@@ -36,7 +31,6 @@ function InquiryConfirmationEmail({
   childDateOfBirth,
   cityLabel,
   nextStep = 'TERMIN_TO_OFFER',
-  trialDateLabel,
   payment,
 }: InquiryConfirmationProps) {
   return (
@@ -124,7 +118,7 @@ function InquiryConfirmationEmail({
         </>
       )}
       <Text style={emailStyles.text}>
-        {inquiryNextStepText(nextStep, { trialDateLabel })}
+        {inquiryNextStepText(nextStep)}
       </Text>
       <Text style={emailStyles.text}>
         U međuvremenu, možete saznati više o našim programima na{' '}

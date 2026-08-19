@@ -30,8 +30,10 @@ export const metadata: Metadata = {
 const perks = [
   'Ispunjavanje prijavnog obrasca ne obvezuje na upis',
   // Scoped to new families: returning polaznici are enrolled straight into the
-  // next level and are never offered a trial, so the old unconditional promise
-  // was one the form no longer keeps for them.
+  // next level and are not sent to a trial. Deliberately a STATEMENT of what we
+  // do, not an instruction — the parent does not request the probni sat here.
+  // We identify the new children ourselves and mail the termin once the probni
+  // tjedan is scheduled.
   'Novi polaznici mogu doći na besplatni probni sat',
   'Kontaktiramo vas u roku 48h',
   'Preporučujemo program prema dobi',
@@ -94,7 +96,7 @@ export default async function InquiryPage() {
                   {[
                     { n: '1', text: 'Ispunite prijavni obrazac i odaberite željenu grupu.' },
                     { n: '2', text: 'Provjeravamo dostupnost i kontaktiramo vas.' },
-                    { n: '3', text: 'Novi polaznici dolaze na besplatni probni sat.' },
+                    { n: '3', text: 'Novim polaznicima javljamo termin besplatnog probnog sata.' },
                     { n: '4', text: 'Nakon potvrde upisujemo dijete.' },
                   ].map((item, i) => (
                     <div key={item.n} className="flex gap-3">

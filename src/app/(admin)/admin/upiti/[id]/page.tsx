@@ -539,25 +539,6 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
               }
             />
           )}
-          {/* A promised free trial. The date is what the parent was told in
-              writing; its absence means nothing was bookable, so a termin still
-              has to be agreed before the child can come. */}
-          {inquiry.wantsTrial && (
-            <DetailRow
-              label="Probni sat"
-              value={
-                inquiry.trialDate ? (
-                  <span className="font-medium text-cyan-700">
-                    {formatDate(inquiry.trialDate)}
-                  </span>
-                ) : (
-                  <span className="font-medium text-amber-700">
-                    Da — termin još nije dogovoren
-                  </span>
-                )
-              }
-            />
-          )}
           <DetailRow
             label="Poruka"
             value={

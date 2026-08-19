@@ -63,6 +63,14 @@ interface Props {
   onClearAssessment: ClearAssessmentAction
   /** Admin or teacher variant — unlike the paid marks, both roles may set this. */
   onSetContractSigned: SetContractSignedAction
+  /**
+   * Group ids whose contract mark this viewer may actually change. `undefined`
+   * means unrestricted (an ADMIN). A TEACHER gets only their own groups in the
+   * current year — the profile lists every enrollment a child has, including
+   * colleagues' groups and settled years, and the server refuses those by
+   * throwing, which would take the whole page down rather than show a toast.
+   */
+  contractEditableGroupIds?: readonly string[]
 }
 
 /**
@@ -88,6 +96,7 @@ export function StudentYearSections({
   onSaveAssessment,
   onClearAssessment,
   onSetContractSigned,
+  contractEditableGroupIds,
 }: Readonly<Props>) {
   const years = useMemo(() => {
     const set = new Set<string>([defaultYear])
@@ -215,6 +224,10 @@ export function StudentYearSections({
                     enrollmentId={enrollment.id}
                     contractSignedAt={enrollment.contractSignedAt}
                     onSetContractSigned={onSetContractSigned}
+                    readOnly={
+                      contractEditableGroupIds !== undefined &&
+                      !contractEditableGroupIds.includes(sg.id)
+                    }
                   />
                   {isAdmin && (
                     <EnrollmentPaymentPanel

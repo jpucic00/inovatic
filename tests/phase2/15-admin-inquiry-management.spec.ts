@@ -3,6 +3,7 @@ import { clickUntilVisible } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 import { fillInquiryStep1 } from '../helpers/prijava'
 
+import { cleanupRunFixtures } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 6 — Admin Dashboard + Inquiry Management
 // Tests run serially: beforeAll creates 3 inquiries, then tests verify
@@ -14,6 +15,17 @@ const BASE = 'http://localhost:3000'
 
 // Unique per test run so each run's data is identifiable even if old data exists
 const RUN_ID = Date.now().toString().slice(-6)
+
+// Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
+// title, so one call removes exactly this run's rows and can reach no other.
+// Without it each run's groups stay for good, and `/admin/grupe` packs a
+// weekday's groups into one lane — past a few dozen leftovers the entries go
+// zero-width and specs that never changed start failing on the litter.
+// Best-effort by design: it swallows, so a teardown problem can never turn a
+// green run red.
+test.afterAll(async () => {
+  await cleanupRunFixtures(RUN_ID)
+})
 
 const INQUIRY_MAIN = {
   parentName: `Marko Testić ${RUN_ID}`,

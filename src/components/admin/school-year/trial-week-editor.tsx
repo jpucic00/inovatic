@@ -80,6 +80,19 @@ export function TrialWeekEditor({ schoolYear, startDate, endDate, editable }: Re
     setEditing(false)
   }
 
+  /**
+   * Seed the inputs from the CURRENT props, not from whatever they held at
+   * mount. Split has more than one admin: if a colleague saves a new week, this
+   * page picks the new dates up on the next refresh and the read-only line shows
+   * them — but without this the form would open on the stale ones and "Spremi"
+   * would quietly write the colleague's change back out. Same across two tabs.
+   */
+  const handleEdit = () => {
+    setStart(toIsoString(startDate))
+    setEnd(toIsoString(endDate))
+    setEditing(true)
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5">
       <div className="flex items-start justify-between gap-3">
@@ -95,7 +108,7 @@ export function TrialWeekEditor({ schoolYear, startDate, endDate, editable }: Re
         </div>
         {editable && !editing && (
           <button
-            onClick={() => setEditing(true)}
+            onClick={handleEdit}
             className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors shrink-0"
             title="Uredi probni tjedan"
           >

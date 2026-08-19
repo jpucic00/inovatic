@@ -16,6 +16,7 @@ import {
 } from '@/actions/teacher/student-assessment'
 import { setEnrollmentContractSignedByTeacher } from '@/actions/teacher/contract'
 import { computeSchoolYear } from '@/lib/school-year'
+import { db } from '@/lib/db'
 import { getRecommendationOptions } from '@/lib/student-detail'
 import { buildGradebookTabs } from '@/lib/student-assessment-view'
 import { StudentDetailView } from '@/components/shared/student-detail-view'
@@ -54,6 +55,27 @@ export default async function TeacherStudentDetailPage({
 
   const isAdmin = session.user.role === 'ADMIN'
   const viewerId = session.user.id
+
+  // Which enrollments this viewer may mark "Ugovor potpisan" on.
+  //
+  // The roster only has to share ONE group for a profile to open, so this page
+  // routinely lists colleagues' groups and previous years too. Left editable,
+  // clicking one hits `assertTeacherOwnsGroup`, which throws `notFound()` and
+  // replaces the whole profile with a 404 — the toggle's error toast can never
+  // fire. So the page names the writable groups and the rest render read-only.
+  // `undefined` means unrestricted: a teaching ADMIN is the correction path
+  // here exactly as they are for attendance.
+  const contractEditableGroupIds = isAdmin
+    ? undefined
+    : (
+        await db.scheduledGroup.findMany({
+          where: {
+            schoolYear: computeSchoolYear(),
+            teacherAssignments: { some: { userId: viewerId } },
+          },
+          select: { id: true },
+        })
+      ).map((g) => g.id)
   const gradebookTabs = buildGradebookTabs(
     student,
     (authorId) => isAdmin || authorId === viewerId,
@@ -74,6 +96,7 @@ export default async function TeacherStudentDetailPage({
       onSaveAssessment={upsertTeacherAssessment}
       onClearAssessment={clearTeacherAssessment}
       onSetContractSigned={setEnrollmentContractSignedByTeacher}
+      contractEditableGroupIds={contractEditableGroupIds}
     />
   )
 }

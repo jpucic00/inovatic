@@ -70,7 +70,6 @@ export function InquiryForm({
   // The promised probni sat date comes back from the server — only it knows
   // whether the trial survived the eligibility re-check and which date the
   // group's trial week resolves to.
-  const [trialDateLabel, setTrialDateLabel] = useState<string | undefined>(undefined)
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   // Live availability keyed by city — the 30s poll / GROUP_FULL refresh only
@@ -210,7 +209,6 @@ export function InquiryForm({
         // decided this, and the success screen must say exactly what the
         // confirmation e-mail says.
         setNextStep(result.nextStep)
-        setTrialDateLabel(result.trialDateLabel)
         setDone(true)
       } else if ('code' in result) {
         // Availability shifted since render (a slot opened or filled, a
@@ -256,7 +254,7 @@ export function InquiryForm({
           Zahvaljujemo na upitu. Provjerite email — poslali smo potvrdu.
         </p>
         <p className="text-gray-600 max-w-md mx-auto mt-3">
-          {inquiryNextStepText(nextStep, { trialDateLabel })}
+          {inquiryNextStepText(nextStep)}
         </p>
         <button
           type="button"

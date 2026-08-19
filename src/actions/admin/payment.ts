@@ -1,6 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
+import { writeContractSigned } from '@/lib/enrollment-contract'
 import { revalidatePath } from 'next/cache'
 import type { AdminActionResult } from '@/lib/action-types'
 import {
@@ -143,31 +144,4 @@ export async function setEnrollmentContractSigned(
       return writeContractSigned(d.enrollmentId, row.userId, signed)
     },
   )
-}
-
-/**
- * The shared write behind both the admin and the teacher action. Kept here (and
- * exported) rather than duplicated so the column, the error copy and the
- * revalidation set can never drift between the two callers — only the guard in
- * front of it differs.
- */
-export async function writeContractSigned(
-  enrollmentId: string,
-  studentId: string,
-  signed: boolean,
-): Promise<AdminActionResult> {
-  try {
-    await db.enrollment.update({
-      where: { id: enrollmentId },
-      data: { contractSignedAt: signed ? new Date() : null },
-    })
-  } catch (err) {
-    console.error('writeContractSigned failed:', err)
-    return { success: false, error: 'Greška pri spremanju ugovora.' }
-  }
-
-  revalidatePath(`/admin/ucenici/${studentId}`)
-  revalidatePath('/admin/ucenici')
-  revalidatePath(`/nastavnik/ucenik/${studentId}`)
-  return { success: true }
 }

@@ -61,7 +61,15 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await db.schoolYearHoliday.deleteMany({ where: { date: { in: holidayDates } } })
+  // Scoped by (schoolYear, city, date), not by date alone. This file writes
+  // CURRENT-year SPLIT holidays — the same key other files plan module arcs
+  // under — and a delete on the bare date would also remove a row another file
+  // owns. The tier shares one database and runs serially with no per-file
+  // cleanup, so that is an order-dependent failure waiting to happen rather
+  // than one anybody would read as this file's doing.
+  await db.schoolYearHoliday.deleteMany({
+    where: { schoolYear: YEAR, city: 'SPLIT', date: { in: holidayDates } },
+  })
   await scope.cleanup()
 })
 

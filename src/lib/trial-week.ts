@@ -1,9 +1,8 @@
-import type { City } from '@prisma/client'
+import type { City, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { computeTrialSession } from '@/lib/session-dates'
 import { hasDatedModules } from '@/lib/program-kind'
-import type { ProgramKind } from '@prisma/client'
 
 /** The group fields a trial date is derived from. */
 type TrialGroup = {

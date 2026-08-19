@@ -21,6 +21,7 @@ const PAST = getPreviousSchoolYear(CURRENT)
 const { getEffectiveMaterialsForStudent } = await import('@/actions/student/materials')
 const { getGroupGalleryForStudent } = await import('@/actions/student/gallery')
 const { getMyCurrentEnrollments } = await import('@/actions/student/dashboard')
+const { getMyAssessmentForGroup } = await import('@/actions/student/assessment')
 
 async function groupIn(schoolYear: string) {
   const course = await createCourse({ kind: 'STANDARD' })
@@ -109,6 +110,23 @@ describe('revalidateTokenClaims — student activity', () => {
 // Defence in depth for the ≤60s window before eviction runs: these routes
 // authorise off a session, so the rule has to hold here too.
 
+/**
+ * Asserts a guard refused with `notFound()` and not `redirect()`.
+ *
+ * Both throw, so a bare `.rejects.toThrow()` cannot tell them apart — and the
+ * difference is the whole point: `requireActiveStudent` must 404, because
+ * `requireStudent`'s `redirect('/portal')` would bounce a student to the page
+ * that renders their dashboard and loop forever. Matched on the 404 half of the
+ * digest rather than the exact string, which Next has already renamed once
+ * (`NEXT_NOT_FOUND` → `NEXT_HTTP_ERROR_FALLBACK;404`); a redirect digest starts
+ * `NEXT_REDIRECT` and never matches either way.
+ */
+async function expectNotFound(p: Promise<unknown>): Promise<void> {
+  await expect(p).rejects.toMatchObject({
+    digest: expect.stringMatching(/^NEXT_(NOT_FOUND|HTTP_ERROR_FALLBACK;404)$/),
+  })
+}
+
 describe('portal reads require an active program', () => {
   it('serves materials to an actively enrolled student', async () => {
     const { student, group } = await studentEnrolledIn(CURRENT)
@@ -117,18 +135,36 @@ describe('portal reads require an active program', () => {
     await expect(getEffectiveMaterialsForStudent(group.id)).resolves.toBeTruthy()
   })
 
+  /**
+   * The digest matters, not just "it threw". `requireActiveStudent` must fail
+   * with `notFound()` and NOT `requireStudent`'s `redirect('/portal')`: /portal
+   * renders the dashboard for a STUDENT session, so bouncing there would loop
+   * forever. Both throw, so a bare `.rejects.toThrow()` is blind to exactly the
+   * regression `auth-guard.ts` documents.
+   */
   it('refuses materials to a student whose enrollment is only in a past year', async () => {
     const { student, group } = await studentEnrolledIn(PAST)
     mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
 
-    await expect(getEffectiveMaterialsForStudent(group.id)).rejects.toThrow()
+    await expectNotFound(getEffectiveMaterialsForStudent(group.id))
   })
 
   it('refuses the gallery to the same student', async () => {
     const { student, group } = await studentEnrolledIn(PAST)
     mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
 
-    await expect(getGroupGalleryForStudent(group.id)).rejects.toThrow()
+    await expectNotFound(getGroupGalleryForStudent(group.id))
+  })
+
+  /**
+   * The portal report card is the parent-visible surface, and it runs the same
+   * guard — it was the one `requireActiveStudent` caller nothing exercised.
+   */
+  it('refuses the portal evaluation to the same student', async () => {
+    const { student, group } = await studentEnrolledIn(PAST)
+    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+
+    await expectNotFound(getMyAssessmentForGroup(group.id))
   })
 
   /**

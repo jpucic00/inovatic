@@ -31,9 +31,6 @@ import { formatGroupSchedule } from '@/lib/format'
 import { computeSchoolYear } from '@/lib/school-year'
 import { GRADE_LABELS, NO_SUITABLE_TERMIN_LABEL, isHighSchoolGrade } from '@/lib/inquiry-status'
 import { inquiryNextStep, type InquiryNextStep } from '@/lib/inquiry-next-step'
-import { isFirstTimeChild } from '@/lib/trial-eligibility'
-import { resolveTrialDateForGroup } from '@/lib/trial-week'
-import { formatDate } from '@/lib/format'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
 import { radionicaPaymentPlan } from '@/lib/radionica-deposit'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
@@ -164,13 +161,10 @@ type InquiryActionResult =
       success: true
       /**
        * What the success screen tells the parent. Decided HERE rather than
-       * re-derived on the client: only the server knows whether a probni sat was
-       * granted (the eligibility re-check) and on which date (the trial week),
-       * and the screen must say exactly what the confirmation e-mail says.
+       * re-derived on the client, so the screen says exactly what the
+       * confirmation e-mail says.
        */
       nextStep: InquiryNextStep
-      /** Already-formatted dd.MM.yyyy. — set only when a trial date was resolved. */
-      trialDateLabel?: string
     }
   | { success: false; error: string }
   | {
@@ -280,7 +274,6 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     courseId,
     scheduledGroupId,
     noSuitableTermin,
-    wantsTrial,
     message,
     referralSource,
   } = parsed.data
@@ -323,20 +316,6 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       }
     }
   }
-
-  // The probni sat is decided HERE, not by the client. The form only offers the
-  // option to a child the identity match does not already know, but that answer
-  // arrives in the payload, so it is re-derived against the database — a crafted
-  // request cannot buy a returning family a free lesson. `trialDate` is resolved
-  // after the row is written, from the group that was actually booked.
-  const grantTrial =
-    Boolean(wantsTrial) &&
-    (await isFirstTimeChild({
-      firstName: childFirstName,
-      lastName: childLastName,
-      dateOfBirth: childDateOfBirth,
-      parentEmail,
-    }))
 
   let inquiryId: string
   try {
@@ -384,7 +363,6 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
           courseId: courseId || null,
           scheduledGroupId: scheduledGroupId || null,
           noSuitableTermin: noSuitableTermin ?? false,
-          wantsTrial: grantTrial,
           schoolYear,
           message: message || null,
           referralSource: referralSource || null,
@@ -399,30 +377,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     return submitInquiryErrorResult(err, city, targetCourse)
   }
 
-  // The concrete probni sat date, resolved from the group that was actually
-  // booked and stored on the row — the parent is about to be promised it in
-  // writing, and an admin can move one child later without moving the week.
-  // Read after the transaction commits (like the termin label below), so it
-  // never holds the capacity guard open; a failure here must not cost the upit,
-  // hence the swallow-and-log.
-  let trialDate: Date | null = null
-  if (grantTrial && scheduledGroupId) {
-    try {
-      trialDate = await resolveTrialDateForInquiryGroup(scheduledGroupId)
-      if (trialDate) {
-        await db.inquiry.update({ where: { id: inquiryId }, data: { trialDate } })
-      }
-    } catch (err) {
-      console.error('Failed to resolve probni sat date (upit still saved):', err)
-    }
-  }
-  const trialDateLabel = trialDate ? formatDate(trialDate) : undefined
-  const nextStep = inquiryNextStep({
-    scheduledGroupId,
-    noSuitableTermin,
-    wantsTrial: grantTrial,
-    trialDateLabel,
-  })
+  const nextStep = inquiryNextStep({ scheduledGroupId, noSuitableTermin })
 
   // Radionice are confirmed by a booking deposit, so their confirmation e-mail
   // carries the payment instruction; SLR and natjecateljski sign-ups are settled
@@ -444,7 +399,6 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       childName: `${childFirstName} ${childLastName}`,
       childDateOfBirth: isoToCroatianDate(childDateOfBirth),
       nextStep,
-      trialDateLabel,
       payment: payment ?? undefined,
     })
   } catch (err) {
@@ -468,9 +422,6 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       gradeLabel: GRADE_LABELS[grade],
       programName: targetCourse?.title,
       terminLabel: await resolveTerminLabel(scheduledGroupId, noSuitableTermin),
-      // Staff need to know a probni sat was promised — and on which date — since
-      // that is the appointment they have to staff and the child to expect.
-      trialLabel: trialLabelFor(grantTrial, trialDateLabel),
       returning: await resolveReturningMarker({
         childFirstName,
         childLastName,
@@ -485,36 +436,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     console.error('Failed to send inquiry notification email:', err)
   }
 
-  return { success: true, nextStep, trialDateLabel }
-}
-
-/**
- * The trial date for the group this upit booked.
- *
- * A thin wrapper so the caller does not have to re-select the group's shape —
- * and so the trial week is looked up against the GROUP'S year rather than
- * today's, which is the whole point (upisi for next year open while the clock
- * still names the year that is ending).
- */
-async function resolveTrialDateForInquiryGroup(groupId: string): Promise<Date | null> {
-  const group = await db.scheduledGroup.findUnique({
-    where: { id: groupId },
-    select: {
-      dayOfWeek: true,
-      schoolYear: true,
-      city: true,
-      course: { select: { kind: true } },
-    },
-  })
-  return group ? resolveTrialDateForGroup(group) : null
-}
-
-/** What the staff notification prints in its "Probni sat" row, if anything. */
-function trialLabelFor(granted: boolean, dateLabel: string | undefined): string | undefined {
-  if (!granted) return undefined
-  // No date means nothing was bookable, which is itself the useful signal: this
-  // family still needs a termin offered before the trial can happen.
-  return dateLabel ?? 'Da – termin još nije dogovoren'
+  return { success: true, nextStep }
 }
 
 /** 'YYYY-MM-DD' → 'dd.MM.yyyy.' for human-facing copy (email body). */
