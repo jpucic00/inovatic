@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getLocations } from '@/actions/admin/location'
 import { LocationTable } from '@/components/admin/locations/location-table'
-import { CreateLocationDialog } from '@/components/admin/locations/create-location-dialog'
+import { LocationFormDialog } from '@/components/admin/locations/location-form-dialog'
 
 export const metadata: Metadata = { title: 'Admin – Lokacije' }
 
@@ -20,7 +20,7 @@ export default async function LocationsPage() {
             {locations.length === 1 ? '1 lokacija' : `${locations.length} lokacija`}
           </p>
         </div>
-        <CreateLocationDialog />
+        <LocationFormDialog />
       </div>
 
       <LocationTable data={locations} />

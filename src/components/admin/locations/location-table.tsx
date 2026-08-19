@@ -13,6 +13,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { deleteLocation } from '@/actions/admin/location'
+import { LocationFormDialog } from '@/components/admin/locations/location-form-dialog'
 
 type Location = {
   id: string
@@ -123,7 +124,12 @@ const columns: ColumnDef<Location>[] = [
   {
     key: 'actions',
     header: '',
-    cell: (row) => <DeleteLocationButton location={row} />,
+    cell: (row) => (
+      <div className="flex items-center justify-end gap-2">
+        <LocationFormDialog location={row} />
+        <DeleteLocationButton location={row} />
+      </div>
+    ),
   },
 ]
 

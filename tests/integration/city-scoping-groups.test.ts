@@ -33,8 +33,12 @@ const {
   updateGroup,
   deleteGroup,
 } = await import('@/actions/admin/group')
-const { getLocations, createLocation: createLocationAction, deleteLocation } =
-  await import('@/actions/admin/location')
+const {
+  getLocations,
+  createLocation: createLocationAction,
+  updateLocation,
+  deleteLocation,
+} = await import('@/actions/admin/location')
 const { getCourses } = await import('@/actions/admin/course')
 
 const SY = '2026/2027'
@@ -312,6 +316,66 @@ describe('locations — city scoping', () => {
       await db.location.findFirstOrThrow({ where: { name } }),
     )
     expect(created.city).toBe('SIBENIK')
+  })
+
+  it('updateLocation throws NEXT_NOT_FOUND on a cross-city id and leaves the row', async () => {
+    const splitLocation = await fx.location({ city: 'SPLIT' })
+    await loginSibenikAdmin()
+
+    await expect(
+      updateLocation({
+        id: splitLocation.id,
+        name: 'Preuzeta lokacija',
+        address: 'Obala palih omladinaca 2, Šibenik',
+        phone: '',
+        email: '',
+      }),
+    ).rejects.toThrow(/NEXT_NOT_FOUND/)
+
+    const unchanged = await db.location.findUniqueOrThrow({ where: { id: splitLocation.id } })
+    expect(unchanged.name).toBe(splitLocation.name)
+    expect(unchanged.city).toBe('SPLIT')
+  })
+
+  it('updateLocation edits an own-city venue and keeps its city', async () => {
+    const sibenikLocation = await fx.location({ city: 'SIBENIK' })
+    await loginSibenikAdmin()
+
+    const res = await updateLocation({
+      id: sibenikLocation.id,
+      name: 'Trokut inkubator — dvorana 2',
+      address: 'Velimira Škorpika 7/a, 22000 Šibenik',
+      phone: '+385 92 168 9987',
+      email: 'sibenik@udruga-inovatic.hr',
+    })
+    expect(res).toEqual({ success: true })
+
+    const updated = await db.location.findUniqueOrThrow({ where: { id: sibenikLocation.id } })
+    expect(updated.name).toBe('Trokut inkubator — dvorana 2')
+    expect(updated.phone).toBe('+385 92 168 9987')
+    expect(updated.city).toBe('SIBENIK')
+  })
+
+  it('updateLocation stores NULL for a blanked phone and email', async () => {
+    const sibenikLocation = await fx.location({ city: 'SIBENIK' })
+    await db.location.update({
+      where: { id: sibenikLocation.id },
+      data: { phone: '+385 91 111 2222', email: 'stara@udruga-inovatic.hr' },
+    })
+    await loginSibenikAdmin()
+
+    const res = await updateLocation({
+      id: sibenikLocation.id,
+      name: sibenikLocation.name,
+      address: sibenikLocation.address,
+      phone: '',
+      email: '',
+    })
+    expect(res).toEqual({ success: true })
+
+    const cleared = await db.location.findUniqueOrThrow({ where: { id: sibenikLocation.id } })
+    expect(cleared.phone).toBeNull()
+    expect(cleared.email).toBeNull()
   })
 
   it('deleteLocation throws NEXT_NOT_FOUND on a cross-city id and leaves the row', async () => {
