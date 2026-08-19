@@ -2,10 +2,10 @@
  * What the release e-mail actually puts in front of an administrator.
  *
  * Asserted on the rendered HTML rather than on props, because the two things
- * that can go wrong here are both about what appears at all: a heading with
- * nothing under it (an empty group must not print), and the association's own
- * contact card closing a mail addressed to the association itself — the same
- * mistake the upit notification exists to avoid.
+ * that can go wrong here are both about what appears at all: a note silently
+ * dropped from the list, and the association's own contact card closing a mail
+ * addressed to the association itself — the same mistake the upit notification
+ * exists to avoid.
  */
 import { createElement } from 'react'
 import { render } from '@react-email/components'
@@ -17,8 +17,10 @@ const release: ReleaseNote = {
   version: '1.2.0',
   date: '2026-08-18',
   title: 'Upiti sada odmah pokazuju je li dijete već bilo polaznik.',
-  added: ['Na popisu upita stoji oznaka "Ponovni upis".'],
-  fixed: ['Roditelj koji je odabrao termin više ne dobiva krivu poruku.'],
+  changes: [
+    'Na Upitima stoji oznaka "Ponovni upis" kad dijete već ima račun kod nas.',
+    'Roditelj koji je na prijavnici odabrao termin više ne dobiva krivu poruku.',
+  ],
 }
 
 function renderEmail(overrides: Partial<ReleaseNote> = {}) {
@@ -38,18 +40,25 @@ describe('release notes email', () => {
     expect(html).toContain('Nova verzija aplikacije')
   })
 
-  it('prints every note under its own heading', async () => {
+  it('prints every note, in the order they were written', async () => {
     const html = await renderEmail()
-    expect(html).toContain('Na popisu upita stoji oznaka')
-    expect(html).toContain('Roditelj koji je odabrao termin')
-    expect(html).toContain('Novo')
-    expect(html).toContain('Ispravljeno')
+    const first = html.indexOf('Na Upitima stoji oznaka')
+    const second = html.indexOf('Roditelj koji je na prijavnici')
+    expect(first).toBeGreaterThan(-1)
+    expect(second).toBeGreaterThan(-1)
+    // The list is ordered feature by feature by whoever wrote it, so the
+    // template must not sort or group it into a shape of its own.
+    expect(first).toBeLessThan(second)
   })
 
-  it('omits a heading with nothing under it', async () => {
-    // `changed` is unset here, so "Poboljšano" must not appear at all — a bare
-    // heading reads as a dropped line rather than an absent group.
-    expect(await renderEmail()).not.toContain('Poboljšano')
+  it('carries no grouping of its own', async () => {
+    // One flat list under one heading. The old novo/poboljšano/ispravljeno
+    // split forced a single feature into two places whenever it both added and
+    // changed something — see the rules in src/lib/releases.ts.
+    const html = await renderEmail()
+    expect(html).toContain('Što je novo')
+    expect(html).not.toContain('Poboljšano')
+    expect(html).not.toContain('Ispravljeno')
   })
 
   it('does not close with the association’s own contact card', async () => {

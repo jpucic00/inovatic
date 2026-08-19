@@ -50,11 +50,21 @@ already live, so `0.x` would understate it) and say why.
 ## Step 3 — Gather what actually changed
 
 ```bash
-git log v<last>..HEAD --no-merges --format='%h %s%n%b'   # all commits, if first release
+git log v<last>..HEAD --no-merges --format='%h %s%n%b'
 git diff --stat v<last>..HEAD
 ```
 
 Include uncommitted work — it is about to be pushed in the same batch.
+
+**On the first release, the baseline is what is already deployed, not the first
+commit.** Railway deploys `origin/main`, so the admins have been using
+everything up to it for months; announcing all of it would read as news about
+features they already have. Use `origin/main..HEAD` instead, and say that is
+what you scoped to:
+
+```bash
+git log --oneline origin/main..HEAD
+```
 
 Commit subjects in this repo are already written as behaviour sentences, but
 they are written for the developer. Read the diff for anything whose user-facing
@@ -66,23 +76,40 @@ rules about who sees what, and anything touching `/admin`, `/nastavnik` or
 
 Write Croatian sentences for an administrator who has never seen the code.
 The rules and the worked examples live in the header of `src/lib/releases.ts` —
-**read that file before drafting**, and follow it.
+**read that file before drafting**, and follow it. In short:
 
-The shape:
 - `title` — one sentence naming the release. It becomes the e-mail subject, so
   it has to stand alone in an inbox list.
-- `added` — capabilities that did not exist.
-- `changed` — things that existed and now behave differently.
-- `fixed` — things that were broken.
+- `changes` — one flat list, **one sentence per feature**, ordered as the reader
+  should meet them. There is deliberately no novo / poboljšano / ispravljeno
+  split: those headings tear a single feature in two the moment it both adds and
+  changes something, which is most of them.
 
-Test each line against: *could an admin notice this without being told?* If not,
-it gets no line. Refactors, tests, dependency bumps, performance work nobody can
-perceive, and internal renames are all silent. Groups may be empty, but a
-release with nothing at all in any group should not be cut — say so and offer to
-stop.
+**Every sentence says where the feature lives**, usually by opening with the
+place. The reader's first question is "where do I find this?", and a note that
+does not answer it sends them hunting through the sidebar:
 
-Merge several commits into one sentence when they are one change to a user.
-Split one commit into several when it changed several unrelated things.
+>  YES  "Na profilu djeteta, uz oznake plaćanja, za svaku upisanu grupu možete
+>        označiti da je ugovor potpisan."
+>  NO   "Dodana je oznaka potpisanog ugovora po upisu."
+
+Name the place the way the navigation names it, not the way the route is
+spelled — `/admin/skolska-godina` is **Kalendar**, `/admin/email` is **E-mail**,
+the attendance screen is **Dolazak**. Check the sidebar rather than guessing.
+A line about a mail that arrives has no screen; then say what arrives and to
+whom.
+
+Merge every commit touching one feature into that feature's single sentence,
+including the ones that only fixed it. Split one commit into several sentences
+when it changed several unrelated things.
+
+Then test each line against: *could an admin notice this without being told?*
+If not, it gets no line. Silent by default: refactors, tests, dependency bumps,
+performance work nobody can perceive, internal renames — **and every fix to a
+feature that is shipping in this same release**, because no admin ever had the
+broken version. A fix earns a line only when the broken thing was live.
+
+A release with nothing left to say should not be cut — say so and offer to stop.
 
 ## Step 5 — Agree the notes and the version with the user
 

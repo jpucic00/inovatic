@@ -4,27 +4,56 @@
  *
  * Written by the `/release` skill (`.claude/skills/release/SKILL.md`), never by
  * hand mid-feature. Adding an entry here IS declaring a release: on the next
- * deploy the announcer (`src/lib/release-announce.ts`) mails it to every admin,
- * exactly once. Pushing with nothing added here mails nobody, which is the
- * normal case — most pushes are invisible to the people using the app.
+ * production start the announcer (`src/lib/release-announce.ts`) mails it to
+ * every admin, exactly once. Pushing with nothing added here mails nobody,
+ * which is the normal case — most pushes are invisible to the people using the
+ * app.
  *
  * ── How the notes must read ────────────────────────────────────────────────
  * Every line is addressed to an administrator who has never seen the code and
- * never will. It names something they can SEE or DO in the app, in Croatian, in
- * one sentence, in the vocabulary the app's own screens use ("upit", "grupa",
- * "polaznik", "preporuka") — not the vocabulary of the repository.
+ * never will. It is one Croatian sentence, in the vocabulary the app's own
+ * screens use ("upit", "grupa", "polaznik", "preporuka") — not the vocabulary
+ * of the repository.
  *
- *   YES  "Kod upita sada odmah piše je li dijete već bilo polaznik."
- *   NO   "Dodan `returningMarker` u `resolveReturningMarker`."
+ * 1. ONE LINE PER FEATURE, AND IT SAYS WHERE THE FEATURE LIVES. The reader's
+ *    first question is "where do I find this?", so the sentence answers it
+ *    before anything else — usually by opening with the place.
  *
- *   YES  "Ocjene se šalju roditeljima po djetetu, pa dvoje braće dobiju dva maila."
- *   NO   "EVALUATION kampanja: jedan recipient = jedno dijete, ne inbox."
+ *      YES  "Na profilu djeteta, uz oznake plaćanja, za svaku upisanu grupu
+ *            možete označiti da je ugovor potpisan."
+ *      NO   "Dodana je oznaka potpisanog ugovora po upisu."
  *
- * No file names, no table or column names, no framework or library names, no
- * ids, no ticket numbers. A change nobody outside the repository can perceive —
- * a refactor, a test, a dependency bump — gets NO line at all. An empty
- * `added`/`changed`/`fixed` is a fine and honest outcome; a release with
- * nothing worth telling anyone is a release that should not have been cut.
+ *    Name the place the way the navigation names it — Kalendar, Upiti, Grupe,
+ *    Programi, Učenici, Nastavnici, Lokacije, Novosti, E-mail, Dolazak,
+ *    polaznički portal, prijavnica. A line whose subject is a mail that
+ *    arrives has no screen; then say what arrives and to whom.
+ *
+ * 2. NEVER SPLIT ONE FEATURE ACROSS SEVERAL LINES by whether the piece is new
+ *    or merely different. The admin meets it as one thing in one place, so it
+ *    is one sentence — the old capability and the way it now behaves belong in
+ *    the same breath.
+ *
+ *      YES  "Pristupni podaci se ne šalju kod kreiranja računa, nego porukom
+ *            Pristupni podaci na E-mailu, prije početka školske godine."
+ *      NO   two lines, one announcing the new message and one announcing that
+ *           account creation stopped sending.
+ *
+ * 3. NO REPOSITORY VOCABULARY. No file names, no table or column names, no
+ *    framework or library names, no ids, no ticket numbers.
+ *
+ *      YES  "Kod upita sada odmah piše je li dijete već bilo polaznik."
+ *      NO   "Dodan returningMarker u resolveReturningMarker."
+ *
+ * 4. A CHANGE NOBODY OUTSIDE THE REPOSITORY CAN PERCEIVE GETS NO LINE. That
+ *    covers refactors, tests and dependency bumps — and also every fix to a
+ *    feature shipping in this same release, because no admin ever had the
+ *    broken version. Fixes earn a line only when the broken thing was live.
+ *
+ * The list is deliberately flat and ordered feature by feature, not grouped
+ * into novo / poboljšano / ispravljeno. Those headings force one feature into
+ * two places the moment it both adds and changes something, which is most of
+ * them — and an admin skimming on a phone wants the app's own shape, not a
+ * taxonomy of how the work was classified.
  *
  * Correcting a typo in an entry that has already shipped is safe: this file is
  * only ever READ, and the receipt lives in `ReleaseAnnouncement`. Nobody is
@@ -47,12 +76,14 @@ export interface ReleaseNote {
    * subject line, so it has to make sense alone in an inbox list.
    */
   title: string
-  /** Capabilities that did not exist before. */
-  added?: string[]
-  /** Things that existed and now behave differently or better. */
-  changed?: string[]
-  /** Things that were broken and now are not. */
-  fixed?: string[]
+  /**
+   * What an administrator can see or do that they could not before, one
+   * sentence per feature, each naming where it lives. Ordered as the reader
+   * should meet them — most consequential first, since a phone shows three
+   * lines before the fold. Never empty: a release with nothing to tell anyone
+   * is a release that should not have been cut.
+   */
+  changes: string[]
 }
 
 /**
@@ -61,20 +92,3 @@ export interface ReleaseNote {
  * somehow pending at once they must be mailed in the order they happened.
  */
 export const RELEASES: readonly ReleaseNote[] = []
-
-/**
- * The three groups in render order, with the empty ones dropped, so the e-mail
- * template never has to ask whether a heading has anything under it.
- *
- * Deliberately ordered novo → poboljšano → ispravljeno: an admin skimming on a
- * phone should meet the new thing first and the bug fixes last.
- */
-export function releaseSections(
-  release: ReleaseNote,
-): { heading: string; items: readonly string[] }[] {
-  return [
-    { heading: 'Novo', items: release.added ?? [] },
-    { heading: 'Poboljšano', items: release.changed ?? [] },
-    { heading: 'Ispravljeno', items: release.fixed ?? [] },
-  ].filter((section) => section.items.length > 0)
-}

@@ -1,7 +1,7 @@
 import { Heading, Hr, Link, Section, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
 import { formatDateKey } from '../src/lib/format'
-import { releaseSections, type ReleaseNote } from '../src/lib/releases'
+import { type ReleaseNote } from '../src/lib/releases'
 
 interface ReleaseNotesProps {
   release: ReleaseNote
@@ -22,8 +22,6 @@ interface ReleaseNotesProps {
  * release commit.
  */
 function ReleaseNotesEmail({ release, appUrl }: ReleaseNotesProps) {
-  const sections = releaseSections(release)
-
   return (
     <EmailLayout preview={release.title} showSignature={false}>
       <Heading style={emailStyles.h1}>Nova verzija aplikacije</Heading>
@@ -40,16 +38,18 @@ function ReleaseNotesEmail({ release, appUrl }: ReleaseNotesProps) {
 
       <Text style={emailStyles.text}>{release.title}</Text>
 
-      {sections.map((section) => (
-        <Section key={section.heading}>
-          <Text style={sectionHeading}>{section.heading}</Text>
-          {section.items.map((item, i) => (
-            <Text key={i} style={bulletText}>
-              {`• ${item}`}
-            </Text>
-          ))}
-        </Section>
-      ))}
+      <Section>
+        {/* One flat list, ordered feature by feature. The heading is the
+            template's, not the note's: grouping the lines by novo/poboljšano
+            would split a single feature in two the moment it both adds and
+            changes something. */}
+        <Text style={sectionHeading}>Što je novo</Text>
+        {release.changes.map((item, i) => (
+          <Text key={i} style={bulletText}>
+            {`• ${item}`}
+          </Text>
+        ))}
+      </Section>
 
       <Section style={{ textAlign: 'center', margin: '32px 0 8px' }}>
         <Link href={appUrl} style={button}>
@@ -117,16 +117,10 @@ ReleaseNotesEmail.PreviewProps = {
     version: '1.1.0',
     date: '2026-08-18',
     title: 'Upiti sada odmah pokazuju je li dijete već bilo polaznik.',
-    added: [
-      'Na popisu upita stoji oznaka "Ponovni upis" kad dijete već ima račun kod nas.',
-      'Pristupne podatke za polaznički portal šaljete kroz vlastitu kampanju na stranici E-mail.',
-    ],
-    changed: [
-      'Filteri na popisima upita i polaznika pamte se dok ste prijavljeni.',
-      'Radionica se nudi na javnim stranicama samo do dana kad počinje.',
-    ],
-    fixed: [
-      'Roditelj koji je odabrao termin više ne dobiva poruku da mu se javljamo s terminima.',
+    changes: [
+      'Na Upitima stoji oznaka "Ponovni upis" kad dijete već ima račun kod nas, i po njoj se može filtrirati.',
+      'Pristupne podatke za polaznički portal šaljete porukom Pristupni podaci na E-mailu, kad su ugovori potpisani.',
+      'Radionica se na javnim stranicama nudi samo do dana kad počinje.',
     ],
   },
 } satisfies ReleaseNotesProps

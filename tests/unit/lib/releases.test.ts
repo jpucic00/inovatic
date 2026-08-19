@@ -10,15 +10,10 @@
  * themselves the moment `/release` writes the first entry.
  */
 import { describe, expect, it } from 'vitest'
-import { RELEASES, releaseSections, type ReleaseNote } from '@/lib/releases'
+import { RELEASES, type ReleaseNote } from '@/lib/releases'
 
 const SEMVER = /^\d+\.\d+\.\d+$/
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
-
-/** Every user-facing sentence in a release, flattened. */
-function allItems(release: ReleaseNote): string[] {
-  return [...(release.added ?? []), ...(release.changed ?? []), ...(release.fixed ?? [])]
-}
 
 function versionOrder(a: string, b: string): number {
   const [aMajor, aMinor, aPatch] = a.split('.').map(Number)
@@ -55,13 +50,13 @@ describe('RELEASES', () => {
       expect(release.title.trim().length).toBeGreaterThan(0)
       // A release with nothing to tell anyone is a release that should not have
       // been cut — the e-mail would arrive empty.
-      expect(allItems(release).length).toBeGreaterThan(0)
+      expect(release.changes.length).toBeGreaterThan(0)
     }
   })
 
   it('writes sentences, not fragments', () => {
     for (const release of RELEASES) {
-      for (const item of [release.title, ...allItems(release)]) {
+      for (const item of [release.title, ...release.changes]) {
         expect(item).toBe(item.trim())
         expect(item.length).toBeGreaterThan(10)
         // Long enough to be a paragraph is long enough to be skipped.
@@ -79,38 +74,9 @@ describe('RELEASES', () => {
       /\.tsx?\b|`|\bprisma\b|\bmigracij|\bcommit\b|\bdeploy|\bendpoint|\brefactor|\bschema\b|\bnull\b|\bundefined\b|\bbackend\b|\bfrontend\b|\bAPI\b|\bPR\b|\bmerge\b/i
 
     for (const release of RELEASES) {
-      for (const item of [release.title, ...allItems(release)]) {
+      for (const item of [release.title, ...release.changes]) {
         expect(item, `technical wording in "${item}"`).not.toMatch(fromTheRepo)
       }
     }
-  })
-})
-
-describe('releaseSections', () => {
-  const release: ReleaseNote = {
-    version: '1.0.0',
-    date: '2026-08-18',
-    title: 'Naslov objave.',
-    added: ['Nova stvar.'],
-    fixed: ['Popravljena stvar.'],
-  }
-
-  it('drops the groups with nothing in them', () => {
-    expect(releaseSections(release).map((s) => s.heading)).toEqual([
-      'Novo',
-      'Ispravljeno',
-    ])
-  })
-
-  it('leads with what is new and closes with what was broken', () => {
-    const full = releaseSections({ ...release, changed: ['Promijenjena stvar.'] })
-    expect(full.map((s) => s.heading)).toEqual(['Novo', 'Poboljšano', 'Ispravljeno'])
-    expect(full[0].items).toEqual(['Nova stvar.'])
-  })
-
-  it('returns nothing for a release that lists nothing', () => {
-    expect(releaseSections({ version: '1.0.0', date: '2026-08-18', title: 'x' })).toEqual(
-      [],
-    )
   })
 })
