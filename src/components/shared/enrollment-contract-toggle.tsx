@@ -1,9 +1,10 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileCheck, FilePlus } from 'lucide-react'
 import { toast } from 'sonner'
+import { ConfirmDialog, type ConfirmRequest } from '@/components/shared/confirm-dialog'
 import type { AdminActionResult } from '@/lib/action-types'
 import { formatDate } from '@/lib/format'
 
@@ -15,6 +16,12 @@ type SetContractSignedAction = (
 interface Props {
   enrollmentId: string
   contractSignedAt: Date | null
+  /**
+   * Course + group of the enrollment this mark belongs to, for the confirmation
+   * dialog. A child can sit in several groups in one school year, each with its
+   * own contract row, and the modal covers the card that was clicked.
+   */
+  groupLabel?: string
   /**
    * The admin or teacher variant, chosen by the page that renders the profile —
    * the same prop-injection the comment and assessment actions already use, so
@@ -47,16 +54,17 @@ interface Props {
 export function EnrollmentContractToggle({
   enrollmentId,
   contractSignedAt,
+  groupLabel,
   onSetContractSigned,
   readOnly = false,
 }: Readonly<Props>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null)
 
   const signed = contractSignedAt !== null
 
-  const toggle = () => {
-    const next = !signed
+  const run = (next: boolean) => {
     startTransition(async () => {
       const res = await onSetContractSigned(enrollmentId, next)
       if (res.success) {
@@ -65,6 +73,26 @@ export function EnrollmentContractToggle({
       } else {
         toast.error(res.error ?? 'Greška pri spremanju ugovora.')
       }
+    })
+  }
+
+  /**
+   * Both directions are confirmed, not just the undo. The button sits in the
+   * same dense stack as the paid chips, one row above them, so marking the
+   * wrong child's contract signed is exactly as easy as un-marking the right
+   * one — and the only trace either way is a toast that fades.
+   */
+  const askToToggle = () => {
+    const next = !signed
+    setConfirmRequest({
+      title: next ? 'Označiti ugovor potpisanim?' : 'Ukloniti oznaku ugovora?',
+      description: next
+        ? 'Ugovor za ovaj upis bit će označen kao potpisan, s današnjim datumom.'
+        : 'Datum potpisa bit će obrisan i upis se ponovno vodi bez potpisanog ugovora.',
+      context: groupLabel,
+      confirmLabel: next ? 'Označi potpisanim' : 'Ukloni oznaku',
+      destructive: !next,
+      onConfirm: () => run(next),
     })
   }
 
@@ -82,6 +110,7 @@ export function EnrollmentContractToggle({
       <div className="flex flex-wrap items-center gap-2">
         {renderBody()}
       </div>
+      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
     </div>
   )
 
@@ -96,7 +125,7 @@ export function EnrollmentContractToggle({
           {badge}
           <button
             type="button"
-            onClick={toggle}
+            onClick={askToToggle}
             disabled={isPending}
             className="text-xs text-gray-400 hover:text-red-600 disabled:opacity-50"
           >
@@ -109,7 +138,7 @@ export function EnrollmentContractToggle({
     return (
       <button
         type="button"
-        onClick={toggle}
+        onClick={askToToggle}
         disabled={isPending}
         className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-dashed border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-700 disabled:opacity-50"
       >

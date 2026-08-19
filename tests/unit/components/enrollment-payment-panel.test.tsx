@@ -1,5 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  setEnrollmentMonthPaid,
+  setEnrollmentYearPaid,
+} from '@/actions/admin/payment'
 import { EnrollmentPaymentPanel } from '@/components/admin/students/enrollment-payment-panel'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
@@ -96,5 +100,96 @@ describe('EnrollmentPaymentPanel — the owed/future month boundary', () => {
     expect(
       screen.getByText(/Trajanje programa još nije određeno/),
     ).toBeTruthy()
+  })
+})
+
+/**
+ * The paid chips are a dense wrapped row of near-identical pills, one mis-aimed
+ * click wide of each other, and a stray mark reads exactly like a real one for
+ * the rest of the year. Both directions therefore ask first.
+ */
+describe('EnrollmentPaymentPanel — nothing is written on the first click', () => {
+  beforeEach(() => {
+    vi.mocked(setEnrollmentMonthPaid).mockClear()
+    vi.mocked(setEnrollmentYearPaid).mockClear()
+  })
+
+  it('asks before marking a month paid', () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Listopad 2026.' }))
+
+    expect(
+      screen.getByRole('heading', { name: 'Označiti mjesec plaćenim?' }),
+    ).toBeInTheDocument()
+    expect(setEnrollmentMonthPaid).not.toHaveBeenCalled()
+  })
+
+  it('writes only once the question is answered', async () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Listopad 2026.' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Označi plaćeno' }))
+
+    await waitFor(() =>
+      expect(setEnrollmentMonthPaid).toHaveBeenCalledWith('m-2026-9', true),
+    )
+  })
+
+  it('writes nothing when the question is dismissed', async () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Listopad 2026.' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Odustani' }))
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('heading', { name: 'Označiti mjesec plaćenim?' }),
+      ).toBeNull(),
+    )
+    expect(setEnrollmentMonthPaid).not.toHaveBeenCalled()
+  })
+
+  it('guards the undo too, and says it is the undo', () => {
+    renderPanel({ months: [month(2026, 9, new Date(Date.UTC(2026, 9, 5)))] })
+    fireEvent.click(screen.getByRole('button', { name: 'Listopad 2026.' }))
+
+    expect(
+      screen.getByRole('heading', { name: 'Ukloniti oznaku plaćanja?' }),
+    ).toBeInTheDocument()
+    expect(setEnrollmentMonthPaid).not.toHaveBeenCalled()
+  })
+
+  // The module titles repeat across a child's groups ("Modul 1"), so the chip's
+  // own label cannot say which card is about to change — the modal covers it.
+  it('names the enrollment the mark belongs to', () => {
+    renderPanel({ groupLabel: 'Natjecateljski program — WRO srijedom' })
+    fireEvent.click(screen.getByRole('button', { name: 'Listopad 2026.' }))
+
+    expect(screen.getByText('Natjecateljski program — WRO srijedom')).toBeInTheDocument()
+  })
+
+  // The year mark sweeps up a different set per kind, and the sentence saying
+  // which set is the only thing that makes it a decision rather than a click.
+  it('spells out what the full-year mark covers on a monthly-billed program', () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Cijela godina plaćena' }))
+
+    expect(screen.getByText(/Svi mjeseci sezone/)).toBeInTheDocument()
+    expect(setEnrollmentYearPaid).not.toHaveBeenCalled()
+  })
+
+  it('spells out the modules instead on a standard program', () => {
+    renderPanel({ kind: 'STANDARD', months: [] })
+    fireEvent.click(screen.getByRole('button', { name: 'Označi cijelu godinu plaćenom' }))
+
+    expect(screen.getByText(/Svi moduli ovog upisa/)).toBeInTheDocument()
+  })
+
+  it('leaves the per-month marks alone when the year mark is undone', () => {
+    renderPanel({ fullYearPaidAt: new Date(Date.UTC(2026, 8, 20)) })
+    fireEvent.click(screen.getByRole('button', { name: 'Poništi' }))
+
+    expect(
+      screen.getByRole('heading', { name: 'Ukloniti oznaku plaćene godine?' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/oznake ostaju kakve jesu/)).toBeInTheDocument()
   })
 })

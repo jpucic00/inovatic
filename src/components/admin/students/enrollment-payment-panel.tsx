@@ -10,6 +10,7 @@ import {
   setEnrollmentYearPaid,
   setModulePaid,
 } from '@/actions/admin/payment'
+import { ConfirmDialog, type ConfirmRequest } from '@/components/shared/confirm-dialog'
 import { formatDate, formatMonthYear } from '@/lib/format'
 import { isMonthlyBilled, isRadionica } from '@/lib/program-kind'
 
@@ -40,6 +41,13 @@ interface Props {
   modules: PaymentModule[]
   /** Monthly-fee items. Empty for every kind except COMPETITION. */
   months?: PaymentMonth[]
+  /**
+   * Course + group of the enrollment these marks belong to, for the
+   * confirmation dialog. A child can sit in several groups in one school year
+   * and the module titles repeat across them ("Modul 1"), so the chip's own
+   * label is not enough to say which card is about to change.
+   */
+  groupLabel?: string
 }
 
 const YEAR_KEY = '__year__'
@@ -282,10 +290,12 @@ export function EnrollmentPaymentPanel({
   fullYearPaidAt,
   modules,
   months = [],
+  groupLabel,
 }: Readonly<Props>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null)
 
   const yearPaid = fullYearPaidAt !== null
 
@@ -334,88 +344,183 @@ export function EnrollmentPaymentPanel({
     )
   }
 
+  /**
+   * The year mark covers a different set per kind, so the sentence explaining
+   * what it sweeps up is chosen here rather than in the three section
+   * components: a radionica has one payable item, a standard program has its
+   * modules, and a competition season has its months.
+   */
+  const yearConfirmCopy = (paid: boolean) => {
+    if (isRadionica(kind)) {
+      return {
+        title: paid ? 'Označiti radionicu plaćenom?' : 'Ukloniti oznaku plaćanja?',
+        description: paid
+          ? 'Upis na radionicu bit će označen kao plaćen, s današnjim datumom.'
+          : 'Upis na radionicu ponovno će se voditi kao neplaćen.',
+      }
+    }
+    const covered = isMonthlyBilled(kind) ? 'mjeseci sezone' : 'moduli ovog upisa'
+    const individually = isMonthlyBilled(kind) ? 'Mjeseci' : 'Moduli'
+    return {
+      title: paid ? 'Označiti cijelu godinu plaćenom?' : 'Ukloniti oznaku plaćene godine?',
+      description: paid
+        ? `Svi ${covered} bit će pokriveni tom oznakom, s današnjim datumom.`
+        : `${individually} se ponovno vode pojedinačno — njihove oznake ostaju kakve jesu.`,
+    }
+  }
+
+  /*
+   * Every chip asks first, in BOTH directions. These sit in a dense wrapped row
+   * of near-identical pills, one mis-aimed click wide of each other, and the
+   * only trace of either a stray mark or a stray un-mark is a toast that fades —
+   * so a family can end up chased for money they paid, or never chased at all.
+   */
+  const askToggleModule = (m: PaymentModule) => {
+    const paid = m.paidAt === null
+    setConfirmRequest({
+      title: paid ? 'Označiti modul plaćenim?' : 'Ukloniti oznaku plaćanja?',
+      description: paid ? (
+        <>
+          Modul <strong>{m.title}</strong> bit će označen kao plaćen, s današnjim
+          datumom.
+        </>
+      ) : (
+        <>
+          Modul <strong>{m.title}</strong> ponovno će se voditi kao neplaćen.
+        </>
+      ),
+      context: groupLabel,
+      confirmLabel: paid ? 'Označi plaćeno' : 'Ukloni oznaku',
+      destructive: !paid,
+      onConfirm: () => toggleModule(m),
+    })
+  }
+
+  const askToggleMonth = (m: PaymentMonth) => {
+    const paid = m.paidAt === null
+    const label = shortMonthLabel(m.periodStart)
+    setConfirmRequest({
+      title: paid ? 'Označiti mjesec plaćenim?' : 'Ukloniti oznaku plaćanja?',
+      description: paid ? (
+        <>
+          Članarina za <strong>{label}</strong> bit će označena kao plaćena.
+        </>
+      ) : (
+        <>
+          Članarina za <strong>{label}</strong> ponovno će se voditi kao
+          neplaćena.
+        </>
+      ),
+      context: groupLabel,
+      confirmLabel: paid ? 'Označi plaćeno' : 'Ukloni oznaku',
+      destructive: !paid,
+      onConfirm: () => toggleMonth(m),
+    })
+  }
+
+  const askToggleYear = () => {
+    const paid = !yearPaid
+    setConfirmRequest({
+      ...yearConfirmCopy(paid),
+      context: groupLabel,
+      confirmLabel: paid ? 'Označi plaćeno' : 'Ukloni oznaku',
+      destructive: !paid,
+      onConfirm: toggleYear,
+    })
+  }
+
   const yearBusy = isPending && pendingId === YEAR_KEY
 
-  // Radionica: the enrollment itself is the single payable item.
-  if (isRadionica(kind)) {
-    return (
-      <RadionicaPaymentSection
-        yearPaid={yearPaid}
-        fullYearPaidAt={fullYearPaidAt}
-        busy={yearBusy}
-        onToggle={toggleYear}
-      />
-    )
-  }
-
-  // Competition: one payable item per month of the season.
-  if (isMonthlyBilled(kind)) {
-    return (
-      <MonthlyPaymentSection
-        months={months}
-        currentMonthStartMs={currentMonthStartMs}
-        yearPaid={yearPaid}
-        fullYearPaidAt={fullYearPaidAt}
-        yearBusy={yearBusy}
-        isPending={isPending}
-        pendingId={pendingId}
-        onToggleYear={toggleYear}
-        onToggleMonth={toggleMonth}
-      />
-    )
-  }
-
+  // One dialog mount for the whole panel, whichever section it renders.
   return (
-    <div className="mt-3 pt-3 border-t border-gray-200">
-      <p className="text-xs font-medium text-gray-500 mb-1.5">Plaćanje</p>
+    <>
+      {renderSection()}
+      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
+    </>
+  )
 
-      {/* Whole school year mark */}
-      <div className="flex flex-wrap items-center gap-2">
-        {yearPaid ? (
-          <>
-            <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700">
-              <Check className="w-3 h-3" />
-              Cijela godina plaćena · {formatDate(fullYearPaidAt)}
-            </span>
+  function renderSection() {
+    // Radionica: the enrollment itself is the single payable item.
+    if (isRadionica(kind)) {
+      return (
+        <RadionicaPaymentSection
+          yearPaid={yearPaid}
+          fullYearPaidAt={fullYearPaidAt}
+          busy={yearBusy}
+          onToggle={askToggleYear}
+        />
+      )
+    }
+
+    // Competition: one payable item per month of the season.
+    if (isMonthlyBilled(kind)) {
+      return (
+        <MonthlyPaymentSection
+          months={months}
+          currentMonthStartMs={currentMonthStartMs}
+          yearPaid={yearPaid}
+          fullYearPaidAt={fullYearPaidAt}
+          yearBusy={yearBusy}
+          isPending={isPending}
+          pendingId={pendingId}
+          onToggleYear={askToggleYear}
+          onToggleMonth={askToggleMonth}
+        />
+      )
+    }
+
+    return (
+      <div className="mt-3 pt-3 border-t border-gray-200">
+        <p className="text-xs font-medium text-gray-500 mb-1.5">Plaćanje</p>
+
+        {/* Whole school year mark */}
+        <div className="flex flex-wrap items-center gap-2">
+          {yearPaid ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-50 border border-green-200 text-green-700">
+                <Check className="w-3 h-3" />
+                Cijela godina plaćena · {formatDate(fullYearPaidAt)}
+              </span>
+              <button
+                type="button"
+                onClick={askToggleYear}
+                disabled={yearBusy}
+                className="text-xs text-gray-400 hover:text-red-600 disabled:opacity-50"
+              >
+                {yearBusy ? '...' : 'Poništi'}
+              </button>
+            </>
+          ) : (
             <button
               type="button"
-              onClick={toggleYear}
+              onClick={askToggleYear}
               disabled={yearBusy}
-              className="text-xs text-gray-400 hover:text-red-600 disabled:opacity-50"
+              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-dashed border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-700 disabled:opacity-50"
             >
-              {yearBusy ? '...' : 'Poništi'}
+              {yearBusy ? <span className="text-[10px]">...</span> : <Plus className="w-3 h-3" />}
+              Označi cijelu godinu plaćenom
             </button>
-          </>
+          )}
+        </div>
+
+        {/* Per-module marks */}
+        {modules.length > 0 ? (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {modules.map((m) => (
+              <ModulePaymentChip
+                key={m.moduleEnrollmentId}
+                module={m}
+                isPending={isPending}
+                pendingId={pendingId}
+                yearPaid={yearPaid}
+                onToggle={() => askToggleModule(m)}
+              />
+            ))}
+          </div>
         ) : (
-          <button
-            type="button"
-            onClick={toggleYear}
-            disabled={yearBusy}
-            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-dashed border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-700 disabled:opacity-50"
-          >
-            {yearBusy ? <span className="text-[10px]">...</span> : <Plus className="w-3 h-3" />}
-            Označi cijelu godinu plaćenom
-          </button>
+          <p className="text-xs text-gray-400 mt-2">Nema upisanih modula.</p>
         )}
       </div>
-
-      {/* Per-module marks */}
-      {modules.length > 0 ? (
-        <div className="flex flex-wrap gap-2 mt-2">
-          {modules.map((m) => (
-            <ModulePaymentChip
-              key={m.moduleEnrollmentId}
-              module={m}
-              isPending={isPending}
-              pendingId={pendingId}
-              yearPaid={yearPaid}
-              onToggle={() => toggleModule(m)}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-gray-400 mt-2">Nema upisanih modula.</p>
-      )}
-    </div>
-  )
+    )
+  }
 }

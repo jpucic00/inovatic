@@ -167,6 +167,9 @@ export function StudentYearSections({
                 ? `${sg.startTime}–${sg.endTime ?? ''}`
                 : null
               const schedule = [sg.dayOfWeek, timeRange].filter(Boolean).join(', ')
+              // Named in the mark confirmations: a child can hold several
+              // enrollments in one year and the modal covers the card clicked.
+              const groupLabel = [sg.course.title, sg.name].filter(Boolean).join(' — ')
 
               const enrolledScheduleIds = new Set(
                 enrollment.moduleEnrollments.map((me) => me.moduleSchedule.id),
@@ -223,6 +226,7 @@ export function StudentYearSections({
                   <EnrollmentContractToggle
                     enrollmentId={enrollment.id}
                     contractSignedAt={enrollment.contractSignedAt}
+                    groupLabel={groupLabel}
                     onSetContractSigned={onSetContractSigned}
                     readOnly={
                       contractEditableGroupIds !== undefined &&
@@ -245,6 +249,7 @@ export function StudentYearSections({
                         periodStart: m.periodStart,
                         paidAt: m.paidAt,
                       }))}
+                      groupLabel={groupLabel}
                     />
                   )}
                   {!isAdmin && enrolledModules.length > 0 && (
