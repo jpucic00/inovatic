@@ -126,6 +126,13 @@ export function sendInquiryNotificationEmail(params: {
   /** Booked group, or the competitive program's "nijedan termin ne odgovara". */
   terminLabel?: string
   /**
+   * The parent's optional "Po modulu" / "Cijela školska godina" answer, already
+   * resolved to its label by the caller — same division of labour as
+   * `terminLabel` and `gradeLabel`, which keeps program vocabulary out of the
+   * template. Absent whenever the question was not asked or not answered.
+   */
+  paymentOptionLabel?: string
+  /**
    * The admin's "Ponovni upis" marker, so the inbox sees what the upit list
    * shows: this child is already a polaznik. Resolved by the caller, which is
    * where the identity match runs.

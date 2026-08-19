@@ -8,7 +8,11 @@ import { CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { inquirySchema, type InquiryFormData } from '@/lib/validators/inquiry'
 import { submitInquiry } from '@/actions/inquiry'
 import { trackUmamiEvent } from '@/lib/umami'
-import { isTerminRequired, type CourseGradeRules } from '@/lib/inquiry-availability'
+import {
+  isPaymentOptionRequired,
+  isTerminRequired,
+  type CourseGradeRules,
+} from '@/lib/inquiry-availability'
 import { inquiryNextStepText, type InquiryNextStep } from '@/lib/inquiry-next-step'
 import type { ActiveProgram } from '@/actions/public/programs'
 import { InquiryStep1 } from './inquiry/InquiryStep1'
@@ -123,6 +127,16 @@ export function InquiryForm({
     preselectedCourseId,
     gradeRules,
   )
+  // The payment model is asked — and required — on SLR programs only. Same
+  // shared helper Step 3 renders from and `submitInquiry` re-checks with, so the
+  // asterisk, this guard and the server can never disagree about whether the
+  // question was on the form.
+  const paymentOptionRequired = isPaymentOptionRequired(
+    activePrograms,
+    watchedGrade,
+    preselectedCourseId,
+    gradeRules,
+  )
 
   // Poll availability for the selected city while on Step 3. On a per-program
   // signup link the poll must ask for THAT program — the default feed is the
@@ -196,6 +210,16 @@ export function InquiryForm({
       setError('scheduledGroupId', {
         type: 'manual',
         message: 'Za odabrani razred dostupni su termini – odaberite jedan.',
+      })
+      return
+    }
+    // Same shape as the termin above: Zod keeps the field optional because the
+    // requirement is program-driven rather than static, so it is enforced here
+    // once the schema has otherwise passed.
+    if (paymentOptionRequired && !data.paymentOption) {
+      setError('paymentOption', {
+        type: 'manual',
+        message: 'Odaberite način plaćanja.',
       })
       return
     }
@@ -296,7 +320,7 @@ export function InquiryForm({
         {step === 1 && <InquiryStep1 register={register} errors={errors} showCity={!preselectedCity} />}
         {step === 2 && <InquiryStep2 register={register} errors={errors} setValue={setValue} getValues={getValues} />}
         {step === 3 && (
-          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} clearErrors={clearErrors} programs={activePrograms} gradeRules={gradeRules} preselectedCourseId={preselectedCourseId} gradeOptions={gradeOptions} terminRequired={terminRequired} />
+          <InquiryStep3 register={register} errors={errors} setValue={setValue} getValues={getValues} clearErrors={clearErrors} programs={activePrograms} gradeRules={gradeRules} preselectedCourseId={preselectedCourseId} gradeOptions={gradeOptions} terminRequired={terminRequired} paymentOptionRequired={paymentOptionRequired} />
         )}
 
         {serverError && (

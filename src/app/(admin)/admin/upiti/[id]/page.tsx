@@ -24,6 +24,7 @@ import {
   GRADE_LABELS,
   NO_SUITABLE_TERMIN_LABEL,
 } from '@/lib/inquiry-status'
+import { paymentOptionLabel } from '@/lib/payment-option'
 import { formatChildName, formatDate, formatDateTime, formatTime } from '@/lib/format'
 import { toDateKey } from '@/lib/session-dates'
 import type { ProgramKind } from '@prisma/client'
@@ -529,6 +530,17 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
               }
             />
           )}
+          {/* The parent's optional answer on the sign-up form. Advisory at that
+              point — the binding choice is the one recorded on the enrollment
+              once an account exists. */}
+          <DetailRow
+            label="Način plaćanja"
+            value={
+              paymentOptionLabel(inquiry.paymentOption) || (
+                <span className="text-gray-400 italic">Nije navedeno</span>
+              )
+            }
+          />
           <DetailRow
             label="Poruka"
             value={

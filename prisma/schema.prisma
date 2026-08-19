@@ -54,6 +54,30 @@ enum ProgramKind {
   COMPETITION
 }
 
+/// How a family chose to settle an SLR program: per module, or the whole school
+/// year up front. These are the two options the public price band quotes ("400
+/// EUR godišnje ili 110 EUR po modulu"), and they exist on the STANDARD ladder
+/// ONLY — the other two kinds have no choice to record:
+///
+///   RADIONICA   one fixed plan (akontacija 20% + ostatak), already stated in
+///               the sign-up confirmation e-mail.
+///   COMPETITION billed month by month across the season (EnrollmentMonth), not
+///               something a family picks.
+///
+/// So a non-null value on anything but a STANDARD course is meaningless: the
+/// public action drops one that arrives anyway, and the admin action refuses to
+/// write one. Null everywhere means "nije odabrano" — deliberately never
+/// backfilled, since a guess about how a family intends to pay is worse than an
+/// admin seeing the question is still open.
+///
+/// Deliberately NOT coupled to the paid marks: this is the family's intent,
+/// while `fullYearPaidAt` and `ModuleEnrollment.paidAt` are what actually
+/// happened. Choosing CIJELA_GODINA must never tick a paid mark.
+enum PaymentOption {
+  PO_MODULU
+  CIJELA_GODINA
+}
+
 enum InquiryStatus {
   NEW
   ACCOUNT_CREATED
@@ -492,6 +516,12 @@ model Inquiry {
   // scheduledGroupId. Offered on the competitive program's invitation link only
   // (its few weekly slots are negotiable), so it stays false everywhere else.
   noSuitableTermin   Boolean       @default(false)
+  // The parent's optional answer to "kako planirate plaćati" on the sign-up
+  // form. Offered on SLR programs only and dropped server-side anywhere else,
+  // so a value here always belongs to a STANDARD course. Advisory: the form
+  // says so in as many words, and an admin re-records the real choice on the
+  // enrollment once the family commits.
+  paymentOption      PaymentOption?
   message            String?       @db.Text
   referralSource     String?
   // PARTY only: parent's optional preferred date from the public form.
@@ -544,6 +574,11 @@ model Enrollment {
   // The payment scrub in `buildStudentDetailForTeacher` therefore does NOT
   // cover it; it lives in the shared `baseEnrollmentSelect`.
   contractSignedAt DateTime?
+  // How this family settles this program — seeded from the upit when the account
+  // is created and corrected by an admin on the student profile. STANDARD only
+  // (see PaymentOption); admin-only, so it is scrubbed from the teacher payload
+  // alongside every paid mark rather than shared like contractSignedAt above.
+  paymentOption    PaymentOption?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

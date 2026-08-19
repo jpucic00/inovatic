@@ -5,6 +5,7 @@ import {
   type Grade,
 } from '@/lib/inquiry-status'
 import { hasDatedModules } from '@/lib/program-kind'
+import { offersPaymentOption } from '@/lib/payment-option'
 
 // Child grade → standard program level. Predškolci have their own program
 // (UVOD, WeDo 2.0) since 2026-07-29 — before that they shared SLR 1 — and from
@@ -153,4 +154,40 @@ export function isTerminRequired(
   const selectionChosen = !!preselectedCourseId || !!grade
   if (!selectionChosen) return false
   return hasOpenTermin(programsForSelection(programs, grade, preselectedCourseId, rules))
+}
+
+/**
+ * Whether the parent must answer "Po modulu / Cijela školska godina".
+ *
+ * True exactly when the current selection resolves to an SLR program, so the
+ * field being SHOWN and the field being REQUIRED are one condition — there is no
+ * state where the form asks a question it will accept an empty answer to. It
+ * lives beside {@link isTerminRequired} and takes the same arguments so both
+ * requirements are derived from one selection, and both are re-checked
+ * server-side in `submitInquiry`.
+ *
+ * Deliberately NOT gated on an open termin, unlike its neighbour. A termin
+ * relaxes to optional when nothing is bookable precisely so a "leave your
+ * details" inquiry can still be sent; the payment model has no such
+ * availability to depend on — the program either offers the choice or it does
+ * not.
+ *
+ * Radionice and the competitive program resolve to false through
+ * `offersPaymentOption`: one is settled by the akontacija + ostatak its
+ * confirmation e-mail spells out, the other is billed monthly across its season.
+ * A razred with no program offered to it at all also resolves to false — there
+ * is nothing to ask about.
+ */
+export function isPaymentOptionRequired(
+  programs: ActiveProgram[],
+  grade: Grade | '' | undefined,
+  preselectedCourseId?: string,
+  rules?: CourseGradeRules,
+): boolean {
+  const selectionChosen = !!preselectedCourseId || !!grade
+  if (!selectionChosen) return false
+  const kinds = new Set(
+    programsForSelection(programs, grade, preselectedCourseId, rules).map((p) => p.kind),
+  )
+  return kinds.size === 1 && offersPaymentOption([...kinds][0])
 }

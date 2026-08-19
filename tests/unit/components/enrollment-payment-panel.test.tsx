@@ -34,6 +34,7 @@ function renderPanel(
       enrollmentId="e1"
       currentMonthStartMs={NOVEMBER}
       kind="COMPETITION"
+      paymentOption={null}
       fullYearPaidAt={null}
       modules={[]}
       months={[month(2026, 9), month(2026, 10), month(2026, 11)]}

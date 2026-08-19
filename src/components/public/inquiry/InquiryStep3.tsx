@@ -21,6 +21,7 @@ import { programsForSelection, type CourseGradeRules } from '@/lib/inquiry-avail
 import { formatGroupSchedule } from '@/lib/format'
 import { FieldError } from './FieldError'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
+import { PAYMENT_OPTION_LABELS, PAYMENT_OPTION_VALUES } from '@/lib/payment-option'
 import type { ProgramKind } from '@prisma/client'
 
 interface Props {
@@ -45,6 +46,12 @@ interface Props {
   gradeOptions?: readonly Grade[]
   /** Whether the current grade/course selection forces a termin choice. */
   terminRequired: boolean
+  /**
+   * Whether the selection is an SLR program, which both shows the payment
+   * question and makes it mandatory — one condition, so the form never asks
+   * something it would accept blank.
+   */
+  paymentOptionRequired: boolean
 }
 
 const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition'
@@ -86,6 +93,7 @@ export function InquiryStep3({
   preselectedCourseId,
   gradeOptions = ELEMENTARY_GRADE_VALUES,
   terminRequired,
+  paymentOptionRequired,
 }: Readonly<Props>) {
   const [selectedGroupKey, setSelectedGroupKey] = useState(() => {
     // Step 3 unmounts when the parent steps back, so restore whichever of the
@@ -98,6 +106,7 @@ export function InquiryStep3({
   const [selectedGrade, setSelectedGrade] = useState<Grade | ''>(() => getValues('grade') ?? '')
 
   const gradeReg = register('grade')
+  const paymentReg = register('paymentOption')
   const gradeSelected = preselectedCourseId || !!selectedGrade
 
   // The open programs whose groups render in the dropdown — radionica page shows
@@ -123,6 +132,11 @@ export function InquiryStep3({
   const offersNoSuitableTermin =
     hasAnyGroups && filteredPrograms.every((p) => isCompetition(p.kind))
 
+  // Shown exactly when it is required — see `isPaymentOptionRequired`, which the
+  // form computes and the server re-checks. Gated on the razred as well so the
+  // form still reads top-down: razred → termin → način plaćanja.
+  const showPaymentOption = gradeSelected && paymentOptionRequired
+
   useEffect(() => {
     // The escape hatch went away with the program that offered it (a city
     // switch, or a poll that closed the last termin) — drop the answer too, so
@@ -142,6 +156,19 @@ export function InquiryStep3({
       setValue('courseId', preselectedCourseId || undefined)
     }
   }, [programs]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    // Same cleanup the refusal flag gets above: once the question is no longer
+    // asked (a city switch, or a selection that lands on another kind), an
+    // answer left in form state would be submitted for a program that never
+    // offered it — and a "required" error raised against the old selection would
+    // block a form that no longer shows the field to clear it on. The server
+    // drops the value anyway; this keeps the payload and the error state honest
+    // about what the parent was actually shown.
+    if (showPaymentOption) return
+    if (getValues('paymentOption')) setValue('paymentOption', '')
+    clearErrors('paymentOption')
+  }, [showPaymentOption, getValues, setValue, clearErrors])
 
   function handleGradeChange(e: React.ChangeEvent<HTMLSelectElement>) {
     setSelectedGrade(e.target.value as Grade | '')
@@ -275,6 +302,33 @@ export function InquiryStep3({
           </p>
         )}
       </div>
+
+      {showPaymentOption && (
+        <div>
+          <label htmlFor="paymentOption" className="block text-sm font-medium text-gray-700 mb-1.5">
+            Način plaćanja <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="paymentOption"
+            {...paymentReg}
+            onChange={(e) => {
+              void paymentReg.onChange(e)
+              clearErrors('paymentOption')
+            }}
+            className={selectClass}
+          >
+            <option value="">– Odaberite –</option>
+            {PAYMENT_OPTION_VALUES.map((v) => (
+              <option key={v} value={v}>{PAYMENT_OPTION_LABELS[v]}</option>
+            ))}
+          </select>
+          <FieldError message={errors.paymentOption?.message} />
+          <p className="mt-1.5 text-xs text-gray-500">
+            Odabrani model plaćanja u ovoj fazi je informativan i možete ga promijeniti u bilo
+            kojem trenutku do konačnog upisa djeteta.
+          </p>
+        </div>
+      )}
 
       <div>
         <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1.5">Poruka</label>

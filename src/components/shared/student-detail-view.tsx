@@ -8,6 +8,7 @@ import type {
   GradebookYearTab,
 } from '@/lib/student-assessment-view'
 import type { RecommendationOption } from '@/lib/assessment-rubric'
+import type { FamilyDiscountsByYear } from '@/lib/family-discount'
 import { BackToListLink } from '@/components/admin/back-to-list-link'
 import { DeleteStudentDialog } from '@/components/admin/students/delete-student-dialog'
 import { EditStudentDialog } from '@/components/admin/students/edit-student-dialog'
@@ -78,6 +79,8 @@ interface Props {
   onSetContractSigned: SetContractSignedAction
   /** Groups whose contract mark this viewer may change; undefined = unrestricted (admin). */
   contractEditableGroupIds?: readonly string[]
+  /** Sibling-discount markers per school year. Admin viewer only. */
+  familyDiscountsByYear?: FamilyDiscountsByYear
 }
 
 function DetailRow({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
@@ -107,6 +110,7 @@ export function StudentDetailView({
   onClearAssessment,
   onSetContractSigned,
   contractEditableGroupIds,
+  familyDiscountsByYear,
 }: Readonly<Props>) {
   const isAdmin = viewerRole === 'ADMIN'
   const fullName = `${student.firstName} ${student.lastName}`
@@ -271,6 +275,7 @@ export function StudentDetailView({
         onClearAssessment={onClearAssessment}
         onSetContractSigned={onSetContractSigned}
         contractEditableGroupIds={contractEditableGroupIds}
+        familyDiscountsByYear={familyDiscountsByYear}
       />
 
       {/* Danger zone — admin only */}

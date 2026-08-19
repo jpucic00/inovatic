@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import type { ReactNode } from 'react'
 import type { InquiryFormData } from '@/lib/validators/inquiry'
 import type { ActiveGroup, ActiveProgram } from '@/actions/public/programs'
-import { isTerminRequired } from '@/lib/inquiry-availability'
+import { isPaymentOptionRequired, isTerminRequired } from '@/lib/inquiry-availability'
 import { InquiryStep3 } from '@/components/public/inquiry/InquiryStep3'
 
 vi.mock('next/link', () => ({
@@ -90,6 +90,11 @@ function Harness({
   const values = watch()
   // Mirror the parent: the required state is derived from the same helper.
   const terminRequired = isTerminRequired(programs, values.grade, preselectedCourseId)
+  const paymentOptionRequired = isPaymentOptionRequired(
+    programs,
+    values.grade,
+    preselectedCourseId,
+  )
   return (
     <>
       <InquiryStep3
@@ -101,6 +106,7 @@ function Harness({
         programs={programs}
         preselectedCourseId={preselectedCourseId}
         terminRequired={terminRequired}
+        paymentOptionRequired={paymentOptionRequired}
       />
       {/* The two termin fields the dropdown writes — what the parent form would
           submit. */}
@@ -110,12 +116,17 @@ function Harness({
           noSuitableTermin: values.noSuitableTermin ?? null,
         })}
       </pre>
+      <pre data-testid="payment-answer">{values.paymentOption ?? ''}</pre>
     </>
   )
 }
 
 function terminAnswer(): { scheduledGroupId: string | null; noSuitableTermin: boolean | null } {
   return JSON.parse(screen.getByTestId('termin-answer').textContent ?? '{}')
+}
+
+function paymentAnswer(): string {
+  return screen.getByTestId('payment-answer').textContent ?? ''
 }
 
 describe('InquiryStep3 — group dropdown scoping', () => {
@@ -262,5 +273,76 @@ describe('InquiryStep3 — "predloženi termin mi ne odgovara"', () => {
     rerender(<Harness programs={[]} preselectedCourseId="course-comp" />)
 
     expect(terminAnswer()).toEqual({ scheduledGroupId: null, noSuitableTermin: false })
+  })
+})
+
+describe('InquiryStep3 — način plaćanja', () => {
+  const paymentSelect = () =>
+    screen.queryByRole('combobox', { name: 'Način plaćanja *' })
+
+  const chooseGrade = (value: string) =>
+    fireEvent.change(screen.getByLabelText(/Razred djeteta/), { target: { value } })
+
+  it('asks for the payment model on an SLR selection, and marks it required', () => {
+    render(<Harness programs={[standardC]} />)
+    chooseGrade('1')
+
+    const select = paymentSelect()
+    expect(select).toBeInTheDocument()
+    // Exactly two answers — the pair the public price band quotes.
+    expect(screen.getByRole('option', { name: 'Po modulu' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Cijela školska godina' })).toBeInTheDocument()
+  })
+
+  it('carries the note that the choice is not yet binding', () => {
+    // The field is mandatory, so the parent has to answer before they have
+    // decided anything with the association — the note is what makes that
+    // reasonable, and losing it would turn an informative question into a
+    // commitment.
+    render(<Harness programs={[standardC]} />)
+    chooseGrade('1')
+
+    expect(
+      screen.getByText(/informativan i možete ga promijeniti u bilo kojem trenutku/),
+    ).toBeInTheDocument()
+  })
+
+  it('does not ask before a razred is chosen', () => {
+    // The form reads top-down: razred → termin → način plaćanja.
+    render(<Harness programs={[standardC]} />)
+
+    expect(paymentSelect()).not.toBeInTheDocument()
+  })
+
+  it('never asks on a radionica page — its plan is fixed', () => {
+    render(<Harness programs={[radionicaA]} preselectedCourseId="course-a" />)
+
+    expect(paymentSelect()).not.toBeInTheDocument()
+  })
+
+  it('never asks on the natjecateljski link — it is billed monthly', () => {
+    render(<Harness programs={[competition]} preselectedCourseId="course-comp" />)
+
+    expect(paymentSelect()).not.toBeInTheDocument()
+  })
+
+  it('still asks when the SLR group is full and the termin is optional', () => {
+    // Deliberately NOT gated on availability, unlike the termin: the program
+    // either offers the choice or it does not, and a parent leaving their
+    // details for a full group is still telling us how they intend to pay.
+    render(<Harness programs={[standardFull]} />)
+    chooseGrade('1')
+
+    expect(paymentSelect()).toBeInTheDocument()
+  })
+
+  it('records the chosen model on the form', () => {
+    render(<Harness programs={[standardC]} />)
+    chooseGrade('1')
+    fireEvent.change(screen.getByLabelText(/Način plaćanja/), {
+      target: { value: 'CIJELA_GODINA' },
+    })
+
+    expect(paymentAnswer()).toBe('CIJELA_GODINA')
   })
 })

@@ -161,6 +161,10 @@ function fetchForAdmin(id: string, city?: City) {
         select: {
           ...baseEnrollmentSelect,
           fullYearPaidAt: true,
+          // Admin-only, deliberately outside `baseEnrollmentSelect`: how a
+          // family pays is a payment fact, so it follows the paid-mark scrub
+          // rather than `contractSignedAt`'s teacher exception.
+          paymentOption: true,
           moduleEnrollments: {
             orderBy: { moduleSchedule: { module: { sortOrder: 'asc' } } },
             select: { ...moduleEnrollmentSelect, paidAt: true },
@@ -225,6 +229,7 @@ export async function buildStudentDetailForTeacher(id: string): Promise<StudentD
     enrollments: raw.enrollments.map((e) => ({
       ...e,
       fullYearPaidAt: null,
+      paymentOption: null,
       moduleEnrollments: e.moduleEnrollments.map((me) => ({ ...me, paidAt: null })),
       enrollmentMonths: e.enrollmentMonths.map((m) => ({ ...m, paidAt: null })),
     })),

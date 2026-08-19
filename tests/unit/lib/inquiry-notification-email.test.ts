@@ -31,6 +31,7 @@ const courseProps = {
   gradeLabel: '3. razred',
   programName: 'Svijet LEGO robotike 2',
   terminLabel: 'SLR 2 · Utorak · 17:00–18:30 · Trokut inkubator',
+  paymentOptionLabel: 'Po modulu',
   message: 'Marko je prošle godine završio SLR 1.',
   referralSource: 'Preporuka prijateljice',
   adminUrl: 'https://udruga-inovatic.hr/admin/upiti/clx123',
@@ -53,6 +54,8 @@ describe('course inquiry notification', () => {
       'Svijet LEGO robotike 2',
       'SLR 2',
       'Trokut inkubator',
+      'Način plaćanja',
+      'Po modulu',
       'Marko je prošle godine završio SLR 1.',
       'Preporuka prijateljice',
     ]) {
@@ -85,6 +88,9 @@ describe('course inquiry notification', () => {
 
     expect(html).not.toContain('Škola')
     expect(html).not.toContain('Željeni termin')
+    // A radionica or natjecateljski upit is never asked how it will pay, so the
+    // label must not appear over an empty value.
+    expect(html).not.toContain('Način plaćanja')
     expect(html).not.toContain('Poruka')
     expect(html).not.toContain('Izvor saznanja')
   })

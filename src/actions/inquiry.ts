@@ -21,7 +21,11 @@ import {
   getSignupProgram,
   type ActiveProgram,
 } from '@/actions/public/programs'
-import { isTerminRequired, type CourseGradeRules } from '@/lib/inquiry-availability'
+import {
+  isPaymentOptionRequired,
+  isTerminRequired,
+  type CourseGradeRules,
+} from '@/lib/inquiry-availability'
 import {
   GroupFullError,
   assertGroupHasAvailableSpot,
@@ -32,6 +36,7 @@ import { computeSchoolYear } from '@/lib/school-year'
 import { GRADE_LABELS, NO_SUITABLE_TERMIN_LABEL, isHighSchoolGrade } from '@/lib/inquiry-status'
 import { inquiryNextStep, type InquiryNextStep } from '@/lib/inquiry-next-step'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
+import { offersPaymentOption, paymentOptionLabel } from '@/lib/payment-option'
 import { radionicaPaymentPlan } from '@/lib/radionica-deposit'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
 import { isRadionicaOpenForSignup } from '@/lib/session-dates'
@@ -274,6 +279,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     courseId,
     scheduledGroupId,
     noSuitableTermin,
+    paymentOption,
     message,
     referralSource,
   } = parsed.data
@@ -295,6 +301,10 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
   // client passes `courseId` only in the radionica/preselected flow, so it maps
   // to the same "preselected course" argument the client uses. The refusal
   // answers the question, so it stands in for a chosen termin here.
+  // Kept for the payment check below, which needs the same feed and rules when
+  // no course could be resolved from the payload itself.
+  let selectionPrograms: ActiveProgram[] | null = null
+  let selectionRules: CourseGradeRules | null = null
   if (!scheduledGroupId && !noSuitableTermin) {
     // Per-program links resolve against their own feed: the competitive program
     // is deliberately absent from getActivePrograms, so checking against the
@@ -306,6 +316,8 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     // (the server would look at SLR 4 and find nothing), and an SLR 4 window
     // opened there would demand a termin the form never offered.
     const gradeRules = await getCourseGradeRules(city)
+    selectionPrograms = programs
+    selectionRules = gradeRules
     if (isTerminRequired(programs, grade, courseId, gradeRules)) {
       return {
         success: false,
@@ -316,6 +328,33 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       }
     }
   }
+
+  // Whether this sign-up is for an SLR program, which is the single condition
+  // behind the payment question: the form shows it, requires it, and the server
+  // both stores and demands it on exactly that condition, so the three can never
+  // disagree about whether the parent was asked.
+  //
+  // Resolved from the SERVER's own view of the target course rather than from
+  // whichever <option>s the client rendered. When no course resolves at all
+  // (a general "leave your details" inquiry, which carries neither a group nor a
+  // courseId) the branch above has necessarily run — `noSuitableTermin` is
+  // competition-only and already refused by `competitionOnlyAnswerError` — so
+  // its program feed answers instead, against the same razred rules.
+  const paymentApplies = targetCourse
+    ? offersPaymentOption(targetCourse.kind)
+    : selectionPrograms !== null &&
+      isPaymentOptionRequired(selectionPrograms, grade, courseId, selectionRules ?? undefined)
+
+  // Refused rather than silently dropped, unlike the radionica/competition case
+  // below: on an SLR sign-up this is a question the form asks with an asterisk,
+  // so a missing answer is a stale or tampered payload, not a parent who was
+  // never offered the choice. A value arriving where the program does NOT offer
+  // one is the opposite case and is simply not stored — it gates nothing, and
+  // failing an otherwise valid sign-up over it would cost the association an upit.
+  if (paymentApplies && !paymentOption) {
+    return { success: false, error: 'Odaberite način plaćanja.' }
+  }
+  const storedPaymentOption = paymentApplies && paymentOption ? paymentOption : null
 
   let inquiryId: string
   try {
@@ -363,6 +402,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
           courseId: courseId || null,
           scheduledGroupId: scheduledGroupId || null,
           noSuitableTermin: noSuitableTermin ?? false,
+          paymentOption: storedPaymentOption,
           schoolYear,
           message: message || null,
           referralSource: referralSource || null,
@@ -422,6 +462,11 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       gradeLabel: GRADE_LABELS[grade],
       programName: targetCourse?.title,
       terminLabel: await resolveTerminLabel(scheduledGroupId, noSuitableTermin),
+      // Resolved here, like every other label in this payload, so the template
+      // stays free of program logic. `storedPaymentOption` rather than the raw
+      // answer: the inbox must show what was actually filed, never a value the
+      // guard above dropped.
+      paymentOptionLabel: paymentOptionLabel(storedPaymentOption) ?? undefined,
       returning: await resolveReturningMarker({
         childFirstName,
         childLastName,

@@ -12,6 +12,7 @@ import {
 } from '@/actions/admin/student-assessment'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { getRecommendationOptions } from '@/lib/student-detail'
+import { findFamilyDiscounts } from '@/lib/family-discount'
 import { buildGradebookTabs } from '@/lib/student-assessment-view'
 import { StudentDetailView } from '@/components/shared/student-detail-view'
 
@@ -22,16 +23,20 @@ interface PageProps {
 }
 
 export default async function StudentDetailPage({ params }: Readonly<PageProps>) {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   const { id } = await params
-  const [student, courses, attendance, defaultYear, recommendationOptions] =
+  const [student, courses, attendance, defaultYear, recommendationOptions, familyDiscountsByYear] =
     await Promise.all([
       getStudent(id),
       getCourses(),
       getStudentAttendance(id),
       getSelectedSchoolYear(),
       getRecommendationOptions(),
+      // Scoped to the admin's own tenant: a Split admin must not be shown a
+      // Šibenik sibling, whose profile they cannot open and whose fees that
+      // office does not collect.
+      findFamilyDiscounts(id, session.user.city),
     ])
 
   if (!student) notFound()
@@ -57,6 +62,7 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
       onSaveAssessment={upsertAssessment}
       onClearAssessment={clearAssessment}
       onSetContractSigned={setEnrollmentContractSigned}
+      familyDiscountsByYear={familyDiscountsByYear}
     />
   )
 }

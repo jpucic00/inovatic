@@ -16,6 +16,9 @@ import { AddEnrollmentDialog } from '@/components/admin/students/add-enrollment-
 import { ManageEnrollmentModules } from '@/components/admin/students/manage-enrollment-modules'
 import { EnrollmentPaymentPanel } from '@/components/admin/students/enrollment-payment-panel'
 import { EnrollmentContractToggle } from '@/components/shared/enrollment-contract-toggle'
+import { FamilyDiscountNote } from '@/components/admin/students/family-discount-note'
+import type { FamilyDiscountsByYear } from '@/lib/family-discount'
+import { hasDatedModules } from '@/lib/program-kind'
 import { formatDate } from '@/lib/format'
 
 type StudentEnrollments = StudentDetail['enrollments']
@@ -71,6 +74,13 @@ interface Props {
    * throwing, which would take the whole page down rather than show a toast.
    */
   contractEditableGroupIds?: readonly string[]
+  /**
+   * Which of this child's school years qualify for the sibling discount, and who
+   * makes each one qualify. Admin only — like the paid marks, it is a payment
+   * fact, and it also says something about another family's composition that a
+   * teacher has no reason to see. Empty/absent for a teacher viewer.
+   */
+  familyDiscountsByYear?: FamilyDiscountsByYear
 }
 
 /**
@@ -97,6 +107,7 @@ export function StudentYearSections({
   onClearAssessment,
   onSetContractSigned,
   contractEditableGroupIds,
+  familyDiscountsByYear,
 }: Readonly<Props>) {
   const years = useMemo(() => {
     const set = new Set<string>([defaultYear])
@@ -233,11 +244,21 @@ export function StudentYearSections({
                       !contractEditableGroupIds.includes(sg.id)
                     }
                   />
+                  {/* Only SLR cards carry it: radionica and natjecateljski
+                      payments are deliberately untouched by the family discount,
+                      each having its own settlement. */}
+                  {isAdmin && hasDatedModules(sg.course.kind) && (
+                    <FamilyDiscountNote
+                      schoolYear={enrollment.schoolYear}
+                      siblings={familyDiscountsByYear?.[enrollment.schoolYear] ?? []}
+                    />
+                  )}
                   {isAdmin && (
                     <EnrollmentPaymentPanel
                       enrollmentId={enrollment.id}
                       currentMonthStartMs={currentMonthStartMs}
                       kind={sg.course.kind}
+                      paymentOption={enrollment.paymentOption}
                       fullYearPaidAt={enrollment.fullYearPaidAt}
                       modules={enrollment.moduleEnrollments.map((me) => ({
                         moduleEnrollmentId: me.id,

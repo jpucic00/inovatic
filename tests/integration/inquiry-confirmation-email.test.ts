@@ -67,6 +67,10 @@ function inquiryFor(overrides: Partial<InquiryFormData> = {}): InquiryFormData {
     childLastName: 'Test',
     childDateOfBirth: '2015-06-12',
     grade: '3',
+    // Mandatory on an SLR sign-up since 2026-08-19, so a standard-program
+    // payload without it is refused. Radionica cases in this file still submit
+    // it — the server drops it there, which is the documented behaviour.
+    paymentOption: 'PO_MODULU',
     consent: true,
     ...overrides,
   }

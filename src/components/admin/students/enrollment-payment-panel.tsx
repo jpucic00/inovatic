@@ -4,12 +4,14 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ProgramKind } from '@prisma/client'
+import type { PaymentOption, ProgramKind } from '@prisma/client'
 import {
   setEnrollmentMonthPaid,
+  setEnrollmentPaymentOption,
   setEnrollmentYearPaid,
   setModulePaid,
 } from '@/actions/admin/payment'
+import { PAYMENT_OPTION_LABELS, PAYMENT_OPTION_VALUES } from '@/lib/payment-option'
 import { ConfirmDialog, type ConfirmRequest } from '@/components/shared/confirm-dialog'
 import { formatDate, formatMonthYear } from '@/lib/format'
 import { isMonthlyBilled, isRadionica } from '@/lib/program-kind'
@@ -37,6 +39,12 @@ interface Props {
    */
   currentMonthStartMs: number
   kind: ProgramKind
+  /**
+   * How this family settles the program — the parent's answer from the upit,
+   * corrected here. Only STANDARD offers the choice, so the control renders in
+   * that branch alone.
+   */
+  paymentOption: PaymentOption | null
   fullYearPaidAt: Date | null
   modules: PaymentModule[]
   /** Monthly-fee items. Empty for every kind except COMPETITION. */
@@ -51,6 +59,10 @@ interface Props {
 }
 
 const YEAR_KEY = '__year__'
+const PAYMENT_OPTION_KEY = '__payment_option__'
+
+const paymentSelectClass =
+  'text-xs px-2 py-1.5 rounded-md border border-gray-300 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent disabled:opacity-50'
 
 /** "Ruj 2026." — short enough that a whole season fits on one or two rows. */
 function shortMonthLabel(periodStart: Date): string {
@@ -287,6 +299,7 @@ export function EnrollmentPaymentPanel({
   enrollmentId,
   currentMonthStartMs,
   kind,
+  paymentOption,
   fullYearPaidAt,
   modules,
   months = [],
@@ -332,6 +345,23 @@ export function EnrollmentPaymentPanel({
       m.enrollmentMonthId,
       () => setEnrollmentMonthPaid(m.enrollmentMonthId, paid),
       paid ? 'Plaćanje označeno.' : 'Oznaka plaćanja uklonjena.',
+    )
+  }
+
+  /**
+   * Deliberately NOT behind `<ConfirmDialog>`, unlike every chip below it.
+   *
+   * That confirmation exists because the marks are a dense wrapped row of
+   * near-identical pills a mis-aimed click apart, whose only trace either way is
+   * a toast that fades. A select is a two-step, deliberate act that keeps its
+   * current value on screen and is trivially set back — putting a modal in front
+   * of it would only train an admin to dismiss the one guarding the marks.
+   */
+  const changePaymentOption = (next: PaymentOption | '') => {
+    run(
+      PAYMENT_OPTION_KEY,
+      () => setEnrollmentPaymentOption(enrollmentId, next || null),
+      next ? 'Način plaćanja spremljen.' : 'Način plaćanja uklonjen.',
     )
   }
 
@@ -469,7 +499,26 @@ export function EnrollmentPaymentPanel({
       )
     }
 
+    // Standard SLR: per-module marks, and the one kind whose family chose how to
+    // pay in the first place.
     return (
+      <>
+      <div className="mt-3 pt-3 border-t border-gray-200">
+        <p className="text-xs font-medium text-gray-500 mb-1.5">Način plaćanja</p>
+        <select
+          aria-label="Način plaćanja"
+          value={paymentOption ?? ''}
+          onChange={(e) => changePaymentOption(e.target.value as PaymentOption | '')}
+          disabled={isPending && pendingId === PAYMENT_OPTION_KEY}
+          className={paymentSelectClass}
+        >
+          <option value="">– Nije odabrano –</option>
+          {PAYMENT_OPTION_VALUES.map((v) => (
+            <option key={v} value={v}>{PAYMENT_OPTION_LABELS[v]}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="mt-3 pt-3 border-t border-gray-200">
         <p className="text-xs font-medium text-gray-500 mb-1.5">Plaćanje</p>
 
@@ -521,6 +570,7 @@ export function EnrollmentPaymentPanel({
           <p className="text-xs text-gray-400 mt-2">Nema upisanih modula.</p>
         )}
       </div>
+      </>
     )
   }
 }

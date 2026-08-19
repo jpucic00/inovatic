@@ -8,8 +8,11 @@ import {
   setModulePaidSchema,
   setEnrollmentContractSignedSchema,
   setEnrollmentMonthPaidSchema,
+  setEnrollmentPaymentOptionSchema,
   setEnrollmentYearPaidSchema,
 } from '@/lib/validators/admin/payment'
+import { offersPaymentOption } from '@/lib/payment-option'
+import type { PaymentOption } from '@prisma/client'
 import { adminAction } from '@/lib/admin-action'
 
 // No archived-year guard on either action: marking late payments for past
@@ -114,6 +117,63 @@ export async function setEnrollmentYearPaid(
     revalidatePath('/admin/ucenici')
     return { success: true }
   })
+}
+
+/**
+ * Record how this family settles this enrollment — "Po modulu" or "Cijela
+ * školska godina", or null to take the answer back off.
+ *
+ * Admin-only, like every paid mark and unlike "Ugovor potpisan": it is a payment
+ * fact, so it is also scrubbed out of the teacher payload rather than shared.
+ *
+ * Refused on any program that offers no choice, which is the same
+ * `offersPaymentOption` rule the public form renders from and `submitInquiry`
+ * stores by — the UI never shows the select on a radionica or a competition
+ * card, and this makes sure a hand-made request cannot put one there either.
+ */
+export async function setEnrollmentPaymentOption(
+  enrollmentId: string,
+  option: PaymentOption | null,
+): Promise<AdminActionResult> {
+  return adminAction(
+    setEnrollmentPaymentOptionSchema,
+    { enrollmentId, option },
+    async (d, { city }) => {
+      const row = await db.enrollment.findUnique({
+        where: { id: d.enrollmentId },
+        select: {
+          userId: true,
+          scheduledGroup: { select: { city: true, course: { select: { kind: true } } } },
+        },
+      })
+      // Cross-city rows answer exactly like nonexistent ones.
+      if (row?.scheduledGroup.city !== city) {
+        return { success: false, error: 'Upis nije pronađen.' }
+      }
+      // '' is the select's "nije odabrano" — one state with the DB's null.
+      const next = d.option || null
+      if (next && !offersPaymentOption(row.scheduledGroup.course.kind)) {
+        return {
+          success: false,
+          error: 'Za ovaj program se ne bira način plaćanja.',
+        }
+      }
+
+      try {
+        await db.enrollment.update({
+          where: { id: d.enrollmentId },
+          data: { paymentOption: next },
+        })
+      } catch (err) {
+        console.error('setEnrollmentPaymentOption failed:', err)
+        return { success: false, error: 'Greška pri spremanju načina plaćanja.' }
+      }
+
+      revalidatePath(`/admin/ucenici/${row.userId}`)
+      revalidatePath('/admin/ucenici')
+      return { success: true }
+    },
+  )
 }
 
 /**

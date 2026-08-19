@@ -77,6 +77,11 @@ async function reachStep3(programs: ActiveProgram[]) {
 }
 
 const submitAndAwaitSuccess = async (user: ReturnType<typeof userEvent.setup>) => {
+  // Mandatory on an SLR selection, so the form does not submit without it. The
+  // razred-with-no-program case renders no field at all — there is no program to
+  // ask a payment question about — so this answers it only when it was asked.
+  const paymentField = screen.queryByLabelText(/Način plaćanja/)
+  if (paymentField) await user.selectOptions(paymentField, 'PO_MODULU')
   await user.click(screen.getByRole('checkbox'))
   await user.click(screen.getByRole('button', { name: /Pošalji/ }))
   await screen.findByRole('heading', { name: /Upit je poslan/ })

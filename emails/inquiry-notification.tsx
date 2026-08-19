@@ -44,6 +44,14 @@ interface InquiryNotificationProps {
    */
   terminLabel?: string
   /**
+   * COURSE only — how the parent plans to pay ("Po modulu" / "Cijela školska
+   * godina"), already resolved to its label. Asked on SLR programs only and
+   * optional there, so it is absent far more often than not — and an absent
+   * answer renders nothing at all rather than a "Nije navedeno" row, which in a
+   * triage inbox is noise rather than information.
+   */
+  paymentOptionLabel?: string
+  /**
    * COURSE only — the child already exists as a student. Absent when this is a
    * first-time sign-up (and always on PARTY, which carries no child).
    */
@@ -112,6 +120,7 @@ function InquiryNotificationEmail({
   gradeLabel,
   programName,
   terminLabel,
+  paymentOptionLabel,
   returning,
   partyProposedDate,
   message,
@@ -167,11 +176,14 @@ function InquiryNotificationEmail({
         </>
       )}
 
-      {(programName ?? terminLabel ?? partyProposedDate) && (
+      {(programName ?? terminLabel ?? paymentOptionLabel ?? partyProposedDate) && (
         <>
           <Hr style={emailStyles.hr} />
           {programName && <Field label="Željeni program">{programName}</Field>}
           {terminLabel && <Field label="Željeni termin">{terminLabel}</Field>}
+          {paymentOptionLabel && (
+            <Field label="Način plaćanja">{paymentOptionLabel}</Field>
+          )}
           {partyProposedDate && <Field label="Željeni datum">{partyProposedDate}</Field>}
         </>
       )}
@@ -200,6 +212,7 @@ InquiryNotificationEmail.PreviewProps = {
   gradeLabel: '3. razred',
   programName: 'Svijet LEGO robotike 2',
   terminLabel: 'SLR 2 · Utorak · 17:00–18:30 · Trokut inkubator',
+  paymentOptionLabel: 'Po modulu',
   returning: 'SAME_CITY',
   message: 'Marko je prošle godine završio SLR 1 i jako bi volio nastaviti.',
   referralSource: 'Preporuka prijateljice',

@@ -1,6 +1,6 @@
 'use server'
 
-import type { City, Prisma, ProgramKind } from '@prisma/client'
+import type { City, PaymentOption, Prisma, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertUserInCity } from '@/lib/city-guard'
@@ -27,6 +27,7 @@ import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
 import { computeSchoolYear } from '@/lib/school-year'
 import { isMonthlyBilled } from '@/lib/program-kind'
+import { offersPaymentOption } from '@/lib/payment-option'
 import { seasonMonths } from '@/lib/monthly-charges'
 import {
   computeStudentPaymentStatus,
@@ -194,6 +195,12 @@ type CoreInput = {
   gdprConsentAt?: Date | null
   groupId?: string | null
   moduleScheduleIds?: string[]
+  /**
+   * The family's "Po modulu" / "Cijela školska godina" answer, carried over from
+   * the upit so an admin does not re-type what the parent already told us. SLR
+   * only — the upit stores null for every other kind.
+   */
+  paymentOption?: PaymentOption | null
 }
 
 type CoreResult = {
@@ -316,6 +323,7 @@ async function ensureEnrollment(
   groupId: string,
   moduleScheduleIds: string[] | undefined,
   city: City,
+  paymentOption: PaymentOption | null | undefined,
   options: { assertCapacity: boolean } = ENSURE_ENROLLMENT_DEFAULT_OPTIONS,
 ): Promise<{ enrollmentId: string; group: CoreResult['group'] }> {
   const sg = await tx.scheduledGroup.findUnique({
@@ -345,10 +353,23 @@ async function ensureEnrollment(
     await assertGroupHasAvailableSpot(tx, sg.id)
   }
 
+  // The payment model is written on CREATE only. An existing row may already
+  // carry a value an admin corrected on the student profile, and re-running this
+  // (a second module added to the same group) must never quietly reinstate what
+  // the parent guessed at sign-up time. Refused outright on a kind that offers no
+  // choice, so a stale inquiry value cannot leak onto a radionica enrollment.
+  const seededOption =
+    paymentOption && offersPaymentOption(sg.course.kind) ? paymentOption : null
+
   const enrollmentId = existingEnrollment
     ? existingEnrollment.id
     : (await tx.enrollment.create({
-        data: { userId, scheduledGroupId: sg.id, schoolYear: sg.schoolYear },
+        data: {
+          userId,
+          scheduledGroupId: sg.id,
+          schoolYear: sg.schoolYear,
+          paymentOption: seededOption,
+        },
       })).id
 
   if (moduleScheduleIds && moduleScheduleIds.length > 0) {
@@ -424,6 +445,7 @@ async function createStudentCore(tx: TxClient, input: CoreInput): Promise<CoreRe
     input.groupId,
     input.moduleScheduleIds,
     input.city,
+    input.paymentOption,
   )
   return { user, password, isExisting, enrollmentId, group }
 }
@@ -531,6 +553,7 @@ export async function createStudentFromInquiry(
         gdprConsentAt: fresh.consentGivenAt,
         groupId,
         moduleScheduleIds,
+        paymentOption: fresh.paymentOption,
       })
 
       if (!created.group) {
@@ -724,7 +747,16 @@ export async function addEnrollment(
   let enrollmentId: string
   try {
     enrollmentId = await runWithGroupCapacityGuard(async (tx) => {
-      const { enrollmentId: id } = await ensureEnrollment(tx, studentId, groupId, moduleScheduleIds, city)
+      // No payment option here: an admin adding a group by hand has no upit
+      // answer to carry over, and sets it on the card afterwards.
+      const { enrollmentId: id } = await ensureEnrollment(
+        tx,
+        studentId,
+        groupId,
+        moduleScheduleIds,
+        city,
+        null,
+      )
       return id
     })
   } catch (err) {

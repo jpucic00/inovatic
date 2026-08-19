@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { GRADE_VALUES } from '@/lib/inquiry-status'
 import { CITY_VALUES } from '@/lib/city'
+import { PAYMENT_OPTION_VALUES } from '@/lib/payment-option'
 
 const step1Schema = z.object({
   // Mandatory tenant choice — first field of the public form, no default.
@@ -33,6 +34,14 @@ const step3Schema = z.object({
   // on the competitive program's signup link only; `submitInquiry` is what
   // enforces that, since a payload can claim it anywhere.
   noSuitableTermin: z.boolean().optional(),
+  // How the parent plans to pay, offered on SLR programs only. Deliberately not
+  // paired with the program in a superRefine: it gates nothing, so a value that
+  // arrives where it was never offered is dropped by `submitInquiry` rather than
+  // failing the whole sign-up. `''` is the empty <option> — accepted as "no
+  // answer" the same way `partyProposedDate` accepts a cleared date, rather than
+  // preprocessed away (a preprocess widens the schema's INPUT type to unknown,
+  // which breaks react-hook-form's resolver inference for the whole form).
+  paymentOption: z.union([z.enum(PAYMENT_OPTION_VALUES), z.literal('')]).optional(),
   message: z.string().max(1000, 'Poruka može imati najviše 1000 znakova').optional(),
   referralSource: z.string().max(200).optional(),
   consent: z.literal(true, {
