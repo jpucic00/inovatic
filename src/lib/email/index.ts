@@ -10,4 +10,5 @@ export {
   sendTeacherCredentialsEmail,
   sendBulkMessageEmail,
   renderBulkMessageHtml,
+  sendReleaseNotesEmail,
 } from './senders'

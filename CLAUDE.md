@@ -223,6 +223,48 @@ npx prisma migrate dev --name <description>
 - **Database**: Neon PostgreSQL (EU Frankfurt)
 - **Images**: Cloudinary (cloud: dgc2tp4f8, EU)
 
+## Verzije i objave (`/release`, 2026-08-18)
+
+**A push is silent unless a release was cut for it.** Most pushes are invisible to the
+people using the app, so they mail nobody — that stays the default and the cheap path.
+Declaring a version is a deliberate extra step, taken with `/release`
+(`.claude/skills/release/SKILL.md`) before pushing.
+
+- **The changelog is code.** `src/lib/releases.ts` holds an ordered `ReleaseNote[]`, newest
+  first: version, date, one-sentence title, and `added`/`changed`/`fixed` lines. Its file
+  header carries the writing rules and worked examples, and `tests/unit/lib/releases.test.ts`
+  enforces them — including a guard that **rejects repository vocabulary** (file names,
+  `prisma`, `commit`, `deploy`, backticks…) in text destined for an administrator. Notes are
+  in Croatian and name only what someone can see or do in the app; a refactor or a test gets
+  no line at all.
+- **The database holds a receipt, not a copy.** `ReleaseAnnouncement.version` is the primary
+  key and the claim: `src/lib/release-announce.ts` INSERTs it **before** the first mail, so a
+  deploy, a crash restart (`restartPolicyMaxRetries = 3`) and two instances booting together
+  all converge on exactly one send. Same claim-before-send ordering as
+  `EmailCampaignRecipient.sentKey`, and for the same reason. Notes deliberately do **not**
+  live in the row — a wording fix later can never disagree with what was actually sent.
+- **The trigger is server start**, via `register()` in `src/instrumentation.ts` — Railway
+  starts a fresh process per deploy, so the mail goes out seconds after the release is live,
+  with no cron and no route to protect. It is fire-and-forget: an unreachable Resend must not
+  hold up the healthcheck.
+- **Recipients are `role: ADMIN, deletedAt: null`**, mailed at their real `User.email` (an
+  admin signs in with it, unlike a student's synthetic address). No `city` — a release belongs
+  to the application, not to an office, so it sends from the association address for both
+  tenants. Template `emails/release-notes.tsx`, sender `sendReleaseNotesEmail`.
+- **Three gates keep it off every non-production machine**, and the `RESEND_API_KEY` no-op is
+  not one of them — `.env.local` on the dev machine holds a working key, so a dev boot would
+  otherwise announce to the seeded admins. `instrumentation.ts` requires
+  `NODE_ENV=production` and no `RELEASE_ANNOUNCE_DISABLED`; the announcer additionally
+  returns **before claiming** when there is no key, because a receipt written locally would
+  silence the real send forever.
+- **Giving a claim back is allowed exactly once**: when `sentCount` stayed 0, nobody was
+  reached and a retry cannot duplicate anything. Any partial success keeps the claim — one
+  admin missing a note beats everyone else getting it twice. Releases older than
+  `ANNOUNCE_WINDOW_DAYS` (30) are never announced, which is what stops a restored backup
+  from mailing the whole changelog.
+- The version is the same string in three places — `src/lib/releases.ts`, `package.json`,
+  and the `v<version>` git tag. If they disagree, the changelog wins.
+
 ## Important
 - `preview_*` tools work — requires macOS Privacy & Security → Files and Folders → Documents Folder access granted to the terminal app. Dev server config is in `.claude/launch.json` (name: `inovatic-dev`, port 3000).
 - SonarQube available locally: `npm run sonar:start`, scan with `npm run sonar:scan`

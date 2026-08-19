@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { render } from '@react-email/components'
 import type { City } from '@prisma/client'
 import type { EvaluationCard } from '@/lib/evaluation-email-cards'
+import type { ReleaseNote } from '@/lib/releases'
 import type { CredentialsCard } from '@/lib/credentials-email-recipients'
 import { ASSOCIATION_EMAIL, cityInboxEmail, sendTransactionalEmail } from './client'
 import type { InquiryNextStep } from '@/lib/inquiry-next-step'
@@ -18,6 +19,7 @@ import ScheduleOptionsEmail, { type GroupOption } from '../../../emails/schedule
 import AccountCredentialsEmail from '../../../emails/account-credentials'
 import TeacherCredentialsEmail from '../../../emails/teacher-credentials'
 import BulkMessageEmail from '../../../emails/bulk-message'
+import ReleaseNotesEmail from '../../../emails/release-notes'
 
 function publicBaseUrl(): string {
   return (
@@ -394,4 +396,28 @@ export function sendBulkMessageEmail(params: BulkMessageParams): Promise<boolean
  */
 export function renderBulkMessageHtml(params: Omit<BulkMessageParams, 'to' | 'city'>): Promise<string> {
   return render(buildBulkMessageElement(params))
+}
+
+/**
+ * Release notes → one administrator per call. The only sender in this file with
+ * no `city`: a release belongs to the application, not to an office, so it goes
+ * out from (and is answered to) the association address for both tenants.
+ *
+ * The subject carries the version because these accumulate in an inbox and
+ * "which one was that?" has to be answerable from the list alone.
+ */
+export function sendReleaseNotesEmail(params: {
+  to: string
+  release: ReleaseNote
+  /** Deployed origin for the "Otvori aplikaciju" link. */
+  appUrl?: string
+}): Promise<boolean> {
+  return sendTransactionalEmail({
+    to: params.to,
+    subject: `Inovatic ${params.release.version} — ${params.release.title}`,
+    react: createElement(ReleaseNotesEmail, {
+      release: params.release,
+      appUrl: params.appUrl ?? publicBaseUrl(),
+    }),
+  })
 }

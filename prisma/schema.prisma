@@ -910,3 +910,38 @@ model EmailCampaignRecipient {
   @@unique([sentKey, parentEmail])
   @@index([campaignId])
 }
+
+/// One row per app version whose release e-mail has ALREADY gone out to the
+/// admins. Written only by the announcer at server start
+/// (`src/lib/release-announce.ts`) — never by a migration, never by hand.
+///
+/// Its single job is to make that e-mail fire exactly once no matter how often
+/// the app boots: Railway starts a fresh process on every deploy AND on every
+/// restart (`restartPolicyMaxRetries = 3`), so "send on start" without a
+/// persisted claim would re-mail every admin on a crash loop.
+///
+/// It deliberately stores **no copy of the notes**. Those live in
+/// `src/lib/releases.ts`, so a note edited after the fact can never disagree
+/// with what was actually sent — the code is the record, this table is only the
+/// receipt.
+model ReleaseAnnouncement {
+  /// The version string from `src/lib/releases.ts`, e.g. `1.2.0` — and the
+  /// PRIMARY KEY, which is precisely what makes the claim atomic. Two instances
+  /// booting together both INSERT it and exactly one wins; the loser sees a
+  /// unique violation and skips, rather than both reading "not announced yet"
+  /// and both sending. Same claim-before-send order as
+  /// `EmailCampaignRecipient.sentKey`.
+  version     String   @id
+  /// Stamped when the claim was taken, i.e. immediately BEFORE the first mail —
+  /// not when the last one landed. A row therefore means "this version's send
+  /// was started and must never be started again".
+  announcedAt DateTime @default(now())
+  /// How many admin inboxes the send reached and how many it could not.
+  /// Recorded for the log rather than for control flow, with one exception: a
+  /// send where `sentCount` stayed 0 and `failedCount` is positive deletes its
+  /// own row, because nobody was mailed and a retry cannot double-mail anyone.
+  /// Any partial success keeps the claim — one admin missing a note is a much
+  /// smaller problem than every other admin receiving it twice.
+  sentCount   Int      @default(0)
+  failedCount Int      @default(0)
+}

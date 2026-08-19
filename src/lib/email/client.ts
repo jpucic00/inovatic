@@ -42,8 +42,11 @@ export function cityInboxEmail(city?: City): string {
 /**
  * Low-level transactional send shared by every function in ./senders.
  *
- * No-ops (returns `false`) when `RESEND_API_KEY` is unset — local dev, tests and
- * preview builds run without a key, and "no key" must never read as a failure.
+ * No-ops (returns `false`) when `RESEND_API_KEY` is unset — tests and preview
+ * builds run without a key, and "no key" must never read as a failure. Note
+ * this is NOT a guarantee that local dev sends nothing: a developer's
+ * `.env.local` may hold a working key, so anything that mails without a
+ * person asking it to (see `src/lib/release-announce.ts`) needs its own gate.
  *
  * The Resend SDK does NOT throw on API-level failures (unverified sender domain,
  * invalid recipient, quota) — it returns them in-band as `{ error }`. We inspect
