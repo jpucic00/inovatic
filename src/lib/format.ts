@@ -1,15 +1,71 @@
 type DateStyle = 'short' | 'long'
 
+/**
+ * The zone every stored instant is rendered in.
+ *
+ * A `DateTime` column is a `TIMESTAMP(3)` holding a UTC instant, so displaying
+ * one is a conversion — and an unnamed conversion silently follows whoever runs
+ * it. The server side is a UTC container (two hours early all summer) and the
+ * client side is the viewer's own clock, which means the same row could render
+ * two different days either side of hydration. Naming the zone here is what
+ * makes the server render, the browser render and the test run agree.
+ *
+ * `@db.Date` columns arrive from Prisma as UTC midnight; Zagreb is ahead of UTC
+ * year-round, so those land on the same calendar day and are unaffected.
+ */
+export const APP_TIME_ZONE = 'Europe/Zagreb'
+
+/**
+ * Zero-padded day/month/year of an instant *in Zagreb*. `en-CA` is a formatting
+ * detail, not a locale choice — it is asked only for 2-digit parts, which are
+ * then reassembled by hand, so no Canadian ordering survives into the output.
+ */
+const PARTS_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: APP_TIME_ZONE,
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+})
+
+function zonedParts(date: Date): { dd: string; mm: string; yyyy: string } {
+  const parts = PARTS_FORMATTER.formatToParts(date)
+  const pick = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? ''
+  return { dd: pick('day'), mm: pick('month'), yyyy: pick('year') }
+}
+
 export function formatDate(date: Date | null, style: DateStyle = 'short'): string {
   if (!date) return ''
   if (style === 'long') {
-    return new Intl.DateTimeFormat('hr-HR', { day: '2-digit', month: 'long', year: 'numeric' }).format(date)
+    return new Intl.DateTimeFormat('hr-HR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      timeZone: APP_TIME_ZONE,
+    }).format(date)
   }
   // Compact dd.MM.yyyy. — matches formatDateKey so adjacent admin UI agrees.
   // (Intl 'hr-HR' short would render "15. 05. 2026." with internal spaces.)
-  const dd = String(date.getDate()).padStart(2, '0')
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  return `${dd}.${mm}.${date.getFullYear()}.`
+  const { dd, mm, yyyy } = zonedParts(date)
+  return `${dd}.${mm}.${yyyy}.`
+}
+
+/** Time of day as "HH:mm" in the app's zone. */
+export function formatTime(date: Date): string {
+  return new Intl.DateTimeFormat('hr-HR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: APP_TIME_ZONE,
+  }).format(date)
+}
+
+/**
+ * An instant with its time of day, e.g. "19.08.2026. u 15:04" — the reading for
+ * a record whose *moment* matters (an upit arriving, a consent being given),
+ * as opposed to formatDate's calendar day.
+ */
+export function formatDateTime(date: Date): string {
+  return `${formatDate(date)} u ${formatTime(date)}`
 }
 
 /** Build display name from child name fields. Empty/null (e.g. PARTY inquiries
@@ -48,9 +104,9 @@ export function formatDateKey(key: string): string {
  * The leading space + parens allow direct concatenation after a module title.
  */
 export function formatModuleDateRange(start: Date, end: Date): string {
-  const dd = (d: Date) => String(d.getDate()).padStart(2, '0')
-  const mm = (d: Date) => String(d.getMonth() + 1).padStart(2, '0')
-  return ` (${dd(start)}.${mm(start)}. – ${dd(end)}.${mm(end)}.${end.getFullYear()}.)`
+  const s = zonedParts(start)
+  const e = zonedParts(end)
+  return ` (${s.dd}.${s.mm}. – ${e.dd}.${e.mm}.${e.yyyy}.)`
 }
 
 /**

@@ -1,5 +1,12 @@
 FROM node:20-alpine AS base
 
+# Every timestamp is stored as a UTC instant, so rendering one is a conversion —
+# and an unset TZ makes that conversion follow the container, which is UTC. Set
+# on `base` rather than `runner` because `builder` needs it too: the article
+# routes have generateStaticParams, so publish dates are baked at build time.
+# Node's bundled ICU resolves the zone; the alpine tzdata package is not needed.
+ENV TZ=Europe/Zagreb
+
 # Install dependencies only when needed
 FROM base AS deps
 RUN apk add --no-cache libc6-compat

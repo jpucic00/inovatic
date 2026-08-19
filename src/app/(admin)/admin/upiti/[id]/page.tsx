@@ -24,7 +24,7 @@ import {
   GRADE_LABELS,
   NO_SUITABLE_TERMIN_LABEL,
 } from '@/lib/inquiry-status'
-import { formatChildName, formatDate } from '@/lib/format'
+import { formatChildName, formatDate, formatDateTime, formatTime } from '@/lib/format'
 import { toDateKey } from '@/lib/session-dates'
 import type { ProgramKind } from '@prisma/client'
 
@@ -95,10 +95,6 @@ function StatusTimeline({ currentStatus }: Readonly<{ currentStatus: string }>) 
       })}
     </div>
   )
-}
-
-function formatDateTime(date: Date): string {
-  return `${formatDate(date)} u ${date.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' })}`
 }
 
 /**
@@ -349,10 +345,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
             Upit primljen{' '}
             {formatDate(inquiry.createdAt)}
             {' u '}
-            {inquiry.createdAt.toLocaleTimeString('hr-HR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {formatTime(inquiry.createdAt)}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -383,10 +376,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
                 Odbijeno{' '}
                 {formatDate(inquiry.updatedAt)}
                 {' u '}
-                {inquiry.updatedAt.toLocaleTimeString('hr-HR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatTime(inquiry.updatedAt)}
               </p>
             </div>
           </>
@@ -559,10 +549,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
                   Dan{' '}
                   {formatDate(inquiry.consentGivenAt)}{' '}
                   u{' '}
-                  {inquiry.consentGivenAt.toLocaleTimeString('hr-HR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatTime(inquiry.consentGivenAt)}
                 </span>
               ) : (
                 <span className="text-gray-400 italic">Nije zabilježen</span>

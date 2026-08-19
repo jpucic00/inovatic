@@ -1,13 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   DAYS_HR,
   formatChildName,
   formatDate,
   formatDateKey,
+  formatDateTime,
   formatEurCents,
   formatGroupSchedule,
   formatHours,
+  formatModuleDateRange,
   formatMonthYear,
+  formatTime,
 } from '@/lib/format'
 
 const utc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d, 12))
@@ -180,5 +183,73 @@ describe('DAYS_HR', () => {
       'Subota',
       'Nedjelja',
     ])
+  })
+})
+
+describe('timezone pinning', () => {
+  // Every stored DateTime is a UTC instant, so these assertions are the whole
+  // contract: the output names the Croatian calendar day and wall clock, not
+  // the one belonging to whichever machine happens to run the formatter.
+  const ORIGINAL_TZ = process.env.TZ
+  afterEach(() => {
+    process.env.TZ = ORIGINAL_TZ
+  })
+
+  it('renders the Zagreb wall clock, not UTC', () => {
+    // 13:00 UTC is 15:00 in Zagreb — the two-hour gap an admin noticed on the
+    // upit list, where a signup made at 15:00 read back as 13:00.
+    expect(formatTime(new Date('2026-08-19T13:00:00Z'))).toBe('15:00')
+    expect(formatDateTime(new Date('2026-08-19T13:00:00Z'))).toBe('19.08.2026. u 15:00')
+  })
+
+  it('rolls the calendar day over at Croatian midnight, not UTC midnight', () => {
+    // 22:30 UTC is already 00:30 the next day in Zagreb (CEST, +2).
+    expect(formatDate(new Date('2026-08-19T22:30:00Z'))).toBe('20.08.2026.')
+    // …and +1 in winter, so the rollover moves with the offset rather than
+    // being a fixed two hours baked into the formatter.
+    expect(formatDate(new Date('2026-01-15T23:30:00Z'))).toBe('16.01.2026.')
+    expect(formatDate(new Date('2026-01-15T22:30:00Z'))).toBe('15.01.2026.')
+  })
+
+  it('leaves @db.Date values on their own calendar day', () => {
+    // Prisma hands back a date-only column as UTC midnight. Zagreb is ahead of
+    // UTC year-round, so it reads 01:00/02:00 the SAME day — date-only columns
+    // (module schedules, sessionDate, EnrollmentMonth) are untouched by the pin.
+    expect(formatDate(new Date('2026-08-19T00:00:00Z'))).toBe('19.08.2026.')
+    expect(formatDate(new Date('2026-01-15T00:00:00Z'))).toBe('15.01.2026.')
+    expect(
+      formatModuleDateRange(
+        new Date('2026-07-15T00:00:00Z'),
+        new Date('2026-07-22T00:00:00Z'),
+      ),
+    ).toBe(' (15.07. – 22.07.2026.)')
+  })
+
+  it('produces the same output whatever timezone the process runs in', () => {
+    // The regression this guards: a Railway container defaults to UTC while a
+    // developer's machine is Europe/Zagreb, so an unpinned formatter passed
+    // locally and shipped wrong. Kiritimati (+14) and Los Angeles (-7) sit
+    // either side of the date line from Zagreb.
+    const instant = new Date('2026-08-19T22:30:00Z')
+    const zones = ['UTC', 'Asia/Tokyo', 'Pacific/Kiritimati', 'America/Los_Angeles']
+
+    const rendered = zones.map((tz) => {
+      process.env.TZ = tz
+      return {
+        tz,
+        date: formatDate(instant),
+        long: formatDate(instant, 'long'),
+        time: formatTime(instant),
+      }
+    })
+
+    for (const r of rendered) {
+      expect({ ...r, tz: 'ignored' }).toEqual({
+        tz: 'ignored',
+        date: '20.08.2026.',
+        long: rendered[0].long,
+        time: '00:30',
+      })
+    }
   })
 })

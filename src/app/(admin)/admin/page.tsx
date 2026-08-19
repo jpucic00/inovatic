@@ -8,6 +8,7 @@ import { StatCard } from '@/components/admin/stat-card'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
 import { ReturningBadge } from '@/components/admin/returning-badge'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
+import { APP_TIME_ZONE } from '@/lib/format'
 
 export const metadata: Metadata = {
   title: 'Admin – Nadzorna ploča',
@@ -151,6 +152,7 @@ export default async function AdminDashboard() {
                       {inquiry.createdAt.toLocaleDateString('hr-HR', {
                         day: '2-digit',
                         month: '2-digit',
+                        timeZone: APP_TIME_ZONE,
                       })}
                     </span>
                   </div>

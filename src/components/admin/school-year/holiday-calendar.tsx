@@ -150,9 +150,16 @@ function monthsForSchoolYear(schoolYear: string): Array<{ year: number; month: n
   for (let i = 0; i < 12; i++) {
     const m = (8 + i) % 12 // Sept = 8
     const y = startYear + (8 + i >= 12 ? 1 : 0)
-    const label = new Intl.DateTimeFormat('hr-HR', { month: 'long', year: 'numeric' }).format(
-      utcMidnight(y, m, 1),
-    )
+    // UTC, not APP_TIME_ZONE: the value being formatted is synthetic — the 1st
+    // at UTC midnight, built only to get a Croatian month name out of Intl — so
+    // it must be read back in the frame it was written in. Unpinned, a viewer at
+    // a negative offset reads that midnight as the previous day and the heading
+    // names the wrong month over a grid that is entirely getUTC*-based.
+    const label = new Intl.DateTimeFormat('hr-HR', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(utcMidnight(y, m, 1))
     out.push({ year: y, month: m, label })
   }
   return out
