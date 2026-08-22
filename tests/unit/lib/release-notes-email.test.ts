@@ -17,9 +17,15 @@ const release: ReleaseNote = {
   version: '1.2.0',
   date: '2026-08-18',
   title: 'Upiti sada odmah pokazuju je li dijete već bilo polaznik.',
-  changes: [
-    'Na Upitima stoji oznaka "Ponovni upis" kad dijete već ima račun kod nas.',
-    'Roditelj koji je na prijavnici odabrao termin više ne dobiva krivu poruku.',
+  sections: [
+    {
+      area: 'Upiti',
+      changes: ['Uz dijete koje kod nas već ima račun stoji oznaka "Ponovni upis".'],
+    },
+    {
+      area: 'Prijavnica',
+      changes: ['Roditelj koji je odabrao termin više ne dobiva krivu poruku.'],
+    },
   ],
 }
 
@@ -40,25 +46,45 @@ describe('release notes email', () => {
     expect(html).toContain('Nova verzija aplikacije')
   })
 
-  it('prints every note, in the order they were written', async () => {
+  it('prints every note under its own heading, in the order they were written', async () => {
     const html = await renderEmail()
-    const first = html.indexOf('Na Upitima stoji oznaka')
-    const second = html.indexOf('Roditelj koji je na prijavnici')
-    expect(first).toBeGreaterThan(-1)
-    expect(second).toBeGreaterThan(-1)
-    // The list is ordered feature by feature by whoever wrote it, so the
-    // template must not sort or group it into a shape of its own.
-    expect(first).toBeLessThan(second)
+    const firstArea = html.indexOf('Upiti')
+    const first = html.indexOf('Uz dijete koje kod nas')
+    const secondArea = html.indexOf('Prijavnica')
+    const second = html.indexOf('Roditelj koji je odabrao termin')
+    for (const at of [firstArea, first, secondArea, second]) {
+      expect(at).toBeGreaterThan(-1)
+    }
+    // Sections and the lines inside them are ordered by whoever wrote the note,
+    // so the template must not sort or regroup them into a shape of its own.
+    expect(firstArea).toBeLessThan(first)
+    expect(first).toBeLessThan(secondArea)
+    expect(secondArea).toBeLessThan(second)
   })
 
-  it('carries no grouping of its own', async () => {
-    // One flat list under one heading. The old novo/poboljšano/ispravljeno
-    // split forced a single feature into two places whenever it both added and
-    // changed something — see the rules in src/lib/releases.ts.
+  it('adds no grouping the note did not ask for', async () => {
+    // The headings are the note's — the parts of the app it touched. What must
+    // never come back is a novo/poboljšano/ispravljeno split, which tears one
+    // feature in two the moment it both adds and changes something.
     const html = await renderEmail()
-    expect(html).toContain('Što je novo')
     expect(html).not.toContain('Poboljšano')
     expect(html).not.toContain('Ispravljeno')
+    // A section the note never wrote must not appear either.
+    expect(html).not.toContain('Razno')
+  })
+
+  it('drops nothing when a release touches one place only', async () => {
+    const html = await renderEmail({
+      sections: [{ area: 'Dolazak', changes: ['Ručno dodan datum preživi osvježavanje.'] }],
+    })
+    expect(html).toContain('Dolazak')
+    expect(html).toContain('Ručno dodan datum preživi osvježavanje.')
+    // The replaced sections are gone. Asserted on their own text rather than on
+    // the area name: "Upiti" is also a word in this fixture's title, so the
+    // heading alone cannot tell a rendered section from the sentence above it.
+    expect(html).not.toContain('Prijavnica')
+    expect(html).not.toContain('Roditelj koji je odabrao termin')
+    expect(html).not.toContain('Uz dijete koje kod nas')
   })
 
   it('does not close with the association’s own contact card', async () => {

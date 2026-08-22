@@ -46,7 +46,7 @@ function stageRelease(overrides: Partial<ReleaseNote> = {}): ReleaseNote {
     version: `9.${Date.now() % 100000}.${seq++}`,
     date: new Date().toISOString().slice(0, 10),
     title: 'Testna objava.',
-    changes: ['Nešto novo.'],
+    sections: [{ area: 'Upiti', changes: ['Nešto novo.'] }],
     ...overrides,
   }
   releases.push(release)

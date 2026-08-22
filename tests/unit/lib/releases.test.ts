@@ -67,6 +67,16 @@ export function isSentence(text: string): boolean {
   return text === text.trim() && text.length > 10 && text.length <= 200
 }
 
+/**
+ * An `area` is a HEADING, so it is held to the opposite shape from a change
+ * line: short enough to scan down the left of a mail, and deliberately allowed
+ * to be shorter than `isSentence` accepts — "Upiti" is a perfectly good section
+ * name and would fail the sentence rule on length alone.
+ */
+export function isAreaLabel(text: string): boolean {
+  return text === text.trim() && text.length >= 3 && text.length <= 60 && !text.endsWith('.')
+}
+
 export function readsLikeTheRepository(text: string): boolean {
   return REPO_WORDS.test(text) || CAMEL_CASE.test(text) || SNAKE_CASE.test(text)
 }
@@ -106,6 +116,22 @@ describe('the rules', () => {
     expect(isSentence('Popravak.')).toBe(false) // too short to say anything
     expect(isSentence(' Vodeći razmak. ')).toBe(false)
     expect(isSentence('a'.repeat(201))).toBe(false)
+  })
+
+  it('tells a heading from a sentence', () => {
+    // The nav's own names, which is what an area must be.
+    for (const good of ['Upiti', 'Profil učenika', 'Kalendar i Dolazak', 'Cijela aplikacija']) {
+      expect(isAreaLabel(good), good).toBe(true)
+    }
+    for (const bad of [
+      'Na',
+      ' Upiti ',
+      // A heading that is really a change line — the sentence belongs under it.
+      'Na profilu učenika možete označiti da je ugovor potpisan.',
+      'a'.repeat(61),
+    ]) {
+      expect(isAreaLabel(bad), bad).toBe(false)
+    }
   })
 
   it('rejects wording that could only come from the repository', () => {
@@ -157,22 +183,44 @@ describe('RELEASES', () => {
     }
   })
 
-  it('says at least one thing per release', () => {
+  it('says at least one thing per release, under at least one heading', () => {
     for (const release of RELEASES) {
       expect(release.title.trim().length).toBeGreaterThan(0)
       // A release with nothing to tell anyone is a release that should not have
       // been cut — the e-mail would arrive empty.
-      expect(release.changes.length).toBeGreaterThan(0)
+      expect(release.sections.length).toBeGreaterThan(0)
+      for (const section of release.sections) {
+        // A heading with nothing under it renders as a rule and a word: the
+        // reader is told a part of the app changed and never told how.
+        expect(section.changes.length, `empty section: "${section.area}"`).toBeGreaterThan(0)
+      }
     }
   })
 
-  it('writes sentences, not fragments', () => {
-    for (const item of everyLine(RELEASES)) {
-      expect(isSentence(item), `not a sentence: "${item}"`).toBe(true)
+  it('names each part of the app once per release', () => {
+    for (const release of RELEASES) {
+      const areas = release.sections.map((s) => s.area)
+      // Two blocks under one heading read as the same place changing twice,
+      // and split what a reader working in it has to hold together.
+      expect(new Set(areas).size, `repeated heading in ${release.version}`).toBe(areas.length)
+    }
+  })
+
+  it('writes sentences under headings, and neither in the other’s shape', () => {
+    for (const release of RELEASES) {
+      expect(isSentence(release.title), `not a sentence: "${release.title}"`).toBe(true)
+      for (const section of release.sections) {
+        expect(isAreaLabel(section.area), `not a heading: "${section.area}"`).toBe(true)
+        for (const item of section.changes) {
+          expect(isSentence(item), `not a sentence: "${item}"`).toBe(true)
+        }
+      }
     }
   })
 
   it('says nothing an administrator cannot see in the app', () => {
+    // Headings included: "Prisma modeli" would be exactly the failure this
+    // guards, and it is the half a skim-reader actually reads.
     for (const item of everyLine(RELEASES)) {
       expect(readsLikeTheRepository(item), `technical wording in "${item}"`).toBe(false)
     }
@@ -180,5 +228,8 @@ describe('RELEASES', () => {
 })
 
 function everyLine(releases: readonly ReleaseNote[]): string[] {
-  return releases.flatMap((r) => [r.title, ...r.changes])
+  return releases.flatMap((r) => [
+    r.title,
+    ...r.sections.flatMap((s) => [s.area, ...s.changes]),
+  ])
 }

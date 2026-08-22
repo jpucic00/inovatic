@@ -80,24 +80,32 @@ The rules and the worked examples live in the header of `src/lib/releases.ts` �
 
 - `title` — one sentence naming the release. It becomes the e-mail subject, so
   it has to stand alone in an inbox list.
-- `changes` — one flat list, **one sentence per feature**, ordered as the reader
-  should meet them. There is deliberately no novo / poboljšano / ispravljeno
-  split: those headings tear a single feature in two the moment it both adds and
-  changes something, which is most of them.
+- `sections` — the changes **grouped by where they live**, ordered as the reader
+  should meet them, and so are the lines inside each one.
 
-**Every sentence says where the feature lives**, usually by opening with the
-place. The reader's first question is "where do I find this?", and a note that
-does not answer it sends them hunting through the sidebar:
+**The grouping is by PLACE, never by novo / poboljšano / ispravljeno.** Staff
+use different halves of this app — a teacher scans for Dolazak, whoever handles
+enrolment scans for Upiti — and a flat list makes each of them read past
+everyone else's changes to find their own. The taxonomy split is the one that
+stays banned: it tears a single feature in two the moment it both adds and
+changes something, which is most of them.
 
->  YES  "Na profilu djeteta, uz oznake plaćanja, za svaku upisanu grupu možete
->        označiti da je ugovor potpisan."
->  NO   "Dodana je oznaka potpisanog ugovora po upisu."
-
-Name the place the way the navigation names it, not the way the route is
+`area` names the place the way the navigation names it, not the way the route is
 spelled — `/admin/skolska-godina` is **Kalendar**, `/admin/email` is **E-mail**,
 the attendance screen is **Dolazak**. Check the sidebar rather than guessing.
-A line about a mail that arrives has no screen; then say what arrives and to
-whom.
+Two places that only ever change together may share one section
+("Kalendar i Dolazak"); a change with no screen at all — a mail that arrives, a
+rule that spans everything — gets a section that says so.
+
+**The section says where, so the sentence says what.** Under `Profil učenika` a
+line must not open by repeating the place; that is the whole payoff of grouping,
+and it is why the same fact never appears in two sections:
+
+>  YES  area `Profil učenika` — "Uz oznake plaćanja, za svaku upisanu grupu
+>        možete označiti da je ugovor potpisan."
+>  NO   area `Profil učenika` — "Na profilu djeteta možete označiti da je ugovor
+>        potpisan."
+>  NO   area `Razno` — "Dodana je oznaka potpisanog ugovora po upisu."
 
 Merge every commit touching one feature into that feature's single sentence,
 including the ones that only fixed it. Split one commit into several sentences

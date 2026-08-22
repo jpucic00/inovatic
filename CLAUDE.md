@@ -237,18 +237,21 @@ Declaring a version is a deliberate extra step, taken with `/release`
 (`.claude/skills/release/SKILL.md`) before pushing.
 
 - **The changelog is code.** `src/lib/releases.ts` holds an ordered `ReleaseNote[]`, newest
-  first: version, date, one-sentence title, and a **flat `changes` list — one sentence per
-  feature, each naming where in the app that feature lives** ("Na profilu djeteta…", "Na
-  Kalendaru školske godine…"), using the sidebar's own names rather than the route's. The
-  novo/poboljšano/ispravljeno grouping was removed on 2026-08-19 before any release shipped:
-  it split a single feature across two headings the moment it both added and changed
-  something, which is most of them, and an admin reads by feature, not by taxonomy. Its file
-  header carries the writing rules and worked examples, and `tests/unit/lib/releases.test.ts`
-  enforces them — including a guard that **rejects repository vocabulary** (file names,
-  `prisma`, `commit`, `deploy`, backticks…) in text destined for an administrator. Notes are
-  in Croatian and name only what someone can see or do in the app; a refactor, a test, or a
-  fix to a feature **shipping in the same release** gets no line at all — nobody ever had the
-  broken version.
+  first: version, date, one-sentence title, and **`sections` — the changes grouped by WHERE
+  they live**, each `area` named the way the sidebar names it (Kalendar, Upiti, Dolazak,
+  E-mail…) rather than the way the route is spelled. Staff use different halves of the app,
+  so a teacher must be able to scan for Dolazak without reading past everyone else's changes.
+  The section says where, so the sentence under it says what and never repeats the place.
+  Grouping by **novo/poboljšano/ispravljeno stays banned** (removed 2026-08-19, before any
+  release shipped): that taxonomy splits a single feature across two headings the moment it
+  both adds and changes something, which is most of them — grouping by place is the opposite
+  axis and reinforces the "say where it lives" rule instead. Its file header carries the
+  writing rules and worked examples, and `tests/unit/lib/releases.test.ts` enforces them —
+  including a guard that **rejects repository vocabulary** (file names, `prisma`, `commit`,
+  `deploy`, backticks…) in the area headings as well as the lines, and an `isAreaLabel`
+  predicate so a heading cannot silently become a sentence. Notes are in Croatian and name
+  only what someone can see or do in the app; a refactor, a test, or a fix to a feature
+  **shipping in the same release** gets no line at all — nobody ever had the broken version.
 - **The database holds a receipt, not a copy.** `ReleaseAnnouncement.version` is the primary
   key and the claim: `src/lib/release-announce.ts` INSERTs it **before** the first mail, so a
   deploy, a crash restart (`restartPolicyMaxRetries = 3`) and two instances booting together

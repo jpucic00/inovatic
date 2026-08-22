@@ -36,20 +36,27 @@ function ReleaseNotesEmail({ release, appUrl }: ReleaseNotesProps) {
         </Text>
       </Section>
 
-      <Text style={emailStyles.text}>{release.title}</Text>
-
-      <Section>
-        {/* One flat list, ordered feature by feature. The heading is the
-            template's, not the note's: grouping the lines by novo/poboljšano
-            would split a single feature in two the moment it both adds and
-            changes something. */}
-        <Text style={sectionHeading}>Što je novo</Text>
-        {release.changes.map((item, i) => (
-          <Text key={i} style={bulletText}>
-            {`• ${item}`}
-          </Text>
-        ))}
-      </Section>
+      {/* `title` is deliberately NOT repeated here. It is the subject line and
+          the preheader — the two places a reader meets it before opening — and
+          a third copy at the top of the body only pushed the first real section
+          below the fold. */}
+      {/* One block per part of the app, in the order the note wrote them. The
+          headings are the NOTE's, never the template's: this file adds no
+          grouping of its own, and in particular never a novo/poboljšano split,
+          which would tear one feature in two the moment it both added and
+          changed something. Staff use different halves of this application, so
+          the area heading is how a teacher finds Dolazak without reading past
+          everyone else's changes. */}
+      {release.sections.map((section) => (
+        <Section key={section.area} style={areaBlock}>
+          <Text style={areaHeading}>{section.area}</Text>
+          {section.changes.map((item, i) => (
+            <Text key={i} style={bulletText}>
+              {`• ${item}`}
+            </Text>
+          ))}
+        </Section>
+      ))}
 
       <Section style={{ textAlign: 'center', margin: '32px 0 8px' }}>
         <Link href={appUrl} style={button}>
@@ -82,11 +89,20 @@ const versionText = {
   margin: '0',
 }
 
-const sectionHeading = {
-  color: '#111827',
+// Each area is its own block with a rule above it. A border is the one
+// separator every mail client renders the same way — a background panel per
+// section is what Outlook loses.
+const areaBlock = {
+  borderTop: '1px solid #e5e7eb',
+  paddingTop: '16px',
+  margin: '20px 0 0',
+}
+
+const areaHeading = {
+  color: '#0e7490',
   fontSize: '15px',
   fontWeight: '700' as const,
-  margin: '24px 0 8px',
+  margin: '0 0 10px',
 }
 
 // Hanging indent: the bullet sits in the left padding so a wrapped second line
@@ -117,10 +133,23 @@ ReleaseNotesEmail.PreviewProps = {
     version: '1.1.0',
     date: '2026-08-18',
     title: 'Upiti sada odmah pokazuju je li dijete već bilo polaznik.',
-    changes: [
-      'Na Upitima stoji oznaka "Ponovni upis" kad dijete već ima račun kod nas, i po njoj se može filtrirati.',
-      'Pristupne podatke za polaznički portal šaljete porukom Pristupni podaci na E-mailu, kad su ugovori potpisani.',
-      'Radionica se na javnim stranicama nudi samo do dana kad počinje.',
+    sections: [
+      {
+        area: 'Upiti',
+        changes: [
+          'Uz dijete koje kod nas već ima račun stoji oznaka "Ponovni upis", i po njoj se može filtrirati.',
+        ],
+      },
+      {
+        area: 'Pristupni podaci',
+        changes: [
+          'Šaljete ih porukom Pristupni podaci na E-mailu, kad su ugovori potpisani.',
+        ],
+      },
+      {
+        area: 'Javne stranice',
+        changes: ['Radionica se nudi samo do dana kad počinje.'],
+      },
     ],
   },
 } satisfies ReleaseNotesProps
