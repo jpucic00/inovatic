@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Loader2, Lock, Plus, Save, X } from 'lucide-react'
+import { readAdhocDates, writeAdhocDates } from '@/lib/adhoc-date-memory'
 import type { MarkingWindow } from '@/lib/attendance-window'
 import { DateInput } from '@/components/ui/date-input'
 import { toast } from 'sonner'
@@ -454,6 +455,42 @@ function RosterTable({
   )
 }
 
+/**
+ * Hand-added dates, remembered per group in sessionStorage (see
+ * `src/lib/adhoc-date-memory.ts`) so switching to another group tab or
+ * reloading does not silently drop an unsaved termin. Loaded in an effect, not
+ * the state initializer — the marker is server-rendered, and reading
+ * sessionStorage during hydration would mismatch. `serverKnown` must be
+ * referentially stable (memoized): it both prunes dates that gained real
+ * attendance rows and re-syncs the memory after a save refreshes the props.
+ */
+function useAdhocDates(
+  groupId: string,
+  serverKnown: readonly string[],
+): [string[], (key: string) => void] {
+  const [adhocDates, setAdhocDates] = useState<string[]>([])
+
+  useEffect(() => {
+    setAdhocDates(readAdhocDates(groupId, new Set(serverKnown)))
+  }, [groupId, serverKnown])
+
+  const addAdhocDate = useCallback(
+    (key: string) => {
+      setAdhocDates((prev) => {
+        if (prev.includes(key)) return prev
+        const next = [...prev, key]
+        // Write-through inside the updater keeps memory and list in lockstep;
+        // a strict-mode double invoke just rewrites the same value.
+        writeAdhocDates(groupId, next)
+        return next
+      })
+    },
+    [groupId],
+  )
+
+  return [adhocDates, addAdhocDate]
+}
+
 // ─── Public component ───────────────────────────────────────────────────────
 
 export function AttendanceMarker(props: Readonly<GroupAttendance>) {
@@ -502,14 +539,16 @@ function FlatAttendanceMarker({
     () => indexTeacherRecords(teacherRecords),
     [teacherRecords],
   )
-  const [adhocDates, setAdhocDates] = useState<string[]>([])
+  const serverKnown = useMemo(
+    () => [...expectedSessions, ...extraSessions],
+    [expectedSessions, extraSessions],
+  )
+  const [adhocDates, addAdhocDate] = useAdhocDates(groupId, serverKnown)
   const allDates = useMemo(() => {
-    const merged = [
-      ...new Set([...expectedSessions, ...extraSessions, ...adhocDates]),
-    ]
+    const merged = [...new Set([...serverKnown, ...adhocDates])]
     merged.sort((a, b) => a.localeCompare(b))
     return merged
-  }, [expectedSessions, extraSessions, adhocDates])
+  }, [serverKnown, adhocDates])
 
   const [selected, setSelected] = useState<string>(() =>
     pickFlatDefault(expectedSessions, extraSessions),
@@ -539,9 +578,7 @@ function FlatAttendanceMarker({
       toast.error('Neispravan datum.')
       return
     }
-    if (!adhocDates.includes(key) && !allDates.includes(key)) {
-      setAdhocDates((prev) => [...prev, key])
-    }
+    if (!allDates.includes(key)) addAdhocDate(key)
     handlePickDate(key)
     setNewDateInput('')
   }
@@ -731,7 +768,14 @@ function StandardAttendanceMarker({
   )
 
   const [selected, setSelected] = useState<string>(defaultSelectedDate)
-  const [adhocDates, setAdhocDates] = useState<string[]>([])
+  const serverKnown = useMemo(
+    () => [
+      ...sections.flatMap((s) => [...s.expectedSessions, ...s.adhocSessions]),
+      ...otherDates,
+    ],
+    [sections, otherDates],
+  )
+  const [adhocDates, addAdhocDate] = useAdhocDates(groupId, serverKnown)
   const [newDateInput, setNewDateInput] = useState('')
 
   const sectionWindows = useMemo(
@@ -803,13 +847,9 @@ function StandardAttendanceMarker({
       toast.error('Neispravan datum.')
       return
     }
-    const alreadyKnown =
-      adhocDates.includes(key) ||
-      sections.some(
-        (s) => s.expectedSessions.includes(key) || s.adhocSessions.includes(key),
-      ) ||
-      otherDates.includes(key)
-    if (!alreadyKnown) setAdhocDates((prev) => [...prev, key])
+    if (!adhocDates.includes(key) && !serverKnown.includes(key)) {
+      addAdhocDate(key)
+    }
     handlePickDate(key)
     setNewDateInput('')
   }
