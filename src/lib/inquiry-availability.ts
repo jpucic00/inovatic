@@ -7,6 +7,15 @@ import {
 import { hasDatedModules } from '@/lib/program-kind'
 import { offersPaymentOption } from '@/lib/payment-option'
 
+/**
+ * The razred as the SIGN-UP FORM holds it: a real grade, `''` while the parent
+ * has not answered yet, or `undefined` on the flows that never render the field.
+ * Named because all three availability predicates take it and must agree on what
+ * "no answer yet" looks like — a widened arm in one of them would let a
+ * requirement fire before the parent has been asked anything.
+ */
+export type GradeSelection = Grade | '' | undefined
+
 // Child grade → standard program level. Predškolci have their own program
 // (UVOD, WeDo 2.0) since 2026-07-29 — before that they shared SLR 1 — and from
 // 1. razred it is two grades per level up to SLR 4. Used to narrow the open
@@ -117,7 +126,7 @@ function programAcceptsGrade(
  */
 export function programsForSelection(
   programs: ActiveProgram[],
-  grade: Grade | '' | undefined,
+  grade: GradeSelection,
   preselectedCourseId?: string,
   rules?: CourseGradeRules,
 ): ActiveProgram[] {
@@ -147,7 +156,7 @@ export function hasOpenTermin(programs: ActiveProgram[]): boolean {
  */
 export function isTerminRequired(
   programs: ActiveProgram[],
-  grade: Grade | '' | undefined,
+  grade: GradeSelection,
   preselectedCourseId?: string,
   rules?: CourseGradeRules,
 ): boolean {
@@ -180,7 +189,7 @@ export function isTerminRequired(
  */
 export function isPaymentOptionRequired(
   programs: ActiveProgram[],
-  grade: Grade | '' | undefined,
+  grade: GradeSelection,
   preselectedCourseId?: string,
   rules?: CourseGradeRules,
 ): boolean {

@@ -530,17 +530,22 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
               }
             />
           )}
-          {/* The parent's optional answer on the sign-up form. Advisory at that
-              point — the binding choice is the one recorded on the enrollment
-              once an account exists. */}
-          <DetailRow
-            label="Način plaćanja"
-            value={
-              paymentOptionLabel(inquiry.paymentOption) || (
-                <span className="text-gray-400 italic">Nije navedeno</span>
-              )
-            }
-          />
+          {/* The parent's answer on the sign-up form. Advisory at that point —
+              the binding choice is the one recorded on the enrollment once an
+              account exists.
+
+              Shown only when there IS an answer, which is how the staff
+              notification e-mail already renders it. A radionica or a
+              natjecateljski upit was never asked the question (they settle by
+              akontacija and by month), so an italic "Nije navedeno" there reads
+              as a parent who skipped it and invites staff to chase an answer
+              that does not exist for that program. */}
+          {inquiry.paymentOption && (
+            <DetailRow
+              label="Način plaćanja"
+              value={paymentOptionLabel(inquiry.paymentOption)}
+            />
+          )}
           <DetailRow
             label="Poruka"
             value={

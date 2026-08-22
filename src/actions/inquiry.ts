@@ -25,6 +25,7 @@ import {
   isPaymentOptionRequired,
   isTerminRequired,
   type CourseGradeRules,
+  type GradeSelection,
 } from '@/lib/inquiry-availability'
 import {
   GroupFullError,
@@ -260,6 +261,47 @@ async function submitInquiryErrorResult(
   return { success: false, error: 'Greška pri slanju upita. Pokušajte ponovo.' }
 }
 
+/**
+ * Whether this sign-up has to answer "Po modulu / Cijela školska godina".
+ *
+ * Decided from the SERVER's own state, never from whichever `<option>`s the
+ * client rendered — but from the same PREDICATE the form uses, over the same
+ * kind of feed, and that ordering is the whole point of this function.
+ *
+ * **The feed wins whenever there is one.** The form derives its field from
+ * `isPaymentOptionRequired` over the live availability feed it polls every 30s;
+ * resolving the course instead would let the two disagree, and they did. A
+ * mailed `/prijava/<slug>` link carries `courseId`, and `resolveTargetCourse`
+ * looks that id up with no window check — so if the program left the feed while
+ * the parent sat on Step 3 (an admin closes the upisi, the last group's arc runs
+ * out), the form hid the field and blanked the answer while this still demanded
+ * one. The refusal carries no `code`, so the parent got a red "Odaberite način
+ * plaćanja." with no field on screen to answer it, and reloading only reached
+ * the closed-signups page. That upit was lost — and without this guard it would
+ * have been filed as an ordinary "leave your details" inquiry, which is exactly
+ * the cost the refusal below says it must not incur.
+ *
+ * The resolved course is the FALLBACK, for the case a feed cannot speak to: a
+ * booked group (`selection` is null there, and the parent picking a real slot
+ * already proves the program is bookable) or the competition refusal answer.
+ *
+ * Being feed-driven makes this deliberately PERMISSIVE in the disagreement: a
+ * program that has just left the feed stops being asked, and the upit is filed
+ * with `paymentOption: null` for staff to follow up. That is the trade — a
+ * missing answer is a phone call, a lost upit is a lost family.
+ */
+function paymentQuestionApplies(
+  targetCourse: { kind: ProgramKind } | null,
+  selection: { programs: ActiveProgram[]; rules: CourseGradeRules } | null,
+  grade: GradeSelection,
+  courseId: string | undefined,
+): boolean {
+  if (selection) {
+    return isPaymentOptionRequired(selection.programs, grade, courseId, selection.rules)
+  }
+  return targetCourse ? offersPaymentOption(targetCourse.kind) : false
+}
+
 export async function submitInquiry(data: InquiryFormData): Promise<InquiryActionResult> {
   const parsed = inquirySchema.safeParse(data)
   if (!parsed.success) {
@@ -303,8 +345,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
   // answers the question, so it stands in for a chosen termin here.
   // Kept for the payment check below, which needs the same feed and rules when
   // no course could be resolved from the payload itself.
-  let selectionPrograms: ActiveProgram[] | null = null
-  let selectionRules: CourseGradeRules | null = null
+  let selection: { programs: ActiveProgram[]; rules: CourseGradeRules } | null = null
   if (!scheduledGroupId && !noSuitableTermin) {
     // Per-program links resolve against their own feed: the competitive program
     // is deliberately absent from getActivePrograms, so checking against the
@@ -316,8 +357,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     // (the server would look at SLR 4 and find nothing), and an SLR 4 window
     // opened there would demand a termin the form never offered.
     const gradeRules = await getCourseGradeRules(city)
-    selectionPrograms = programs
-    selectionRules = gradeRules
+    selection = { programs, rules: gradeRules }
     if (isTerminRequired(programs, grade, courseId, gradeRules)) {
       return {
         success: false,
@@ -329,21 +369,11 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
     }
   }
 
-  // Whether this sign-up is for an SLR program, which is the single condition
-  // behind the payment question: the form shows it, requires it, and the server
-  // both stores and demands it on exactly that condition, so the three can never
-  // disagree about whether the parent was asked.
-  //
-  // Resolved from the SERVER's own view of the target course rather than from
-  // whichever <option>s the client rendered. When no course resolves at all
-  // (a general "leave your details" inquiry, which carries neither a group nor a
-  // courseId) the branch above has necessarily run — `noSuitableTermin` is
-  // competition-only and already refused by `competitionOnlyAnswerError` — so
-  // its program feed answers instead, against the same razred rules.
-  const paymentApplies = targetCourse
-    ? offersPaymentOption(targetCourse.kind)
-    : selectionPrograms !== null &&
-      isPaymentOptionRequired(selectionPrograms, grade, courseId, selectionRules ?? undefined)
+  // One condition behind the whole payment question: the form shows it, the form
+  // requires it, and the server both demands and stores it on exactly that
+  // condition, so the three can never disagree about whether the parent was
+  // asked. See `paymentQuestionApplies` for how each arm is decided.
+  const paymentApplies = paymentQuestionApplies(targetCourse, selection, grade, courseId)
 
   // Refused rather than silently dropped, unlike the radionica/competition case
   // below: on an SLR sign-up this is a question the form asks with an asterisk,

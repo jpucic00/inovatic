@@ -18,9 +18,12 @@ import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import {
   createAdmin,
+  createEnrollment,
   createEnrollmentWindow,
   createModule,
+  createModuleEnrollment,
   createModuleSchedule,
+  createStudent,
   relativeDateKey,
 } from './helpers/factory'
 import { fixtureScope } from './helpers/cleanup'
@@ -70,6 +73,60 @@ async function openStandardProgram() {
     enrollmentEnd: new Date('2099-12-31'),
   })
   const group = await fx.group({ courseId: course.id, city: 'SPLIT', schoolYear: YEAR })
+  return { course, group }
+}
+
+/**
+ * An SLR program whose upisi are CLOSED — it has a live module arc and a group,
+ * but no open window, so `loadPrograms` leaves it out of the feed entirely. This
+ * is the state a program drops into while a parent is already on Step 3.
+ */
+async function closedStandardProgram() {
+  const course = await fx.course({ kind: 'STANDARD', level: 'SLR_2' })
+  const moduleRow = await createModule(course.id)
+  await createModuleSchedule(moduleRow.id, {
+    schoolYear: YEAR,
+    city: 'SPLIT',
+    startDate: new Date(`${relativeDateKey(30)}T00:00:00.000Z`),
+    endDate: new Date(`${relativeDateKey(90)}T00:00:00.000Z`),
+  })
+  // Deliberately NO CourseEnrollmentWindow.
+  const group = await fx.group({ courseId: course.id, city: 'SPLIT', schoolYear: YEAR })
+  return { course, group }
+}
+
+/**
+ * An SLR program that is offered but has nothing bookable left: open window,
+ * live arc, and its only group full. The termin relaxes to optional there — the
+ * "leave your details" path — while the payment question stays required.
+ */
+async function fullStandardProgram() {
+  const course = await fx.course({ kind: 'STANDARD', level: 'SLR_3' })
+  const moduleRow = await createModule(course.id)
+  const schedule = await createModuleSchedule(moduleRow.id, {
+    schoolYear: YEAR,
+    city: 'SPLIT',
+    startDate: new Date(`${relativeDateKey(30)}T00:00:00.000Z`),
+    endDate: new Date(`${relativeDateKey(90)}T00:00:00.000Z`),
+  })
+  await createEnrollmentWindow(course.id, {
+    schoolYear: YEAR,
+    city: 'SPLIT',
+    enrollmentStart: new Date('2020-01-01'),
+    enrollmentEnd: new Date('2099-12-31'),
+  })
+  const group = await fx.group({
+    courseId: course.id,
+    city: 'SPLIT',
+    schoolYear: YEAR,
+    maxStudents: 1,
+  })
+  // The occupant needs a ModuleEnrollment for the NEXT enrolling module, not
+  // just an Enrollment: on a dated program `computeGroupCapacity` counts seats
+  // per module, so a bare enrollment leaves the group reading as empty.
+  const occupant = await createStudent()
+  const enrollment = await createEnrollment(occupant.id, group.id)
+  await createModuleEnrollment(enrollment.id, schedule.id)
   return { course, group }
 }
 
@@ -135,6 +192,59 @@ describe('submitInquiry — način plaćanja', () => {
     expect(res.success).toBe(false)
     if (!res.success) expect(res.error).toBe('Odaberite način plaćanja.')
     expect(await storedInquiry(data.parentEmail)).toBeNull()
+  })
+
+  it('files the upit when the program left the feed mid-form, instead of losing it', async () => {
+    // The regression this precedence exists for. A mailed /prijava/<slug> link
+    // carries `courseId`, and the form derives its payment field from the
+    // availability feed it polls every 30s. If an admin closes the upisi while
+    // the parent is on Step 3, the field is hidden AND the answer blanked — so
+    // the payload arrives with no payment option through no fault of anyone.
+    //
+    // Resolving the course instead of reading the feed made the server demand
+    // one anyway, and the refusal carries no `code`, so the parent got a red
+    // "Odaberite način plaćanja." with no field on screen to answer it and a
+    // closed-signups page on reload. The upit was lost — and without any payment
+    // guard at all it would have been filed as an ordinary "leave your details"
+    // inquiry, which is exactly the cost the strict arm is written to avoid.
+    const { course } = await closedStandardProgram()
+    const data = inquiryFor({ courseId: course.id })
+
+    const res = await submitInquiry(data)
+
+    expect(res.success).toBe(true)
+    // Filed with no answer, for staff to follow up — deliberately permissive.
+    expect((await storedInquiry(data.parentEmail))?.paymentOption).toBeNull()
+  })
+
+  it('still demands an answer when the program IS offered but nothing is bookable', async () => {
+    // The other side of the same precedence, and the case that proves it did not
+    // simply weaken the guard: the program is in the feed, so the question is
+    // asked — even though every group is full and the termin has relaxed to
+    // optional. This is the ordinary "leave your details" path on a live
+    // program, and the form does render the field here.
+    const { course } = await fullStandardProgram()
+    const data = inquiryFor({ courseId: course.id, grade: '5' })
+
+    const res = await submitInquiry(data)
+
+    expect(res.success).toBe(false)
+    expect(res).toMatchObject({ error: 'Odaberite način plaćanja.' })
+    expect(await storedInquiry(data.parentEmail)).toBeNull()
+  })
+
+  it('accepts that same sign-up once the answer is there', async () => {
+    const { course } = await fullStandardProgram()
+    const data = inquiryFor({
+      courseId: course.id,
+      grade: '5',
+      paymentOption: 'PO_MODULU',
+    })
+
+    const res = await submitInquiry(data)
+
+    expect(res.success).toBe(true)
+    expect((await storedInquiry(data.parentEmail))?.paymentOption).toBe('PO_MODULU')
   })
 
   it('accepts a radionica sign-up and drops the answer it never asked for', async () => {

@@ -84,7 +84,7 @@ stateDiagram-v2
 
 | From | To | Action | Guard | Side effects |
 |------|-----|--------|-------|-------------|
-| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation (`inquirySchema` rejects `scheduledGroupId` + `noSuitableTermin` together); COURSE: high-school grade / `noSuitableTermin` only on a COMPETITION target (`competitionOnlyAnswerError`); with group: `group.city === submitted city`, radionica termin not yet started; **without** group **and** without `noSuitableTermin`: `!isTerminRequired(programs, grade, courseId)` against `loadProgramsForCheck` | Inquiry created with `city`; confirmation email to the parent **and** a notification to the city's staff inbox (reply-to = parent, swallow-and-log after the row is committed); spot reserved if group selected (COURSE) |
+| — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation (`inquirySchema` rejects `scheduledGroupId` + `noSuitableTermin` together); COURSE: high-school grade / `noSuitableTermin` only on a COMPETITION target (`competitionOnlyAnswerError`); with group: `group.city === submitted city`, radionica termin not yet started; **without** group **and** without `noSuitableTermin`: `!isTerminRequired(programs, grade, courseId)` against `loadProgramsForCheck`; on an SLR target `paymentOption` is additionally mandatory (`'Odaberite način plaćanja.'`) | Inquiry created with `city`; confirmation email to the parent **and** a notification to the city's staff inbox (reply-to = parent, swallow-and-log after the row is committed); spot reserved if group selected (COURSE) |
 | `NEW` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED && status !== DECLINED`; `type === COURSE` | User + Enrollment + ModuleEnrollments; **no e-mail**; `studentId` + `assignedGroupId` set |
 | `NEW` | `PARTY_SCHEDULED` | `schedulePartyInquiry` | `type === PARTY` | `partyConfirmedDate` + `partyStartTime` set; appears on Kalendar |
 | `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000) | `declineReason` persisted; spot freed |
@@ -232,18 +232,27 @@ flowchart TD
     RT --> G1{"competitionOnlyAnswerError:<br/>high-school grade OR noSuitableTermin<br/>on a non-COMPETITION target?"}
     G1 -->|Yes| GERR["Reject (plain error, no code):<br/>'Za odabrani program nije moguće odabrati srednjoškolski razred.'<br/>or 'Za odabrani program potrebno je odabrati jedan od dostupnih termina.'"]
     G1 -->|No| B{"scheduledGroupId provided,<br/>OR noSuitableTermin = true?"}
-    B -->|Yes| TX["Capacity guard transaction (above) —<br/>the refusal answer skips it (no group, nothing to reserve)"]
+    B -->|Yes| PG
     B -->|No| C["programs = loadProgramsForCheck(city, targetCourse):<br/>getSignupProgram for a per-program link's target,<br/>else getActivePrograms(city)"]
     C --> CR["gradeRules = getCourseGradeRules(city) —<br/>each program's saved razred override, read for the year<br/>its OWN open enrollment window names (§4)"]
     CR --> D["isTerminRequired → programsForSelection(programs, grade, courseId, gradeRules)<br/>radionica/preselected flow → only that course<br/>standard flow → only hasDatedModules programs,<br/>then saved rule if any, else grade → level"]
     D --> E{"Selection chosen?<br/>grade OR preselected course"}
-    E -->|No| TX
+    E -->|No| PG
     E -->|Yes| F{"hasOpenTermin — any matching group with isFull = false?"}
-    F -->|No| TX
+    F -->|No| PG
     F -->|Yes| ERR["Reject: code TERMIN_REQUIRED<br/>'Za odabrani razred dostupni su termini – odaberite jedan.'<br/>+ fresh programs AND gradeRules payload,<br/>no Inquiry row written"]
+
+    PG{"paymentQuestionApplies —<br/>isPaymentOptionRequired over the feed above whenever one was loaded,<br/>else offersPaymentOption(targetCourse.kind) for a booked group"}
+    PG -->|"No — radionica / COMPETITION / nothing offered"| TX
+    PG -->|Yes| PQ{"paymentOption in the payload?"}
+    PQ -->|Yes| TX
+    PQ -->|No| PERR["Reject (plain error, no code):<br/>'Odaberite način plaćanja.'"]
+    TX["Capacity guard transaction (above) —<br/>the refusal answer skips it (no group, nothing to reserve)"]
 
     style ERR fill:#fee2e2
     style GERR fill:#fee2e2
+    style PERR fill:#fee2e2
+    style PG fill:#e0f2fe
     style TX fill:#d1fae5
     style F fill:#e0f2fe
 ```
@@ -264,6 +273,46 @@ One dropdown, two fields: on the competitive program's invitation link the "Žel
 - The refusal **satisfies the termin requirement** (the `B` gate above) — it is an answer, not a skipped question — but reserves **no spot** (no group, nothing in the `preferredInquiries` count).
 - **Competition-only, enforced server-side** on the resolved target course (`competitionOnlyAnswerError`), not on which `<option>`s rendered — otherwise the flag would be the way to skip the termin choice on an SLR program or radionica, where the offered slot is the only thing on the table.
 - The admin reads it back in the same "Željeni termin" row on `/admin/upiti/[id]` where a chosen group would show, rendered as `NO_SUITABLE_TERMIN_LABEL`.
+
+### The payment question — `paymentOption`
+
+`PO_MODULU` / `CIJELA_GODINA`, asked on Step 3 and stored on the upit. **One
+predicate decides all three of shown, required and stored** — `offersPaymentOption`
+(which is `hasDatedModules`, i.e. STANDARD only) — so the form can never ask
+something the server refuses, nor stay silent about something it demands.
+
+- **A missing answer on an SLR target is REFUSED**; a value arriving on a kind
+  that offers none is **silently DROPPED**. The asymmetry is deliberate: on an
+  SLR sign-up the form asks with an asterisk, so a blank is a stale or tampered
+  payload — whereas a stray value gates nothing, and failing an otherwise valid
+  sign-up over it would cost the association an upit.
+- **Deliberately NOT gated on an open termin**, unlike its neighbour
+  `isTerminRequired`. A termin relaxes to optional when nothing is bookable,
+  precisely so a "leave your details" inquiry can still be sent; the payment
+  model has no availability to depend on — the program either offers the choice
+  or it does not.
+- **The server reads the same feed the form does, and that precedence is
+  deliberate.** `paymentQuestionApplies` prefers `isPaymentOptionRequired` over
+  the availability feed whenever one was loaded, and falls back to the resolved
+  course's kind only where a feed cannot speak — a booked group, or the
+  competition refusal answer. Resolving the course first let the two disagree:
+  `resolveTargetCourse` looks a `courseId` up with **no window check**, so a
+  mailed `/prijava/<slug>` link whose program left the feed mid-form (an admin
+  closes the upisi; the last group's arc runs out) had its field hidden and its
+  answer blanked client-side while the server still demanded one. The refusal
+  carries no `code`, so the parent saw a flat "Odaberite način plaćanja." with no
+  field to answer and a closed-signups page on reload — the upit was lost, where
+  with no guard at all it would have been filed as an ordinary "leave your
+  details" inquiry.
+- Being feed-driven makes the gate deliberately **permissive in that
+  disagreement**: a program that has just left the feed stops being asked and the
+  upit is filed with `paymentOption: null` for staff to follow up. A missing
+  answer is a phone call; a lost upit is a lost family. It stays strict wherever
+  the feed can still see the program — including the "everything is full" path,
+  where the termin relaxes to optional but the payment question does not.
+- Zod accepts `''` as "no answer" via a union with `z.literal('')` rather than a
+  preprocess, which would widen the schema's INPUT type and break the
+  react-hook-form resolver's inference.
 
 ---
 
@@ -498,6 +547,7 @@ flowchart TD
 - **A module is "done"** when `ModuleSchedule.endDate < now`. No per-enrollment status update needed — every `ModuleEnrollment` for that schedule is automatically treated as past once the date is past.
 - **`Enrollment`** — a group-membership row per school year. No status, no lifecycle. Deleting it (`onDelete: Cascade`) removes its `ModuleEnrollment` rows.
 - **`Enrollment.contractSignedAt` is not a status either (2026-08-17).** An account and enrollment exist as soon as an admin accepts an inquiry, so a child is visible in the group before anyone has committed to anything; "Ugovor potpisan" plus the paid marks are what "actually signed up" means. A nullable timestamp, not a state machine. It is the **only** enrollment mark a TEACHER may see and set — teachers collect the signed contracts at the group — and even they are limited to their **own groups in the current school year** (`setEnrollmentContractSignedByTeacher`, `src/actions/teacher/contract.ts`); a past year is a correction and corrections are the admin's job, the same split `teacherMarkingWindow` draws for attendance. The admin twin is `setEnrollmentContractSigned`, and both funnel through `writeContractSigned` in **`src/lib/enrollment-contract.ts`** — a plain module, deliberately not `src/actions/**`, because every export from a `'use server'` file becomes its own callable endpoint.
+- **`Enrollment.paymentOption` is not a status either.** `PO_MODULU` / `CIJELA_GODINA` / null ("nije odabrano"). Seeded from `Inquiry.paymentOption` when the account is created and **CREATE-only** — re-running `ensureEnrollment` (adding a second module to the same group) must never reinstate the parent's sign-up guess over an admin's later correction — and corrected afterwards by `setEnrollmentPaymentOption` (`src/actions/admin/payment.ts`). **ADMIN-only**, unlike `contractSignedAt`, so `buildStudentDetailForTeacher` scrubs it to null alongside every paid mark. It records **intent, never money**: choosing `CIJELA_GODINA` does not tick `fullYearPaidAt`, and the paid marks remain the only record of what was actually settled.
 - **Cancellations are deletes.** For a radionica: `deleteEnrollment`. For a single module in a standard course: `deleteModuleEnrollment`.
 - **History is whatever rows still exist.** Past `ModuleEnrollment` rows stay in the DB as the record of what the student participated in. There is no "COMPLETED" status to set.
 
@@ -522,7 +572,7 @@ sequenceDiagram
 
     Note over Parent, Web: Step 1: parentName, parentEmail, parentPhone
     Note over Parent, Web: Step 2: childFirstName, childLastName, childDateOfBirth, childSchool
-    Note over Parent, Web: Step 3: grade, group preference, message, referralSource, GDPR consent
+    Note over Parent, Web: Step 3: grade, group preference, nacin placanja (SLR only - shown and required by one condition), message, referralSource, GDPR consent
 
     Parent->>Web: Fills 3-step form and submits
     Web->>Server: submitInquiry(formData)
@@ -531,6 +581,7 @@ sequenceDiagram
     Server->>Server: resolveTargetCourse (chosen group's course wins, courseId fallback)
     Server->>Server: competitionOnlyAnswerError guard (high-school grade / noSuitableTermin only on COMPETITION)
     Server->>Server: Termin gate when no group AND no refusal - isTerminRequired against loadProgramsForCheck plus getCourseGradeRules(city)
+    Server->>Server: Payment gate - paymentQuestionApplies from the resolved target course. A missing answer on an SLR sign-up rejects, a value on any other kind is dropped
     Server->>Server: Create Inquiry type COURSE status NEW consentGivenAt now
 
     alt scheduledGroupId provided
@@ -585,6 +636,7 @@ sequenceDiagram
     end
 
     Server->>Server: Create Enrollment (and ModuleEnrollments for standard courses)
+    Note right of Server: Enrollment.paymentOption is seeded from the upit on CREATE only, and refused outright on a kind that offers no choice
     Note right of Server: Monthly-billed COMPETITION groups instead get EnrollmentMonth rows (createSeasonMonths in ensureEnrollment) - join month through season end, skipDuplicates. An unplanned season writes nothing. Setting dates later backfills via upsertCourseSeason, whose same-transaction syncSeasonMonths adds newly covered months and deletes only unpaid out-of-range ones.
     Server->>Server: Update Inquiry status ACCOUNT_CREATED, studentId, assignedGroupId
     Note right of Server: NO e-mail is sent on acceptance (2026-08-17). Credentials leave only through a CREDENTIALS campaign on /admin/email, run once contracts are signed - one mail per CHILD, ownership re-derived per recipient by assertCredentialsBelongTo. Passwords for accounts that have none are minted up front at campaign creation (hashed outside the transaction), and User.credentialsSentAt records the delivery. The password also stays readable on the student profile, which is the primary early hand-over.
