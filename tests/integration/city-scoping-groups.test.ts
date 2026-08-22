@@ -356,6 +356,32 @@ describe('locations — city scoping', () => {
     expect(updated.city).toBe('SIBENIK')
   })
 
+  it('updateLocation ignores a city smuggled into the payload', async () => {
+    // `updateLocationSchema` carries no `city` and z.object strips what it does
+    // not declare, so this cannot get through — but nothing pinned it, and the
+    // consequence if it ever did is out of proportion to the guard's size:
+    // ScheduledGroup(locationId, city) is a COMPOSITE FK to Location(id, city),
+    // so moving a venue across the tenant boundary tears every group off it.
+    const sibenikLocation = await fx.location({ city: 'SIBENIK' })
+    await loginSibenikAdmin()
+
+    const res = await updateLocation({
+      id: sibenikLocation.id,
+      name: 'Trokut inkubator',
+      address: sibenikLocation.address,
+      phone: '',
+      email: '',
+      // Deliberately not part of UpdateLocationInput — that is the point.
+      city: 'SPLIT',
+    } as never)
+    expect(res).toEqual({ success: true })
+
+    const stillSibenik = await db.location.findUniqueOrThrow({
+      where: { id: sibenikLocation.id },
+    })
+    expect(stillSibenik.city).toBe('SIBENIK')
+  })
+
   it('updateLocation stores NULL for a blanked phone and email', async () => {
     const sibenikLocation = await fx.location({ city: 'SIBENIK' })
     await db.location.update({

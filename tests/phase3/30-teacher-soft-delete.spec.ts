@@ -14,7 +14,7 @@ import {
   seedStudentInGroup,
 } from '../helpers/seed'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Soft-delete teachers — DOM-dependent slice only (Flux a69o3ew slim).
 // The headless ACs (deletedAt write succeeds, query-filter hides soft-deleted
@@ -25,7 +25,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 //   2. "Bivši nastavnik" badge rendering on historical comment in admin view
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.

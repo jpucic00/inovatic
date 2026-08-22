@@ -23,13 +23,6 @@ export type ActiveGroup = {
   availableSpots: number
   isFull: boolean
   currentModuleName?: string
-  /**
-   * This group's probni sat date as 'YYYY-MM-DD', or null when the year has no
-   * trial week, the program is not STANDARD, or a holiday took that day. Carried
-   * per group so the form can name the exact date without a second round trip —
-   * and because each group knows its own school year, which is the only year the
-   * trial week may be looked up under.
-   */
 }
 
 export type ActiveProgram = {

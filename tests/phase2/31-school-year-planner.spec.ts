@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 import { db } from '@/lib/db'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 — School-year planner (/admin/skolska-godina, planning mode)
 // Uses a far-future school year (2030/2031) so the dev DB's current-year data
@@ -18,7 +18,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 
 const BASE = 'http://localhost:3000'
 
-const RUN_ID = Date.now().toString().slice(-8)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.

@@ -10,6 +10,9 @@ loadEnv({ path: '.env', override: false })
 
 export default defineConfig({
   testDir: './tests',
+  // Read-only dev-data check. Prints the one command that fixes date rot before
+  // the suite spends minutes failing on a missing termin dropdown instead.
+  globalSetup: './tests/global-setup.ts',
   // 60s per test so an admin-login that races Next.js on-demand compilation
   // (can be 15–25s under parallel load) still leaves room for the actual
   // assertions. Individual tests may override via test.setTimeout().

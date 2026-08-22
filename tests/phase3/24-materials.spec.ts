@@ -17,9 +17,9 @@ import {
   seedStudentInGroup,
 } from '../helpers/seed'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.

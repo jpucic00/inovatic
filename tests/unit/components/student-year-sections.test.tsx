@@ -91,6 +91,8 @@ function makeEnrollment(
     schoolYear: string
     courseTitle: string
     withModule?: boolean
+    /** STANDARD is what carries the family-discount note; radionice never do. */
+    kind?: 'STANDARD' | 'RADIONICA' | 'COMPETITION'
   }>,
 ): StudentEnrollments[number] {
   return {
@@ -122,7 +124,7 @@ function makeEnrollment(
         id: `c-${opts.id}`,
         title: opts.courseTitle,
         level: null,
-        kind: 'RADIONICA',
+        kind: opts.kind ?? 'RADIONICA',
         modules: [],
       },
       location: { name: 'Split centar', address: 'Testna ulica 1' },
@@ -360,5 +362,82 @@ describe('StudentYearSections — admin vs teacher affordances', () => {
     })
 
     expect(screen.getByTestId('contract-toggle-e1')).toHaveAttribute('data-readonly', 'false')
+  })
+})
+
+describe('StudentYearSections — family discount note', () => {
+  // The note names ANOTHER family's children in full and links each to
+  // /admin/ucenici/<id>. It lives in a component the admin and the teacher
+  // student profiles both render, and inside that component its only barrier is
+  // `isAdmin &&`. The teacher page not fetching `familyDiscountsByYear` is a
+  // second barrier and the stronger one — no sibling data reaches a teacher's
+  // payload at all — but both are prop-shaped, and neither was asserted, unlike
+  // the payment scrub which has an explicit test. These pin both.
+  const SIBLINGS = {
+    '2026/2027': [
+      { id: 'sib-1', firstName: 'Mara', lastName: 'Horvat', programTitles: ['SLR 2'] },
+      { id: 'sib-2', firstName: 'Jure', lastName: 'Horvat', programTitles: [] },
+    ],
+  }
+
+  function renderWithSiblings(
+    overrides: Partial<ComponentProps<typeof StudentYearSections>> = {},
+    kind: 'STANDARD' | 'RADIONICA' = 'STANDARD',
+  ) {
+    return renderSections({
+      defaultYear: '2026/2027',
+      enrollments: [
+        makeEnrollment({ id: 'e1', schoolYear: '2026/2027', courseTitle: 'SLR 1', kind }),
+      ],
+      familyDiscountsByYear: SIBLINGS,
+      ...overrides,
+    })
+  }
+
+  it('shows the note to an admin on an SLR card', () => {
+    renderWithSiblings({ isAdmin: true })
+
+    expect(screen.getByText('Popust za brata/sestru')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Mara Horvat' })).toHaveAttribute(
+      'href',
+      '/admin/ucenici/sib-1',
+    )
+    // The program is what tells an admin WHY it fired — a competition sibling
+    // counts too, which no bare badge could convey.
+    expect(screen.getByText(/SLR 2/)).toBeInTheDocument()
+    expect(screen.getByText(/10% popusta/)).toBeInTheDocument()
+  })
+
+  it('never shows it to a teacher, even handed the data', () => {
+    // `isAdmin` is false on /nastavnik/ucenik/[id] — the page passes
+    // viewerRole="TEACHER" unconditionally, including for a teaching admin.
+    renderWithSiblings({ isAdmin: false })
+
+    expect(screen.queryByText('Popust za brata/sestru')).not.toBeInTheDocument()
+    expect(screen.queryByText('Mara Horvat')).not.toBeInTheDocument()
+    expect(screen.queryByText('Jure Horvat')).not.toBeInTheDocument()
+    // The strongest version of the assertion: no route into another child's
+    // profile appears anywhere in a teacher's render.
+    expect(
+      screen.queryAllByRole('link').filter((a) =>
+        (a.getAttribute('href') ?? '').startsWith('/admin/ucenici/'),
+      ),
+    ).toHaveLength(0)
+  })
+
+  it('stays off a radionica card even for an admin', () => {
+    // Workshops settle under their own scheme — a flat 20 € "drugo dijete"
+    // popust in the confirmation e-mail — so the year-long discount does not
+    // apply and must not be implied.
+    renderWithSiblings({ isAdmin: true }, 'RADIONICA')
+
+    expect(screen.queryByText('Popust za brata/sestru')).not.toBeInTheDocument()
+    expect(screen.queryByText('Mara Horvat')).not.toBeInTheDocument()
+  })
+
+  it('renders nothing when the year has no siblings', () => {
+    renderWithSiblings({ isAdmin: true, familyDiscountsByYear: {} })
+
+    expect(screen.queryByText('Popust za brata/sestru')).not.toBeInTheDocument()
   })
 })

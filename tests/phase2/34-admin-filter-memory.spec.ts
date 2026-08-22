@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { loginAsAdmin, loginWithEmail } from '../helpers/phase3'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 — Admin list filters survive leaving the list.
 //
@@ -20,7 +20,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 
 const BASE = 'http://localhost:3000'
 
-const RUN_ID = Date.now().toString().slice(-8)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.

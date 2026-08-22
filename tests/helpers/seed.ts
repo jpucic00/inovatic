@@ -21,6 +21,8 @@
 import bcrypt from 'bcryptjs'
 import type { TeacherAssignment } from '@prisma/client'
 import { db } from '@/lib/db'
+import { computeSchoolYear } from '@/lib/school-year'
+import { deleteGroupsAndDependents } from './cleanup'
 import type { StudentData, TeacherData } from './phase3'
 
 const HASH_ROUNDS = 4
@@ -200,4 +202,108 @@ export async function clearFixtureGroupEnrollments(groupIds: string[]): Promise<
     await db.user.deleteMany({ where: { id: { in: orphaned.map((u) => u.id) } } })
   }
   return enrollments.length
+}
+
+/**
+ * A bookable `ScheduledGroup` on the shared natjecateljski program, named with
+ * the caller's run id so the ordinary teardown removes it.
+ *
+ * Exists because the competition signup spec had no group to sign up to.
+ * `seedCompetitionProgram` seeds the course and its natjecanja but deliberately
+ * no groups — those are admin-created — and `loadPrograms` builds its course map
+ * from the groups query, so a program with none never enters it and
+ * `/prijava/natjecateljski-program` renders "Upisi trenutno nisu otvoreni". The
+ * spec then failed on a missing Step-1 field, which reads like a broken form
+ * rather than absent fixture data. Seeding it here is what makes the spec
+ * self-sufficient instead of dependent on whatever happens to be in the dev
+ * database.
+ *
+ * Returns null when the program is not seeded at all (`npm run db:seed:competition`
+ * never run) — the caller can then skip rather than fail on unrelated setup.
+ */
+export async function seedCompetitionGroup(
+  runId: string,
+  city: 'SPLIT' | 'SIBENIK' = 'SPLIT',
+): Promise<{ id: string; courseId: string } | null> {
+  const course = await db.course.findUnique({
+    where: { slug: 'natjecateljski-program' },
+    select: { id: true },
+  })
+  if (!course) return null
+
+  const location = await db.location.findFirst({
+    where: { city },
+    select: { id: true },
+  })
+  if (!location) return null
+
+  const schoolYear = computeSchoolYear()
+
+  // The window is what `loadPrograms` gates on; the season is what gives the
+  // group its sessions. Both are upserted wide open, because a dev fixture wants
+  // "this is bookable now", not a faithful reproduction of a real season.
+  await db.courseEnrollmentWindow.upsert({
+    where: { courseId_schoolYear_city: { courseId: course.id, schoolYear, city } },
+    create: {
+      courseId: course.id,
+      schoolYear,
+      city,
+      enrollmentStart: new Date('2020-01-01'),
+      enrollmentEnd: new Date('2099-12-31'),
+    },
+    update: {
+      enrollmentStart: new Date('2020-01-01'),
+      enrollmentEnd: new Date('2099-12-31'),
+    },
+  })
+  await db.courseSeason.upsert({
+    where: { courseId_schoolYear_city: { courseId: course.id, schoolYear, city } },
+    create: {
+      courseId: course.id,
+      schoolYear,
+      city,
+      startDate: new Date('2020-01-01'),
+      endDate: new Date('2099-12-31'),
+    },
+    update: { startDate: new Date('2020-01-01'), endDate: new Date('2099-12-31') },
+  })
+
+  const group = await db.scheduledGroup.create({
+    data: {
+      name: `Test Natjecatelji ${runId}`,
+      courseId: course.id,
+      locationId: location.id,
+      city,
+      schoolYear,
+      dayOfWeek: 'Subota',
+      startTime: '09:00',
+      endTime: '10:30',
+      maxStudents: 20,
+    },
+    select: { id: true },
+  })
+  return { id: group.id, courseId: course.id }
+}
+
+/**
+ * Remove the bootstrap pair left by PREVIOUS runs, before this one creates its own.
+ *
+ * `20-bootstrap` names its two groups `Test Grupa A` / `Test Grupa B` — fixed,
+ * because downstream specs find them by name — so it cannot stamp a run id and
+ * `cleanupRunFixtures` has nothing to match on. The result was a fresh pair on
+ * every run, stacked on top of the last, with the fixture file pointing only at
+ * the newest: invisible, and the single largest source of the `/admin/grupe`
+ * lane packing this whole teardown effort exists to stop.
+ *
+ * Called at the START of bootstrap rather than the end of the suite, because the
+ * groups have to outlive the run that made them — every phase3 spec enrols into
+ * them.
+ */
+export async function dropPreviousBootstrapGroups(names: string[]): Promise<number> {
+  const groups = await db.scheduledGroup.findMany({
+    where: { name: { in: names } },
+    select: { id: true },
+  })
+  await deleteGroupsAndDependents(groups.map((g) => g.id))
+  return groups.length
 }

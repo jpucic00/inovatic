@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { BASE, loginAsAdmin, loginWithEmail, createTeacher, type TeacherData } from '../helpers/phase3'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Phase 3 — Access-control DOM redirect-flow slice (Flux a69o3ew slim).
 // The headless ACs (API role rejection, requireXxx guard bounces, teacher
@@ -16,7 +16,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 //   5. teacher login routing redirect to /nastavnik (DOM nav post-login)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.

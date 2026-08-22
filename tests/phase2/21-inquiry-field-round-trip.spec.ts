@@ -1,9 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
 import { BASE, loginAsAdmin } from '../helpers/phase3'
 import { clickUntilVisible } from '../helpers/hydration'
-import { fillInquiryStep1 } from '../helpers/prijava'
+import { fillInquiryStep1, selectPaymentOptionIfShown } from '../helpers/prijava'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
+import { seedCompetitionGroup } from '../helpers/seed'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 — Inquiry field round-trip: childGrade + referralSource
 // Pins the form → DB → admin-detail round-trip for the two fields collected
@@ -14,7 +15,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // Unique per test run so each run's data is identifiable even if old data exists
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.
@@ -99,6 +100,9 @@ async function submitInquiry(page: Page, data: InquiryData) {
       .evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value).filter(Boolean))
     if (values.length > 0) await terminSelect.selectOption(values[0])
   }
+  // Mandatory on every SLR selection, and absent on the kinds that offer no
+  // choice — so it is answered on the same terms as the termin above.
+  await selectPaymentOptionIfShown(page)
   if (data.referralSource) {
     await page.locator('#referralSource').selectOption(data.referralSource)
   }
@@ -181,6 +185,23 @@ const COMPETITION_INQUIRY = {
 }
 
 test.describe.serial('noSuitableTermin round-trip — competition signup link', () => {
+  // The program needs at least one bookable group before any of this is
+  // reachable: `loadPrograms` builds its course map from the groups query, so a
+  // competition program with none never enters it and the signup link renders
+  // "Upisi trenutno nisu otvoreni" — Step 1 never appears and the failure reads
+  // like a broken form. `seedCompetitionProgram` deliberately seeds no groups
+  // (those are admin-created), so the spec must make its own rather than depend
+  // on whatever the dev database happens to hold. Named with RUN_ID, so the
+  // afterAll teardown takes it away again.
+  test.beforeAll(async () => {
+    const seeded = await seedCompetitionGroup(RUN_ID)
+    if (!seeded) {
+      throw new Error(
+        'Natjecateljski program is not seeded — run `npm run db:seed:competition` first.',
+      )
+    }
+  })
+
   test('admin opens the competition enrollment window', async ({ page }) => {
     test.setTimeout(120000)
     await loginAsAdmin(page)

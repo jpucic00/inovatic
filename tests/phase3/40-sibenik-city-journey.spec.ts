@@ -3,7 +3,8 @@ import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { loginWithEmail, BASE, addLinkMaterial, markSession, croatianDateRegex, expectNotFoundPage } from '../helpers/phase3'
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
-import { fillInquiryStep1 } from '../helpers/prijava'
+import { fillInquiryStep1, selectPaymentOptionIfShown } from '../helpers/prijava'
+import { newRunId } from '../helpers/cleanup'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PR9 — E2E Šibenik journey (launch gate for the two-city separation)
@@ -26,7 +27,7 @@ import { fillInquiryStep1 } from '../helpers/prijava'
 const SLAVICA_EMAIL = 'slavica.jurcevic@udruga-inovatic.hr'
 const SLAVICA_PASSWORD = 'admin123'
 
-const RUN_ID = Date.now().toString().slice(-8)
+const RUN_ID = newRunId()
 const CY = computeSchoolYear() // the journey runs in the CURRENT year — the portal only shows current-year enrollments
 
 const GROUP_NAME = `Trokut Junior ${RUN_ID}`
@@ -260,6 +261,9 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
     await expect(realOptions.first()).toContainText(GROUP_NAME)
 
     await groupSelect.selectOption({ index: 1 })
+    // Mandatory on every SLR selection, and absent on the kinds that offer no
+    // choice — so it is answered on the same terms as the termin above.
+    await selectPaymentOptionIfShown(page)
     await page.locator('input[name="consent"]').check()
     await page.locator('button', { hasText: 'Pošalji upit' }).click()
     await expect(page.locator('text=Upit je poslan!')).toBeVisible({ timeout: 15000 })

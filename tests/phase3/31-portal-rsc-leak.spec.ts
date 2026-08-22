@@ -13,7 +13,7 @@ import {
 } from '../helpers/seed'
 import { db } from '@/lib/db'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Phase 3 — Portal RSC payload leak guard.
 //
@@ -34,7 +34,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 // attendance objects, these assertions catch it before merge.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.

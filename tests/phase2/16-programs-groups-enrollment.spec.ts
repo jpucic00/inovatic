@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
-import { fillInquiryStep1 } from '../helpers/prijava'
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { fillInquiryStep1, selectPaymentOptionIfShown } from '../helpers/prijava'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 7 — Programs, Groups & Enrollment
@@ -25,7 +25,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 const BASE = 'http://localhost:3000'
 
 // Unique per run so test data is identifiable and doesn't collide between runs
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // Radionica created in admin, then tested on the public /radionice/[slug] page.
 // Slug is computed to match the server-side slugify algorithm in createCourse.
@@ -165,6 +165,9 @@ async function submitWithGroup(
   }
   await selectGroupOption(page, groupName)
 
+  // Mandatory on every SLR selection, and absent on the kinds that offer no
+  // choice — so it is answered on the same terms as the termin above.
+  await selectPaymentOptionIfShown(page)
   await page.locator('input[name="consent"]').check()
   await page.locator('button', { hasText: 'Pošalji upit' }).click()
   await expect(page.locator('text=Upit je poslan!')).toBeVisible({ timeout: 15000 })
@@ -540,6 +543,9 @@ test.describe.serial('Phase 2 Step 7 — Programs, Groups & Enrollment', () => {
       // Required affordance: the "(neobavezno)" hint is dropped from the label.
       await expect(page.locator('label[for="scheduledGroupId"]')).not.toContainText('neobavezno')
 
+      // Answer the payment question first, so the termin is the only thing left
+      // unanswered and the block below can only be the termin rule firing.
+      await selectPaymentOptionIfShown(page)
       // Consent, but deliberately skip the termin → submission is blocked inline.
       await page.locator('input[name="consent"]').check()
       await page.locator('button', { hasText: 'Pošalji upit' }).click()

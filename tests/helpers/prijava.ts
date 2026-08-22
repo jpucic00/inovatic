@@ -30,3 +30,23 @@ export async function fillInquiryStep1(page: Page, data: InquiryStep1Data): Prom
     page.locator('#childFirstName'),
   )
 }
+
+/**
+ * Answer Step 3's "Način plaćanja" dropdown when the current selection renders
+ * it. Mandatory since the payment question landed: `isPaymentOptionRequired`
+ * makes the field shown and required by one condition, so an SLR sign-up that
+ * leaves it blank is blocked client-side and never reaches the success screen.
+ *
+ * Conditional on presence, for the same reason `fillInquiryStep1` treats the
+ * city dropdown that way: radionice and the competitive program offer no choice
+ * (they settle by akontacija and by month), so the select simply is not there
+ * and those flows must stay untouched.
+ */
+export async function selectPaymentOptionIfShown(page: Page): Promise<void> {
+  const paymentSelect = page.locator('select#paymentOption')
+  if ((await paymentSelect.count()) === 0) return
+  const values = await paymentSelect
+    .locator('option')
+    .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value).filter(Boolean))
+  if (values.length > 0) await paymentSelect.selectOption(values[0])
+}

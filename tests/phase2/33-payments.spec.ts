@@ -1,11 +1,11 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { submitUntilUrl } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 import { seedTeacher, seedTeacherAssignment } from '../helpers/seed'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 — Per-module payment tracking (admin).
 // Seeds one PENDING student (unpaid started module) and one PAID student in the
@@ -19,7 +19,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 
 const BASE = 'http://localhost:3000'
 
-const RUN_ID = Date.now().toString().slice(-8)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.
@@ -181,6 +181,21 @@ async function loginAsAdmin(page: Page) {
   await page.waitForLoadState('domcontentloaded')
 }
 
+/**
+ * Every paid mark now asks first, in BOTH directions: the chips are a dense
+ * wrapped row of near-identical targets a mis-aimed click apart, and a stray
+ * mark looks exactly like a real one for the rest of the year. So a click only
+ * opens the question — the write happens on the confirm button, whose label
+ * says which way it goes ("Označi plaćeno" to set, "Ukloni oznaku" to undo).
+ */
+async function clickAndConfirm(page: Page, trigger: Locator, confirmLabel: string) {
+  await trigger.click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: confirmLabel, exact: true }).click()
+  await expect(dialog).toBeHidden()
+}
+
 test.describe('payment tracking — student detail page', () => {
   test('marks a module paid and back to unpaid', async ({ page }) => {
     test.setTimeout(60000)
@@ -192,13 +207,13 @@ test.describe('payment tracking — student detail page', () => {
     // Starts unpaid.
     await expect(chip).toHaveAttribute('title', 'Označi kao plaćeno')
 
-    await chip.click()
+    await clickAndConfirm(page, chip, 'Označi plaćeno')
     await expect(page.getByRole('button', { name: MODULE_TITLE })).toHaveAttribute(
       'title',
       'Označi kao neplaćeno',
     )
 
-    await page.getByRole('button', { name: MODULE_TITLE }).click()
+    await clickAndConfirm(page, page.getByRole('button', { name: MODULE_TITLE }), 'Ukloni oznaku')
     await expect(page.getByRole('button', { name: MODULE_TITLE })).toHaveAttribute(
       'title',
       'Označi kao plaćeno',
@@ -210,7 +225,11 @@ test.describe('payment tracking — student detail page', () => {
     await loginAsAdmin(page)
     await page.goto(`${BASE}/admin/ucenici/${seeded.pendingStudentId}`)
 
-    await page.getByRole('button', { name: 'Označi cijelu godinu plaćenom' }).click()
+    await clickAndConfirm(
+      page,
+      page.getByRole('button', { name: 'Označi cijelu godinu plaćenom' }),
+      'Označi plaćeno',
+    )
 
     // Module chip is now a locked (disabled) span, not a button.
     await expect(
@@ -218,7 +237,7 @@ test.describe('payment tracking — student detail page', () => {
     ).toBeVisible()
     await expect(page.getByRole('button', { name: MODULE_TITLE })).toHaveCount(0)
 
-    await page.getByRole('button', { name: 'Poništi' }).click()
+    await clickAndConfirm(page, page.getByRole('button', { name: 'Poništi' }), 'Ukloni oznaku')
 
     // Year mark cleared → the per-module toggle button is back.
     await expect(page.getByRole('button', { name: MODULE_TITLE })).toBeVisible()
@@ -267,8 +286,19 @@ test.describe('payment tracking — teacher view', () => {
 
     await page.goto(`${BASE}/nastavnik/ucenik/${seeded.pendingStudentId}`)
 
-    // Read-only module list shows, but no payment heading or mark buttons.
+    // Read-only module list shows, but no payment heading and no PAYMENT mark
+    // buttons. Matched on the payment wording rather than a bare /Označi/: the
+    // teacher legitimately gets "Označi ugovor potpisanim" — collecting signed
+    // contracts at the group is the whole reason for that exception — and a
+    // pattern loose enough to catch it fails on the one button that belongs
+    // here while saying nothing about the ones that must not.
     await expect(page.getByText('Plaćanje', { exact: true })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /Označi/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Označi.*plać/i })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Označi cijelu godinu/ })).toHaveCount(0)
+    await expect(page.getByTitle(/Označi kao (ne)?plaćeno/)).toHaveCount(0)
+
+    // And the one mark a teacher IS trusted with is still offered, so this stays
+    // a scrub test rather than quietly becoming "the teacher can do nothing".
+    await expect(page.getByRole('button', { name: 'Označi ugovor potpisanim' })).toBeVisible()
   })
 })

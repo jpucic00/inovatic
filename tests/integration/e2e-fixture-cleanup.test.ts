@@ -102,6 +102,51 @@ describe('cleanupRunFixtures', () => {
     expect(await db.teacherAttendance.count({ where: { scheduledGroupId: run.group.id } })).toBe(0)
   })
 
+  it('removes staff who acted on a group the run did NOT name', async () => {
+    // The leak that survived the first version of this teardown, and the reason
+    // it went unnoticed: a fixture teacher routinely uploads a material or
+    // writes a comment on the SHARED phase3 fixture group, whose name carries no
+    // run id. The group sweep cannot reach those rows, `Material.uploadedById`
+    // and `StudentComment.authorId` are required relations (RESTRICT), so the
+    // account delete threw P2003 — and because this helper swallows, the run
+    // went green while leaving its teacher behind for good.
+    const runId = nextRunId()
+    const run = await seedRun(runId)
+
+    // A group belonging to nobody's run — stands in for the shared fixture group.
+    const outsideGroup = await survivor.group()
+    const outsideStudent = await createStudent()
+    await createEnrollment(outsideStudent.id, outsideGroup.id)
+
+    const strayMaterial = await createMaterial({
+      uploadedById: run.teacher.id,
+      scheduledGroupId: outsideGroup.id,
+    })
+    const strayComment = await db.studentComment.create({
+      data: {
+        studentId: outsideStudent.id,
+        groupId: outsideGroup.id,
+        authorId: run.teacher.id,
+        content: 'Bilješka na tuđoj grupi.',
+      },
+    })
+
+    await cleanupRunFixtures(runId)
+
+    // The account is actually gone — the assertion the P2003 used to break.
+    expect(await db.user.findUnique({ where: { id: run.teacher.id } })).toBeNull()
+    expect(await db.material.findUnique({ where: { id: strayMaterial.id } })).toBeNull()
+    expect(await db.studentComment.findUnique({ where: { id: strayComment.id } })).toBeNull()
+
+    // …while the group it acted on, and the child in it, are untouched: only the
+    // run's OWN rows go, however far outside its groups they reached.
+    expect(await db.scheduledGroup.findUnique({ where: { id: outsideGroup.id } })).not.toBeNull()
+    expect(await db.user.findUnique({ where: { id: outsideStudent.id } })).not.toBeNull()
+
+    // Not covered by `survivor`, which tracks groups/courses/locations only.
+    await db.user.delete({ where: { id: outsideStudent.id } })
+  })
+
   it('leaves another run’s fixtures and ordinary dev data alone', async () => {
     const mineId = nextRunId()
     const theirsId = nextRunId()

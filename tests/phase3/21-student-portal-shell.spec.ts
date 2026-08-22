@@ -11,9 +11,10 @@ import {
   type StudentData,
 } from '../helpers/phase3'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
+import { clickUntilVisible } from '../helpers/hydration'
 
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.
@@ -120,41 +121,61 @@ test.describe('Phase 3 Step 10 — Student Portal Shell', () => {
 
   // ── Zero-enrollment experience ─────────────────────────────────────────────
 
-  test('zero-enrollment student lands on empty state with Croatian copy', async ({ page }) => {
+  // A child with no active programme is refused AT `authorize()`, which is the
+  // only point where no cookie is ever minted — so there is no portal empty
+  // state to land on any more, and asserting one was asserting a screen this
+  // account can no longer reach. What is worth pinning instead is that the
+  // refusal names its own reason: the password WAS right, and telling this
+  // family "wrong credentials" would send them resetting a working password.
+  //
+  // `loginWithEmail` is deliberately not used — it retries for 45s waiting for
+  // a success that cannot come, so a refusal reads as a timeout.
+  test('zero-enrollment student is refused login, and told why', async ({ page }) => {
     if (!zeroCredentials) throw new Error('zero-enrollment student not seeded')
-    await loginWithEmail(page, zeroCredentials.loginEmail, zeroCredentials.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
+    await page.goto(`${BASE}/portal`)
+    await page.locator('#identifier').fill(zeroCredentials.loginEmail)
+    await page.locator('input[type="password"]').fill(zeroCredentials.password)
+    await clickUntilVisible(
+      page.locator('button[type="submit"]'),
+      page.getByText(/više nije dio nijednog programa/),
+    )
 
-    await expect(page.getByRole('heading', { name: 'Dobrodošli' })).toBeVisible()
-    await expect(page.getByText(/Nemate aktivnih upisa\. Obratite se administratoru\./)).toBeVisible()
+    // No session was minted: the login form is still the thing on screen.
+    await expect(page.locator('#identifier')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Moje grupe' })).toHaveCount(0)
   })
 
-  test('zero-enrollment student sees their profile read-only with parent info', async ({ page }) => {
-    if (!zeroCredentials) throw new Error('zero-enrollment student not seeded')
-    await loginWithEmail(page, zeroCredentials.loginEmail, zeroCredentials.password)
+  // Re-pointed at the single-enrollment child for the same reason: the profile
+  // screen is unchanged, but the only accounts that can now reach it are the
+  // ones with an active programme.
+  test('student sees their profile read-only with parent info', async ({ page }) => {
+    if (!singleCredentials) throw new Error('single-enrollment student not seeded')
+    await loginWithEmail(page, singleCredentials.loginEmail, singleCredentials.password)
     await page.waitForURL(/\/portal/, { timeout: 30000 })
     await page.goto(`${BASE}/portal/profil`)
 
     await expect(
-      page.getByRole('heading', { name: `${ZERO_STUDENT.firstName} ${ZERO_STUDENT.lastName}` }),
+      page.getByRole('heading', { name: `${SINGLE_STUDENT.firstName} ${SINGLE_STUDENT.lastName}` }),
     ).toBeVisible()
 
     await expect(page.getByText('Korisničko ime', { exact: true })).toBeVisible()
-    await expect(page.getByText(zeroCredentials.username, { exact: true })).toBeVisible()
-    await expect(page.getByText(ZERO_STUDENT.childSchool)).toBeVisible()
+    await expect(page.getByText(singleCredentials.username, { exact: true })).toBeVisible()
+    await expect(page.getByText(SINGLE_STUDENT.childSchool)).toBeVisible()
 
     await expect(page.getByText('Roditelj / skrbnik')).toBeVisible()
-    await expect(page.getByText(ZERO_STUDENT.parentName)).toBeVisible()
-    await expect(page.getByText(ZERO_STUDENT.parentEmail)).toBeVisible()
-    await expect(page.getByText(ZERO_STUDENT.parentPhone)).toBeVisible()
+    await expect(page.getByText(SINGLE_STUDENT.parentName)).toBeVisible()
+    await expect(page.getByText(SINGLE_STUDENT.parentEmail)).toBeVisible()
+    await expect(page.getByText(SINGLE_STUDENT.parentPhone)).toBeVisible()
 
     await expect(page.getByRole('button', { name: /Uredi|Spremi/ })).toHaveCount(0)
   })
 
+  // On the ENROLLED child, which is the stronger version of this guard as well
+  // as the only one still reachable: an empty portal has no group content for
+  // staff-only wording to leak out of in the first place.
   test('student portal does NOT expose comment/grade UI (internal-staff-only leakage guard)', async ({ page }) => {
-    if (!zeroCredentials) throw new Error('zero-enrollment student not seeded')
-    await loginWithEmail(page, zeroCredentials.loginEmail, zeroCredentials.password)
+    if (!singleCredentials) throw new Error('single-enrollment student not seeded')
+    await loginWithEmail(page, singleCredentials.loginEmail, singleCredentials.password)
     await page.waitForURL(/\/portal/, { timeout: 30000 })
 
     const body = (await page.locator('body').innerText()).toLowerCase()

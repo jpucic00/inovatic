@@ -15,9 +15,9 @@ import {
   type StudentData,
 } from '../helpers/phase3'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.
@@ -49,7 +49,13 @@ const STUDENT: StudentData = {
 const COURSE_MATERIAL = `E2E program material ${RUN_ID}`
 const GROUP_MATERIAL = `E2E grupa material ${RUN_ID}`
 const REVIEW_TEXT = `E2E recenzija ${RUN_ID} — odličan napredak.`
-const SESSION_DATE = '2026-03-10'
+// Today, on the Zagreb calendar — NOT a fixed date. A teacher may only record
+// the current calendar month up to today (`teacherMarkingWindow`), and an
+// out-of-window date still renders its heading while Save is replaced by the
+// reason. A hardcoded date therefore does not fail when it rots, it fails a
+// month later as a missing "Spremi" button, which reads like a broken form
+// rather than a stale fixture. `en-CA` is the locale that formats as YYYY-MM-DD.
+const SESSION_DATE = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Zagreb' })
 
 type Seeded = {
   teacher: { email: string; password: string; teacherId: string }
@@ -152,7 +158,9 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await page.goto(`${BASE}/admin/ucenici/${seeded.studentId}`)
 
     await expect(page.getByRole('heading', { name: 'Evidencija dolaska' })).toBeVisible()
-    await expect(page.getByText(/10\.\s?03\.\s?2026\./).first()).toBeVisible()
+    // Derived from SESSION_DATE, not written out again — a second literal copy
+    // of the same date is what silently outlived the first one.
+    await expect(page.getByText(croatianDateRegex(SESSION_DATE)).first()).toBeVisible()
     await expect(page.getByText('Prisutan').first()).toBeVisible()
 
     await expect(page.getByLabel('Opisna ocjena').first()).toHaveValue(REVIEW_TEXT)

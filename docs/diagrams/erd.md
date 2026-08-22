@@ -130,6 +130,7 @@ erDiagram
         string courseId FK "nullable"
         string scheduledGroupId FK "nullable - preferred group"
         boolean noSuitableTermin "default false - parent's none-of-the-termini-work answer; mutually exclusive with scheduledGroupId; COMPETITION signup link only"
+        PaymentOption paymentOption "nullable - the parent's 'kako planirate placati' answer on /prijava; SLR only and dropped server-side on any other kind. Advisory: the binding choice is the one re-recorded on the Enrollment once an account exists"
         string assignedGroupId FK "nullable - final group"
         string studentId FK "nullable"
         string message "nullable"
@@ -173,6 +174,7 @@ erDiagram
         string schoolYear
         datetime fullYearPaidAt "nullable - admin whole-year paid mark"
         datetime contractSignedAt "nullable - Ugovor potpisan. The ONLY enrollment mark a TEACHER may see and set, and only for their own groups in the CURRENT year; an admin is unrestricted, being the correction path"
+        PaymentOption paymentOption "nullable - seeded from the upit on account creation, CREATE-only so a re-run never overwrites an admin correction. STANDARD only, and ADMIN-only unlike contractSignedAt - scrubbed from the teacher payload alongside every paid mark"
     }
 
     EnrollmentMonth {
@@ -274,6 +276,13 @@ erDiagram
         string failureReason "nullable - why FAILED, or why SKIPPED had no address"
         string sentKey "nullable - invitation idempotency key, set only on SENT"
         datetime sentAt
+    }
+
+    ReleaseAnnouncement {
+        string version PK "the version string from src/lib/releases.ts e.g. 1.2.0 - the PK IS the lock: two instances booting together both INSERT, exactly one wins, the loser reads a unique violation and skips"
+        datetime announcedAt "default now - stamped BEFORE the first mail, not after the last"
+        int sentCount "default 0 - a run that reached NOBODY deletes its own row, so a retry cannot duplicate; any partial success keeps the claim"
+        int failedCount "default 0"
     }
 
     Article {
@@ -408,6 +417,7 @@ erDiagram
 | RecommendationKind | `COURSE`, `COMPETITION_PREP`, `COMPETITION_PROGRAM`, `COMPETITION_FLL`, `COMPETITION_WRO` — `COURSE` pairs with `recommendedCourseId`; the rest are the `RECOMMENDATION_SPECIALS` tracks (the per-team FLL/WRO values let a mentor recommend the *team* a child should join, which no catalog entry can express) |
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
 | MaterialScope | `MODULE`, `COURSE`, `GROUP` |
+| PaymentOption | `PO_MODULU`, `CIJELA_GODINA` — how a family settles an SLR program. **STANDARD only**, gated by `offersPaymentOption` (which is `hasDatedModules`): a radionica settles by the akontacija + ostatak its confirmation e-mail spells out, and COMPETITION is billed monthly through `EnrollmentMonth`, so neither has a choice to record. **Null means "nije odabrano" and is never backfilled.** Decoupled from the paid marks on purpose — this is intent, `fullYearPaidAt` / `ModuleEnrollment.paidAt` are what happened, and choosing `CIJELA_GODINA` must never tick a paid mark |
 | EmailCampaignKind | `CUSTOM`, `REENROLLMENT`, `EVALUATION`, `CREDENTIALS` — REENROLLMENT sends are idempotent per `(city, targetCourseId, targetSchoolYear)`; CUSTOM is deliberately repeatable; EVALUATION mails report cards with one recipient row per **child** (not per inbox) and never sets `sentKey`, so a corrected card stays re-sendable. **CREDENTIALS** is one row per child ACCOUNT (a child in two selected groups is still one mail) and, since 2026-08-17, the ONLY way a student login leaves the building — neither inquiry acceptance nor manual creation mails anything. Radionica groups are deliberately NOT excluded from it: a workshop child gets a real portal account too |
 | EmailRecipientStatus | `PENDING`, `SENT`, `FAILED`, `ALREADY_SENT`, `SKIPPED` — every intended recipient is written as `PENDING` upfront, so the detail view lists the whole cohort immediately and a resumed send knows exactly who is still owed a mail |
 
@@ -430,6 +440,7 @@ erDiagram
 | Enrollment → ModuleEnrollment → ModuleSchedule | Per-module opt-in within a group enrollment |
 | Course → CourseSeason | Per-`(courseId, schoolYear, city)` season range `[startDate, endDate]` for the COMPETITION program (`onDelete: Cascade`) — its replacement for module dates. Sessions are derived weekly on each group's own `dayOfWeek` via `computeSeasonSessions`: holiday weeks dropped outright, **no session-count target and no make-up**, so two weekdays legitimately finish with different totals. Edited via `<CourseSeasonEditor>` on `/admin/programi/[courseId]`. |
 | TrialWeek | **No relations at all.** A standalone `(schoolYear, city)` row like the `SchoolYear` registry — nothing is stored per group, because a calendar week contains exactly one occurrence of each weekday, so `computeTrialSession` (`src/lib/session-dates.ts`) derives the date from the group's existing `dayOfWeek`. An **ABSENT row is the "no probni sat this year" state**, the same doctrine as `CourseGradeRule`, which also means the feature is dark until an admin sets a week on `/admin/skolska-godina`. Read through `resolveTrialDateForGroup` (`src/lib/trial-week.ts`), always keyed on the GROUP'S own `schoolYear` — never `computeSchoolYear()`, the trap `getCourseGradeRules` documents. STANDARD only (`hasDatedModules`): a radionica is a one-off trial of its own and the competitive program is invitation-only. |
+| ReleaseAnnouncement | **No relations and no `city`** — a release belongs to the application, not to an office, so its e-mail goes to every ADMIN in both tenants and sends from the association address rather than a city inbox. Written only by the announcer at server start (`src/lib/release-announce.ts`, wired through `src/instrumentation.ts`); there is no route, no action and no admin button. It stores **no copy of the notes** — those live in `src/lib/releases.ts`, so the code is the record and this table is only the receipt, and a wording fix later can never disagree with what was actually sent. Claim-before-send, the same ordering as `EmailCampaignRecipient.sentKey` and for the same reason. |
 | Enrollment → EnrollmentMonth | One payable month of a monthly-billed (COMPETITION) enrollment (`onDelete: Cascade`). Written up front by `ensureEnrollment` → `createSeasonMonths` from the **join month** through season end — a child joining in January never owes the autumn. A month becomes owed once `periodStart <= now`, so the 1st-of-month flip needs no cron. `upsertCourseSeason` re-syncs rows on a date edit (`syncSeasonMonths`, same transaction) and never deletes a paid month; `fullYearPaidAt` still works as the pay-upfront override. |
 | Material.scope → MODULE / COURSE / GROUP | Discriminated union - exactly one FK populated per scope |
 | Material → MaterialGroupHide → ScheduledGroup | Per-group visibility override for MODULE/COURSE-scoped materials |
@@ -505,6 +516,8 @@ Split and Šibenik run as fully separated tenants inside one app. "City" is the 
 **Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `CourseSeason` (each city runs the shared competition program's season on its own dates), `CourseGradeRule` (each city offers the shared standard program to its own razredi), `TrialWeek` (each city picks its own probni-sat week), `SchoolYearHoliday`, `EmailCampaign` (the sending admin's city — the tenant boundary for both recipient resolution and the `/admin/email` history list), and `Course` (nullable — `null` = shared standard SLR program and the competition program, set = per-city radionica).
 
 **Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`EnrollmentMonth`/`Attendance`/`TeacherAttendance`/`GalleryImage`/`TeacherAssignment`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `ArticleImage`/`ArticleTag` through their article, `EmailCampaignRecipient` through its campaign.
+
+`ReleaseAnnouncement` is the one model with **no city at all, not even transitively**.
 
 **Deliberately shared (no city):** the `SchoolYear` label registry, the `Tag` taxonomy, `CourseModule` templates, and MODULE/COURSE-scoped `Material` rows (one curriculum for both cities). GROUP-scoped materials are per-group, hence per-city.
 

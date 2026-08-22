@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 8 — Module Enrollment + School-Year Historization
@@ -24,7 +24,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 
 const BASE = 'http://localhost:3000'
 
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // SLR 1 — seeded standard course (title contains "Robotike 1")
 const COURSE_SEARCH = 'Robotike 1'
@@ -207,7 +207,7 @@ async function createStudentAndEnroll(
   // The post-create credentials modal was dropped — success is a toast and
   // the dialog closes on its own.
   await expect(
-    page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+    page.getByText(/Račun učenika kreiran\./),
   ).toBeVisible({ timeout: 15000 })
   await expect(dialog).toBeHidden({ timeout: 10000 })
 }

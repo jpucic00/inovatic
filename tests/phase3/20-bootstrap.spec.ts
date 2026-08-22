@@ -2,7 +2,10 @@ import { test, expect } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { BASE, loginAsAdmin } from '../helpers/phase3'
-import { clearFixtureGroupEnrollments } from '../helpers/seed'
+import { clearFixtureGroupEnrollments, dropPreviousBootstrapGroups } from '../helpers/seed'
+
+/** Fixed on purpose: downstream specs find these two groups by name. */
+const BOOTSTRAP_GROUP_NAMES = ['Test Grupa A', 'Test Grupa B']
 
 const STATE_FILE = path.resolve(__dirname, '../fixtures/phase3-state.json')
 
@@ -24,6 +27,14 @@ test.describe('Phase 3 Step 0 — Bootstrap (creates groups for downstream specs
     test.setTimeout(120000)
     await loginAsAdmin(page)
 
+    // Clear the pair a previous run left behind FIRST. These two names are
+    // fixed (downstream specs look them up by name), so no run id can be
+    // stamped on them and the per-run teardown cannot see them — without this,
+    // every run stacked another pair on the last and only the newest was ever
+    // referenced again.
+    const dropped = await dropPreviousBootstrapGroups(BOOTSTRAP_GROUP_NAMES)
+    if (dropped > 0) console.log(`bootstrap: removed ${dropped} group(s) from a previous run`)
+
     const groupIds: string[] = []
 
     for (let i = 0; i < 2; i++) {
@@ -35,7 +46,7 @@ test.describe('Phase 3 Step 0 — Bootstrap (creates groups for downstream specs
 
       await dialog.locator('#create-courseId').selectOption({ index: 1 })
       await dialog.locator('#create-locationId').selectOption({ index: 1 })
-      await dialog.locator('#create-name').fill(`Test Grupa ${String.fromCharCode(65 + i)}`)
+      await dialog.locator('#create-name').fill(BOOTSTRAP_GROUP_NAMES[i])
       await dialog.locator('#create-dayOfWeek').selectOption(i === 0 ? 'Ponedjeljak' : 'Utorak')
       await dialog.locator('#create-startTime').fill('17:00')
       await dialog.locator('#create-endTime').fill('18:30')
@@ -54,7 +65,7 @@ test.describe('Phase 3 Step 0 — Bootstrap (creates groups for downstream specs
     // the page can put a leftover full 2-seat group from phase2/16's capacity
     // flow at index 0 — downstream specs then hang on its disabled radio.
     await page.goto(`${BASE}/admin/grupe`)
-    for (const name of ['Test Grupa A', 'Test Grupa B']) {
+    for (const name of BOOTSTRAP_GROUP_NAMES) {
       const href = await page
         .locator('tr', { hasText: name })
         .first()

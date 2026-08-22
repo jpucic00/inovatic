@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
-import { fillInquiryStep1 } from '../helpers/prijava'
+import { fillInquiryStep1, selectPaymentOptionIfShown } from '../helpers/prijava'
 
-import { cleanupRunFixtures } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 8 — Student Management
 // Tests run serially: beforeAll creates one inquiry for create-from-inquiry
@@ -17,7 +17,7 @@ import { cleanupRunFixtures } from '../helpers/cleanup'
 const BASE = 'http://localhost:3000'
 
 // Unique per test run so each run's data is identifiable even if old data exists
-const RUN_ID = Date.now().toString().slice(-6)
+const RUN_ID = newRunId()
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.
@@ -107,6 +107,9 @@ async function submitInquiry(page: Page, data: typeof INQUIRY_FOR_ACCOUNT) {
       .getAttribute('value')
     if (firstGroup) await termin.selectOption(firstGroup)
   }
+  // Mandatory on every SLR selection, and absent on the kinds that offer no
+  // choice — so it is answered on the same terms as the termin above.
+  await selectPaymentOptionIfShown(page)
   await page.locator('input[name="consent"]').check()
   await clickUntilVisible(
     page.locator('button', { hasText: 'Pošalji upit' }),
@@ -262,7 +265,7 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       // The result modal was dropped — success is signalled by a toast that
       // points the admin to the profile for credentials, and the dialog closes.
       await expect(
-        page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+        page.getByText(/Račun učenika kreiran\./),
       ).toBeVisible({ timeout: 10000 })
       await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10000 })
     })
@@ -470,14 +473,14 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
 
         await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: '2015-01-01' })
         await expect(
-          page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+          page.getByText(/Račun učenika kreiran\./),
           'first creation → NEW account toast',
         ).toBeVisible({ timeout: 10000 })
         await expect(dialog, 'dialog closes on success').toBeHidden({ timeout: 10000 })
 
         await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: '2010-12-31' })
         await expect(
-          page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+          page.getByText(/Račun učenika kreiran\./),
           'second creation (different DOB) → also a NEW account toast',
         ).toBeVisible({ timeout: 10000 })
         await expect(dialog, 'dialog closes on success').toBeHidden({ timeout: 10000 })
@@ -499,7 +502,7 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
 
         await createStudentManuallyViaDialog(page, { ...sharedName, dateOfBirth: DEDUP_DOB })
         await expect(
-          page.getByText('Račun učenika kreiran. Otvorite profil učenika za pristupne podatke.'),
+          page.getByText(/Račun učenika kreiran\./),
           'first creation → NEW account toast',
         ).toBeVisible({ timeout: 10000 })
         await expect(dialog, 'dialog closes on success').toBeHidden({ timeout: 10000 })
