@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Pencil, Check, X, CalendarClock } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
 import { adminInputClass } from '@/lib/admin-styles'
-import { formatDate } from '@/lib/format'
+import { formatDate, toDateInputValue } from '@/lib/format'
 import { upsertEnrollmentWindow } from '@/actions/admin/enrollment-window'
 import {
   getEnrollmentWindowState,
@@ -22,15 +22,6 @@ interface Props {
   editable: boolean
 }
 
-function toIsoString(d: Date | null): string {
-  if (!d) return ''
-  const date = new Date(d)
-  const yyyy = date.getFullYear()
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
-
 
 export function EnrollmentWindowEditor({
   courseId,
@@ -40,8 +31,8 @@ export function EnrollmentWindowEditor({
   editable,
 }: Readonly<Props>) {
   const [editing, setEditing] = useState(false)
-  const [start, setStart] = useState(toIsoString(enrollmentStart))
-  const [end, setEnd] = useState(toIsoString(enrollmentEnd))
+  const [start, setStart] = useState(toDateInputValue(enrollmentStart))
+  const [end, setEnd] = useState(toDateInputValue(enrollmentEnd))
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -66,8 +57,8 @@ export function EnrollmentWindowEditor({
   }
 
   const handleCancel = () => {
-    setStart(toIsoString(enrollmentStart))
-    setEnd(toIsoString(enrollmentEnd))
+    setStart(toDateInputValue(enrollmentStart))
+    setEnd(toDateInputValue(enrollmentEnd))
     setEditing(false)
   }
 

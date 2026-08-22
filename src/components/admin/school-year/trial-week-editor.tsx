@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Pencil, Check, X, Sparkles } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
 import { adminInputClass } from '@/lib/admin-styles'
-import { formatDate } from '@/lib/format'
+import { formatDate, toDateInputValue } from '@/lib/format'
 import { clearTrialWeek, upsertTrialWeek } from '@/actions/admin/trial-week'
 
 interface Props {
@@ -14,15 +14,6 @@ interface Props {
   startDate: Date | null
   endDate: Date | null
   editable: boolean
-}
-
-function toIsoString(d: Date | null): string {
-  if (!d) return ''
-  const date = new Date(d)
-  const yyyy = date.getUTCFullYear()
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
-  const dd = String(date.getUTCDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
 }
 
 /**
@@ -35,8 +26,8 @@ function toIsoString(d: Date | null): string {
  */
 export function TrialWeekEditor({ schoolYear, startDate, endDate, editable }: Readonly<Props>) {
   const [editing, setEditing] = useState(false)
-  const [start, setStart] = useState(toIsoString(startDate))
-  const [end, setEnd] = useState(toIsoString(endDate))
+  const [start, setStart] = useState(toDateInputValue(startDate))
+  const [end, setEnd] = useState(toDateInputValue(endDate))
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -75,8 +66,8 @@ export function TrialWeekEditor({ schoolYear, startDate, endDate, editable }: Re
   }
 
   const handleCancel = () => {
-    setStart(toIsoString(startDate))
-    setEnd(toIsoString(endDate))
+    setStart(toDateInputValue(startDate))
+    setEnd(toDateInputValue(endDate))
     setEditing(false)
   }
 
@@ -88,8 +79,8 @@ export function TrialWeekEditor({ schoolYear, startDate, endDate, editable }: Re
    * would quietly write the colleague's change back out. Same across two tabs.
    */
   const handleEdit = () => {
-    setStart(toIsoString(startDate))
-    setEnd(toIsoString(endDate))
+    setStart(toDateInputValue(startDate))
+    setEnd(toDateInputValue(endDate))
     setEditing(true)
   }
 

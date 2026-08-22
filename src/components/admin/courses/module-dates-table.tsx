@@ -7,7 +7,7 @@ import { Check, X, Pencil, Users, CheckCircle, Calendar } from 'lucide-react'
 import { upsertModuleSchedule } from '@/actions/admin/module'
 import { closeModuleSchedule } from '@/actions/admin/module-enrollment'
 import { DateInput } from '@/components/ui/date-input'
-import { formatDate } from '@/lib/format'
+import { formatDate, toDateInputValue } from '@/lib/format'
 import Link from 'next/link'
 
 type Module = {
@@ -39,15 +39,6 @@ interface ModuleDatesTableProps {
   hideHeader?: boolean
 }
 
-function toIsoString(d: Date | null): string {
-  if (!d) return ''
-  const date = new Date(d)
-  const yyyy = date.getFullYear()
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
-
 function getModuleStatus(mod: Module): { label: string; className: string } {
   const now = new Date()
   if (!mod.startDate || !mod.endDate) return { label: 'Nema datuma', className: 'text-gray-400' }
@@ -62,8 +53,8 @@ function ModuleRow({
   editable,
 }: Readonly<{ mod: Module; selectedYear: string; editable: boolean }>) {
   const [editing, setEditing] = useState(false)
-  const [startDate, setStartDate] = useState(toIsoString(mod.startDate))
-  const [endDate, setEndDate] = useState(toIsoString(mod.endDate))
+  const [startDate, setStartDate] = useState(toDateInputValue(mod.startDate))
+  const [endDate, setEndDate] = useState(toDateInputValue(mod.endDate))
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const status = getModuleStatus(mod)
@@ -100,8 +91,8 @@ function ModuleRow({
   }
 
   const handleCancel = () => {
-    setStartDate(toIsoString(mod.startDate))
-    setEndDate(toIsoString(mod.endDate))
+    setStartDate(toDateInputValue(mod.startDate))
+    setEndDate(toDateInputValue(mod.endDate))
     setEditing(false)
   }
 

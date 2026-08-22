@@ -50,6 +50,34 @@ export function formatDate(date: Date | null, style: DateStyle = 'short'): strin
   return `${dd}.${mm}.${yyyy}.`
 }
 
+/**
+ * A `@db.Date` column as the `yyyy-MM-dd` an `<input type="date">` wants.
+ *
+ * Read with `getUTC*`, NOT the local getters, and that is the whole point of
+ * this living in one place. A date-only column arrives from Prisma as UTC
+ * midnight, so on a machine at a negative offset the local getters name the
+ * PREVIOUS day: `formatDate` would render 15.09.2026 beside an input opened on
+ * the 14th, and saving the form without touching that field would write the 14th
+ * back — silently moving every session of that module by a day. Before the app
+ * pinned display to {@link APP_TIME_ZONE} both halves were local and agreed, so
+ * that mismatch is a thing the pinning could introduce rather than an old bug.
+ *
+ * Deliberately NOT zoned through `APP_TIME_ZONE`: the stored value is a calendar
+ * date with no time in it, and the round trip that matters is input → column →
+ * input, not instant → wall clock.
+ *
+ * There were four hand-rolled copies of this and exactly one of them was right.
+ * Add callers here rather than a fifth copy.
+ */
+export function toDateInputValue(d: Date | null | undefined): string {
+  if (!d) return ''
+  const date = new Date(d)
+  const yyyy = date.getUTCFullYear()
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(date.getUTCDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 /** Time of day as "HH:mm" in the app's zone. */
 export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat('hr-HR', {

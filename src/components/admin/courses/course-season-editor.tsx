@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Pencil, Check, X, CalendarRange } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
 import { adminInputClass } from '@/lib/admin-styles'
-import { formatDate } from '@/lib/format'
+import { formatDate, toDateInputValue } from '@/lib/format'
 import { upsertCourseSeason } from '@/actions/admin/course-season'
 
 interface Props {
@@ -15,15 +15,6 @@ interface Props {
   startDate: Date | null
   endDate: Date | null
   editable: boolean
-}
-
-function toIsoString(d: Date | null): string {
-  if (!d) return ''
-  const date = new Date(d)
-  const yyyy = date.getFullYear()
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
 }
 
 /**
@@ -40,8 +31,8 @@ export function CourseSeasonEditor({
   editable,
 }: Readonly<Props>) {
   const [editing, setEditing] = useState(false)
-  const [start, setStart] = useState(toIsoString(startDate))
-  const [end, setEnd] = useState(toIsoString(endDate))
+  const [start, setStart] = useState(toDateInputValue(startDate))
+  const [end, setEnd] = useState(toDateInputValue(endDate))
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -64,8 +55,8 @@ export function CourseSeasonEditor({
   }
 
   const handleCancel = () => {
-    setStart(toIsoString(startDate))
-    setEnd(toIsoString(endDate))
+    setStart(toDateInputValue(startDate))
+    setEnd(toDateInputValue(endDate))
     setEditing(false)
   }
 
