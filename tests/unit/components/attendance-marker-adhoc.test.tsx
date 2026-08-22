@@ -34,7 +34,9 @@ function flatProps(
   }
 }
 
-function standardProps(): GroupAttendance {
+function standardProps(
+  overrides: Partial<Extract<GroupAttendance, { kind: 'standard' }>> = {},
+): GroupAttendance {
   return {
     kind: 'standard',
     groupId: 'g-std',
@@ -64,6 +66,7 @@ function standardProps(): GroupAttendance {
     teachers: [],
     teacherRecords: [],
     markingWindow: null,
+    ...overrides,
   }
 }
 
@@ -118,6 +121,35 @@ describe('AttendanceMarker — hand-added dates survive a remount', () => {
       <AttendanceMarker {...flatProps({ groupId: 'g-other-flat' })} />,
     )
     expect(screen.queryByText('15.07.2026.')).toBeNull()
+  })
+
+  // Saving evidencija does not remount — `bulkMarkSession` calls `router.refresh()`,
+  // so the SAME tree receives fresh props carrying the now-real session. That is a
+  // different path from the remount cases above: the draft is still in React state
+  // while the effect re-reads storage, and the two have to agree on one date.
+  it('flat branch: a save-triggered refresh keeps the date and drops the draft', () => {
+    const { rerender } = render(<AttendanceMarker {...flatProps()} />)
+    addDate('15.07.2026')
+
+    rerender(<AttendanceMarker {...flatProps({ extraSessions: ['2026-07-15'] })} />)
+
+    expect(
+      screen.getAllByRole('button', { name: /15\.07\.2026\./ }),
+    ).toHaveLength(1)
+    expect(window.sessionStorage.length).toBe(0)
+  })
+
+  it('standard branch: a save-triggered refresh keeps the date and drops the draft', () => {
+    const { rerender } = render(<AttendanceMarker {...standardProps()} />)
+    addDate('26.01.2026')
+
+    // Past module 1's last session, so the server buckets it into Ostali termini.
+    rerender(<AttendanceMarker {...standardProps({ otherDates: ['2026-01-26'] })} />)
+
+    expect(
+      screen.getAllByRole('button', { name: /26\.01\.2026\./ }),
+    ).toHaveLength(1)
+    expect(window.sessionStorage.length).toBe(0)
   })
 
   it('standard branch: the date is back after unmount + remount', () => {

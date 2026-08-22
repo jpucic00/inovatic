@@ -581,7 +581,7 @@ sequenceDiagram
     Server->>Server: resolveTargetCourse (chosen group's course wins, courseId fallback)
     Server->>Server: competitionOnlyAnswerError guard (high-school grade / noSuitableTermin only on COMPETITION)
     Server->>Server: Termin gate when no group AND no refusal - isTerminRequired against loadProgramsForCheck plus getCourseGradeRules(city)
-    Server->>Server: Payment gate - paymentQuestionApplies from the resolved target course. A missing answer on an SLR sign-up rejects, a value on any other kind is dropped
+    Server->>Server: Payment gate - paymentQuestionApplies over the availability feed whenever one was loaded, else the resolved target course. A missing answer on an SLR sign-up rejects, a value on any other kind is dropped
     Server->>Server: Create Inquiry type COURSE status NEW consentGivenAt now
 
     alt scheduledGroupId provided
