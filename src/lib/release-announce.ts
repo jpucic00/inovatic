@@ -91,9 +91,12 @@ async function claim(version: string): Promise<boolean> {
   }
 }
 
-async function announce(release: ReleaseNote): Promise<void> {
-  if (!(await claim(release.version))) return
+/** What a send attempt reached. Counted into a caller-owned tally rather than
+ *  returned, so the numbers survive a throw and the give-back below can tell
+ *  "nothing went out" from "some of it did". */
+type Tally = { sent: number; failed: number }
 
+async function mailAdmins(release: ReleaseNote, tally: Tally): Promise<void> {
   const admins = await db.user.findMany({
     // Administrators only, and their real `email` — an ADMIN signs in with it,
     // unlike a STUDENT whose `email` is synthetic and must never be mailed.
@@ -102,30 +105,53 @@ async function announce(release: ReleaseNote): Promise<void> {
     orderBy: { email: 'asc' },
   })
 
-  let sentCount = 0
-  let failedCount = 0
   const throttle = sendThrottleMs()
 
   for (const [i, admin] of admins.entries()) {
     if (i > 0 && throttle > 0) await sleep(throttle)
     try {
-      if (await sendReleaseNotesEmail({ to: admin.email, release })) sentCount++
-      else failedCount++
+      if (await sendReleaseNotesEmail({ to: admin.email, release })) tally.sent++
+      else tally.failed++
     } catch (err) {
-      failedCount++
+      tally.failed++
       console.error(`Release ${release.version}: send to ${admin.email} failed:`, err)
     }
+  }
+}
+
+async function announce(release: ReleaseNote): Promise<void> {
+  if (!(await claim(release.version))) return
+
+  const tally: Tally = { sent: 0, failed: 0 }
+
+  try {
+    await mailAdmins(release, tally)
+  } catch (err) {
+    // The claim is already taken, and `pendingReleases` filters on the row
+    // EXISTING rather than on what it says — so an escape from here would
+    // silence this version permanently, recoverable only by deleting the row by
+    // hand. The realistic case is the admin lookup above meeting a cold Neon at
+    // boot (P1001), which is exactly when this code runs. Same rule as the
+    // give-back below: hand the claim back only when nothing went out, so a
+    // retry can never mail anyone twice. The delete is allowed to fail quietly —
+    // if the database is what broke, the original error is the one to report.
+    if (tally.sent === 0) {
+      await db.releaseAnnouncement
+        .delete({ where: { version: release.version } })
+        .catch(() => undefined)
+    }
+    throw err
   }
 
   // Nobody was reached, so nothing can be duplicated by trying again — give the
   // claim back and let the next boot retry. Any partial success keeps it: one
   // admin missing a note is a far smaller problem than the rest being told
   // twice, and a resend would have no way to skip the ones already mailed.
-  if (sentCount === 0) {
+  if (tally.sent === 0) {
     await db.releaseAnnouncement.delete({ where: { version: release.version } })
-    if (failedCount > 0) {
+    if (tally.failed > 0) {
       console.error(
-        `Release ${release.version}: no admin could be mailed (${failedCount} failed) — will retry on next start.`,
+        `Release ${release.version}: no admin could be mailed (${tally.failed} failed) — will retry on next start.`,
       )
     }
     return
@@ -133,11 +159,11 @@ async function announce(release: ReleaseNote): Promise<void> {
 
   await db.releaseAnnouncement.update({
     where: { version: release.version },
-    data: { sentCount, failedCount },
+    data: { sentCount: tally.sent, failedCount: tally.failed },
   })
   console.info(
-    `Release ${release.version} announced to ${sentCount} admin(s)` +
-      (failedCount > 0 ? `, ${failedCount} failed` : ''),
+    `Release ${release.version} announced to ${tally.sent} admin(s)` +
+      (tally.failed > 0 ? `, ${tally.failed} failed` : ''),
   )
 }
 

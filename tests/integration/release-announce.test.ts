@@ -168,6 +168,34 @@ describe('announcePendingReleases', () => {
     expect(recipients()).toContain(recipient.email)
   })
 
+  it('gives the claim back when the send never even started', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const recipient = await admin()
+    const release = stageRelease()
+
+    // The realistic boot-time failure, and the one this code runs into: the
+    // claim lands on a warm connection, then a cold Neon refuses the very next
+    // query. Nothing is sent. `pendingReleases` filters on the receipt EXISTING
+    // rather than on what it says, so a claim stranded here would silence this
+    // version for good — the give-back has to cover the throwing path too, not
+    // just the one where every send came back refused.
+    const lookup = vi
+      .spyOn(db.user, 'findMany')
+      .mockRejectedValueOnce(new Error('P1001: Can\'t reach database server'))
+
+    await expect(announcePendingReleases()).rejects.toThrow(/P1001/)
+    expect(
+      await db.releaseAnnouncement.findUnique({ where: { version: release.version } }),
+    ).toBeNull()
+    expect(recipients()).toHaveLength(0)
+
+    // And the next boot actually delivers it, which is the point of giving the
+    // claim back rather than merely not writing one.
+    lookup.mockRestore()
+    await announcePendingReleases()
+    expect(recipients()).toContain(recipient.email)
+  })
+
   it('keeps the claim when some mails got through', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const failing = await admin()
