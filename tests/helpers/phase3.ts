@@ -16,6 +16,7 @@ import { expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { v2 as cloudinarySdk } from 'cloudinary'
+import { db } from '@/lib/db'
 
 export const BASE = 'http://localhost:3000'
 const ADMIN_EMAIL = 'jpucic00@gmail.com'
@@ -307,10 +308,21 @@ export async function createStudentNoEnrollment(
   // student detail page instead.
   await expect(dialog).toBeHidden({ timeout: 10000 })
 
-  await page.goto(`${BASE}/admin/ucenici?search=${encodeURIComponent(student.lastName)}`)
-  const row = page.locator('a[href^="/admin/ucenici/"]', { hasText: student.lastName }).first()
-  await row.click()
-  await page.waitForURL(/\/admin\/ucenici\/[a-z0-9]+/)
+  // Deliberately NOT via /admin/ucenici: that list is year-scoped to
+  // `getSelectedSchoolYear()`, and a child with no enrollment in that year is
+  // absent from it by design — which is exactly the fixture this helper makes,
+  // so its row could never appear and the click timed out. Resolve the id with
+  // Prisma the way `tests/helpers/seed.ts` does and open the detail page, which
+  // is where the credentials live anyway.
+  const created = await db.user.findFirst({
+    where: { role: 'STUDENT', lastName: student.lastName },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  })
+  if (!created) {
+    throw new Error(`student ${student.lastName} not found after creation`)
+  }
+  await page.goto(`${BASE}/admin/ucenici/${created.id}`)
 
   const { username, password } = await readCredentialsFromDetail(page)
   if (!username || !password) {
