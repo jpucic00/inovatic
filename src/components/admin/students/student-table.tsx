@@ -9,12 +9,13 @@ import { ReturningBadge } from '@/components/admin/returning-badge'
 import { PAYMENT_STATUS_SORT_KEY } from '@/lib/payment-status'
 
 /**
- * The "Ponovni upis" column names its own school year. The list is not
- * year-scoped, so without the year in the header the badge would be a claim
- * about an unstated year — and the admin cannot tell "returned this year" from
- * "returned at some point" by looking.
+ * Every column that can differ by school year is resolved against the one the
+ * list is scoped to. "Ponovni upis" names it in its header — the admin cannot
+ * tell "returned this year" from "returned at some point" by looking — and the
+ * Grupe cell shows only that year's groups, so a child's list of chips answers
+ * "where is this kid now" rather than replaying their whole history.
  */
-const buildColumns = (returningYear: string): ColumnDef<StudentRow>[] => [
+const buildColumns = (schoolYear: string): ColumnDef<StudentRow>[] => [
   {
     key: 'name',
     header: 'Ime i prezime',
@@ -46,12 +47,16 @@ const buildColumns = (returningYear: string): ColumnDef<StudentRow>[] => [
     key: 'groups',
     header: 'Grupe',
     cell: (row) => {
-      if (row.enrollments.length === 0) {
+      // `enrollments` deliberately carries every year — the payment status reads
+      // debts across all of them — so the year filter belongs here, at the point
+      // where the chips are drawn.
+      const inYear = row.enrollments.filter((e) => e.schoolYear === schoolYear)
+      if (inYear.length === 0) {
         return <span className="text-gray-400 italic">Nema upisa</span>
       }
       return (
         <div className="flex flex-wrap gap-1">
-          {row.enrollments.map((e) => (
+          {inYear.map((e) => (
             <span
               key={e.id}
               className="inline-block px-2 py-0.5 text-xs bg-cyan-50 text-cyan-700 border border-cyan-200 rounded-md"
@@ -65,7 +70,7 @@ const buildColumns = (returningYear: string): ColumnDef<StudentRow>[] => [
   },
   {
     key: 'returning',
-    header: `Ponovni upis (${returningYear})`,
+    header: `Ponovni upis (${schoolYear})`,
     sortable: true,
     // Descending puts the returning kids on top, which is the way this column
     // gets read — the filter is for extracting them, the sort for spotting them.
@@ -103,17 +108,23 @@ const buildColumns = (returningYear: string): ColumnDef<StudentRow>[] => [
 
 interface StudentTableProps {
   data: StudentRow[]
-  /** School year every row's `isReturning` was resolved against. */
-  returningYear: string
+  /**
+   * The school year the list is scoped to — the same one every row's
+   * `isReturning` and `paymentStatus` were resolved against.
+   */
+  schoolYear: string
 }
 
-export function StudentTable({ data, returningYear }: Readonly<StudentTableProps>) {
+export function StudentTable({ data, schoolYear }: Readonly<StudentTableProps>) {
   return (
     <DataTable
       data={data}
-      columns={buildColumns(returningYear)}
+      columns={buildColumns(schoolYear)}
       getRowKey={(row) => row.id}
-      emptyMessage="Nema učenika za prikaz."
+      // Names the year: an empty list here means "nobody is enrolled in this
+      // year", which is an ordinary state for a year not yet filled in — and
+      // reads as missing data unless it says which year it is talking about.
+      emptyMessage={`Nema učenika upisanih u ${schoolYear}.`}
     />
   )
 }

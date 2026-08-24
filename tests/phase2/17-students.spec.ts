@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
+import { db } from '@/lib/db'
+import { computeSchoolYear } from '@/lib/school-year'
 import { clickUntilVisible } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 import { fillInquiryStep1, selectPaymentOptionIfShown } from '../helpers/prijava'
@@ -18,6 +20,18 @@ const BASE = 'http://localhost:3000'
 
 // Unique per test run so each run's data is identifiable even if old data exists
 const RUN_ID = newRunId()
+
+const CY = computeSchoolYear()
+
+/**
+ * A group for every manually created student to land in.
+ *
+ * `/admin/ucenici` is scoped to the sidebar school year, so an account with no
+ * enrollment is in no year's list — and almost every test below finds its
+ * student by searching that list. A RADIONICA on purpose: it has no dated
+ * modules, so the create dialog asks for nothing beyond the group itself.
+ */
+let enrollFixture: { courseTitle: string; groupId: string }
 
 // Teardown: every fixture this spec creates carries RUN_ID in its name, e-mail or
 // title, so one call removes exactly this run's rows and can reach no other.
@@ -169,6 +183,17 @@ async function createStudentManuallyViaDialog(
   await page.locator('#create-student-parent-email').fill(parentEmail)
   if (data.parentPhone) await page.locator('#create-student-parent-phone').fill(data.parentPhone)
 
+  // Enrol into this spec's radionica group. Not decoration: the list is scoped
+  // to the sidebar school year, so a student created without a group would not
+  // appear in it and every search-based assertion below would look like a
+  // search bug instead of what it is.
+  await page.locator('#create-student-course').selectOption({ label: enrollFixture.courseTitle })
+  const groupRadio = page.locator(
+    `input[name="create-student-group"][value="${enrollFixture.groupId}"]`,
+  )
+  await expect(groupRadio).toBeVisible({ timeout: 10000 })
+  await groupRadio.check()
+
   // The dialog has a footer submit button with identical label to the trigger.
   // Scope it to the dialog to avoid strict-mode violations.
   const dialog = page.locator('[role="dialog"]')
@@ -211,6 +236,40 @@ async function readGeneratedUsernames(
 test.describe.serial('Phase 2 Step 8 — Student Management', () => {
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000)
+
+    await db.schoolYear.upsert({ where: { label: CY }, create: { label: CY }, update: {} })
+    const location = await db.location.create({
+      data: { city: 'SPLIT', name: `Loc ${RUN_ID}`, address: `Test address ${RUN_ID}` },
+    })
+    const course = await db.course.create({
+      data: {
+        slug: `students-spec-radionica-${RUN_ID}`,
+        title: `Radionica ${RUN_ID}`,
+        description: 'Test radionica',
+        kind: 'RADIONICA',
+        isCustom: true,
+        city: 'SPLIT',
+        schoolYear: CY,
+        ageMin: 6,
+        ageMax: 14,
+      },
+    })
+    const group = await db.scheduledGroup.create({
+      data: {
+        city: 'SPLIT',
+        courseId: course.id,
+        locationId: location.id,
+        name: `Grupa ${RUN_ID}`,
+        schoolYear: CY,
+        dayOfWeek: 'Petak',
+        startTime: '17:00',
+        endTime: '18:30',
+        // Every student this spec creates goes in here; a real cap would fill.
+        maxStudents: 200,
+      },
+    })
+    enrollFixture = { courseTitle: course.title, groupId: group.id }
+
     const page = await browser.newPage()
     await submitInquiry(page, INQUIRY_FOR_ACCOUNT)
     await submitInquiry(page, INQUIRY_FOR_DECLINE)
@@ -372,7 +431,9 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       await expect(page.getByRole('heading', { name: 'Pristupni podaci' })).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Podaci', exact: true })).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Upisane grupe' })).toBeVisible()
-      await expect(page.getByRole('heading', { name: 'Bilješke' })).toBeVisible()
+      // Exact: the student now arrives with an enrollment, which brings the
+      // "Ocjene i bilješke" section along and makes a loose match ambiguous.
+      await expect(page.getByRole('heading', { name: 'Bilješke', exact: true })).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Opasna zona' })).toBeVisible()
 
       // Personal data fields

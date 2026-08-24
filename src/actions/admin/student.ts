@@ -101,6 +101,7 @@ export type StudentRow = {
   username: string | null
   dateOfBirth: string | null
   createdAt: Date
+  /** Resolved against the result's `returningYear`, not against today's date. */
   paymentStatus: PaymentStatus
   /** Enrolled in the result's `returningYear` and in some year before it. */
   isReturning: boolean
@@ -125,9 +126,10 @@ export type StudentRow = {
 }
 
 /**
- * The list plus the school year its `isReturning` flags (and the "Ponovni upis"
- * filter, when on) were resolved against — the page renders that year in the
- * column header, so the flag can never be read against a year it does not name.
+ * The list plus the school year it was resolved against — the year that flagged
+ * `isReturning`, decided each `paymentStatus`, and (when `schoolYear` was given)
+ * narrowed the rows. The page renders it in the column header, so nothing here
+ * can be read against a year it does not name.
  */
 type StudentListResult = PaginatedResult<StudentRow> & {
   returningYear: string
@@ -812,12 +814,15 @@ type StudentFilters = {
   paymentStatus?: PaymentFilter
   returning?: ReturningFilter
   /**
-   * School year the "Ponovni upis" marker is resolved against. Supplied by the
-   * page rather than read from the year cookie here: this list is deliberately
-   * NOT year-scoped, so which year the admin is *looking at* is a question the
-   * page answers (its `year` filter, else the sidebar selection) and the action
-   * should not grow a second opinion about. Falls back to the year filter, then
-   * to today's, for callers that pass nothing.
+   * Overrides the year that `isReturning` and the payment badge are resolved
+   * against, for a caller that wants to ask about a year it is not narrowing to.
+   * `/admin/ucenici` never passes it — it scopes to the sidebar year and lets
+   * this fall through to `schoolYear`, so the list, the flags and the badges can
+   * only ever name one year.
+   *
+   * The year is supplied by the caller rather than read from the cookie here:
+   * `getSelectedSchoolYear()` needs a request context, and four integration
+   * files call this action directly.
    */
   returningYear?: string
   page?: number
@@ -834,14 +839,20 @@ export async function getStudents(
   const now = new Date()
   const currentYear = computeSchoolYear(now)
 
-  // Echoed back on the result: the column header names this year and the filter
-  // chip repeats it, and a badge reporting on a different year than the one it
-  // prints is the single way this feature can lie.
-  const returningYear = filters.returningYear || schoolYear || currentYear
+  // The one year this call reasons about: it flags "ponovni upis", it decides
+  // whether a child's programme has started for the payment badge, and it is
+  // echoed back so the column header names it. A badge reporting on a different
+  // year than the one it prints is the single way this feature can lie.
+  //
+  // `computeSchoolYear(now)` is only the fallback for a caller that scopes to no
+  // year at all. The page always passes `schoolYear`, and must: through the
+  // summer, today's date still names the year that is ending while every upis
+  // being made is for the one starting in September.
+  const referenceYear = filters.returningYear || schoolYear || currentYear
 
   const andClauses: Prisma.UserWhereInput[] = []
-  if (paymentStatus) andClauses.push(paymentStatusUserWhere(paymentStatus, currentYear, now))
-  if (returning) andClauses.push(returningStudentWhere(returning, returningYear))
+  if (paymentStatus) andClauses.push(paymentStatusUserWhere(paymentStatus, referenceYear, now))
+  if (returning) andClauses.push(returningStudentWhere(returning, referenceYear))
 
   // Name and username, matched case- AND accent-insensitively so "Testic" finds
   // "Testić" (see unaccent-search.ts), and per token so a full name — which
@@ -910,8 +921,8 @@ export async function getStudents(
 
   const rows: StudentRow[] = data.map((u) => ({
     ...u,
-    paymentStatus: computeStudentPaymentStatus(u.enrollments, currentYear, now),
-    isReturning: isReturningStudent(u.enrollments, returningYear),
+    paymentStatus: computeStudentPaymentStatus(u.enrollments, referenceYear, now),
+    isReturning: isReturningStudent(u.enrollments, referenceYear),
   })) as StudentRow[]
 
   return {
@@ -920,7 +931,7 @@ export async function getStudents(
     page,
     pageSize,
     pageCount: Math.ceil(total / pageSize),
-    returningYear,
+    returningYear: referenceYear,
   }
 }
 

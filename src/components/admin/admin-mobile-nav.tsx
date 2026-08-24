@@ -16,6 +16,10 @@ const navGroups = [
     links: [
       { href: '/admin/skolska-godina', label: 'Kalendar', icon: CalendarDays },
       { href: '/admin/upiti', label: 'Upiti', icon: Inbox },
+      // Follows the year switcher above it: the list shows the students
+      // enrolled in the selected year, so it belongs to this section and not
+      // to "Općenito", where it used to promise every child ever.
+      { href: '/admin/ucenici', label: 'Učenici', icon: GraduationCap },
       { href: '/admin/grupe', label: 'Grupe', icon: Users2 },
       { href: '/admin/programi', label: 'Programi', icon: BookOpen },
     ],
@@ -24,7 +28,6 @@ const navGroups = [
     label: 'Općenito',
     links: [
       { href: '/admin', label: 'Nadzorna ploča', icon: LayoutDashboard },
-      { href: '/admin/ucenici', label: 'Učenici', icon: GraduationCap },
       { href: '/admin/nastavnici', label: 'Nastavnici', icon: Users },
       { href: '/admin/lokacije', label: 'Lokacije', icon: MapPin },
       { href: '/admin/novosti', label: 'Novosti', icon: Newspaper },

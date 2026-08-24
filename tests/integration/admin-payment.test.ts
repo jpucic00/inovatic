@@ -198,7 +198,8 @@ describe('getStudents payment filter + computed status', () => {
     expect(byId.get(ids.C_yearpaid)).toBe('PAID')
     expect(byId.get(ids.D_radio_unpaid)).toBe('PENDING')
     expect(byId.get(ids.D2_radio_paid)).toBe('PAID')
-    expect(byId.get(ids.E_future)).toBe('PAID')
+    // Enrolled, but its only module still lies ahead — nothing owed, nothing paid.
+    expect(byId.get(ids.E_future)).toBe('NOT_DUE')
     expect(byId.get(ids.F_pastpaid)).toBe('NONE')
     expect(byId.get(ids.G_pastunpaid)).toBe('PENDING') // cross-year debt
     expect(byId.get(ids.H_courseX)).toBe('PENDING')
@@ -217,16 +218,45 @@ describe('getStudents payment filter + computed status', () => {
     expect(got.has(ids.F_pastpaid)).toBe(false)
   })
 
-  it('PAID filter returns current-year enrolled with nothing owed', async () => {
+  it('PAID filter returns current-year enrolled who have settled what came due', async () => {
     const got = await fetchIds({ paymentStatus: 'PAID' })
     expect(got.has(ids.B_allpaid)).toBe(true)
     expect(got.has(ids.C_yearpaid)).toBe(true)
     expect(got.has(ids.D2_radio_paid)).toBe(true)
-    expect(got.has(ids.E_future)).toBe(true)
     expect(got.has(ids.A_pending)).toBe(false)
     expect(got.has(ids.D_radio_unpaid)).toBe(false)
     expect(got.has(ids.G_pastunpaid)).toBe(false)
     expect(got.has(ids.F_pastpaid)).toBe(false) // NONE: no current-year enrollment
+    // Nothing has come due for E yet, so there is nothing it could have paid.
+    expect(got.has(ids.E_future)).toBe(false)
+  })
+
+  it('NOT_DUE filter returns the enrolled whose programme has not started', async () => {
+    const got = await fetchIds({ paymentStatus: 'NOT_DUE' })
+    expect(got.has(ids.E_future)).toBe(true)
+    // Everyone else has either paid something or owes something.
+    expect(got.has(ids.A_pending)).toBe(false)
+    expect(got.has(ids.B_allpaid)).toBe(false)
+    expect(got.has(ids.C_yearpaid)).toBe(false)
+    expect(got.has(ids.D_radio_unpaid)).toBe(false)
+    expect(got.has(ids.D2_radio_paid)).toBe(false)
+    expect(got.has(ids.F_pastpaid)).toBe(false)
+    expect(got.has(ids.G_pastunpaid)).toBe(false)
+  })
+
+  it('splits the three filters into disjoint sets that agree with the badges', async () => {
+    // The dropdown and the column are two renderings of one rule; if the Prisma
+    // mirror ever drifted from computeStudentPaymentStatus, a row would sit in
+    // the wrong bucket or in two at once.
+    const all = await getStudents({ search: MARKER, pageSize: 100 })
+    const byId = new Map(all.data.map((r) => [r.id, r.paymentStatus]))
+
+    for (const filter of ['PENDING', 'NOT_DUE', 'PAID'] as const) {
+      const got = await fetchIds({ paymentStatus: filter })
+      for (const id of got) expect(byId.get(id)).toBe(filter)
+      const expected = [...byId].filter(([, status]) => status === filter).map(([id]) => id)
+      for (const id of expected) expect(got.has(id)).toBe(true)
+    }
   })
 
   it('combines courseId with paymentStatus (AND-wrap regression)', async () => {

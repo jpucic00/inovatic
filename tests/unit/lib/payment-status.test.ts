@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   isEnrollmentPending,
+  hasDueItems,
   computeStudentPaymentStatus,
   pendingEnrollmentWhere,
+  dueEnrollmentWhere,
   type PaymentStatusEnrollment,
 } from '@/lib/payment-status'
 
@@ -39,6 +41,19 @@ function radionica(
     scheduledGroup: { course: { kind: 'RADIONICA' } },
     moduleEnrollments: [],
     enrollmentMonths: [],
+  }
+}
+
+function competition(
+  months: { paidAt: Date | null; periodStart: Date }[],
+  opts: { schoolYear?: string } = {},
+): PaymentStatusEnrollment {
+  return {
+    schoolYear: opts.schoolYear ?? CURRENT_YEAR,
+    fullYearPaidAt: null,
+    scheduledGroup: { course: { kind: 'COMPETITION' } },
+    moduleEnrollments: [],
+    enrollmentMonths: months,
   }
 }
 
@@ -90,19 +105,64 @@ describe('isEnrollmentPending', () => {
   })
 })
 
+describe('hasDueItems', () => {
+  it('is due once a module has started, paid or not', () => {
+    expect(hasDueItems(standardEnrollment([{ paidAt: null, startDate: STARTED }]), NOW)).toBe(true)
+    expect(
+      hasDueItems(standardEnrollment([{ paidAt: new Date(), startDate: STARTED }]), NOW),
+    ).toBe(true)
+  })
+
+  it('is NOT due while the only module still lies in the future', () => {
+    expect(hasDueItems(standardEnrollment([{ paidAt: null, startDate: FUTURE }]), NOW)).toBe(false)
+  })
+
+  it('is due when a module carries no start date at all', () => {
+    expect(hasDueItems(standardEnrollment([{ paidAt: null, startDate: null }]), NOW)).toBe(true)
+  })
+
+  it('is NOT due for an enrollment with zero modules', () => {
+    expect(hasDueItems(standardEnrollment([]), NOW)).toBe(false)
+  })
+
+  it('counts a whole-year mark on its own, ahead of any module', () => {
+    // Paying up front is a payment whatever the calendar says — without this
+    // the family that settled early would read as though nothing had happened.
+    expect(
+      hasDueItems(
+        standardEnrollment([{ paidAt: null, startDate: FUTURE }], {
+          fullYearPaidAt: new Date(),
+        }),
+        NOW,
+      ),
+    ).toBe(true)
+  })
+
+  it('radionica is due from the moment of enrollment', () => {
+    expect(hasDueItems(radionica(), NOW)).toBe(true)
+  })
+
+  it('competition: due once a month has begun, not before', () => {
+    expect(hasDueItems(competition([{ paidAt: null, periodStart: STARTED }]), NOW)).toBe(true)
+    expect(hasDueItems(competition([{ paidAt: null, periodStart: FUTURE }]), NOW)).toBe(false)
+  })
+})
+
 describe('computeStudentPaymentStatus', () => {
   it('NONE when there are no enrollments at all', () => {
     expect(computeStudentPaymentStatus([], CURRENT_YEAR, NOW)).toBe('NONE')
   })
 
-  it('PAID when enrolled this year with nothing started yet', () => {
+  it('NOT_DUE when enrolled this year with nothing started yet', () => {
+    // The whole point of the third state: nobody has paid, but nobody owes
+    // either. Green here would have claimed a payment that never happened.
     expect(
       computeStudentPaymentStatus(
         [standardEnrollment([{ paidAt: null, startDate: FUTURE }])],
         CURRENT_YEAR,
         NOW,
       ),
-    ).toBe('PAID')
+    ).toBe('NOT_DUE')
   })
 
   it('PAID when all current-year started modules are paid', () => {
@@ -115,8 +175,10 @@ describe('computeStudentPaymentStatus', () => {
     ).toBe('PAID')
   })
 
-  it('PAID for a dropped/zero-module current-year enrollment', () => {
-    expect(computeStudentPaymentStatus([standardEnrollment([])], CURRENT_YEAR, NOW)).toBe('PAID')
+  it('NOT_DUE for a dropped/zero-module current-year enrollment', () => {
+    expect(computeStudentPaymentStatus([standardEnrollment([])], CURRENT_YEAR, NOW)).toBe(
+      'NOT_DUE',
+    )
   })
 
   it('PAID when year-paid covers a later-added unpaid started module', () => {
@@ -180,6 +242,35 @@ describe('computeStudentPaymentStatus', () => {
       ),
     ).toBe('NONE')
   })
+
+  // The reported bug, in one pair of assertions. Through the summer the admin
+  // is enrolling into a year the calendar has not reached, and reading "Bez
+  // upisa" over children who are demonstrably enrolled.
+  it('answers about the year it is ASKED about, not about today', () => {
+    const nextYearOnly = [
+      standardEnrollment([{ paidAt: null, startDate: FUTURE }], { schoolYear: '2027/2028' }),
+    ]
+    expect(computeStudentPaymentStatus(nextYearOnly, CURRENT_YEAR, NOW)).toBe('NONE')
+    expect(computeStudentPaymentStatus(nextYearOnly, '2027/2028', NOW)).toBe('NOT_DUE')
+  })
+
+  // Last year's settled modules say nothing about whether this year has begun,
+  // so PAID is decided inside the reference year — unlike PENDING, which is
+  // deliberately cross-year because a debt follows a family.
+  it('does not let a previous year\'s paid modules read as PAID for this one', () => {
+    expect(
+      computeStudentPaymentStatus(
+        [
+          standardEnrollment([{ paidAt: new Date(), startDate: STARTED }], {
+            schoolYear: PAST_YEAR,
+          }),
+          standardEnrollment([{ paidAt: null, startDate: FUTURE }]),
+        ],
+        CURRENT_YEAR,
+        NOW,
+      ),
+    ).toBe('NOT_DUE')
+  })
 })
 
 describe('pendingEnrollmentWhere (drift guard)', () => {
@@ -192,5 +283,24 @@ describe('pendingEnrollmentWhere (drift guard)', () => {
     // standard (a started, unpaid module). One arm per arm of
     // `isEnrollmentPending` — the two MUST stay in sync.
     expect(where.OR).toHaveLength(3)
+  })
+})
+
+describe('dueEnrollmentWhere (drift guard)', () => {
+  it('builds a year-independent where with one branch per arm of hasDueItems', () => {
+    const where = dueEnrollmentWhere(NOW)
+    // The year is the caller's to add — paymentStatusUserWhere spreads this
+    // alongside a schoolYear, so baking one in here would silently double up.
+    expect(where).not.toHaveProperty('schoolYear')
+    expect(Array.isArray(where.OR)).toBe(true)
+    // whole-year mark + radionica + competition month + standard module.
+    expect(where.OR).toHaveLength(4)
+  })
+
+  it('accepts a paid enrollment, unlike its pending twin', () => {
+    // The two mirrors differ by exactly this: pending excludes a settled row,
+    // due includes it. If they ever agreed, PAID and NOT_DUE would collapse.
+    expect(pendingEnrollmentWhere(NOW).fullYearPaidAt).toBeNull()
+    expect(dueEnrollmentWhere(NOW).OR?.[0]).toEqual({ fullYearPaidAt: { not: null } })
   })
 })

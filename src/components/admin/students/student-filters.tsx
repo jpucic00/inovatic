@@ -5,6 +5,7 @@ import { useTransition, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 import { RETURNING_FILTER_LABELS } from '@/lib/returning-filter'
+import { PAYMENT_FILTER_VALUES, PAYMENT_STATUS_LABELS } from '@/lib/payment-status'
 
 type CourseOption = { id: string; title: string }
 type GroupOption = { id: string; name: string | null; course: { title: string } }
@@ -14,13 +15,15 @@ interface StudentFiltersProps {
   currentCourseId?: string
   currentGroupId?: string
   currentPayment?: string
-  currentYear?: string
   currentReturning?: string
-  /** Year the ponovni-upis filter resolves against, named in its options. */
+  /**
+   * The school year the whole list is scoped to (the sidebar selection), named
+   * in the ponovni-upis options. There is deliberately no Godina control here —
+   * the year is not this page's to change.
+   */
   returningYear?: string
   courses?: CourseOption[]
   groups?: GroupOption[]
-  years?: string[]
 }
 
 export function StudentFilters({
@@ -28,12 +31,10 @@ export function StudentFilters({
   currentCourseId,
   currentGroupId,
   currentPayment,
-  currentYear,
   currentReturning,
   returningYear,
   courses,
   groups,
-  years,
 }: Readonly<StudentFiltersProps>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -56,12 +57,10 @@ export function StudentFilters({
       const courseId = overrides.courseId ?? currentCourseId ?? ''
       const groupId = overrides.groupId ?? currentGroupId ?? ''
       const payment = overrides.payment ?? currentPayment ?? ''
-      const year = overrides.year ?? currentYear ?? ''
       const returning = overrides.returning ?? currentReturning ?? ''
       if (courseId) sp.set('courseId', courseId)
       if (groupId) sp.set('groupId', groupId)
       if (payment) sp.set('payment', payment)
-      if (year) sp.set('year', year)
       if (returning) sp.set('returning', returning)
     }
 
@@ -90,12 +89,6 @@ export function StudentFilters({
   const handlePaymentChange = (payment: string) => {
     startTransition(() => {
       router.push(`${pathname}?${buildParams({ payment })}`)
-    })
-  }
-
-  const handleYearChange = (year: string) => {
-    startTransition(() => {
-      router.push(`${pathname}?${buildParams({ year })}`)
     })
   }
 
@@ -128,19 +121,6 @@ export function StudentFilters({
       {showFilters && (
         <div className="flex flex-wrap gap-3">
           <select
-            value={currentYear ?? ''}
-            onChange={(e) => handleYearChange(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">Sve godine</option>
-            {(years ?? []).map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-
-          <select
             value={currentCourseId ?? ''}
             onChange={(e) => handleCourseChange(e.target.value)}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -166,19 +146,25 @@ export function StudentFilters({
             ))}
           </select>
 
+          {/* Options come from the badge's own label map: the dropdown and the
+              table cell must call each state by the same name, or "Nije
+              dospjelo" in one place and something else in the other reads as
+              two different things. */}
           <select
             value={currentPayment ?? ''}
             onChange={(e) => handlePaymentChange(e.target.value)}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="">Plaćanje: svi</option>
-            <option value="PENDING">Nije plaćeno</option>
-            <option value="PAID">Plaćeno</option>
+            {PAYMENT_FILTER_VALUES.map((value) => (
+              <option key={value} value={value}>
+                {PAYMENT_STATUS_LABELS[value]}
+              </option>
+            ))}
           </select>
 
-          {/* Both options name the year, because both narrow to it: a returning
-              or first-time upis is a fact about one school year, so this filter
-              answers "who came back in <year>", not "who has ever come back". */}
+          {/* Both options name the year, because both narrow within it: a
+              returning or first-time upis is a fact about one school year. */}
           <select
             value={currentReturning ?? ''}
             onChange={(e) => handleReturningChange(e.target.value)}

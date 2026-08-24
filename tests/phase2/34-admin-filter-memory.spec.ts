@@ -90,6 +90,13 @@ test.beforeAll(async () => {
       role: 'STUDENT',
     },
   })
+  // Enrolled in the current year, because /admin/ucenici is year-scoped: an
+  // account with no enrollment is in no year's list, so an unenrolled fixture
+  // would make every filter assertion here fail on an empty table.
+  await db.enrollment.create({
+    data: { userId: student.id, scheduledGroupId: group.id, schoolYear: CY },
+  })
+
   const otherAdmin = await db.user.create({
     data: {
       city: 'SPLIT',

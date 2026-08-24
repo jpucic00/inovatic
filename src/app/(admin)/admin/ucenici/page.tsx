@@ -5,7 +5,6 @@ import { db } from '@/lib/db'
 import { getStudents } from '@/actions/admin/student'
 import { getCourses } from '@/actions/admin/course'
 import { getGroups } from '@/actions/admin/group'
-import { getAllSchoolYears } from '@/actions/admin/school-year'
 import { StudentFilters } from '@/components/admin/students/student-filters'
 import { StudentTable } from '@/components/admin/students/student-table'
 import { CreateStudentDialog } from '@/components/admin/students/create-student-dialog'
@@ -14,7 +13,11 @@ import {
   ListFilterMemory,
   type ActiveFilterChip,
 } from '@/components/admin/list-filter-memory'
-import { PAYMENT_FILTER_VALUES, type PaymentFilter } from '@/lib/payment-status'
+import {
+  PAYMENT_FILTER_VALUES,
+  PAYMENT_STATUS_LABELS,
+  type PaymentFilter,
+} from '@/lib/payment-status'
 import {
   parseReturningFilter,
   RETURNING_FILTER_LABELS,
@@ -32,12 +35,21 @@ interface PageProps {
 export default async function StudentsPage({ searchParams }: Readonly<PageProps>) {
   const { city } = await requireAdminCtx()
 
+  // The list follows the sidebar year like every other school-year section —
+  // there is no Godina filter and no `?year=`. One year governs the rows, the
+  // "Ponovni upis" flags and the Plaćanje badges at once, which is what stops
+  // the badge from reporting on a year the table is not showing.
+  //
+  // The trade the owner accepted: a child with no enrollment in the selected
+  // year is not in this list at all, search included. Finding last year's
+  // polaznik means switching the year in the sidebar.
+  const selectedYear = await getSelectedSchoolYear()
+
   const params = await searchParams
   const search = params.search ?? ''
   const courseId = params.courseId ?? ''
   const groupId = params.groupId ?? ''
   const scheduleId = params.scheduleId ?? ''
-  const year = params.year ?? ''
   const paymentStatus = PAYMENT_FILTER_VALUES.includes(params.payment as PaymentFilter)
     ? (params.payment as PaymentFilter)
     : undefined
@@ -46,23 +58,16 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
 
   const isModuleView = !!scheduleId
 
-  // "Ponovni upis" is a claim about one school year, and this list shows every
-  // year at once. The year the admin filtered to is the one they are looking at;
-  // with the filter off, the sidebar selection is what every other /admin
-  // surface treats as the current context, so it is the honest default here.
-  const returningYear = year || (await getSelectedSchoolYear())
-
   const groupFilter = courseId ? { courseId } : {}
-  const [result, courses, groups, scheduleInfo, years] = await Promise.all([
+  const [result, courses, groups, scheduleInfo] = await Promise.all([
     getStudents({
       search,
       courseId,
       groupId,
       scheduleId: scheduleId || undefined,
-      schoolYear: year || undefined,
+      schoolYear: selectedYear,
       paymentStatus,
       returning,
-      returningYear,
       page,
       pageSize: PAGE_SIZE,
     }),
@@ -77,18 +82,15 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
           },
         })
       : Promise.resolve(null),
-    isModuleView ? Promise.resolve<string[]>([]) : getAllSchoolYears(),
   ])
 
   const chips = buildStudentChips({
-    year,
     courseId,
     groupId,
     scheduleId,
     search,
     paymentStatus,
     returning,
-    returningYear: result.returningYear,
     courses,
     groups,
     scheduleInfo,
@@ -107,7 +109,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
             )}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Ukupno {result.total} učenik{result.total === 1 ? '' : 'a'}
+            Ukupno {result.total} učenik{result.total === 1 ? '' : 'a'} u {selectedYear}
           </p>
         </div>
         {!isModuleView && (
@@ -125,20 +127,18 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
           currentCourseId: courseId,
           currentGroupId: groupId,
           currentPayment: paymentStatus ?? '',
-          currentYear: year,
           currentReturning: returning ?? '',
-          returningYear: result.returningYear,
+          returningYear: selectedYear,
           courses: courses.map((c) => ({ id: c.id, title: c.title })),
           groups: groups.map((g) => ({
             id: g.id,
             name: g.name,
             course: g.course,
           })),
-          years,
         })}
       />
 
-      <StudentTable data={result.data} returningYear={result.returningYear} />
+      <StudentTable data={result.data} schoolYear={selectedYear} />
 
       <Pagination
         basePath="/admin/ucenici"
@@ -158,32 +158,27 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
  * render its chip, or the × on it would be the only way out and it would be
  * gone (a remembered module view whose ModuleSchedule was later deleted is
  * exactly that trap).
+ *
+ * The school year is deliberately not a chip. It is not a filter the admin set
+ * on this page and there is no × that could take it off — the sidebar switcher
+ * owns it, and names it.
  */
 function buildStudentChips(args: {
-  year: string
   courseId: string
   groupId: string
   scheduleId: string
   search: string
   paymentStatus: PaymentFilter | undefined
   returning: ReturningFilter | undefined
-  returningYear: string
   courses: ReadonlyArray<{ id: string; title: string }>
   groups: ReadonlyArray<{ id: string; name: string | null; course: { title: string } }>
   scheduleInfo: { module: { title: string; course: { title: string } } } | null
 }): ActiveFilterChip[] {
-  const { year, courseId, groupId, scheduleId, search, paymentStatus, returning, returningYear, courses, groups, scheduleInfo } =
+  const { courseId, groupId, scheduleId, search, paymentStatus, returning, courses, groups, scheduleInfo } =
     args
   const selectedGroup = groups.find((g) => g.id === groupId)
   return [
-    year && { key: 'year', label: `Godina: ${year}` },
-    // Names the year even when the Godina filter is off, because this filter
-    // narrows to it either way — a chip reading just "Ponovni upis" would hide
-    // the fact that the table is now showing one school year's students.
-    returning && {
-      key: 'returning',
-      label: `${RETURNING_FILTER_LABELS[returning]}: ${returningYear}`,
-    },
+    returning && { key: 'returning', label: RETURNING_FILTER_LABELS[returning] },
     courseId && {
       key: 'courseId',
       label: `Program: ${courses.find((c) => c.id === courseId)?.title ?? courseId}`,
@@ -194,7 +189,7 @@ function buildStudentChips(args: {
     },
     paymentStatus && {
       key: 'payment',
-      label: paymentStatus === 'PAID' ? 'Plaćeno' : 'Nije plaćeno',
+      label: PAYMENT_STATUS_LABELS[paymentStatus],
     },
     scheduleId && {
       key: 'scheduleId',
