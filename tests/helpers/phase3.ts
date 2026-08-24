@@ -93,6 +93,12 @@ export async function loginWithEmail(page: Page, email: string, password: string
       continue
     }
     if ((await identifier.count()) === 0) break // student: portal shell replaced the form
+    // Re-fill on every attempt. A click that lands before hydration is
+    // swallowed, and React then resets the controlled inputs to empty — so a
+    // loop that filled only once would submit a blank form on every retry and
+    // could never recover, timing out 45s later on a login that was fine.
+    await identifier.fill(email).catch(() => undefined)
+    await page.locator('input[type="password"]').fill(password).catch(() => undefined)
     await submit.click({ timeout: 5000 }).catch(() => undefined)
     await Promise.race([
       page.waitForURL(staffUrl, { timeout: 20000 }).catch(() => undefined),
@@ -435,7 +441,11 @@ export async function markSession(page: Page, groupId: string, date: string) {
   await expect(
     page.getByRole('heading', { level: 3, name: croatianDateRegex(date) }),
   ).toBeVisible({ timeout: 5000 })
-  await page.getByRole('button', { name: 'Spremi' }).click()
+  // Every box starts empty since the marker moved to checkboxes — an untouched
+  // session claims nothing. The header checkbox is the teacher's own one-click
+  // shortcut for a full class, and it is what makes this roster present.
+  await page.getByRole('checkbox', { name: 'Označi sve prisutne' }).click()
+  await page.getByRole('button', { name: 'Spremi evidenciju' }).click()
   await expect(page.getByText('Evidencija spremljena.')).toBeVisible({ timeout: 15000 })
 }
 

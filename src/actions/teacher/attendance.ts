@@ -44,6 +44,12 @@ export type AttendanceRecord = {
   note: string | null
   recordedBy: string | null
   recordedByDeleted: boolean
+  /**
+   * When the row was last written, ISO. The marker states it back as
+   * "spremljeno …" — with a blank draft, "this session is recorded" is no
+   * longer readable off the checkboxes themselves.
+   */
+  recordedAt: string
 }
 
 export type AttendanceModuleSection = {
@@ -254,6 +260,7 @@ function flattenAttendanceRecords(
           ? `${a.recordedBy.firstName} ${a.recordedBy.lastName}`
           : null,
         recordedByDeleted: a.recordedBy?.deletedAt != null,
+        recordedAt: a.updatedAt.toISOString(),
       })
     }
   }

@@ -149,15 +149,20 @@ test.describe('Phase 3 Step 14 — Attendance', () => {
       await dateButton.first().click()
 
       const studentFullName = `${STUDENT.lastName} ${STUDENT.firstName}`
-      const row = page.locator('tr', { hasText: studentFullName })
-      await row.getByRole('button', { name: 'Prisutan' }).click()
+      const row = page.getByRole('listitem').filter({ hasText: studentFullName })
+      const box = row.getByRole('checkbox', { name: studentFullName })
+      await box.click()
       await expect(
-        row.getByRole('button', { name: 'Odsutan' }),
-        'row flips to "Odsutan" after re-mark click',
-      ).toBeVisible()
+        box,
+        'row checkbox clears after the re-mark click',
+      ).toHaveAttribute('aria-checked', 'false')
       await row.locator('input[type="text"]').fill(RE_MARK_NOTE)
 
-      await page.getByRole('button', { name: 'Spremi' }).click()
+      await page.getByRole('button', { name: 'Spremi evidenciju' }).click()
+      // Clearing the group's only student leaves nothing marked, and that case
+      // asks first — a blank roster would otherwise write everyone absent in
+      // one click, which is the risk the blank-by-default draft introduced.
+      await page.getByRole('button', { name: 'Evidentiraj kao odsutne' }).click()
       await expect(
         page.getByText('Evidencija spremljena.'),
         'save toast confirms server upsert ran',

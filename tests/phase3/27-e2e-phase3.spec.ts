@@ -135,7 +135,9 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await expect(
       page.getByRole('heading', { level: 3, name: croatianDateRegex(SESSION_DATE) }),
     ).toBeVisible({ timeout: 5000 })
-    await page.getByRole('button', { name: 'Spremi' }).click()
+    // Checkboxes start blank; nothing is present until the teacher says so.
+    await page.getByRole('checkbox', { name: 'Označi sve prisutne' }).click()
+    await page.getByRole('button', { name: 'Spremi evidenciju' }).click()
     await expect(page.getByText('Evidencija spremljena.')).toBeVisible({ timeout: 30000 })
 
     // Fill the structured report card (Ocjena) — replaced MODULE_REVIEW 2026-07.
