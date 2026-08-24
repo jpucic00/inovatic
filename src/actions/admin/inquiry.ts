@@ -21,6 +21,7 @@ import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
 import type { ReturningFilter } from '@/lib/returning-filter'
 import { isRadionica } from '@/lib/program-kind'
+import { unaccentSearchFilter } from '@/lib/unaccent-search'
 
 type InquiryFilters = {
   status?: InquiryStatus | 'ALL'
@@ -42,10 +43,6 @@ function courseIdFilter(courseId: string | undefined) {
 type InquiryListRow = Awaited<ReturnType<typeof db.inquiry.findMany>>[number] & {
   isReturning: boolean
   isReturningOtherCity: boolean
-}
-
-function searchTokens(search: string | undefined): string[] {
-  return search?.trim().split(/\s+/).filter(Boolean) ?? []
 }
 
 /**
@@ -101,7 +98,9 @@ export async function getInquiries(
 
   const { status, search, courseId, grade, type, returning, page = 1, pageSize = 20 } = filters
   const schoolYear = await getSelectedSchoolYear()
-  const tokens = searchTokens(search)
+  // Parent name, child name and parent e-mail, matched case- AND
+  // accent-insensitively so "Testic" finds "Testić" — see unaccent-search.ts.
+  const searchFilter = await unaccentSearchFilter('Inquiry', search)
 
   const where: Prisma.InquiryWhereInput = {
     schoolYear,
@@ -110,26 +109,13 @@ export async function getInquiries(
     ...(type && type !== 'ALL' ? { type } : {}),
     ...(courseIdFilter(courseId)),
     ...(grade ? { childGrade: grade } : {}),
-    // Every whitespace-separated token must land in SOME field. A child's full
-    // name spans two columns ("Petra" in childFirstName, "Testić" in
-    // childLastName), so matching the whole string against each column finds
-    // nothing — the natural staff search is the full name off the upit mail.
-    ...(tokens.length > 0
-      ? {
-          AND: tokens.map((token) => ({
-            OR: [
-              { parentName: { contains: token, mode: 'insensitive' as const } },
-              { childFirstName: { contains: token, mode: 'insensitive' as const } },
-              { childLastName: { contains: token, mode: 'insensitive' as const } },
-              { parentEmail: { contains: token, mode: 'insensitive' as const } },
-            ],
-          })),
-        }
-      : {}),
+    ...(searchFilter ?? {}),
   }
 
+  // AND-composed rather than spread: the search filter already claims `id`, and
+  // spreading a second one would silently drop whichever came first.
   const scopedWhere: Prisma.InquiryWhereInput = returning
-    ? { ...where, id: { in: await returningInquiryIds(where, returning) } }
+    ? { AND: [where, { id: { in: await returningInquiryIds(where, returning) } }] }
     : where
 
   const [data, total] = await Promise.all([

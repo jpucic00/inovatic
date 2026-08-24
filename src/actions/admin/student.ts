@@ -28,6 +28,7 @@ import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
 import { computeSchoolYear } from '@/lib/school-year'
 import { isMonthlyBilled } from '@/lib/program-kind'
 import { offersPaymentOption } from '@/lib/payment-option'
+import { unaccentSearchFilter } from '@/lib/unaccent-search'
 import { seasonMonths } from '@/lib/monthly-charges'
 import {
   computeStudentPaymentStatus,
@@ -842,18 +843,15 @@ export async function getStudents(
   if (paymentStatus) andClauses.push(paymentStatusUserWhere(paymentStatus, currentYear, now))
   if (returning) andClauses.push(returningStudentWhere(returning, returningYear))
 
+  // Name and username, matched case- AND accent-insensitively so "Testic" finds
+  // "Testić" (see unaccent-search.ts), and per token so a full name — which
+  // spans firstName and lastName — matches at all.
+  const searchFilter = await unaccentSearchFilter('User', search)
+
   const where = {
     role: 'STUDENT' as const,
     city,
-    ...(search
-      ? {
-          OR: [
-            { firstName: { contains: search, mode: 'insensitive' as const } },
-            { lastName: { contains: search, mode: 'insensitive' as const } },
-            { username: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {}),
+    ...(searchFilter ?? {}),
     ...(courseId || groupId || scheduleId || schoolYear
       ? {
           enrollments: {
