@@ -524,3 +524,32 @@ export async function expectNotFoundPage(page: Page) {
     body.includes('stranica nije pronađena')
   expect(hasNotFound, `Expected a not-found page but got: "${body.slice(0, 200)}"`).toBe(true)
 }
+
+/**
+ * Navigate to a portal path, for specs that walk a LIST of them in one page.
+ *
+ * Two things bite there, both timing rather than logic:
+ *
+ * 1. `/portal` renders group cards whose links the App Router prefetches the
+ *    moment it hydrates. A `goto` fired while one of those RSC prefetches is
+ *    still in flight is cancelled by Chromium as `net::ERR_ABORTED` — the
+ *    request never reaches the server, which answers 200 for every one of these
+ *    URLs when asked directly. Letting it settle and going once more is enough.
+ * 2. `/portal` also sends a child with a single enrollment straight to their
+ *    group (2026-08-24), so the page can already BE the URL being asked for;
+ *    navigating to the URL you are on aborts as well. Reload instead.
+ */
+export async function gotoPortalPath(page: Page, path: string): Promise<void> {
+  const url = `${BASE}${path}`
+  if (page.url() === url) {
+    await page.reload()
+    return
+  }
+  try {
+    await page.goto(url)
+  } catch (err) {
+    if (!String(err).includes('ERR_ABORTED')) throw err
+    await page.waitForLoadState('domcontentloaded').catch(() => {})
+    await page.goto(url)
+  }
+}

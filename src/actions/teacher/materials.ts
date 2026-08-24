@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
-import { buildGroupMaterialsView, type GroupMaterialsView } from '@/lib/group-materials-view'
+import { buildGroupMaterialsView, interactiveGuides } from '@/lib/group-materials-view'
 import type { StaffMaterialRow } from '@/components/material/staff-material-list'
 
 /**
@@ -97,13 +97,47 @@ export async function getGroupUploadTargets(groupId: string) {
   }
 }
 
+export type StaffGuide = {
+  id: string
+  title: string
+  description: string | null
+  externalUrl: string | null
+  moduleTitle: string | null
+}
+
+type StaffGuideFeed = {
+  groupId: string
+  courseTitle: string
+  groupName: string | null
+  guides: StaffGuide[]
+}
+
 /**
- * The exact post-hide view a STUDENT of this group sees, for the teacher
- * "scene view" (Pregled) tab. Gated by group ownership (ADMIN bypasses).
+ * The RoboCamp guides this group can put on the classroom wall.
+ *
+ * Built from `buildGroupMaterialsView`, which is the group's EFFECTIVE view —
+ * so a material hidden in this group is absent here too. What is presented has
+ * to be what the group actually has; a teacher projecting a worksheet their own
+ * class cannot open is the failure this avoids.
+ *
+ * Usually one: a STANDARD group is paced to a single active module. A
+ * COMPETITION group sees every natjecanje at once and can therefore have
+ * several, which is the only reason the presenter has a switcher at all.
  */
-export async function getGroupMaterialsViewForStaff(
-  groupId: string,
-): Promise<GroupMaterialsView> {
+export async function getGroupGuidesForStaff(groupId: string): Promise<StaffGuideFeed> {
   await assertTeacherOwnsGroup(groupId)
-  return buildGroupMaterialsView(groupId)
+  const view = await buildGroupMaterialsView(groupId)
+
+  return {
+    groupId: view.group.id,
+    courseTitle: view.group.course.title,
+    groupName: view.group.name,
+    guides: interactiveGuides(view).map(({ item, moduleTitle }) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      externalUrl: item.externalUrl,
+      moduleTitle,
+    })),
+  }
 }

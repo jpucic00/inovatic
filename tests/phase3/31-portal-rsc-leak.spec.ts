@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
   BASE,
+  gotoPortalPath,
   loginWithEmail,
   collectGroupIds,
   type TeacherData,
@@ -93,7 +94,7 @@ type Seeded = {
 let seeded: Seeded | null = null
 
 async function assertNoStaffLeak(page: Page, path: string) {
-  await page.goto(`${BASE}${path}`)
+  await gotoPortalPath(page, path)
   await page.waitForLoadState('domcontentloaded')
   const html = await page.content()
   for (const token of FORBIDDEN_HTML_TOKENS) {

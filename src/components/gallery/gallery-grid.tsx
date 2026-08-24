@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import Image from 'next/image'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import type { GalleryImageRow } from '@/actions/teacher/gallery'
@@ -38,7 +38,14 @@ export function GalleryGrid({
   }, [images])
 
   if (images.length === 0) {
-    return <p className="text-sm text-gray-500 italic">{emptyLabel}</p>
+    return (
+      <div className="rounded-xl border border-dashed border-gray-300 bg-white p-11 text-center">
+        <span className="mb-3.5 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-yellow-50 text-yellow-700">
+          <ImageIcon className="h-7 w-7" />
+        </span>
+        <p className="text-sm text-gray-500">{emptyLabel}</p>
+      </div>
+    )
   }
 
   const handleRemove = (image: GalleryImageRow) => {

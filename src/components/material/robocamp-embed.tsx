@@ -13,7 +13,23 @@ import { toProxyUrl } from '@/lib/robocamp-proxy'
 const BASE_W = 1330
 const BASE_H = 860
 
-export function RobocampEmbed({ url, title }: Readonly<{ url: string; title?: string }>) {
+/**
+ * `width` (default) scales the exercise to the container's width and lets the
+ * page grow as tall as the result — right for a document you scroll.
+ *
+ * `contain` fits it inside BOTH dimensions, so the whole exercise is on screen
+ * at once and the surrounding box never scrolls. That is what a lesson needs:
+ * while this is on the classroom wall, nothing may shift under the teacher's
+ * cursor. The grey margins it leaves on a wide screen are the point, not waste.
+ */
+type EmbedFit = 'width' | 'contain'
+
+export function RobocampEmbed({
+  url,
+  title,
+  fit = 'width',
+  chrome = true,
+}: Readonly<{ url: string; title?: string; fit?: EmbedFit; chrome?: boolean }>) {
   const proxied = toProxyUrl(url)
   const wrapRef = useRef<HTMLDivElement>(null)
   const fsRef = useRef<HTMLDivElement>(null)
@@ -22,9 +38,17 @@ export function RobocampEmbed({ url, title }: Readonly<{ url: string; title?: st
   const [canFullscreen, setCanFullscreen] = useState(false)
 
   const measure = useCallback(() => {
-    const w = wrapRef.current?.clientWidth
-    if (w && w > 0) setScale(Math.min(1, w / BASE_W))
-  }, [])
+    const el = wrapRef.current
+    if (!el) return
+    const w = el.clientWidth
+    if (w <= 0) return
+    const h = el.clientHeight
+    setScale(
+      fit === 'contain' && h > 0
+        ? Math.min(1, w / BASE_W, h / BASE_H)
+        : Math.min(1, w / BASE_W),
+    )
+  }, [fit])
 
   useEffect(() => {
     measure()
@@ -63,7 +87,12 @@ export function RobocampEmbed({ url, title }: Readonly<{ url: string; title?: st
   if (!proxied) return null
 
   return (
-    <div ref={wrapRef} className="w-full">
+    <div
+      ref={wrapRef}
+      className={
+        fit === 'contain' ? 'flex h-full w-full items-center justify-center' : 'w-full'
+      }
+    >
       <div
         ref={fsRef}
         className="relative overflow-hidden rounded-lg border border-gray-200 bg-white mx-auto"
@@ -92,6 +121,9 @@ export function RobocampEmbed({ url, title }: Readonly<{ url: string; title?: st
           }
         />
 
+        {/* The presenter supplies its own bar; two sets of the same two
+            buttons on a projected screen is exactly the clutter it avoids. */}
+        {chrome ? (
         <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
           <a
             href={proxied}
@@ -114,6 +146,7 @@ export function RobocampEmbed({ url, title }: Readonly<{ url: string; title?: st
             </button>
           ) : null}
         </div>
+        ) : null}
       </div>
     </div>
   )

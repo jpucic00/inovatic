@@ -1,6 +1,11 @@
 import Link from 'next/link'
 import type { MaterialType, MaterialScope } from '@prisma/client'
-import { MaterialTypeBadge, formatBytes } from './material-type-badge'
+import { displayKindOf, formatBytes, resolveHref } from '@/lib/material-display'
+import {
+  MATERIAL_KIND_LABEL,
+  MATERIAL_KIND_LABEL_CLASS,
+  MaterialKindTile,
+} from './material-kind'
 import { EditMaterialDialog } from './edit-material-dialog'
 import { DeleteMaterialButton } from './delete-material-button'
 import { HideInGroupToggle } from './hide-in-group-toggle'
@@ -46,12 +51,6 @@ const SCOPE_LABEL: Record<MaterialScope, string> = {
   GROUP: 'Grupa',
 }
 
-export function resolveHref(row: { id: string; externalUrl: string | null; fileUrl: string | null }): string | null {
-  if (row.externalUrl) return row.externalUrl
-  if (row.fileUrl) return `/api/download/${row.id}`
-  return null
-}
-
 export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Props>) {
   if (rows.length === 0) {
     return (
@@ -72,30 +71,23 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
         else scopeDetail = row.groupName
 
         const isDimmed = row.hiddenInThisGroup === true
+        const kind = displayKindOf(row)
 
         return (
           <li
             key={row.id}
             className={[
-              'flex items-start gap-3 px-4 py-3 transition-colors',
+              'flex items-start gap-3.5 px-4 py-3.5 transition-colors',
               isDimmed ? 'opacity-60' : '',
             ].join(' ')}
           >
+            {/* Same tile the kids' list uses, so both sides read one vocabulary.
+                The scope beside it does NOT cross over: to a teacher it decides
+                whether this row can be edited, only hidden, or neither. */}
+            <MaterialKindTile kind={kind} />
+
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <MaterialTypeBadge type={row.type} />
-                <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide rounded bg-gray-100 px-1.5 py-0.5">
-                  {SCOPE_LABEL[row.scope]}
-                  {scopeDetail ? ` · ${scopeDetail}` : ''}
-                </span>
-                {row.hiddenInThisGroup ? (
-                  <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                    Sakriveno u grupi
-                  </span>
-                ) : null}
-                {size ? <span className="text-xs text-gray-500">{size}</span> : null}
-              </div>
-              <div className="mt-1 flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 {href ? (
                   <Link
                     href={href}
@@ -109,8 +101,25 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
                   <span className="text-sm font-semibold text-gray-900 truncate">{row.title}</span>
                 )}
               </div>
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wide ${MATERIAL_KIND_LABEL_CLASS[kind]}`}
+                >
+                  {MATERIAL_KIND_LABEL[kind]}
+                </span>
+                <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide rounded bg-gray-100 px-1.5 py-0.5">
+                  {SCOPE_LABEL[row.scope]}
+                  {scopeDetail ? ` · ${scopeDetail}` : ''}
+                </span>
+                {row.hiddenInThisGroup ? (
+                  <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                    Sakriveno u grupi
+                  </span>
+                ) : null}
+                {size ? <span className="text-xs text-gray-500">{size}</span> : null}
+              </div>
               {row.description ? (
-                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{row.description}</p>
+                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{row.description}</p>
               ) : null}
               {row.uploadedBy ? (
                 <p className="text-[11px] text-gray-400 mt-1">

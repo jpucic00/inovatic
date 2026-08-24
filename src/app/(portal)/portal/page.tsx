@@ -3,9 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { auth } from '@/lib/auth'
 import { getMyCurrentEnrollments, type StudentEnrollmentSummary } from '@/actions/student/dashboard'
-import { getEffectiveMaterialsForStudent } from '@/actions/student/materials'
 import { LoginScreen } from '@/components/auth/login-screen'
-import { GroupMaterialsScreen } from '@/components/portal/group-materials-screen'
 import { GroupCard, groupByCourse } from '@/components/shared/group-card'
 import { formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
@@ -39,8 +37,11 @@ async function PortalDashboard() {
     return <EmptyState />
   }
 
+  // One enrollment still means no extra click — but it has to be the real
+  // group route, or that child would get the materials panel with no tab strip
+  // and no way through to Galerija or Evaluacija.
   if (enrollments.length === 1) {
-    return <SingleEnrollmentView enrollment={enrollments[0]} />
+    redirect(`/portal/grupa/${enrollments[0].group.id}`)
   }
 
   return <MultiEnrollmentGrid enrollments={enrollments} />
@@ -55,11 +56,6 @@ function EmptyState() {
       </p>
     </div>
   )
-}
-
-async function SingleEnrollmentView({ enrollment }: Readonly<{ enrollment: StudentEnrollmentSummary }>) {
-  const view = await getEffectiveMaterialsForStudent(enrollment.group.id)
-  return <GroupMaterialsScreen view={view} />
 }
 
 function MultiEnrollmentGrid({ enrollments }: Readonly<{ enrollments: StudentEnrollmentSummary[] }>) {

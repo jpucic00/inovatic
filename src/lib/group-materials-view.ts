@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import type { Material, MaterialType, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
@@ -6,7 +7,7 @@ import { computeSchoolYear } from '@/lib/school-year'
 import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
 import { loadHolidayDateKeys } from '@/lib/holidays'
-import { isRobocampUrl } from '@/lib/robocamp-proxy'
+import { displayKindOf, kindOf, EXTRA_KIND_ORDER } from '@/lib/material-display'
 
 export type MaterialItem = {
   id: string
@@ -20,9 +21,6 @@ export type MaterialItem = {
   sortOrder: number
   createdAt: Date
 }
-
-/** The four display buckets the kids' page separates materials into. */
-type MaterialKind = 'robocamp' | 'videos' | 'docs' | 'links'
 
 export type KindBuckets = {
   robocamp: MaterialItem[]
@@ -50,8 +48,6 @@ export type GroupMaterialsView = {
     location: { name: string }
     teacherNames: string[]
   }
-  /** Active-module RoboCamp tutorials, surfaced at the very top of the page. */
-  featuredRobocamp: MaterialItem[]
   /**
    * Per-module sections. Standard programs get exactly one (the module the
    * group is working on now); COMPETITION programs get one per natjecanje, all
@@ -72,22 +68,64 @@ function emptyBuckets(): KindBuckets {
   return { robocamp: [], videos: [], docs: [], links: [] }
 }
 
-export function bucketsAreEmpty(b: KindBuckets): boolean {
-  return b.robocamp.length + b.videos.length + b.docs.length + b.links.length === 0
+type InteractiveGuide = {
+  item: MaterialItem
+  /** Which module the guide belongs to, when the program has modules. */
+  moduleTitle: string | null
 }
 
 /**
- * Classifies a material into one of the four kid-facing buckets. RoboCamp is
- * detected by the first-class type OR (as a fallback for any un-backfilled row)
- * a RoboCamp externalUrl.
+ * Every RoboCamp guide a group can see, each carrying its module's title.
+ *
+ * Deliberately gathers from ALL buckets, not just the module ones. A guide
+ * attached at COURSE or GROUP scope is still a guide — and since the guide
+ * section is the only place a RoboCamp row is rendered now, anything missed
+ * here disappears from the page entirely rather than merely being demoted.
+ * That is exactly what the old `featuredRobocamp` (module-scope only) would
+ * have done to a programme-wide guide.
  */
-export function kindOf(item: { type: MaterialType; externalUrl: string | null }): MaterialKind {
-  if (item.type === 'ROBOCAMP' || (item.externalUrl && isRobocampUrl(item.externalUrl))) {
-    return 'robocamp'
+export function interactiveGuides(view: GroupMaterialsView): InteractiveGuide[] {
+  const guides: InteractiveGuide[] = view.moduleSections.flatMap((section) =>
+    section.buckets.robocamp.map((item) => ({ item, moduleTitle: section.title })),
+  )
+  for (const bucket of [
+    view.programMaterials,
+    view.groupMaterials,
+    view.radionicaMaterials,
+  ]) {
+    for (const item of bucket.robocamp) guides.push({ item, moduleTitle: null })
   }
-  if (item.type === 'VIDEO') return 'videos'
-  if (item.type === 'LINK') return 'links'
-  return 'docs' // DOCUMENT, PRESENTATION
+  return guides
+}
+
+/**
+ * Everything that is NOT an interactive guide, as ONE list.
+ *
+ * Where a material came from — this module, the whole program, or the group's
+ * own extras — is deliberately dropped here. To a child that distinction means
+ * nothing; what they need is to find the thing and know what kind it is, so the
+ * list is ordered by kind instead and each row is labelled with its own. Staff
+ * keep the scope: `StaffMaterialList` still groups and labels by it, because
+ * for a teacher it decides whether a row can be edited, only hidden, or
+ * neither.
+ */
+export function flattenExtraMaterials(view: GroupMaterialsView): MaterialItem[] {
+  const buckets: KindBuckets[] = [
+    ...view.moduleSections.map((s) => s.buckets),
+    view.programMaterials,
+    view.groupMaterials,
+    view.radionicaMaterials,
+  ]
+  const all = buckets.flatMap((b) => [...b.videos, ...b.docs, ...b.links])
+
+  return all.sort((a, b) => {
+    const byKind =
+      EXTRA_KIND_ORDER.indexOf(displayKindOf(a)) -
+      EXTRA_KIND_ORDER.indexOf(displayKindOf(b))
+    if (byKind !== 0) return byKind
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
+    return a.createdAt.getTime() - b.createdAt.getTime()
+  })
 }
 
 function toItem(m: {
@@ -162,13 +200,36 @@ function partitionMaterials(
   return { moduleBuckets, programMaterials, groupMaterials, radionicaMaterials }
 }
 
+export type GroupShell = {
+  group: GroupMaterialsView['group']
+  courseId: string
+  kind: ProgramKind
+  /** Every module of the course, in sortOrder. Empty for radionice. */
+  modules: { id: string; title: string; sortOrder: number }[]
+  /** The module this group is working through now — null for COMPETITION. */
+  activeModule: { id: string; title: string; sortOrder: number } | null
+  /** Modules whose materials this group may see at all. */
+  visibleModuleIds: string[]
+  schoolYear: string
+}
+
 /**
- * Loads a group and computes the effective, kind-partitioned material view a
- * student sees — respecting per-group hides. Does NOT authorize the caller;
- * the caller (student enrollment gate, or staff ownership gate) must do that
- * first. Throws notFound() if the group does not exist.
+ * Loads a group and resolves its pacing — everything about the group that is
+ * true regardless of which panel is being rendered.
+ *
+ * Wrapped in React `cache()` because the portal group route resolves this
+ * TWICE per navigation: once in the layout (which draws the header and the tab
+ * strip) and once inside `buildGroupMaterialsView` for the Materijali panel.
+ * Without the memo that is two identical group+modules+schedules queries on
+ * every tab switch.
+ *
+ * Does NOT authorize the caller; the caller (student enrollment gate, or staff
+ * ownership gate) must do that first. Throws notFound() if the group does not
+ * exist.
  */
-export async function buildGroupMaterialsView(groupId: string): Promise<GroupMaterialsView> {
+export const buildGroupShell = cache(async function buildGroupShell(
+  groupId: string,
+): Promise<GroupShell> {
   const schoolYear = computeSchoolYear()
 
   const group = await db.scheduledGroup.findUnique({
@@ -213,10 +274,57 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
   if (allModules) visibleModuleIds = group.course.modules.map((m) => m.id)
   else if (activeModule) visibleModuleIds = [activeModule.id]
 
+  return {
+    group: {
+      id: group.id,
+      name: group.name,
+      dayOfWeek: group.dayOfWeek,
+      startTime: group.startTime,
+      endTime: group.endTime,
+      course: {
+        id: group.course.id,
+        title: group.course.title,
+        kind,
+      },
+      location: { name: group.location.name },
+      teacherNames: group.teacherAssignments.map(
+        (t) => `${t.user.firstName} ${t.user.lastName}`,
+      ),
+    },
+    courseId: group.course.id,
+    kind,
+    modules: group.course.modules.map((m) => ({
+      id: m.id,
+      title: m.title,
+      sortOrder: m.sortOrder,
+    })),
+    activeModule: activeModule
+      ? {
+          id: activeModule.id,
+          title: activeModule.title,
+          sortOrder: activeModule.sortOrder,
+        }
+      : null,
+    visibleModuleIds,
+    schoolYear,
+  }
+})
+
+/**
+ * Loads a group and computes the effective, kind-partitioned material view a
+ * student sees — respecting per-group hides. Does NOT authorize the caller;
+ * the caller (student enrollment gate, or staff ownership gate) must do that
+ * first. Throws notFound() if the group does not exist.
+ */
+export async function buildGroupMaterialsView(groupId: string): Promise<GroupMaterialsView> {
+  const shell = await buildGroupShell(groupId)
+  const { kind, activeModule, visibleModuleIds, modules } = shell
+  const allModules = showsAllModules(kind)
+
   const materials = await db.material.findMany({
     where: buildEffectiveMaterialsWhere({
-      scheduledGroupId: group.id,
-      courseId: group.course.id,
+      scheduledGroupId: shell.group.id,
+      courseId: shell.courseId,
       moduleIds: visibleModuleIds,
     }),
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -229,7 +337,7 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
   if (allModules) {
     // Every natjecanje, in sortOrder. None is "active" — the season runs them
     // all in parallel — so the UI must not highlight one over the others.
-    moduleSections = group.course.modules.map((m) => ({
+    moduleSections = modules.map((m) => ({
       moduleId: m.id,
       title: m.title,
       sortOrder: m.sortOrder,
@@ -248,33 +356,8 @@ export async function buildGroupMaterialsView(groupId: string): Promise<GroupMat
     ]
   }
 
-  let featuredRobocamp: MaterialItem[] = []
-  if (isRadionica(kind)) {
-    featuredRobocamp = radionicaMaterials.robocamp
-  } else if (allModules) {
-    featuredRobocamp = moduleSections.flatMap((s) => s.buckets.robocamp)
-  } else if (activeModule) {
-    featuredRobocamp = moduleBuckets.get(activeModule.id)?.robocamp ?? []
-  }
-
   return {
-    group: {
-      id: group.id,
-      name: group.name,
-      dayOfWeek: group.dayOfWeek,
-      startTime: group.startTime,
-      endTime: group.endTime,
-      course: {
-        id: group.course.id,
-        title: group.course.title,
-        kind,
-      },
-      location: { name: group.location.name },
-      teacherNames: group.teacherAssignments.map(
-        (t) => `${t.user.firstName} ${t.user.lastName}`,
-      ),
-    },
-    featuredRobocamp,
+    group: shell.group,
     moduleSections,
     programMaterials,
     groupMaterials,

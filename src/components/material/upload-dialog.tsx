@@ -17,7 +17,7 @@ import { createMaterial } from '@/actions/material/crud'
 import type { MaterialType } from '@prisma/client'
 import { isAllowedExternalVideoUrl } from '@/lib/validators/material'
 import { isRobocampUrl } from '@/lib/robocamp-proxy'
-import { formatBytes } from './material-type-badge'
+import { formatBytes } from '@/lib/material-display'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 

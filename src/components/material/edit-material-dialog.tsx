@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { updateMaterial } from '@/actions/material/crud'
 import type { MaterialType } from '@prisma/client'
-import { formatBytes } from './material-type-badge'
+import { formatBytes } from '@/lib/material-display'
 
 interface Props {
   id: string

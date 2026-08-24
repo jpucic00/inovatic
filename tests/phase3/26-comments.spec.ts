@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
   BASE,
+  gotoPortalPath,
   loginAsAdmin,
   loginWithEmail,
   collectGroupIds,
@@ -307,7 +308,7 @@ test.describe('Phase 3 Step 15 — Comments UI', () => {
       await page.waitForURL(/\/portal/, { timeout: 30000 })
 
       for (const path of ['/portal', `/portal/grupa/${seeded!.groupAId}`, '/portal/profil']) {
-        await page.goto(`${BASE}${path}`)
+        await gotoPortalPath(page, path)
         const body = (await page.locator('body').innerText()).toLowerCase()
         expect(body, `${path} hides TEACHER_COMMENT`).not.toContain(TEACHER_COMMENT.toLowerCase())
         expect(body, `${path} hides TEACHER_REVIEW`).not.toContain(TEACHER_REVIEW.toLowerCase())

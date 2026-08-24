@@ -50,6 +50,7 @@ type Seeded = {
   student: { email: string; password: string }
   groupId: string
   courseId: string
+  courseTitle: string
 }
 let seeded: Seeded | null = null
 
@@ -93,6 +94,7 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
       student: { email: `${s.username}@student.inovatic.local`, password: s.password },
       groupId,
       courseId,
+      courseTitle,
     }
     await page.close()
   })
@@ -113,7 +115,7 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
     await expect(page.getByText(ROBOCAMP_TITLE)).toBeVisible()
   })
 
-  test('student sees the program-wide material and the RoboCamp tutorial featured', async ({
+  test('student sees the RoboCamp guide up front and the rest in one flat list', async ({
     page,
   }) => {
     if (!seeded) throw new Error('not seeded')
@@ -121,14 +123,36 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
     await page.waitForURL(/\/portal/, { timeout: 30000 })
     await page.goto(`${BASE}/portal/grupa/${seeded.groupId}`)
 
-    await expect(page.getByText('Za cijeli program')).toBeVisible()
-    await expect(page.getByText(PROGRAM_LINK_TITLE)).toBeVisible()
-    // RoboCamp is surfaced under the "Interaktivni vodiči" heading.
-    await expect(page.getByText('Interaktivni vodiči').first()).toBeVisible()
+    // The guide gets its own card above everything else. This one is attached
+    // at COURSE scope, which the old featured-set (module scope only) dropped.
+    await expect(page.getByText('Interaktivni vodič').first()).toBeVisible()
     await expect(page.getByText(ROBOCAMP_TITLE)).toBeVisible()
+
+    // Everything else is one list. Where a material came from is no longer
+    // shown to a child, so the old scope headings must be gone.
+    await expect(page.getByRole('heading', { name: 'Dodatni materijali' })).toBeVisible()
+    await expect(page.getByText(PROGRAM_LINK_TITLE)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Za cijeli program' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Materijali grupe' })).toHaveCount(0)
   })
 
-  test('teacher Materijali tab — "Pregled (učenik)" shows the student-facing view', async ({
+  test('the three panels are tabs on one group page', async ({ page }) => {
+    if (!seeded) throw new Error('not seeded')
+    await loginWithEmail(page, seeded.student.email, seeded.student.password)
+    await page.waitForURL(/\/portal/, { timeout: 30000 })
+    await page.goto(`${BASE}/portal/grupa/${seeded.groupId}`)
+
+    await page.getByRole('link', { name: 'Galerija' }).click()
+    await page.waitForURL(/\/galerija$/, { timeout: 30000 })
+    // The heading belongs to the layout, so it survives the tab switch.
+    await expect(page.getByRole('heading', { name: seeded.courseTitle })).toBeVisible()
+
+    await page.getByRole('link', { name: 'Evaluacija' }).click()
+    await page.waitForURL(/\/evaluacija$/, { timeout: 30000 })
+    await expect(page.getByRole('heading', { name: seeded.courseTitle })).toBeVisible()
+  })
+
+  test('teacher Materijali tab presents the guide instead of previewing it', async ({
     page,
   }) => {
     if (!seeded) throw new Error('not seeded')
@@ -136,16 +160,18 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
     await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
     await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
 
-    // Switch from management to the student-preview within the merged tab.
-    await page.getByRole('button', { name: 'Pregled (učenik)' }).click()
-    await expect(page.getByText('Ovako učenici vide materijale', { exact: false })).toBeVisible()
+    // The student-preview mode is gone; the list is the whole tab.
+    await expect(page.getByRole('button', { name: 'Pregled (učenik)' })).toHaveCount(0)
 
-    // Program-wide LINK + RoboCamp render in the "Za cijeli program" section.
-    // Scope to that section so we don't match the (hidden) management list copy.
-    const programSection = page.locator('section', {
-      has: page.getByRole('heading', { name: 'Za cijeli program' }),
-    })
-    await expect(programSection.getByText(PROGRAM_LINK_TITLE)).toBeVisible()
-    await expect(programSection.getByText(ROBOCAMP_TITLE)).toBeVisible()
+    const present = page.getByRole('link', { name: 'Prezentiraj interaktivni vodič' })
+    await expect(present).toBeVisible()
+    await present.click()
+    await page.waitForURL(/\/nastavnik\/prezentacija\//, { timeout: 30000 })
+
+    await expect(page.getByRole('button', { name: /Izađi/ })).toBeVisible()
+    // Nothing on a projected screen may change a material — that absence is
+    // the whole reason presenting is a separate surface.
+    await expect(page.getByRole('button', { name: /Obriši|Uredi/ })).toHaveCount(0)
+    await expect(page.getByText('Dodaj novi materijal')).toHaveCount(0)
   })
 })
