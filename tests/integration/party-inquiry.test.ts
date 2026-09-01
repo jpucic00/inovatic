@@ -34,6 +34,13 @@ const { schedulePartyInquiry, getScheduledParties, getInquiries } = await import
 let emailCounter = 0
 const uniqueEmail = () => `party-${Date.now().toString(36)}-${++emailCounter}@test.local`
 
+// 20 December of the NEXT school year's starting calendar year — a confirmed
+// date guaranteed to land in a different school year than a submission made
+// today, whatever today is. A hardcoded ISO date here goes stale the moment
+// the calendar catches up with it.
+const confirmedIsoInNextSchoolYear = () =>
+  `${getNextSchoolYear(computeSchoolYear()).split('/')[0]}-12-20`
+
 function validParty(overrides: Partial<PartyInquiryFormData> = {}): PartyInquiryFormData {
   return {
     parentFirstName: 'Ana',
@@ -96,7 +103,7 @@ describe('schedulePartyInquiry', () => {
     const submissionYear = party.schoolYear
 
     // A confirmed date in a *different* school year than submission.
-    const confirmedIso = '2026-12-20'
+    const confirmedIso = confirmedIsoInNextSchoolYear()
     const confirmedYear = computeSchoolYear(new Date(`${confirmedIso}T00:00:00.000Z`))
     expect(confirmedYear).not.toBe(submissionYear) // sanity: genuinely different years
 
@@ -142,7 +149,7 @@ describe('getScheduledParties', () => {
     const submissionYear = party.schoolYear!
 
     // Confirm for a date in a different school year than submission.
-    const confirmedIso = '2026-12-20'
+    const confirmedIso = confirmedIsoInNextSchoolYear()
     const confirmedYear = computeSchoolYear(new Date(`${confirmedIso}T00:00:00.000Z`))
     expect(confirmedYear).not.toBe(submissionYear)
 
