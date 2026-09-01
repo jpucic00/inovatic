@@ -13,6 +13,7 @@ import {
 import { upsertTagByName } from '@/lib/tags'
 import { extractImageUrls } from '@/lib/blocknote-images'
 import { destroyCloudinaryAssets } from '@/lib/cloudinary-cleanup'
+import { removedAssetUrls } from '@/lib/cloudinary-url'
 
 type ArticleRow = {
   id: string
@@ -204,11 +205,16 @@ export async function autosaveArticle(
       ...(existing.coverImage ? [existing.coverImage] : []),
       ...extractImageUrls(existing.content),
     ]
-    const newUrls = new Set([
+    const newUrls = [
       ...(data.coverImage ? [data.coverImage] : []),
       ...extractImageUrls(data.content),
-    ])
-    const removedUrls = oldUrls.filter((u) => !newUrls.has(u))
+    ]
+    // Diffed on resolved public ids, not raw strings: the same asset has
+    // different URLs whenever their delivery transformations differ, and a
+    // string diff would read a still-referenced image as removed and destroy
+    // it. The watermark backfill rewrites stored URLs, so an editor tab opened
+    // before it ran submits the older spelling of every image it still holds.
+    const removedUrls = removedAssetUrls(oldUrls, newUrls)
 
     await db.$transaction(async (tx) => {
       await tx.article.update({

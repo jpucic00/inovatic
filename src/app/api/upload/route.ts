@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import cloudinary from '@/lib/cloudinary'
 import type { UploadApiResponse, UploadApiErrorResponse } from 'cloudinary'
 import { mimeMatchesBytes } from '@/lib/mime-guard'
+import { withWatermark } from '@/lib/cloudinary-url'
 
 export const runtime = 'nodejs'
 
@@ -84,7 +85,10 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({
-    url: result.secure_url,
+    // The watermark lives in the URL, never in the stored asset: Cloudinary
+    // keeps the original untouched and this string is what the database holds,
+    // so every render path and the lightbox download pick it up unchanged.
+    url: withWatermark(result.secure_url),
     publicId: result.public_id,
     width: result.width,
     height: result.height,

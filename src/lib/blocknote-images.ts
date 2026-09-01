@@ -38,3 +38,39 @@ export function extractImageUrls(content: unknown): string[] {
   visit(content)
   return urls
 }
+
+/**
+ * Return a copy of BlockNote `content` with every IMAGE block's url passed
+ * through `fn`. Video blocks are deliberately left alone — the watermark is an
+ * image-only feature, and overlaying a video is a much heavier transformation
+ * than the association has any need for.
+ *
+ * Same permissive walk as `extractImageUrls`, for the same reason: this runs on
+ * stored JSON that may predate the current editor.
+ */
+export function mapImageUrls(content: unknown, fn: (url: string) => string): unknown {
+  function visit(node: unknown): unknown {
+    if (Array.isArray(node)) return node.map(visit)
+    if (!node || typeof node !== 'object') return node
+
+    const block = node as {
+      type?: string
+      props?: { url?: unknown }
+      children?: unknown
+    }
+    const next: Record<string, unknown> = { ...(node as Record<string, unknown>) }
+
+    if (
+      block.type === 'image' &&
+      typeof block.props?.url === 'string' &&
+      block.props.url.length > 0
+    ) {
+      next.props = { ...block.props, url: fn(block.props.url) }
+    }
+    if (block.children) next.children = visit(block.children)
+
+    return next
+  }
+
+  return visit(content)
+}
