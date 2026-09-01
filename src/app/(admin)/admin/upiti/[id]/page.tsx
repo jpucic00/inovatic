@@ -24,7 +24,7 @@ import {
   GRADE_LABELS,
   NO_SUITABLE_TERMIN_LABEL,
 } from '@/lib/inquiry-status'
-import { paymentOptionLabel } from '@/lib/payment-option'
+import { offersPaymentOption, paymentOptionLabel } from '@/lib/payment-option'
 import { formatChildName, formatDate, formatDateTime, formatTime } from '@/lib/format'
 import { toDateKey } from '@/lib/session-dates'
 import type { ProgramKind } from '@prisma/client'
@@ -534,16 +534,26 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
               the binding choice is the one recorded on the enrollment once an
               account exists.
 
-              Shown only when there IS an answer, which is how the staff
-              notification e-mail already renders it. A radionica or a
-              natjecateljski upit was never asked the question (they settle by
-              akontacija and by month), so an italic "Nije navedeno" there reads
-              as a parent who skipped it and invites staff to chase an answer
-              that does not exist for that program. */}
-          {inquiry.paymentOption && (
+              Rendered whenever the PROGRAM asks the question, not only when an
+              answer exists: the permissive gate deliberately files an SLR upit
+              with paymentOption null when the availability feed flickers
+              mid-form, and staff are meant to chase that answer — a row reading
+              "Nije navedeno" is the prompt to do it at the point of decision.
+              A radionica or natjecateljski upit was never asked (they settle by
+              akontacija and by month), so those stay rowless — an italic "Nije
+              navedeno" there would invite staff to chase an answer that does
+              not exist for that program. The answer-exists arm is a safety net:
+              a stored option renders even if the course link is missing, so
+              this can never hide what the old gate showed. */}
+          {(inquiry.paymentOption ||
+            (inquiry.course && offersPaymentOption(inquiry.course.kind))) && (
             <DetailRow
               label="Način plaćanja"
-              value={paymentOptionLabel(inquiry.paymentOption)}
+              value={
+                paymentOptionLabel(inquiry.paymentOption) ?? (
+                  <span className="text-gray-400 italic">Nije navedeno</span>
+                )
+              }
             />
           )}
           <DetailRow

@@ -109,7 +109,7 @@ export async function getInquiries(
     ...(type && type !== 'ALL' ? { type } : {}),
     ...(courseIdFilter(courseId)),
     ...(grade ? { childGrade: grade } : {}),
-    ...(searchFilter ?? {}),
+    ...searchFilter,
   }
 
   // AND-composed rather than spread: the search filter already claims `id`, and
@@ -272,6 +272,10 @@ export async function getInquiry(id: string) {
           id: true,
           title: true,
           level: true,
+          // Whether this program offers the payment choice at all — the
+          // difference between "never asked" (radionica, natjecateljski) and
+          // "asked but unanswered", which the detail page must not collapse.
+          kind: true,
         },
       },
       scheduledGroup: { include: { location: true } },
