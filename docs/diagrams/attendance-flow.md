@@ -153,12 +153,19 @@ sequenceDiagram
     participant DB as Database
 
     Teacher->>UI: Selects a session date from the date picker
-    UI->>UI: Loads roster for the group, pre-fills existing records for that date
+    UI->>UI: SessionPanel remounts (key = sessionDate) — initAttendanceDraft(roster, records)
+    Note over UI: BLANK start (2026-08-24). A checkbox states the teacher's decision, never the DB —<br/>only a student with an existing Attendance row is pre-ticked. Assigned TEACHERS are the<br/>deliberate exception (initTeacherDraft): still present-by-default, because an unticked<br/>box there is a lost payout hour noticed a month later.
 
-    Teacher->>UI: Marks each student as Prisutan/Odsutan, optional notes
+    Teacher->>UI: Ticks the present students (whole row is the tap target, except the note field)
+    Note over UI: Tri-state "Označi sve prisutne": none → all · partial → all · all → clear
+    UI->>UI: sessionStatus(...) — Nije evidentirano / Nespremljene izmjene / Evidentirano · spremljeno HH:mm
     Teacher->>UI: (group with 2+ assigned teachers) ticks who actually taught
     Note over UI: A single-teacher group shows no teacher control at all
     Teacher->>UI: Clicks Save
+    alt zero students marked present
+        UI->>Teacher: ConfirmDialog "Spremiti bez ijednog prisutnog?" — destructive styling ONLY when existing records would be overwritten
+        Teacher->>UI: Confirms (or cancels — nothing is sent)
+    end
 
     UI->>Server: bulkMarkSession(groupId, sessionDate, entries[], teacherEntries?[])
 
@@ -173,7 +180,7 @@ sequenceDiagram
         Server->>DB: Verify all enrollmentIds belong to this group + schoolYear
         Note right of Server: If count mismatch → throw ENROLLMENT_MISMATCH (rolls back transaction)
         Server->>DB: Upsert Attendance for each entry
-        Note right of DB: Upsert key: (enrollmentId, sessionDate). Sets present, note, recordedById.
+        Note right of DB: Upsert key: (enrollmentId, sessionDate). Sets present, note, recordedById.<br/>The row's updatedAt is what the marker reads back as recordedAt → "spremljeno HH:mm",<br/>so an optimisation that skips touching updatedAt on a no-op upsert breaks the status line.
         Server->>DB: Fetch TeacherAssignment userIds for this group
         Server->>Server: resolveTeacherEntries(teacherEntries, assignedUserIds)
         Note right of Server: Drops entries for non-assigned users.<br/>Single-teacher group with no entry → auto { present: true }.
@@ -186,7 +193,21 @@ sequenceDiagram
     Server->>Server: revalidatePath for teacher group + admin student pages
 ```
 
-> Source: `bulkMarkSession()` in `src/actions/teacher/attendance.ts`. The upsert means re-saving the same date updates existing records rather than creating duplicates.
+> Source: `bulkMarkSession()` in `src/actions/teacher/attendance.ts`. The upsert means re-saving the same date updates existing records rather than creating duplicates. The client-side draft rules the flow starts from live in `src/lib/attendance-draft.ts` — next section.
+
+## Client-side draft state the marker reads back
+
+An empty checkbox means two different things either side of a save — "not asked yet" before, "marked absent" after — so the marker carries a status line no checkbox can express:
+
+| Condition | Line |
+|---|---|
+| no records, no edits | *Nije evidentirano — označite prisutne polaznike* |
+| draft differs from records | *Nespremljene izmjene — N od M označeno* |
+| records exist, draft matches | *Evidentirano · N od M prisutno · spremljeno HH:mm* |
+
+`dirty` wins over `saved` (reading back the old timestamp on edited work would be a lie), it is **computed against the records rather than tracked as a touched-flag** — ticking a box and unticking it again must leave the session clean — and notes compare **trimmed**, because `note.trim() || null` is what the save writes. Save is disabled only when nothing changed **and the saved rows cover everyone on the session**: `hasUnrecordedEntries` keeps it live when a student enrolled — or a teacher was assigned — *after* the session was saved, since their missing row rests at the draft baseline and can never present as an edit (2026-09-01). In the date list the chip shows `—` rather than `0/8` when nothing is recorded: `0/8` counts records but reads as "nobody came"; `8/8` still means "fully recorded", the question that list answers. The rules are pure functions in `src/lib/attendance-draft.ts` (`initAttendanceDraft`, `initTeacherDraft`, `isSessionDirty`, `summarizeSession`, `sessionStatus`, `hasUnrecordedEntries`), kept out of the component so the standard and flat branches cannot answer them differently.
+
+**Hand-added dates ("Dodaj datum ručno") are a client-side draft too.** Nothing exists server-side until evidencija is saved for the date, so it lives in per-group `sessionStorage` (`src/lib/adhoc-date-memory.ts`): it survives tab switches and reloads within one browser tab, is pruned automatically once the server lists the date itself, is removable with the × on its row (a sibling button, offered only while the date has no saved rows — 2026-09-01), and dies with the tab as the backstop. The structural replacement for all of this is the planned `ClassSession` model (Flux `6q66ke4`).
 
 ## Teaching hours — which rows get written
 

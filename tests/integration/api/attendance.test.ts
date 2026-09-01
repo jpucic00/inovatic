@@ -154,6 +154,15 @@ describe('bulkMarkSession — session marking', () => {
     const rowB = await db.attendance.findFirst({ where: { enrollmentId: enrollmentB.id } })
     expect(rowA).toMatchObject({ present: true, recordedById: teacher.id })
     expect(rowB).toMatchObject({ present: false, note: 'Bolestan', recordedById: teacher.id })
+
+    // The marker reads the row's updatedAt back as `recordedAt` and states it
+    // as "spremljeno …" — if the select drops it, that line silently vanishes.
+    const view = await getGroupAttendance(group.id)
+    const saved = view.records.filter((r) => r.sessionDate === MARK_DATE)
+    expect(saved).toHaveLength(2)
+    for (const r of saved) {
+      expect(Number.isNaN(Date.parse(r.recordedAt))).toBe(false)
+    }
   })
 
   it('upserts in place when the same session is re-marked (no duplicate row)', async () => {

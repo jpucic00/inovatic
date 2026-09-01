@@ -163,3 +163,72 @@ describe('AttendanceMarker — hand-added dates survive a remount', () => {
     expect(screen.getAllByText('26.01.2026.').length).toBeGreaterThan(0)
   })
 })
+
+describe('AttendanceMarker — removing a mistyped hand-added date', () => {
+  const removeButton = (label: string) =>
+    screen.getByRole('button', { name: `Ukloni ručno dodani datum ${label}` })
+
+  it('offers the × only on hand-added dates, never on server-listed ones', () => {
+    render(<AttendanceMarker {...flatProps()} />)
+    addDate('15.07.2026')
+
+    expect(removeButton('15.07.2026.')).toBeTruthy()
+    // The three server-known dates are not removable from here.
+    expect(
+      screen.getAllByRole('button', { name: /Ukloni ručno dodani datum/ }),
+    ).toHaveLength(1)
+  })
+
+  it('takes the date out of the list AND out of the per-tab memory', () => {
+    const first = render(<AttendanceMarker {...flatProps()} />)
+    addDate('15.07.2026')
+
+    fireEvent.click(removeButton('15.07.2026.'))
+
+    expect(screen.queryByText('15.07.2026.')).toBeNull()
+    // The memory entry is gone too — a remount must not resurrect the typo.
+    expect(window.sessionStorage.length).toBe(0)
+    first.unmount()
+    render(<AttendanceMarker {...flatProps()} />)
+    expect(screen.queryByText('15.07.2026.')).toBeNull()
+  })
+
+  it('moves the selection off the removed date instead of stranding the panel', () => {
+    render(<AttendanceMarker {...flatProps()} />)
+    // addDate also selects the new date, so the panel heading shows it.
+    addDate('15.07.2026')
+    expect(
+      screen.getByRole('heading', { level: 3, name: /15\.07\.2026\./ }),
+    ).toBeTruthy()
+
+    fireEvent.click(removeButton('15.07.2026.'))
+
+    // Back on the branch default (the newest already-held session).
+    expect(
+      screen.getByRole('heading', { level: 3, name: /08\.07\.2026\./ }),
+    ).toBeTruthy()
+  })
+
+  it('standard branch: removes a date bucketed into Ostali termini', () => {
+    render(<AttendanceMarker {...standardProps()} />)
+    addDate('26.01.2026')
+    expect(screen.getAllByText('26.01.2026.').length).toBeGreaterThan(0)
+
+    fireEvent.click(removeButton('26.01.2026.'))
+
+    expect(screen.queryByText('26.01.2026.')).toBeNull()
+    expect(window.sessionStorage.length).toBe(0)
+  })
+
+  it('standard branch: removes a date that landed inside a module section', () => {
+    render(<AttendanceMarker {...standardProps()} />)
+    // Between the section's first and last session, so it buckets into module 1.
+    addDate('14.01.2026')
+    expect(screen.getAllByText('14.01.2026.').length).toBeGreaterThan(0)
+
+    fireEvent.click(removeButton('14.01.2026.'))
+
+    expect(screen.queryByText('14.01.2026.')).toBeNull()
+    expect(window.sessionStorage.length).toBe(0)
+  })
+})

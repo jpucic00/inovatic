@@ -111,6 +111,34 @@ export function isSessionDirty({
   return false
 }
 
+interface UnrecordedInput {
+  roster: readonly DraftRosterRow[]
+  existing: ReadonlyMap<string, DraftRecord> | undefined
+  teachers: readonly DraftTeacherRow[]
+  teacherExisting: ReadonlyMap<string, boolean> | undefined
+}
+
+/**
+ * True when the session's saved rows do not cover everyone on it: a roster
+ * member without an `Attendance` row (enrolled after the session was saved), or
+ * an assigned teacher without a `TeacherAttendance` row (assigned after).
+ *
+ * Such a session must stay saveable even while the draft matches the rows that
+ * DO exist — the missing row is itself the unsaved work, and it cannot show up
+ * as an edit because that person's checkbox already rests at the draft
+ * baseline. Without this, the one save that would write the missing row is the
+ * one the disabled button refuses.
+ */
+export function hasUnrecordedEntries({
+  roster,
+  existing,
+  teachers,
+  teacherExisting,
+}: UnrecordedInput): boolean {
+  if (roster.some((r) => !existing?.has(r.enrollmentId))) return true
+  return teachers.some((t) => t.assigned && !teacherExisting?.has(t.userId))
+}
+
 interface SessionSummary {
   /** How many of the roster already have a row for this session. */
   recorded: number

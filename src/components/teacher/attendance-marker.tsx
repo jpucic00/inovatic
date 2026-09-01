@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Loader2, Lock, Minus, Pencil, Plus, Save } from 'lucide-react'
+import { Check, Loader2, Lock, Minus, Pencil, Plus, Save, X } from 'lucide-react'
 import { readAdhocDates, writeAdhocDates } from '@/lib/adhoc-date-memory'
 import type { MarkingWindow } from '@/lib/attendance-window'
 import { DateInput } from '@/components/ui/date-input'
@@ -22,6 +22,7 @@ import type {
   TeacherAttendanceRow,
 } from '@/actions/teacher/attendance'
 import {
+  hasUnrecordedEntries,
   initAttendanceDraft,
   initTeacherDraft,
   isSessionDirty,
@@ -687,9 +688,21 @@ function SessionPanel({
     })
   }
 
-  // Nothing recorded yet stays saveable even while clean, or a session nobody
-  // attended could never be written down.
-  const saveDisabled = !dirty && summary.recorded > 0
+  // A clean draft disables Save only when the saved rows cover EVERYONE.
+  // Nothing-recorded stays saveable (a session nobody attended must be
+  // writable), and so does a partial record: a student enrolled — or a teacher
+  // assigned — after the session was saved has no row, rests at the draft
+  // baseline, and can never look like an edit; this save is the only way that
+  // missing row gets written.
+  const saveDisabled =
+    !dirty &&
+    summary.recorded > 0 &&
+    !hasUnrecordedEntries({
+      roster: visibleRoster,
+      existing,
+      teachers,
+      teacherExisting,
+    })
 
   return (
     <section>
@@ -753,6 +766,12 @@ interface DateButtonProps {
   recorded: number
   total: number
   onPick: (key: string) => void
+  /**
+   * Present only on a hand-added date with no saved rows yet — the × that
+   * takes a typo back out of the per-tab memory. A date the server lists, or
+   * one evidencija was saved for, is not removable from here.
+   */
+  onRemove?: () => void
 }
 
 function DateButton({
@@ -761,12 +780,16 @@ function DateButton({
   recorded,
   total,
   onPick,
+  onRemove,
 }: Readonly<DateButtonProps>) {
   const isFuture = dateKey > toDateKey(todayUtc())
   let chipClass = 'bg-gray-100 text-gray-500'
   if (total > 0 && recorded === total) chipClass = 'bg-emerald-100 text-emerald-700'
   else if (recorded > 0) chipClass = 'bg-amber-100 text-amber-700'
-  return (
+  // A sibling, never a child: a remove button nested inside the pick button
+  // would be interactive-inside-interactive — the same invalid-HTML trap the
+  // roster checkboxes design around.
+  const pickButton = (
     <button
       type="button"
       onClick={() => onPick(dateKey)}
@@ -796,6 +819,26 @@ function DateButton({
         {recorded === 0 ? '—' : `${recorded}/${total}`}
       </span>
     </button>
+  )
+
+  if (!onRemove) return pickButton
+
+  return (
+    <div className="flex items-stretch gap-1">
+      <div className="min-w-0 flex-1">{pickButton}</div>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Ukloni ručno dodani datum ${sessionLabel(dateKey)}`}
+        title="Ukloni ručno dodani datum"
+        className={cn(
+          'flex w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 transition-colors hover:border-red-200 hover:text-red-600',
+          CONTROL_FOCUS,
+        )}
+      >
+        <X className="size-3.5" />
+      </button>
+    </div>
   )
 }
 
@@ -885,7 +928,7 @@ function scheduleHint(
 function useAdhocDates(
   groupId: string,
   serverKnown: readonly string[],
-): [string[], (key: string) => void] {
+): [string[], (key: string) => void, (key: string) => void] {
   const [adhocDates, setAdhocDates] = useState<string[]>([])
 
   useEffect(() => {
@@ -906,7 +949,22 @@ function useAdhocDates(
     [groupId],
   )
 
-  return [adhocDates, addAdhocDate]
+  // The deliberate delete path for a mistyped date. Adding the memory
+  // (2026-08-22) removed the accidental one — navigating away used to discard
+  // the draft — so without this a typo sat in the list for the tab's lifetime.
+  const removeAdhocDate = useCallback(
+    (key: string) => {
+      setAdhocDates((prev) => {
+        if (!prev.includes(key)) return prev
+        const next = prev.filter((d) => d !== key)
+        writeAdhocDates(groupId, next)
+        return next
+      })
+    },
+    [groupId],
+  )
+
+  return [adhocDates, addAdhocDate, removeAdhocDate]
 }
 
 /** Shared by both branches: validate a hand-typed date and select it. */
@@ -987,7 +1045,7 @@ function FlatAttendanceMarker({
     () => [...expectedSessions, ...extraSessions],
     [expectedSessions, extraSessions],
   )
-  const [adhocDates, addAdhocDate] = useAdhocDates(groupId, serverKnown)
+  const [adhocDates, addAdhocDate, removeAdhocDate] = useAdhocDates(groupId, serverKnown)
   const allDates = useMemo(() => {
     const merged = [...new Set([...serverKnown, ...adhocDates])]
     merged.sort((a, b) => a.localeCompare(b))
@@ -998,6 +1056,13 @@ function FlatAttendanceMarker({
     pickFlatDefault(expectedSessions, extraSessions),
   )
   const adhocInput = useAdhocInput(allDates, addAdhocDate, setSelected)
+
+  // Removing the date under the open panel would leave it showing a session
+  // the list no longer offers — fall back to the branch default instead.
+  const handleRemoveAdhoc = (key: string) => {
+    removeAdhocDate(key)
+    if (selected === key) setSelected(pickFlatDefault(expectedSessions, extraSessions))
+  }
 
   if (roster.length === 0) return <EmptyRoster />
 
@@ -1017,17 +1082,25 @@ function FlatAttendanceMarker({
           </p>
         ) : (
           <ul className="max-h-[28rem] space-y-1 overflow-y-auto pr-1">
-            {allDates.map((key) => (
-              <li key={key}>
-                <DateButton
-                  dateKey={key}
-                  isActive={key === selected}
-                  recorded={recordedCount(roster, recordIndex.get(key))}
-                  total={roster.length}
-                  onPick={setSelected}
-                />
-              </li>
-            ))}
+            {allDates.map((key) => {
+              const recorded = recordedCount(roster, recordIndex.get(key))
+              return (
+                <li key={key}>
+                  <DateButton
+                    dateKey={key}
+                    isActive={key === selected}
+                    recorded={recorded}
+                    total={roster.length}
+                    onPick={setSelected}
+                    onRemove={
+                      adhocDates.includes(key) && recorded === 0
+                        ? () => handleRemoveAdhoc(key)
+                        : undefined
+                    }
+                  />
+                </li>
+              )
+            })}
           </ul>
         )}
 
@@ -1113,7 +1186,7 @@ function StandardAttendanceMarker({
     ],
     [sections, otherDates],
   )
-  const [adhocDates, addAdhocDate] = useAdhocDates(groupId, serverKnown)
+  const [adhocDates, addAdhocDate, removeAdhocDate] = useAdhocDates(groupId, serverKnown)
 
   const sectionWindows = useMemo(
     () =>
@@ -1166,6 +1239,13 @@ function StandardAttendanceMarker({
   )
   const adhocInput = useAdhocInput(allKnownDates, addAdhocDate, setSelected)
 
+  // Removing the date under the open panel would leave it showing a session
+  // the list no longer offers — fall back to the branch default instead.
+  const handleRemoveAdhoc = (key: string) => {
+    removeAdhocDate(key)
+    if (selected === key) setSelected(defaultSelectedDate)
+  }
+
   if (roster.length === 0) return <EmptyRoster />
 
   const hint = scheduleHint(false, dayOfWeek, dateStart, dateEnd, startTime, endTime)
@@ -1207,20 +1287,28 @@ function StandardAttendanceMarker({
                     </p>
                   ) : (
                     <ul className="space-y-1">
-                      {datesForSection.map((key) => (
-                        <li key={key}>
-                          <DateButton
-                            dateKey={key}
-                            isActive={key === selected}
-                            recorded={recordedCount(
-                              sectionRoster,
-                              recordIndex.get(key),
-                            )}
-                            total={sectionRoster.length}
-                            onPick={setSelected}
-                          />
-                        </li>
-                      ))}
+                      {datesForSection.map((key) => {
+                        const recorded = recordedCount(
+                          sectionRoster,
+                          recordIndex.get(key),
+                        )
+                        return (
+                          <li key={key}>
+                            <DateButton
+                              dateKey={key}
+                              isActive={key === selected}
+                              recorded={recorded}
+                              total={sectionRoster.length}
+                              onPick={setSelected}
+                              onRemove={
+                                adhocDates.includes(key) && recorded === 0
+                                  ? () => handleRemoveAdhoc(key)
+                                  : undefined
+                              }
+                            />
+                          </li>
+                        )
+                      })}
                     </ul>
                   )}
                 </div>
@@ -1238,17 +1326,25 @@ function StandardAttendanceMarker({
               </summary>
               <div className="border-t border-gray-100 p-2">
                 <ul className="space-y-1">
-                  {otherDatesAll.map((key) => (
-                    <li key={key}>
-                      <DateButton
-                        dateKey={key}
-                        isActive={key === selected}
-                        recorded={recordedCount(roster, recordIndex.get(key))}
-                        total={roster.length}
-                        onPick={setSelected}
-                      />
-                    </li>
-                  ))}
+                  {otherDatesAll.map((key) => {
+                    const recorded = recordedCount(roster, recordIndex.get(key))
+                    return (
+                      <li key={key}>
+                        <DateButton
+                          dateKey={key}
+                          isActive={key === selected}
+                          recorded={recorded}
+                          total={roster.length}
+                          onPick={setSelected}
+                          onRemove={
+                            adhocDates.includes(key) && recorded === 0
+                              ? () => handleRemoveAdhoc(key)
+                              : undefined
+                          }
+                        />
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             </details>

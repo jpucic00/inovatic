@@ -145,6 +145,28 @@ describe('AttendanceMarker — a recorded session', () => {
     fireEvent.click(box(/Babić/))
     expect(saveButton().hasAttribute('disabled')).toBe(false)
   })
+
+  // A student enrolled AFTER the session was saved has no row and rests at the
+  // blank baseline, so their missing row can never look like an edit. Save must
+  // stay enabled on such a session, or that row could never be written at all.
+  it('keeps Spremi live while one roster member has no row, and writes it', async () => {
+    render(<AttendanceMarker {...props([record('e-1', true)])} />)
+
+    const save = saveButton()
+    expect(save.hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(save)
+    // Ana's record keeps one box ticked, so no all-absent confirmation fires.
+    expect(screen.queryByText('Spremiti bez ijednog prisutnog?')).toBeNull()
+
+    await waitFor(() => expect(bulkMarkSession).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(bulkMarkSession).mock.calls[0][0]).toMatchObject({
+      entries: [
+        { enrollmentId: 'e-1', present: true },
+        { enrollmentId: 'e-2', present: false },
+      ],
+    })
+  })
 })
 
 describe('AttendanceMarker — saving nothing', () => {

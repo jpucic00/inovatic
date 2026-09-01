@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  hasUnrecordedEntries,
   initAttendanceDraft,
   initTeacherDraft,
   isSessionDirty,
@@ -109,6 +110,82 @@ describe('isSessionDirty', () => {
 
   it('does not call the assigned default dirty on its own', () => {
     expect(isSessionDirty({ ...clean, teacherDraft: { t1: true } })).toBe(false)
+  })
+
+  // Pins the trim-on-compare rule: the save writes `note.trim() || null`, so a
+  // raw comparison would read "Nespremljene izmjene" forever after saving.
+  it('treats a note differing only by surrounding whitespace as clean', () => {
+    const existing = new Map([['e1', rec(true, 'zakasnio')], ['e2', rec(false)]])
+    expect(
+      isSessionDirty({
+        ...clean,
+        existing,
+        draft: {
+          e1: { present: true, note: '  zakasnio  ' },
+          e2: { present: false, note: '' },
+        },
+      }),
+    ).toBe(false)
+  })
+
+  it('treats a whitespace-only note against no record as clean', () => {
+    expect(
+      isSessionDirty({
+        ...clean,
+        draft: { ...clean.draft, e2: { present: false, note: '   ' } },
+      }),
+    ).toBe(false)
+  })
+})
+
+describe('hasUnrecordedEntries', () => {
+  const teachers = [
+    { userId: 't1', assigned: true },
+    { userId: 't2', assigned: false },
+  ]
+
+  it('is true while nothing at all is recorded', () => {
+    expect(
+      hasUnrecordedEntries({ roster, existing: undefined, teachers: [], teacherExisting: undefined }),
+    ).toBe(true)
+  })
+
+  // The case the flag exists for: a student enrolled AFTER the session was
+  // saved has no row, rests at the blank baseline, and can never read as an
+  // edit — this save is the only way their row gets written.
+  it('is true when one roster member has no row on a recorded session', () => {
+    const existing = new Map([['e1', rec(true)]])
+    expect(
+      hasUnrecordedEntries({ roster, existing, teachers: [], teacherExisting: undefined }),
+    ).toBe(true)
+  })
+
+  it('is false once every member and assigned teacher has a row', () => {
+    const existing = new Map([['e1', rec(true)], ['e2', rec(false)]])
+    expect(
+      hasUnrecordedEntries({
+        roster,
+        existing,
+        teachers,
+        teacherExisting: new Map([['t1', true]]),
+      }),
+    ).toBe(false)
+  })
+
+  it('is true for an assigned teacher without a row; unassigned ones are ignored', () => {
+    const existing = new Map([['e1', rec(true)], ['e2', rec(false)]])
+    expect(
+      hasUnrecordedEntries({ roster, existing, teachers, teacherExisting: undefined }),
+    ).toBe(true)
+    // t2 is unassigned — a historic chip, not bookable work.
+    expect(
+      hasUnrecordedEntries({
+        roster,
+        existing,
+        teachers: [{ userId: 't2', assigned: false }],
+        teacherExisting: undefined,
+      }),
+    ).toBe(false)
   })
 })
 

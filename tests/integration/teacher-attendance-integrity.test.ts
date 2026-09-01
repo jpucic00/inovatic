@@ -22,6 +22,7 @@ import {
   createEnrollment,
   createStudent,
   createTeacher,
+  createTeacherAssignment,
   createTeacherAttendance,
 } from './helpers/factory'
 import { fixtureScope } from './helpers/cleanup'
@@ -31,6 +32,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 const { upsertHoliday, bulkImportHolidays } = await import('@/actions/admin/holidays')
 const { deleteGroup } = await import('@/actions/admin/group')
 const { deleteCourse } = await import('@/actions/admin/course')
+const { bulkMarkSession } = await import('@/actions/teacher/attendance')
 
 const SY = '2026/2027'
 // The cascade counts by (date, schoolYear, city), not by fixture id, so this
@@ -240,5 +242,66 @@ describe('deleteCourse — a radionica cannot take booked hours with it', () => 
     expect(res).toEqual({ success: true })
     expect(await db.course.count({ where: { id: course.id } })).toBe(0)
     expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(0)
+  })
+})
+
+describe('re-saving a session — booked hours ride through a growing roster', () => {
+  it('keeps the teacher booked when a late enrollee is saved onto a recorded session', async () => {
+    // The blank-start marker keeps Save live on a partially-recorded session (a
+    // student enrolled after the first save has no row), and that save sends
+    // the WHOLE roster again. The teacher's hour must ride through untouched —
+    // bulkMarkSession has no delete path, and this pins it: an un-booked
+    // session is a lost payout hour noticed a month later.
+    const admin = await createAdmin()
+    const teacher = await createTeacher({ city: 'SPLIT' })
+    const course = await fixtures.course({ kind: 'STANDARD' })
+    const location = await fixtures.location({ city: 'SPLIT' })
+    const group = await fixtures.group({
+      courseId: course.id,
+      locationId: location.id,
+      schoolYear: SY,
+      city: 'SPLIT',
+    })
+    await createTeacherAssignment(teacher.id, group.id)
+
+    const first = await createStudent()
+    const enrA = await createEnrollment(first.id, group.id, { schoolYear: SY })
+
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    // First save: single assigned teacher → auto-booked present, no UI entry.
+    const save1 = await bulkMarkSession({
+      groupId: group.id,
+      sessionDate: SESSION_KEY,
+      entries: [{ enrollmentId: enrA.id, present: true }],
+    })
+    expect(save1.success).toBe(true)
+    const booked = await db.teacherAttendance.findFirst({
+      where: { userId: teacher.id, scheduledGroupId: group.id },
+    })
+    expect(booked?.present).toBe(true)
+
+    // A child enrolls after the fact; the re-save covers the whole roster.
+    const late = await createStudent()
+    const enrB = await createEnrollment(late.id, group.id, { schoolYear: SY })
+    const save2 = await bulkMarkSession({
+      groupId: group.id,
+      sessionDate: SESSION_KEY,
+      entries: [
+        { enrollmentId: enrA.id, present: true },
+        { enrollmentId: enrB.id, present: false },
+      ],
+    })
+    expect(save2.success).toBe(true)
+
+    // Exactly one teacher row, still present — re-saving upserted, never wiped.
+    const after = await db.teacherAttendance.findMany({
+      where: { userId: teacher.id, scheduledGroupId: group.id },
+    })
+    expect(after).toHaveLength(1)
+    expect(after[0].present).toBe(true)
+    // …and the late child's absence row now exists.
+    expect(
+      await db.attendance.findFirst({ where: { enrollmentId: enrB.id } }),
+    ).toMatchObject({ present: false })
   })
 })

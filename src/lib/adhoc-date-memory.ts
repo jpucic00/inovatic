@@ -9,11 +9,12 @@
  *
  * `sessionStorage`, per group, gives the draft the lifetime of the sitting —
  * it survives tab switches and reloads inside one browser tab and deliberately
- * dies with it. That expiry doubles as the delete path: there is no UI for
- * removing a mistyped date, and closing the tab is the escape hatch. Unlike
- * the admin filter memory this key carries no user id — the Dolazak page is
- * already gated per group (`assertTeacherOwnsGroup`), and a planned extra
- * termin is a fact about the group, not about whoever typed it.
+ * dies with it. A mistyped date is removed with the × on its row (2026-09-01)
+ * — the marker filters it out and writes the list back — with tab expiry as
+ * the backstop. Unlike the admin filter memory this key carries no user id —
+ * the Dolazak page is already gated per group (`assertTeacherOwnsGroup`), and
+ * a planned extra termin is a fact about the group, not about whoever typed
+ * it.
  */
 
 const KEY_PREFIX = 'inovatic:adhoc-dates'

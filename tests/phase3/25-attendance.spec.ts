@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import {
   BASE,
+  gotoPortalPath,
   loginAsAdmin,
   loginWithEmail,
   collectGroupIds,
@@ -206,7 +207,10 @@ test.describe('Phase 3 Step 14 — Attendance', () => {
     await page.waitForURL(/\/portal/, { timeout: 30000 })
 
     for (const path of ['/portal', `/portal/grupa/${seeded.groupId}`, '/portal/profil']) {
-      await page.goto(`${BASE}${path}`)
+      // Same prefetch race specs 26/31 hit: /portal prefetches its group-card
+      // links the moment it hydrates, and a goto fired mid-prefetch is
+      // cancelled by Chromium as ERR_ABORTED. gotoPortalPath absorbs it.
+      await gotoPortalPath(page, path)
       const body = (await page.locator('body').innerText()).toLowerCase()
       expect(body).not.toContain('evidencija dolaska')
       expect(body).not.toContain('odsutan')

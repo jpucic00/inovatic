@@ -441,10 +441,16 @@ export async function markSession(page: Page, groupId: string, date: string) {
   await page.goto(`${BASE}/nastavnik/grupa/${groupId}/dolazak`)
   const dateInput = page.locator('input[type="date"]')
   await dateInput.waitFor({ state: 'visible', timeout: 20000 })
-  await dateInput.fill(date)
-  await dateInput.evaluate((el) => el.dispatchEvent(new Event('input', { bubbles: true })))
   const addBtn = page.getByRole('button', { name: 'Dodaj' })
-  await expect(addBtn).toBeEnabled({ timeout: 10000 })
+  // Re-fill until React reflects it. A fill that lands before hydration is
+  // swallowed when the controlled input re-renders empty — the same failure
+  // mode loginWithEmail retries around — and Dodaj then stays disabled with
+  // the date sitting visibly in the box.
+  await expect(async () => {
+    await dateInput.fill(date)
+    await dateInput.evaluate((el) => el.dispatchEvent(new Event('input', { bubbles: true })))
+    await expect(addBtn).toBeEnabled({ timeout: 1500 })
+  }).toPass({ timeout: 20000 })
   await addBtn.click()
   // Wait for React to commit setSelected(date) before clicking Spremi —
   // otherwise handleSave can read the previous `selected` and persist the

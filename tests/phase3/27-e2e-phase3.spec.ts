@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import {
   BASE,
+  gotoPortalPath,
   loginAsAdmin,
   loginWithEmail,
   pickStandardGroupId,
@@ -123,12 +124,17 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/dolazak`)
     const dateInput = page.locator('input[type="date"]')
     await dateInput.waitFor({ state: 'visible', timeout: 20000 })
-    await dateInput.fill(SESSION_DATE)
-    await dateInput.evaluate((el) =>
-      el.dispatchEvent(new Event('input', { bubbles: true })),
-    )
     const addBtn = page.getByRole('button', { name: 'Dodaj' })
-    await expect(addBtn).toBeEnabled({ timeout: 10000 })
+    // Re-fill until React reflects it — a fill that lands before hydration is
+    // swallowed when the controlled input re-renders empty. Same loop as
+    // markSession in tests/helpers/phase3.ts.
+    await expect(async () => {
+      await dateInput.fill(SESSION_DATE)
+      await dateInput.evaluate((el) =>
+        el.dispatchEvent(new Event('input', { bubbles: true })),
+      )
+      await expect(addBtn).toBeEnabled({ timeout: 1500 })
+    }).toPass({ timeout: 20000 })
     await addBtn.click()
     // Wait for React to commit setSelected(SESSION_DATE) before Spremi reads it;
     // see markSession in tests/helpers/phase3.ts for the same workaround.
@@ -184,7 +190,9 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await expect(page.getByText(GROUP_MATERIAL).first()).toBeVisible()
 
     for (const path of ['/portal', `/portal/grupa/${seeded.groupId}`, '/portal/profil']) {
-      await page.goto(`${BASE}${path}`)
+      // Portal-path walks hit the App Router prefetch race (ERR_ABORTED);
+      // gotoPortalPath absorbs it — same as specs 25/26/31.
+      await gotoPortalPath(page, path)
       const body = (await page.locator('body').innerText()).toLowerCase()
       expect(body).not.toContain(REVIEW_TEXT.toLowerCase())
       expect(body).not.toContain('evidencija dolaska')
