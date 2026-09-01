@@ -126,4 +126,21 @@ describe('getGroupGuidesForStaff', () => {
 
     expect(feed.guides).toEqual([])
   })
+
+  it("404s for a same-city teacher not assigned to the group", async () => {
+    // This feed is the ONLY guard in front of /nastavnik/prezentacija/[groupId]
+    // — the presenter page has no gate of its own, so this refusal is what
+    // keeps a colleague's lesson material off someone else's wall.
+    const owner = await createTeacher({ city: 'SPLIT' })
+    const outsider = await createTeacher({ city: 'SPLIT' })
+    const course = await createCourse({ kind: 'RADIONICA', city: 'SPLIT' })
+    const group = await createGroup({ courseId: course.id, city: 'SPLIT' })
+    await createTeacherAssignment(owner.id, group.id)
+
+    mockSession({ id: outsider.id, role: 'TEACHER', city: 'SPLIT' })
+
+    await expect(getGroupGuidesForStaff(group.id)).rejects.toMatchObject({
+      digest: expect.stringMatching(/^NEXT_(NOT_FOUND|HTTP_ERROR_FALLBACK;404)$/),
+    })
+  })
 })

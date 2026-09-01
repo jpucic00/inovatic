@@ -1,6 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
+import { db } from '@/lib/db'
+import { computeSchoolYear } from '@/lib/school-year'
 import {
   BASE,
+  expectNotFoundPage,
   loginAsAdmin,
   loginWithEmail,
   pickStandardGroupId,
@@ -143,12 +146,18 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
     await page.goto(`${BASE}/portal/grupa/${seeded.groupId}`)
 
     await page.getByRole('link', { name: 'Galerija' }).click()
-    await page.waitForURL(/\/galerija$/, { timeout: 30000 })
+    await page.waitForURL(/\/galerija(\?|$)/, { timeout: 30000 })
     // The heading belongs to the layout, so it survives the tab switch.
     await expect(page.getByRole('heading', { name: seeded.courseTitle })).toBeVisible()
 
+    // GalleryTabsAndGrid normalizes its module selection into `?tab=` with a
+    // router.replace right after mount; a tab click fired while that replace
+    // is in flight gets swallowed. This group has modules, so wait for the
+    // normalized URL before leaving the panel.
+    await page.waitForURL(/\/galerija\?tab=/, { timeout: 10000 })
+
     await page.getByRole('link', { name: 'Evaluacija' }).click()
-    await page.waitForURL(/\/evaluacija$/, { timeout: 30000 })
+    await page.waitForURL(/\/evaluacija(\?|$)/, { timeout: 30000 })
     await expect(page.getByRole('heading', { name: seeded.courseTitle })).toBeVisible()
   })
 
@@ -173,5 +182,52 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
     // the whole reason presenting is a separate surface.
     await expect(page.getByRole('button', { name: /Obriši|Uredi/ })).toHaveCount(0)
     await expect(page.getByText('Dodaj novi materijal')).toHaveCount(0)
+    // chrome={false}: exactly ONE "Nova kartica" — the presenter bar's. Two
+    // would mean the embed's own overlay buttons are back on the wall.
+    await expect(page.getByRole('link', { name: 'Nova kartica' })).toHaveCount(1)
+  })
+
+  test('a presentation link for a guide-less group 404s instead of an empty stage', async ({
+    page,
+  }) => {
+    // A teacher bookmarks the presentation; the guide is later deleted or
+    // hidden. The route's guides.length === 0 branch must notFound() cleanly.
+    // A FRESH radionica inherits no COURSE/MODULE materials from anywhere, so
+    // its group is guide-less by construction.
+    const year = computeSchoolYear()
+    const location = await db.location.create({
+      data: { city: 'SPLIT', name: `Loc prez404 ${RUN_ID}`, address: `Adresa ${RUN_ID}` },
+    })
+    const course = await db.course.create({
+      data: {
+        slug: `prez404-${RUN_ID}`,
+        title: `Radionica prez404 ${RUN_ID}`,
+        description: 'Guide-less radionica for the stale-presentation-link test',
+        kind: 'RADIONICA',
+        isCustom: true,
+        city: 'SPLIT',
+        schoolYear: year,
+        ageMin: 6,
+        ageMax: 14,
+      },
+    })
+    const group = await db.scheduledGroup.create({
+      data: {
+        city: 'SPLIT',
+        courseId: course.id,
+        locationId: location.id,
+        name: `Grupa prez404 ${RUN_ID}`,
+        schoolYear: year,
+        dayOfWeek: 'Petak',
+        startTime: '17:00',
+        endTime: '18:30',
+      },
+    })
+
+    // Admin pass-through owns any same-city group, so the only gate left to
+    // hit is the empty-guides branch itself.
+    await loginAsAdmin(page)
+    await page.goto(`${BASE}/nastavnik/prezentacija/${group.id}`)
+    await expectNotFoundPage(page)
   })
 })

@@ -23,12 +23,14 @@ export function GuideLaunchStrip({
           <Gamepad2 className="h-6.5 w-6.5" />
         </span>
         <div className="min-w-0">
+          {/* "Grupa", not "modul": this strip also renders for radionice (no
+              modules at all) and competition groups (no single active one). */}
           <h2 className="text-base font-semibold text-gray-700">
-            Ovaj modul nema interaktivni vodič
+            Ova grupa nema interaktivni vodič
           </h2>
           <p className="mt-0.5 text-[13px] text-gray-500">
-            RoboCamp poveznica dodaje se modulu na stranici programa, pa je vide sve grupe
-            koje taj modul rade.
+            RoboCamp poveznica dodaje se na stranici programa — modulu ili cijelom programu —
+            pa je vide sve grupe kojima pripada.
           </p>
         </div>
       </section>

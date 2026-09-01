@@ -31,8 +31,10 @@ function searchTokens(search: string | undefined): string[] {
  * pattern has to do it itself, or one stray `%` quietly matches the whole
  * table and reads as a broken filter rather than a wildcard.
  */
+const ESCAPE_MATCH = String.raw`\$&`
+
 function likePattern(token: string): string {
-  return `%${token.replace(/[\\%_]/g, '\\$&')}%`
+  return `%${token.replaceAll(/[\\%_]/g, ESCAPE_MATCH)}%`
 }
 
 /**
@@ -59,19 +61,20 @@ export async function unaccentSearchFilter(
   const tokens = searchTokens(search)
   if (tokens.length === 0) return null
 
+  const columnIdents = SEARCH_COLUMNS[table].map((column) => Prisma.raw(`"${column}"`))
   const conditions = tokens.map((token) => {
     const pattern = likePattern(token)
     return Prisma.sql`(${Prisma.join(
-      SEARCH_COLUMNS[table].map(
-        (column) =>
-          Prisma.sql`unaccent(${Prisma.raw(`"${column}"`)}) ILIKE unaccent(${pattern})`,
+      columnIdents.map(
+        (column) => Prisma.sql`unaccent(${column}) ILIKE unaccent(${pattern})`,
       ),
       ' OR ',
     )})`
   })
 
+  const tableIdent = Prisma.raw(`"${table}"`)
   const rows = await db.$queryRaw<{ id: string }[]>(
-    Prisma.sql`SELECT "id" FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conditions, ' AND ')}`,
+    Prisma.sql`SELECT "id" FROM ${tableIdent} WHERE ${Prisma.join(conditions, ' AND ')}`,
   )
   return { id: { in: rows.map((row) => row.id) } }
 }

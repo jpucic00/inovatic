@@ -35,7 +35,7 @@ export function GuidePresenter({
   const current = guides[index]
 
   const leave = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen()
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined)
     router.push(backHref)
   }, [router, backHref])
 
@@ -57,8 +57,8 @@ export function GuidePresenter({
   }, [leave])
 
   const toggleFullscreen = () => {
-    if (document.fullscreenElement) void document.exitFullscreen()
-    else void rootRef.current?.requestFullscreen()
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined)
+    else rootRef.current?.requestFullscreen().catch(() => undefined)
   }
 
   const proxied = current?.externalUrl ? toProxyUrl(current.externalUrl) : null

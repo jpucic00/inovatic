@@ -77,7 +77,7 @@ test.describe('Phase 3 Step 11 — Student Group Materials', () => {
     await expect(page.getByRole('heading', { name: seeded.courseTitle })).toBeVisible()
     await expect(page.getByRole('link', { name: /Natrag/ })).toBeVisible()
 
-    const hasEmpty = await page.getByText(/Još nema materijala za ovu grupu\./).count()
+    const hasEmpty = await page.getByText(/Materijali još nisu objavljeni/).count()
     const hasModuleHeading = await page.locator('main h2').count()
     expect(
       hasEmpty > 0 || hasModuleHeading > 0,
@@ -93,7 +93,7 @@ test.describe('Phase 3 Step 11 — Student Group Materials', () => {
     await page.goto(`${BASE}/portal/grupa/${seeded.otherGroupId}`)
     await expectNotFoundPage(page)
     await expect(page.getByRole('heading', { name: seeded.courseTitle })).toHaveCount(0)
-    await expect(page.getByText(/Još nema materijala/)).toHaveCount(0)
+    await expect(page.getByText(/Materijali još nisu objavljeni/)).toHaveCount(0)
   })
 
   test('visiting a completely non-existent groupId returns 404', async ({ page }) => {

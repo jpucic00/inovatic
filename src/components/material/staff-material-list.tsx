@@ -141,7 +141,8 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
                   hidden={row.hiddenInThisGroup === true}
                 />
               ) : null}
-              {row.canEdit !== false ? (
+              {/* `canEdit` is three-state: `undefined` means unrestricted (admin). */}
+              {row.canEdit === false ? null : (
                 <>
                   <EditMaterialDialog
                     id={row.id}
@@ -154,7 +155,7 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
                   />
                   <DeleteMaterialButton id={row.id} title={row.title} />
                 </>
-              ) : null}
+              )}
             </div>
           </li>
         )

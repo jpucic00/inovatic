@@ -110,6 +110,17 @@ describe('/admin/upiti search', () => {
     const control = await getInquiries({ search: TAG, pageSize: 100 })
     expect(control.data.length).toBeGreaterThanOrEqual(2)
   })
+
+  it('treats a typed _ as a literal character, not a single-char wildcard', async () => {
+    // `_` matches ANY one character when unescaped, so `_etra` would quietly
+    // find every Petra — a subtler failure than `%`, and escaped by the same
+    // likePattern rule.
+    const wild = await getInquiries({ search: `_etra${TAG}`, pageSize: 100 })
+    expect(wild.data).toHaveLength(0)
+
+    const control = await getInquiries({ search: `Petra${TAG}`, pageSize: 100 })
+    expect(control.data.length).toBeGreaterThanOrEqual(2)
+  })
 })
 
 describe('/admin/ucenici search', () => {

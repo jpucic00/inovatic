@@ -862,7 +862,7 @@ export async function getStudents(
   const where = {
     role: 'STUDENT' as const,
     city,
-    ...(searchFilter ?? {}),
+    ...searchFilter,
     ...(courseId || groupId || scheduleId || schoolYear
       ? {
           enrollments: {

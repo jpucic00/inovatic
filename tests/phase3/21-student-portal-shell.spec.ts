@@ -187,17 +187,23 @@ test.describe('Phase 3 Step 10 — Student Portal Shell', () => {
 
   // ── C1: Single-enrollment inline dashboard ─────────────────────────────────
 
-  test('single-enrollment student sees inline materials view with course info and gallery link', async ({ page }) => {
+  test('single-enrollment student is redirected to their group page with course info and gallery tab', async ({ page }) => {
     if (!singleCredentials) throw new Error('single-enrollment student not seeded')
     await loginWithEmail(page, singleCredentials.loginEmail, singleCredentials.password)
-    await page.waitForURL(/\/portal/, { timeout: 30000 })
+    // Not merely /portal: one enrollment now REDIRECTS to the real group route,
+    // because the inline render gave that child no tab strip (2026-08-24).
+    await page.waitForURL(new RegExp(`/portal/grupa/${singleCredentials.groupId}`), {
+      timeout: 30000,
+    })
 
     await expect(page.getByRole('heading', { name: singleCredentials.courseTitle })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Moje grupe' })).toHaveCount(0)
 
     await expect(page.locator(`a[href="/portal/grupa/${singleCredentials.groupId}/galerija"]`)).toBeVisible()
 
-    const hasEmpty = await page.getByText(/Još nema materijala za ovu grupu\./).count()
+    // Current empty-state copy — the pre-tabs "Još nema materijala za ovu
+    // grupu." arm was dead and made the disjunction depend on fixture data.
+    const hasEmpty = await page.getByText(/Materijali još nisu objavljeni/).count()
     const hasModuleHeading = await page.locator('main h2').count()
     expect(
       hasEmpty > 0 || hasModuleHeading > 0,

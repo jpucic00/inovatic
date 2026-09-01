@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import {
   BASE,
+  gotoPortalPath,
   loginAsAdmin,
   loginWithEmail,
   pickStandardGroupId,
@@ -639,5 +640,39 @@ test.describe('Phase 3 Step 13 — COURSE-scope material on a radionica', () => 
     // Gone from every group of the radionica.
     await page.goto(`${BASE}/nastavnik/grupa/${radionicaSeeded.groupB}/materijali`)
     await expect(page.getByText(COURSE_MATERIAL_TITLE)).toHaveCount(0)
+  })
+
+  test('portal: a radionica group offers two tabs, and /evaluacija explains itself', async ({
+    page,
+  }) => {
+    if (!radionicaSeeded) throw new Error('radionica not seeded')
+
+    // Radionice are never graded, so the Evaluacija tab must not exist — and a
+    // mailed /evaluacija link must land on an explanation, never a 404.
+    const s = await seedStudentInGroup(radionicaSeeded.groupA, {
+      firstName: 'Iva',
+      lastName: `RadKid${RUN_ID}`,
+      dateOfBirth: '2015-06-06',
+      childSchool: 'OŠ Rad',
+      parentName: `Roditelj Rad ${RUN_ID}`,
+      parentEmail: `rad.kid.${RUN_ID}@test.com`,
+      parentPhone: '0911117777',
+    })
+
+    await loginWithEmail(page, `${s.username}@student.inovatic.local`, s.password)
+    // One enrollment: /portal forwards straight to the group page.
+    await page.waitForURL(new RegExp(`/portal/grupa/${radionicaSeeded.groupA}`), {
+      timeout: 30000,
+    })
+
+    await expect(page.getByRole('link', { name: 'Materijali' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Galerija' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Evaluacija' })).toHaveCount(0)
+
+    await gotoPortalPath(
+      page,
+      `/portal/grupa/${radionicaSeeded.groupA}/evaluacija`,
+    )
+    await expect(page.getByText('Ova grupa se ne ocjenjuje')).toBeVisible()
   })
 })

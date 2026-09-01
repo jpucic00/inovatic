@@ -23,6 +23,7 @@ import type { TeacherAssignment } from '@prisma/client'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { deleteGroupsAndDependents } from './cleanup'
+import { isLocalDatabaseUrl } from './db-guard'
 import type { StudentData, TeacherData } from './phase3'
 
 const HASH_ROUNDS = 4
@@ -298,8 +299,22 @@ export async function seedCompetitionGroup(
  * Called at the START of bootstrap rather than the end of the suite, because the
  * groups have to outlive the run that made them — every phase3 spec enrols into
  * them.
+ *
+ * Refuses a non-local DATABASE_URL: unlike everything `cleanupRunFixtures`
+ * touches, this deletes by LITERAL NAME — no run id scopes it — and the
+ * dependents chain includes `TeacherAttendance` payout rows. A shell whose env
+ * points at a real database must not be one Playwright invocation away from
+ * that. `E2E_ALLOW_REMOTE_DB=1` is the escape hatch for a CI test DB that is
+ * genuinely not on localhost (the `--force` of `refresh-dev-dates`).
  */
 export async function dropPreviousBootstrapGroups(names: string[]): Promise<number> {
+  if (!isLocalDatabaseUrl(process.env.DATABASE_URL) && process.env.E2E_ALLOW_REMOTE_DB !== '1') {
+    throw new Error(
+      'dropPreviousBootstrapGroups: DATABASE_URL does not look local. This helper deletes ' +
+        'groups BY NAME, including their TeacherAttendance payout rows — refusing. Set ' +
+        'E2E_ALLOW_REMOTE_DB=1 only for a dedicated remote test database.',
+    )
+  }
   const groups = await db.scheduledGroup.findMany({
     where: { name: { in: names } },
     select: { id: true },

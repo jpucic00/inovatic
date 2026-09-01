@@ -78,9 +78,9 @@ export function RobocampEmbed({
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) {
-      void document.exitFullscreen()
+      document.exitFullscreen().catch(() => undefined)
     } else {
-      void fsRef.current?.requestFullscreen()
+      fsRef.current?.requestFullscreen().catch(() => undefined)
     }
   }
 

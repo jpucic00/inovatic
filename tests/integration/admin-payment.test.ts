@@ -150,6 +150,21 @@ describe('getStudents payment filter + computed status', () => {
     return s.id
   }
 
+  // The third billing model. Without these two, the enrollmentMonths arm of
+  // dueEnrollmentWhere never runs as SQL and the disjointness test below could
+  // not see it drift from hasDueItems.
+  async function competitionStudent(key: string, opts: { periodStart: Date }) {
+    const s = await createStudent({ lastName: `${MARKER}_${key}` })
+    const course = await createCourse({ kind: 'COMPETITION' })
+    const group = await createGroup({ courseId: course.id, schoolYear: CY })
+    const enr = await createEnrollment(s.id, group.id, { schoolYear: CY })
+    await db.enrollmentMonth.create({
+      data: { enrollmentId: enr.id, periodStart: opts.periodStart, paidAt: null },
+    })
+    ids[key] = s.id
+    return s.id
+  }
+
   beforeAll(async () => {
     const admin = await createAdmin()
     adminId = admin.id
@@ -177,6 +192,10 @@ describe('getStudents payment filter + computed status', () => {
       paid: false,
       courseId: courseX,
     })
+    // A begun month is owed; a month still ahead is not — the competition
+    // mirror of A_pending and E_future.
+    await competitionStudent('I_comp_pending', { periodStart: STARTED })
+    await competitionStudent('J_comp_notdue', { periodStart: FUTURE })
   })
 
   // setup.ts resets the auth mock to null after every test; re-arm the admin
@@ -200,6 +219,8 @@ describe('getStudents payment filter + computed status', () => {
     expect(byId.get(ids.D2_radio_paid)).toBe('PAID')
     // Enrolled, but its only module still lies ahead — nothing owed, nothing paid.
     expect(byId.get(ids.E_future)).toBe('NOT_DUE')
+    expect(byId.get(ids.I_comp_pending)).toBe('PENDING')
+    expect(byId.get(ids.J_comp_notdue)).toBe('NOT_DUE')
     expect(byId.get(ids.F_pastpaid)).toBe('NONE')
     expect(byId.get(ids.G_pastunpaid)).toBe('PENDING') // cross-year debt
     expect(byId.get(ids.H_courseX)).toBe('PENDING')

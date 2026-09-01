@@ -97,12 +97,12 @@ flowchart LR
 
 ## Who fills `MaterialScopeContext.moduleIds` — kind-driven visibility
 
-`buildGroupMaterialsView` (`src/lib/group-materials-view.ts`) is the caller that turns `Course.kind` into the `moduleIds` the query above filters on:
+`buildGroupShell` (`src/lib/group-materials-view.ts`) is what turns `Course.kind` into the `moduleIds` the query above filters on. It is `cache()`-wrapped because the portal group route resolves it twice per navigation — once in `layout.tsx` for the header and tab strip, once inside `buildGroupMaterialsView` for the Materijali panel — and `buildGroupMaterialsView` calls it rather than repeating the group+modules+schedules query:
 
 ```mermaid
 flowchart TD
-    A["buildGroupMaterialsView(groupId)"] --> B{"visibleModuleIds ="}
-    B -->|"showsAllModules(kind) — COMPETITION"| ALL["Every CourseModule id — all natjecanja, all season.<br/>Every moduleSection has isActive: false (none is current)<br/>and featuredRobocamp = union of all sections"]
+    A["buildGroupShell(groupId) — cache()-wrapped"] --> B{"visibleModuleIds ="}
+    B -->|"showsAllModules(kind) — COMPETITION"| ALL["Every CourseModule id — all natjecanja, all season.<br/>Every moduleSection has isActive: false (none is current)"]
     B -->|"else, activeModule found — STANDARD"| ONE["[activeModule.id] via getCurrentActiveModuleForGroup —<br/>one section, isActive: true"]
     B -->|"else — RADIONICA, or standard with no active module"| NONE["[] — MODULE branch skipped entirely"]
 
@@ -112,6 +112,8 @@ flowchart TD
 ```
 
 > The **same MODULE-scoped row** is therefore visible: on STANDARD only while its module is the group's active one; on COMPETITION all season (which natjecanje a group attends lives in the group NAME, not the data, so the app must never narrow for them); on RADIONICA never (the write path already refuses it). Downstream, `partitionMaterials(materials, kind)` folds COURSE + GROUP into one flat `radionicaMaterials` bucket for radionice, while programs with modules keep separate program/group buckets; `MaterialFilterTabs` renders module tabs only when `hasModules(kind)`.
+
+> **Scope is staff-facing only (2026-08-24).** Those buckets are an intermediate structure, not a layout. The portal re-flattens them: `interactiveGuides(view)` lifts every RoboCamp row out of EVERY bucket — module sections, program, group, radionica — into the one guide section, deliberately wider than the `featuredRobocamp` field it replaced, which read module scope only and would now make a COURSE- or GROUP-scoped guide vanish from the page entirely rather than merely be demoted. `flattenExtraMaterials(view)` merges what is left into a single list ordered video → prezentacija → dokument → poveznica. A child is shown WHAT KIND a material is, never WHERE IT CAME FROM; staff keep the scope, because for them it decides whether a row can be edited, only hidden, or neither (`StaffMaterialList`). Classification lives in `src/lib/material-display.ts` — `kindOf` buckets DOCUMENT with PRESENTATION (they lay out identically), `displayKindOf` is built ON it and splits the two, keeping the RoboCamp rule (first-class type OR a RoboCamp `externalUrl` on an un-backfilled row) at one definition. That module is separate from `group-materials-view.ts` because the kids' list is a client component and must not pull `@/lib/db` into the bundle.
 
 ## Summary
 
