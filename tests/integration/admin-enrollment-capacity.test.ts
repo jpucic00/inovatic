@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
 import type { Mock } from 'vitest'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
@@ -480,5 +480,99 @@ describe('group pickers — scope by selected school year', () => {
     setSelectedYearCookie(undefined)
     res = await getGroupsForCourse(radionica.id)
     expect(res.map((g) => g.id)).toEqual([currentGroup.id])
+  })
+})
+
+describe('getGroupsForCourse — excludeInquiryId (upit ne blokira vlastitu konverziju)', () => {
+  beforeEach(() => {
+    setSelectedYearCookie(undefined)
+  })
+
+  async function createReservingInquiry(
+    courseId: string,
+    scheduledGroupId: string,
+    status: 'NEW' | 'ACCOUNT_CREATED' = 'NEW',
+  ) {
+    return db.inquiry.create({
+      data: {
+        city: 'SPLIT',
+        parentName: 'Rezervacija Parent',
+        parentEmail: `rezervacija-${Date.now()}-${Math.random().toString(36).slice(2)}@example.local`,
+        parentPhone: '+38500010',
+        childFirstName: 'Iva',
+        childLastName: 'Rezervirana',
+        childDateOfBirth: '2015-03-04',
+        consentGivenAt: new Date(),
+        courseId,
+        scheduledGroupId,
+        status,
+      },
+    })
+  }
+
+  it('frees exactly the seat reserved by the excluded inquiry and flags its group', async () => {
+    const admin = await createAdmin()
+    const radionica = await createCourse({ kind: 'RADIONICA' })
+    const group = await createGroup({ courseId: radionica.id, maxStudents: 3 })
+    // 2 enrolled + this inquiry's NEW reservation = full at cap 3
+    await fillGroup(group.id, 2, group.schoolYear)
+    const myInquiry = await createReservingInquiry(radionica.id, group.id)
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    // Without the param — the generic view every other caller gets: full.
+    const generic = (await getGroupsForCourse(radionica.id)).find((g) => g.id === group.id)
+    expect(generic?.isFull).toBe(true)
+    expect(generic?.availableSpots).toBe(0)
+    expect(generic?.reservedByThisInquiry).toBe(false)
+
+    // With it — the conversion view: the child's own reserved seat is free,
+    // and the row is flagged so the dialog can say whose seat it is.
+    const forInquiry = (await getGroupsForCourse(radionica.id, myInquiry.id)).find(
+      (g) => g.id === group.id,
+    )
+    expect(forInquiry?.isFull).toBe(false)
+    expect(forInquiry?.availableSpots).toBe(1)
+    expect(forInquiry?.reservedByThisInquiry).toBe(true)
+  })
+
+  it('keeps other families reservations and other groups counted', async () => {
+    const admin = await createAdmin()
+    const radionica = await createCourse({ kind: 'RADIONICA' })
+    const group = await createGroup({ courseId: radionica.id, maxStudents: 3 })
+    // 1 enrolled + my reservation + another family's reservation = full at cap 3
+    await fillGroup(group.id, 1, group.schoolYear)
+    const myInquiry = await createReservingInquiry(radionica.id, group.id)
+    await createReservingInquiry(radionica.id, group.id)
+    const otherFull = await createGroup({ courseId: radionica.id, maxStudents: 1 })
+    await fillGroup(otherFull.id, 1, otherFull.schoolYear)
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const rows = await getGroupsForCourse(radionica.id, myInquiry.id)
+
+    // Excluding me frees exactly one seat — the other family's stays counted.
+    const mine = rows.find((g) => g.id === group.id)
+    expect(mine?.availableSpots).toBe(1)
+    expect(mine?.reservedByThisInquiry).toBe(true)
+
+    // A group full of enrollments is untouched by the exclusion.
+    const other = rows.find((g) => g.id === otherFull.id)
+    expect(other?.isFull).toBe(true)
+    expect(other?.reservedByThisInquiry).toBe(false)
+  })
+
+  it('an ACCOUNT_CREATED inquiry id changes nothing — only NEW reserves a seat', async () => {
+    const admin = await createAdmin()
+    const radionica = await createCourse({ kind: 'RADIONICA' })
+    const group = await createGroup({ courseId: radionica.id, maxStudents: 2 })
+    await fillGroup(group.id, 2, group.schoolYear)
+    const processed = await createReservingInquiry(radionica.id, group.id, 'ACCOUNT_CREATED')
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const row = (await getGroupsForCourse(radionica.id, processed.id)).find(
+      (g) => g.id === group.id,
+    )
+    expect(row?.isFull).toBe(true)
+    expect(row?.reservedByThisInquiry).toBe(false)
   })
 })

@@ -37,6 +37,13 @@ interface GroupOption {
   endTime: string | null
   availableSpots: number
   isFull: boolean
+  /**
+   * True when this group's shown spots include the seat reserved by THIS
+   * inquiry (the server excludes it from the count, mirroring the
+   * free-before-assert step in createStudentFromInquiry). The row then says
+   * whose seat it is, or a publicly full group with one spot reads as a bug.
+   */
+  reservedByThisInquiry: boolean
   location: { name: string }
   course: { title: string; kind: ProgramKind; modules?: ModuleOption[] }
 }
@@ -74,6 +81,7 @@ function mapGroupOption(sg: {
   endTime: string | null
   availableSpots?: number
   isFull?: boolean
+  reservedByThisInquiry?: boolean
   location: { name: string }
   course: { title: string; kind: ProgramKind; modules?: ModuleOption[] }
 }): GroupOption {
@@ -87,6 +95,7 @@ function mapGroupOption(sg: {
     endTime: sg.endTime,
     availableSpots: sg.availableSpots ?? 0,
     isFull: sg.isFull ?? false,
+    reservedByThisInquiry: sg.reservedByThisInquiry ?? false,
     location: { name: sg.location.name },
     course: {
       title: sg.course.title,
@@ -136,7 +145,7 @@ export function CreateAccountDialog({
     if (!courseId) return
     setLoadingGroups(true)
     try {
-      const groups = await getGroupsForCourse(courseId)
+      const groups = await getGroupsForCourse(courseId, inquiryId)
       setLoadedGroups(groups.map(mapGroupOption))
     } finally {
       setLoadingGroups(false)
@@ -274,7 +283,14 @@ export function CreateAccountDialog({
                         className="h-4 w-4 border-gray-300 text-cyan-600 focus:ring-cyan-500 disabled:cursor-not-allowed"
                       />
                       <span className="flex-1 text-sm text-gray-800">{label}</span>
-                      <GroupCapacityChip availableSpots={g.availableSpots} isFull={g.isFull} />
+                      <span className="flex flex-col items-end gap-0.5">
+                        <GroupCapacityChip availableSpots={g.availableSpots} isFull={g.isFull} />
+                        {g.reservedByThisInquiry && !g.isFull && (
+                          <span className="text-[10px] text-cyan-700 text-right leading-tight">
+                            uključuje mjesto rezervirano za ovo dijete
+                          </span>
+                        )}
+                      </span>
                     </label>
                   )
                 })

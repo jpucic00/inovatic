@@ -29,6 +29,9 @@ interface GroupOption {
   endTime: string | null
   availableSpots: number
   isFull: boolean
+  // See CreateAccountDialog: spots here include this inquiry's own reserved
+  // seat, and the row labels it so a publicly full group doesn't read wrong.
+  reservedByThisInquiry: boolean
   location: { name: string }
   course: { kind: ProgramKind }
 }
@@ -68,7 +71,7 @@ export function SendScheduleDialog({
     if (!courseId) return
     setLoadingGroups(true)
     try {
-      const groups = await getGroupsForCourse(courseId)
+      const groups = await getGroupsForCourse(courseId, inquiryId)
       setLoadedGroups(
         groups.map((sg) => ({
           id: sg.id,
@@ -80,6 +83,7 @@ export function SendScheduleDialog({
           endTime: sg.endTime,
           availableSpots: sg.availableSpots,
           isFull: sg.isFull,
+          reservedByThisInquiry: sg.reservedByThisInquiry,
           location: { name: sg.location.name },
           course: { kind: sg.course.kind },
         })),
@@ -191,7 +195,14 @@ export function SendScheduleDialog({
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="flex-1 text-sm text-gray-800">{label}</span>
-                  <GroupCapacityChip availableSpots={g.availableSpots} isFull={g.isFull} />
+                  <span className="flex flex-col items-end gap-0.5">
+                    <GroupCapacityChip availableSpots={g.availableSpots} isFull={g.isFull} />
+                    {g.reservedByThisInquiry && !g.isFull && (
+                      <span className="text-[10px] text-cyan-700 text-right leading-tight">
+                        uključuje mjesto rezervirano za ovo dijete
+                      </span>
+                    )}
+                  </span>
                 </label>
               )
             })

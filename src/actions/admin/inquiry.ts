@@ -333,11 +333,27 @@ export async function deleteInquiry(id: string): Promise<AdminActionResult> {
   return { success: true }
 }
 
-export async function getGroupsForCourse(courseId: string) {
+export async function getGroupsForCourse(courseId: string, excludeInquiryId?: string) {
   const { city } = await requireAdminCtx()
   const year = await getSelectedSchoolYear()
 
   if (!courseId) return []
+
+  // The inquiry being processed must not block its own conversion: its NEW
+  // reservation is the very seat createStudentFromInquiry frees before its
+  // capacity assert, so the counts feeding the upit dialogs exclude it — and
+  // the group holding that seat is flagged, because a publicly full group
+  // showing one free spot here reads as a bug unless the UI says whose seat
+  // it is. Only a NEW inquiry reserves a spot, so only a NEW one has a seat
+  // to flag; a cross-city id is inert (it cannot prefer an own-city group).
+  let reservedGroupId: string | null = null
+  if (excludeInquiryId) {
+    const excluded = await db.inquiry.findUnique({
+      where: { id: excludeInquiryId },
+      select: { status: true, scheduledGroupId: true },
+    })
+    if (excluded?.status === 'NEW') reservedGroupId = excluded.scheduledGroupId
+  }
 
   // Session city == inquiry city for every inquiry-driven picker (cross-city
   // inquiries already read as nonexistent), so this offers only groups in the
@@ -373,7 +389,9 @@ export async function getGroupsForCourse(courseId: string) {
       _count: {
         select: {
           preferredInquiries: {
-            where: { status: 'NEW' },
+            where: excludeInquiryId
+              ? { status: 'NEW', id: { not: excludeInquiryId } }
+              : { status: 'NEW' },
           },
         },
       },
@@ -385,7 +403,7 @@ export async function getGroupsForCourse(courseId: string) {
   const holidayDates = await loadHolidayDateKeys(year, city)
   return groups.map((g) => {
     const { availableSpots, isFull } = computeGroupCapacity(g, holidayDates, now)
-    return { ...g, availableSpots, isFull }
+    return { ...g, availableSpots, isFull, reservedByThisInquiry: g.id === reservedGroupId }
   })
 }
 

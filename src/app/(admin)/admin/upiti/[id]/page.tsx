@@ -276,6 +276,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     endTime: string | null
     availableSpots: number
     isFull: boolean
+    reservedByThisInquiry: boolean
     location: { name: string }
     course: {
       title: string
@@ -297,12 +298,16 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     endTime: sg.endTime,
     availableSpots: sg.availableSpots,
     isFull: sg.isFull,
+    reservedByThisInquiry: sg.reservedByThisInquiry,
     location: { name: sg.location.name },
     course: { title: sg.course.title, kind: sg.course.kind, modules: sg.course.modules },
   })
 
+  // The inquiry's own NEW reservation is excluded from the counts (and the
+  // group holding it flagged) — see getGroupsForCourse: without this, a group
+  // full only of reservations grays out the very conversion that would free one.
   const groupsForInitial = inquiry.courseId
-    ? await getGroupsForCourse(inquiry.courseId)
+    ? await getGroupsForCourse(inquiry.courseId, inquiry.id)
     : []
   const courseGroups = groupsForInitial.map(toGroupOption)
   const allCourses = await getInquiryCourses()
