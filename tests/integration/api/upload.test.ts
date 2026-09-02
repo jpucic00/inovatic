@@ -1,4 +1,34 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { hasWatermark, withWatermark } from '@/lib/cloudinary-url'
+
+// Stub Cloudinary so the positive control stays offline. Real-shaped host on
+// purpose: `withWatermark` is a no-op on any other hostname, and the assertion
+// below exists to prove the route wraps what it returns.
+const SECURE_URL =
+  'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1700000000/articles/covers/fake.png'
+vi.mock('@/lib/cloudinary', () => ({
+  default: {
+    uploader: {
+      upload_stream: (
+        _opts: unknown,
+        cb: (
+          err: undefined,
+          res: { secure_url: string; public_id: string; bytes: number; width: number; height: number },
+        ) => void,
+      ) => ({
+        end: (bytes: Buffer) =>
+          cb(undefined, {
+            secure_url: SECURE_URL,
+            public_id: 'articles/covers/fake',
+            bytes: bytes.length,
+            width: 1,
+            height: 1,
+          }),
+      }),
+    },
+  },
+}))
+
 import { POST } from '@/app/api/upload/route'
 import { mockSession } from '../setup'
 import { createAdmin, createStudent, createTeacher } from '../helpers/factory'
@@ -67,5 +97,20 @@ describe('POST /api/upload — MIME guard wiring', () => {
     expect(res.status).toBe(415)
     const body = (await res.json()) as { error?: string }
     expect(body.error).toContain('Unsupported type')
+  })
+})
+
+describe('POST /api/upload — watermark on the returned url', () => {
+  it('ADMIN genuine PNG → 200 with the overlay spliced into the url, public id untouched', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN', email: admin.email })
+    const res = await postUpload(
+      makeForm({ name: 'cover.png', type: 'image/png', bytes: PNG_HEAD }),
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { url?: string; publicId?: string }
+    expect(body.url).toBe(withWatermark(SECURE_URL))
+    expect(hasWatermark(body.url ?? '')).toBe(true)
+    expect(body.publicId).toBe('articles/covers/fake')
   })
 })

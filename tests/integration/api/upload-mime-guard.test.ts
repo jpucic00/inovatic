@@ -10,6 +10,13 @@
  * renamed to slip past the allow-list.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { hasWatermark, publicIdFromUrl, withWatermark } from '@/lib/cloudinary-url'
+
+// A real-shaped delivery url. The host matters: `withWatermark` bails on
+// anything that is not res.cloudinary.com, so a `res.cloudinary.test` stub
+// would let the positive control pass with the wrapper deleted from the route.
+const SECURE_URL =
+  'https://res.cloudinary.com/dgc2tp4f8/image/upload/v1700000000/gallery/fake.png'
 
 // Both routes stream to Cloudinary on the success path. Stub the client so the
 // positive control below stays offline — without it the 415 assertions could
@@ -31,7 +38,7 @@ vi.mock('@/lib/cloudinary', () => {
         upload_stream: (_opts: unknown, cb: UploadCallback) => ({
           end: (bytes: Buffer) =>
             cb(undefined, {
-              secure_url: 'https://res.cloudinary.test/fake.png',
+              secure_url: SECURE_URL,
               public_id: 'fake',
               bytes: bytes.length,
               width: 1,
@@ -82,6 +89,8 @@ const ROUTES = [
     label: '/api/upload/materials',
     path: '/api/upload/materials',
     route: postMaterials as UploadRoute,
+    // Materials are documents, presentations and videos — never watermarked.
+    watermarked: false,
     signIn: async () => {
       const admin = await createAdmin()
       mockSession({ id: admin.id, role: 'ADMIN', email: admin.email })
@@ -91,6 +100,8 @@ const ROUTES = [
     label: '/api/upload/gallery',
     path: '/api/upload/gallery',
     route: postGallery as UploadRoute,
+    // Gallery photos carry the Inovatic overlay in the url that gets stored.
+    watermarked: true,
     signIn: async () => {
       const teacher = await createTeacher()
       mockSession({ id: teacher.id, role: 'TEACHER', email: teacher.email })
@@ -98,7 +109,7 @@ const ROUTES = [
   },
 ] as const
 
-describe.each(ROUTES)('POST $label — SVG rejection', ({ path, route, signIn }) => {
+describe.each(ROUTES)('POST $label — SVG rejection', ({ path, route, signIn, watermarked }) => {
   beforeEach(async () => {
     await signIn()
   })
@@ -132,7 +143,13 @@ describe.each(ROUTES)('POST $label — SVG rejection', ({ path, route, signIn })
       bytes: PNG_HEAD,
     })
     expect(res.status).toBe(200)
-    const body = (await res.json()) as { url?: string }
-    expect(body.url).toBe('https://res.cloudinary.test/fake.png')
+    const body = (await res.json()) as { url?: string; publicId?: string }
+    // The url the client will store: watermarked for photos, verbatim for
+    // materials. The public id stays the bare asset id either way, so a later
+    // delete resolves the real asset.
+    expect(body.url).toBe(watermarked ? withWatermark(SECURE_URL) : SECURE_URL)
+    expect(hasWatermark(body.url ?? '')).toBe(watermarked)
+    expect(publicIdFromUrl(body.url ?? '')).toBe('gallery/fake')
+    expect(body.publicId).toBe('fake')
   })
 })

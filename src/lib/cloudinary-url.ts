@@ -172,7 +172,11 @@ const WATERMARK_PREFIX = `l_${WATERMARK_OVERLAY_ID}`
  * Does this path segment look like a Cloudinary transformation component
  * (`c_fill,w_400`, `l_branding:inovatic-watermark,o_60`) rather than a version
  * or a folder? Every component is `<key>_<value>`, comma-separated; folder
- * names in this project never take that shape.
+ * names in this project never take that shape (`articles/`, `gallery/`,
+ * `materials/`, `branding/` — verified against every stored URL, 2026-09-02).
+ * That is a naming constraint on upload folders: a first folder spelled like
+ * `wp_uploads` would be read as a transformation and dropped from the public
+ * id, and `destroyCloudinaryAssets` would then miss the asset.
  */
 function isTransformSegment(segment: string): boolean {
   if (!segment || /^v\d+$/.test(segment)) return false
@@ -235,7 +239,11 @@ export function withWatermark(url: string): string {
     if (uploadIdx <= 0 || uploadIdx >= parts.length - 1) return url
     if (parts[uploadIdx - 1] !== 'image') return url
 
-    parts.splice(uploadIdx + 1, 0, WATERMARK_TRANSFORM)
+    // Behind any transformation already in the chain: a resize must stay in
+    // FRONT of the overlay (the rule cloudinaryThumbUrl enforces), or the logo
+    // is drawn on the full photo and then shrunk and cropped along with it.
+    const lead = leadingTransforms(parts, uploadIdx).length
+    parts.splice(uploadIdx + 1 + lead, 0, WATERMARK_TRANSFORM)
     parsed.pathname = '/' + parts.join('/')
     return parsed.toString()
   } catch {

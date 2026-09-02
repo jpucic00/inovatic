@@ -42,6 +42,12 @@ describe('publicIdFromUrl', () => {
     ).toBe('articles/x')
   })
 
+  it('resolves a video public id the same way (article bodies hold video/upload urls)', () => {
+    expect(publicIdFromUrl(`${CLOUD}/video/upload/v1/articles/inline/saonice.mp4`)).toBe(
+      'articles/inline/saonice',
+    )
+  })
+
   it('keeps a folder that merely looks wordy (no key_value shape)', () => {
     expect(
       publicIdFromUrl(`${CLOUD}/image/upload/articles/gallery/prvi-ciklus/01.jpg`),
@@ -264,6 +270,22 @@ describe('withWatermark', () => {
     expect(withWatermark(once)).toBe(once)
   })
 
+  it('goes BEHIND a resize already in the chain, never in front of it', () => {
+    // Same ordering rule cloudinaryThumbUrl enforces from the other side: the
+    // overlay must be drawn on the finished thumbnail, not shrunk with the photo.
+    const sized = `${CLOUD}/image/upload/c_fill,g_auto,w_400,h_400/v1/articles/x.jpg`
+    expect(withWatermark(sized)).toBe(
+      `${CLOUD}/image/upload/c_fill,g_auto,w_400,h_400/${WATERMARK_TRANSFORM}/v1/articles/x.jpg`,
+    )
+    // Which makes the two helpers commute: thumb-then-watermark and
+    // watermark-then-thumb spell the same url, so no call site has to care
+    // which one ran first.
+    const plain = `${CLOUD}/image/upload/v1/articles/x.jpg`
+    expect(withWatermark(cloudinaryThumbUrl(plain, 400, 400))).toBe(
+      cloudinaryThumbUrl(withWatermark(plain), 400, 400),
+    )
+  })
+
   it('leaves video and raw assets alone', () => {
     const video = `${CLOUD}/video/upload/v1/articles/inline/saonice.mp4`
     const raw = `${CLOUD}/raw/upload/v1/materials/plan.pdf`
@@ -299,6 +321,11 @@ describe('stripWatermark', () => {
 
   it('is a no-op on an unwatermarked url', () => {
     expect(stripWatermark(ORIG)).toBe(ORIG)
+  })
+
+  it('round-trips a thumbnail chain too (resize in front, overlay behind)', () => {
+    const thumb = cloudinaryThumbUrl(ORIG, 400, 400)
+    expect(stripWatermark(withWatermark(thumb))).toBe(thumb)
   })
 })
 

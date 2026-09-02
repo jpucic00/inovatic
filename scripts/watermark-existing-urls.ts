@@ -72,28 +72,51 @@ function sample(before: string, after: string): void {
   samples.push(`    - ${before}\n    + ${after}`)
 }
 
+/** Articles left alone because an editor saved them between our read and write. */
+let raced = 0
+
+/**
+ * Optimistic write: the row is updated only if nobody has saved it since it
+ * was read. `autosaveArticle` rewrites the whole body on every pause in
+ * typing, so an article open in an editor while this runs would otherwise get
+ * its newest autosave overwritten with the script's older copy. A row that
+ * raced is counted and left alone — the script is idempotent, so a second run
+ * picks it up.
+ */
+async function writeArticleGuarded(
+  id: string,
+  updatedAt: Date,
+  data: { coverImage?: string; content?: never },
+): Promise<void> {
+  const { count } = await db.article.updateMany({ where: { id, updatedAt }, data })
+  if (count === 0) raced++
+}
+
 async function articleCovers(): Promise<void> {
   const rows = await db.article.findMany({
     where: { coverImage: { not: null } },
-    select: { id: true, coverImage: true },
+    select: { id: true, coverImage: true, updatedAt: true },
   })
 
   let changed = 0
   for (const row of rows) {
-    const before = row.coverImage!
+    const before = row.coverImage
+    if (!before) continue
     const after = rewrite(before)
     if (after === before) continue
     changed++
     sample(before, after)
     if (apply) {
-      await db.article.update({ where: { id: row.id }, data: { coverImage: after } })
+      await writeArticleGuarded(row.id, row.updatedAt, { coverImage: after })
     }
   }
   record('Article.coverImage', rows.length, changed)
 }
 
 async function articleBodies(): Promise<void> {
-  const rows = await db.article.findMany({ select: { id: true, content: true } })
+  const rows = await db.article.findMany({
+    select: { id: true, content: true, updatedAt: true },
+  })
 
   let changed = 0
   let blocks = 0
@@ -111,10 +134,7 @@ async function articleBodies(): Promise<void> {
     changed++
     blocks += touched
     if (apply) {
-      await db.article.update({
-        where: { id: row.id },
-        data: { content: next as never },
-      })
+      await writeArticleGuarded(row.id, row.updatedAt, { content: next as never })
     }
   }
   record(`Article.content (${blocks} image block(s))`, rows.length, changed)
@@ -173,6 +193,12 @@ async function main(): Promise<void> {
 
   if (samples.length > 0) {
     console.log(`\n  Sample rewrite(s):\n${samples.join('\n')}`)
+  }
+
+  if (raced > 0) {
+    console.log(
+      `\n  ${raced} article(s) skipped — saved in the editor while this ran. Re-run to pick them up.`,
+    )
   }
 
   console.log(
