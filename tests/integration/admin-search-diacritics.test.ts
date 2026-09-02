@@ -55,13 +55,24 @@ beforeAll(async () => {
     childLastName: `Drugić${TAG}`,
   })
 
+  // Each child carries a parent: staff arrive from an upit mail or an Outlook
+  // thread holding the parent's name or address, and the account is what they
+  // are looking for.
   const student = await createStudent({
     city: 'SPLIT',
     firstName: `Petra${TAG}`,
     lastName: `Testić${TAG}`,
+    parentName: `Šimun${TAG} Perić${TAG}`,
+    parentEmail: `simun.${TAG}@example.com`,
   })
   accentedStudentId = student.id
-  await createStudent({ city: 'SPLIT', firstName: `Petra${TAG}`, lastName: `Drugić${TAG}` })
+  await createStudent({
+    city: 'SPLIT',
+    firstName: `Petra${TAG}`,
+    lastName: `Drugić${TAG}`,
+    parentName: `Ivan${TAG} Ivić${TAG}`,
+    parentEmail: `ivan.${TAG}@example.com`,
+  })
 })
 
 describe('/admin/upiti search', () => {
@@ -132,6 +143,26 @@ describe('/admin/ucenici search', () => {
 
   it('reaches a student by full name, across firstName and lastName', async () => {
     const res = await getStudents({ search: `Petra${TAG} Testic${TAG}`, pageSize: 100 })
+
+    expect(res.data.map((r) => r.id)).toEqual([accentedStudentId])
+  })
+
+  it('reaches a student by the parent’s name, undiacriticised', async () => {
+    const res = await getStudents({ search: `simun${TAG} peric${TAG}`, pageSize: 100 })
+
+    expect(res.data.map((r) => r.id)).toEqual([accentedStudentId])
+  })
+
+  it('reaches a student by a fragment of the parent’s e-mail address', async () => {
+    const res = await getStudents({ search: `simun.${TAG}@`, pageSize: 100 })
+
+    expect(res.data.map((r) => r.id)).toEqual([accentedStudentId])
+  })
+
+  it('lets one query span the child’s first name and the parent’s surname', async () => {
+    // Both children are Petra; only the parent's surname tells them apart, and
+    // it lives in a different column than the child's first name.
+    const res = await getStudents({ search: `Petra${TAG} Peric${TAG}`, pageSize: 100 })
 
     expect(res.data.map((r) => r.id)).toEqual([accentedStudentId])
   })

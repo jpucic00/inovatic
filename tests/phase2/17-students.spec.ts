@@ -291,7 +291,7 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/ucenici`)
       await expect(
-        page.getByPlaceholder('Pretraži po imenu ili korisničkom imenu...'),
+        page.getByPlaceholder('Pretraži po imenu djeteta, roditelja, e-mailu ili korisničkom imenu...'),
       ).toBeVisible()
       await expect(page.getByRole('button', { name: 'Traži' })).toBeVisible()
       await expect(page.locator('select').filter({ hasText: 'Svi programi' })).toBeVisible()

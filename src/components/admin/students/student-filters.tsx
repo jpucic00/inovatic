@@ -105,7 +105,7 @@ export function StudentFilters({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           <Input
             ref={searchRef}
-            placeholder="Pretraži po imenu ili korisničkom imenu..."
+            placeholder="Pretraži po imenu djeteta, roditelja, e-mailu ili korisničkom imenu..."
             className="pl-9"
             defaultValue={currentSearch}
           />

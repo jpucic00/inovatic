@@ -10,7 +10,12 @@ import { db } from '@/lib/db'
  */
 const SEARCH_COLUMNS = {
   Inquiry: ['parentName', 'childFirstName', 'childLastName', 'parentEmail'],
-  User: ['firstName', 'lastName', 'username'],
+  // The parent columns mirror Inquiry on purpose: staff arrive from an upit
+  // mail or an Outlook thread holding the parent's name or address, and the
+  // child's account is what they are looking for. `parentEmail` may still carry
+  // the legacy `"Name <a@b>"` import residue — a substring match finds it
+  // either way.
+  User: ['firstName', 'lastName', 'username', 'parentName', 'parentEmail'],
 } as const
 
 type SearchableTable = keyof typeof SEARCH_COLUMNS

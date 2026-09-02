@@ -854,9 +854,10 @@ export async function getStudents(
   if (paymentStatus) andClauses.push(paymentStatusUserWhere(paymentStatus, referenceYear, now))
   if (returning) andClauses.push(returningStudentWhere(returning, referenceYear))
 
-  // Name and username, matched case- AND accent-insensitively so "Testic" finds
-  // "Testić" (see unaccent-search.ts), and per token so a full name — which
-  // spans firstName and lastName — matches at all.
+  // Child's name and username plus the parent's name and e-mail, matched case-
+  // AND accent-insensitively so "Testic" finds "Testić" (see unaccent-search.ts),
+  // and per token so a full name — which spans firstName and lastName — matches
+  // at all.
   const searchFilter = await unaccentSearchFilter('User', search)
 
   const where = {
