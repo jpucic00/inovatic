@@ -189,6 +189,33 @@ flowchart LR
 
 > The preferred-inquiry count is `status === NEW` only. When an inquiry transitions to `ACCOUNT_CREATED` (or `DECLINED`) it stops counting as a preferred inquiry; the new enrollment takes over the slot so the net count stays the same.
 
+### The inquiry being converted must not block itself (2026-09-01)
+
+The `status === NEW` count above is what **the public feed and every other picker** see. The two upit dialogs see one seat less, because the seat they would block with is the one the conversion is about to free.
+
+```mermaid
+flowchart TD
+    A["Admin opens upit X (status NEW, preferred group G)"] --> B["getGroupsForCourse(courseId, excludeInquiryId: X)"]
+    B --> C{"Excluded inquiry loaded — status === NEW?"}
+    C -->|"No — ACCOUNT_CREATED / DECLINED / unknown id / other city"| D["reservedGroupId = null<br/>counts identical to the public feed"]
+    C -->|Yes| E["reservedGroupId = inquiry.scheduledGroupId"]
+    D --> F2["_count.preferredInquiries where { status: NEW }"]
+    E --> F1["_count.preferredInquiries where { status: NEW, id: { not: X } }"]
+    F1 --> G["computeGroupCapacity → availableSpots, isFull"]
+    F2 --> G
+    G --> H{"group.id === reservedGroupId AND not isFull?"}
+    H -->|Yes| I["reservedByThisInquiry: true → the row reads<br/>'uključuje mjesto rezervirano za ovo dijete'"]
+    H -->|No| J["reservedByThisInquiry: false — plain capacity chip"]
+
+    style I fill:#fef3c7
+    style D fill:#e0f2fe
+    style G fill:#e0f2fe
+```
+
+> Source: `getGroupsForCourse` in `src/actions/admin/inquiry.ts`, consumed by `CreateAccountDialog`, `SendScheduleDialog` and the server prefetch on `/admin/upiti/[id]`. **A view, never a write.** The exclusion mirrors — it does not create — the free-before-assert step inside `createStudentFromInquiry`: the transaction flips the inquiry to `ACCOUNT_CREATED` *before* `assertGroupHasAvailableSpot` runs, so the seat the picker hides is genuinely gone by the time capacity is re-checked under `Serializable`. Without the exclusion the last seat in a group would gray out the one conversion that releases it.
+>
+> **Only these two callers pass an inquiry id.** `getActivePrograms` / `getSignupProgram` (the public feed) and `getGroupsForCourseInSelectedYear` (manual student creation) count every `NEW` inquiry, so a group can legitimately read *puna* on `/prijava` and *1 mjesto* on that child's own upit at the same second. That is why the flag exists: the row says **whose** seat it is, or the discrepancy reads as a capacity bug. Only a `NEW` inquiry reserves anything, so an already-processed or cross-city id resolves to `reservedGroupId = null` and the counts fall back to the public ones (integration-tested: the cross-city call is deep-equal to the plain one).
+
 ### Capacity guard pattern (write path)
 
 Every action that can take a spot routes through the shared guard in `src/lib/group-capacity.ts`. The guard runs the mutation inside a `Serializable` transaction, re-checks capacity from inside that same snapshot, and throws `GroupFullError` rather than over-booking.

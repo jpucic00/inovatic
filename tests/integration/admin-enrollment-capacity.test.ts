@@ -492,10 +492,11 @@ describe('getGroupsForCourse — excludeInquiryId (upit ne blokira vlastitu konv
     courseId: string,
     scheduledGroupId: string,
     status: 'NEW' | 'ACCOUNT_CREATED' = 'NEW',
+    city: 'SPLIT' | 'SIBENIK' = 'SPLIT',
   ) {
     return db.inquiry.create({
       data: {
-        city: 'SPLIT',
+        city,
         parentName: 'Rezervacija Parent',
         parentEmail: `rezervacija-${Date.now()}-${Math.random().toString(36).slice(2)}@example.local`,
         parentPhone: '+38500010',
@@ -559,6 +560,30 @@ describe('getGroupsForCourse — excludeInquiryId (upit ne blokira vlastitu konv
     const other = rows.find((g) => g.id === otherFull.id)
     expect(other?.isFull).toBe(true)
     expect(other?.reservedByThisInquiry).toBe(false)
+  })
+
+  it('a cross-city inquiry id is inert — the response is identical to the plain call', async () => {
+    // The lookup itself is not city-filtered, so this is the negative test the
+    // tenancy rule asks for: a Šibenik upit id handed to a Split admin must
+    // neither free a Split seat nor flag a Split group, and must not surface
+    // the Šibenik group it actually reserves.
+    const admin = await createAdmin()
+    const radionica = await createCourse({ kind: 'RADIONICA' })
+    const splitGroup = await createGroup({ courseId: radionica.id, maxStudents: 2 })
+    await fillGroup(splitGroup.id, 1, splitGroup.schoolYear)
+    await createReservingInquiry(radionica.id, splitGroup.id) // another Split family
+    const sibenikGroup = await createGroup({ courseId: radionica.id, maxStudents: 5, city: 'SIBENIK' })
+    const foreign = await createReservingInquiry(radionica.id, sibenikGroup.id, 'NEW', 'SIBENIK')
+
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const plain = await getGroupsForCourse(radionica.id)
+    const withForeign = await getGroupsForCourse(radionica.id, foreign.id)
+
+    expect(withForeign).toEqual(plain)
+    const mine = withForeign.find((g) => g.id === splitGroup.id)
+    expect(mine?.isFull).toBe(true)
+    expect(mine?.reservedByThisInquiry).toBe(false)
+    expect(withForeign.map((g) => g.id)).not.toContain(sibenikGroup.id)
   })
 
   it('an ACCOUNT_CREATED inquiry id changes nothing — only NEW reserves a seat', async () => {

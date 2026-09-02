@@ -54,6 +54,31 @@ flowchart TD
 
 > Source: the `moduleScopeError` helper near the top of `src/actions/gallery/crud.ts` (the kind-driven moduleId rule, with the kind-aware error copy), `canManageGroupImages` above it, `archivedYearError` from `src/lib/school-year-guard.ts`, and the transactional insert with sort-order seeding lower down. Validator at `src/lib/validators/gallery.ts`. The standard-program error string stays byte-identical to the pre-COMPETITION copy (asserted in E2E spec 29).
 
+### What the row actually stores — the watermark lives in `url`, not in the asset
+
+```mermaid
+flowchart LR
+    U["GalleryUploadZone → POST /api/upload/gallery"] --> C["cloudinary.uploader.upload_stream(resource_type: 'image')"]
+    C --> W["withWatermark(result.secure_url):<br/>splices l_branding:inovatic-watermark,o_60,w_0.28,fl_relative,g_south_east,x_20,y_20<br/>straight after /image/upload/"]
+    C --> P["result.public_id — never transformed"]
+    W --> A["addGalleryImages({ url, publicId, width, height })"]
+    P --> A
+    A --> DB["GalleryImage.url = watermarked DELIVERY url<br/>GalleryImage.publicId = bare asset id"]
+    DB --> T["Grid: cloudinaryThumbUrl(url, 400, 400) inserts<br/>c_fill,g_auto,400x400 IN FRONT of the overlay"]
+    DB --> L["Lightbox download: { url: img.url } → the watermarked file"]
+    DB --> D["deleteGalleryImage → destroyCloudinaryAssetsByPublicId([publicId])"]
+
+    style W fill:#fef3c7
+    style D fill:#d1fae5
+    style DB fill:#e0f2fe
+```
+
+> Source: `withWatermark` / `cloudinaryThumbUrl` in `src/lib/cloudinary-url.ts`, applied at `src/app/api/upload/gallery/route.ts`. The stored asset is never touched — the watermark is a delivery instruction inside the string, which is why `--revert` on `npm run db:watermark-images` gives every gallery its clean photos back (`docs/runbooks/watermark-images.md`).
+>
+> **Order in the chain is load-bearing.** Cloudinary applies chained components left to right, so the thumbnail resize must sit in FRONT of the overlay: the logo is then drawn on the finished 400×400 crop at a constant 28% of it, instead of being shrunk and cropped along with the photo. `cloudinaryThumbUrl` therefore bails only on an existing **sizing** transformation, and `isSizingTransform` excludes any `l_…` component even though the watermark carries `w_0.28` — inside an overlay that `w_` sizes the layer, not the photo. Since 2026-09-02 `withWatermark` honours the same rule from the other side (it splices behind any transform already present), so the two helpers commute.
+>
+> **Deletion is unaffected here, unlike articles.** `GalleryImage` stores `publicId` as its own column and `deleteGalleryImage` destroys by that id, so no gallery cleanup ever parses a URL. Article bodies hold URLs only — which is why the same feature forced `publicIdFromUrl` to skip leading transformation segments and `autosaveArticle` to diff removals on resolved public ids (`removedAssetUrls`) rather than on raw strings.
+
 ## Reader gate
 
 ```mermaid
@@ -99,7 +124,7 @@ flowchart TD
     style OK fill:#d1fae5
 ```
 
-> Source: `deleteGroup` in `src/actions/admin/group.ts`. The guard prevents orphan Cloudinary assets — Prisma `onDelete: Cascade` would drop the `GalleryImage` rows but the underlying remote files would leak because Cloudinary cleanup runs at the action layer, not via DB trigger. The Croatian error string above uses ASCII inside the mermaid label; the production error preserves the č: `Grupa ima slike u galeriji i ne može se obrisati.`
+> Source: `deleteGroup` in `src/actions/admin/group.ts`. The guard prevents orphan Cloudinary assets — Prisma `onDelete: Cascade` would drop the `GalleryImage` rows but the underlying remote files would leak because Cloudinary cleanup runs at the action layer, not via DB trigger. That cleanup goes by `GalleryImage.publicId`, never by parsing `url`, so the watermark segment in the stored URL can never cause a miss. The Croatian error string above uses ASCII inside the mermaid label; the production error preserves the č: `Grupa ima slike u galeriji i ne može se obrisati.`
 
 ## Why no DB `CHECK` constraint
 

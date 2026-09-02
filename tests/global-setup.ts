@@ -15,6 +15,15 @@
  * before the suite, is strictly READ-ONLY, and turns a scattered set of
  * assertion failures into one sentence naming the command.
  *
+ * A second, quieter rot (found 2026-09-02): the public feed keys on the
+ * ENROLLMENT WINDOW's year, so on 1 September it can still offer last year's
+ * plan while `computeSchoolYear()` — and with it the admin sidebar — has moved
+ * on. The create-student dialog then lists no modules for the new year,
+ * "Svi moduli" checks nothing, and `createStudentInGroup` dies in `beforeAll`
+ * with the dialog still open and no error text. The first check cannot see
+ * that, so a second one asks the question directly: does the CURRENT school
+ * year have any standard module plan in SPLIT at all?
+ *
  * Deliberately NOT auto-applying it. This runs against the dev database, and a
  * setup hook that silently rewrites every module window (and with it every
  * expected session and attendance screen) because a test run started is a much
@@ -23,9 +32,44 @@
 import { db } from '@/lib/db'
 import { getActivePrograms } from '@/actions/public/programs'
 import { hasDatedModules } from '@/lib/program-kind'
+import { computeSchoolYear } from '@/lib/school-year'
+
+const REFRESH_HINT = [
+  '',
+  '         npm run db:refresh-dev-dates -- --apply',
+  '',
+  '     (Dry-runs by default; refuses a non-local DATABASE_URL without --force;',
+  '      upserts ModuleSchedule + CourseEnrollmentWindow and deletes nothing.)',
+  '',
+]
+
+/** The 1 September case: the sidebar year has no standard module plan yet. */
+async function warnIfCurrentYearUnplanned(): Promise<void> {
+  const year = computeSchoolYear()
+  const planned = await db.moduleSchedule.count({
+    where: { schoolYear: year, city: 'SPLIT', module: { course: { kind: 'STANDARD' } } },
+  })
+  if (planned > 0) return
+
+  console.warn(
+    [
+      '',
+      `  ⚠  No standard module plan exists for ${year} in SPLIT — the school year`,
+      '     has flipped and the dev plans still carry the previous label.',
+      '',
+      '     The admin sidebar now defaults to this year, so the create-student',
+      '     dialog lists no modules, "Svi moduli" checks nothing, and every spec',
+      '     that enrols a child through the admin (createStudentInGroup) dies in',
+      '     beforeAll with the dialog still open. Fix it with:',
+      ...REFRESH_HINT,
+    ].join('\n'),
+  )
+}
 
 export default async function globalSetup(): Promise<void> {
   try {
+    await warnIfCurrentYearUnplanned()
+
     const programs = await getActivePrograms('SPLIT')
     const standardWithGroups = programs.filter(
       (p) => hasDatedModules(p.kind) && p.groups.length > 0,
@@ -51,12 +95,7 @@ export default async function globalSetup(): Promise<void> {
         '',
         '     Every spec that signs a child up through /prijava will fail on a',
         '     missing termin dropdown. Fix it with:',
-        '',
-        '         npm run db:refresh-dev-dates -- --apply',
-        '',
-        '     (Dry-runs by default; refuses a non-local DATABASE_URL without --force;',
-        '      upserts ModuleSchedule + CourseEnrollmentWindow and deletes nothing.)',
-        '',
+        ...REFRESH_HINT,
       ].join('\n'),
     )
   } catch (err) {
