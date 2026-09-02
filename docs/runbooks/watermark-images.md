@@ -63,7 +63,21 @@ Pokriva `Article.coverImage`, `Article.content` (BlockNote JSON),
 
 Skripta je idempotentna — drugo pokretanje prijavi 0 izmjena.
 
-## 4. Provjera
+## 4. Redeploy — inače članci ostaju na staroj verziji
+
+`/novosti/[slug]` ima `generateStaticParams` + `revalidate = 3600`, pa se HTML
+tih stranica **ispeče tijekom builda**. Backfill nakon deploya zato ne mijenja
+ono što posjetitelj vidi na članku sve dok stranica ne istekne — do sat vremena.
+Lista `/novosti` je dinamična (čita `?grad=`) i osvježi se odmah, pa slike
+izgledaju watermarkirano na listi, a čisto u članku. To je cache, ne greška.
+
+Nakon `--apply` pokreni **novi deploy**. Alternativa je čekati sat vremena.
+
+Ako se ide obrnutim redoslijedom — backfill pa deploy — ovaj korak otpada, ali
+tada nove slike do deploya nemaju watermark. Jedan od dva reda mora se dogoditi;
+bitno je da **deploy bude zadnji**.
+
+## 5. Provjera
 
 Otvori `/novosti`, jedan članak i jednu galeriju grupe. Watermark je dolje
 desno, 28% širine isporučene slike. Na thumbnailu mora biti **cijeli**, ne
