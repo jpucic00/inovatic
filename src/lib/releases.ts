@@ -124,6 +124,49 @@ export interface ReleaseNote {
  */
 export const RELEASES: readonly ReleaseNote[] = [
   {
+    version: '1.2.0',
+    date: '2026-09-02',
+    title: 'Nova verzija aplikacije.',
+    sections: [
+      {
+        area: 'Novosti i galerije',
+        changes: [
+          'Svaka fotografija, naslovna, u tijelu članka, u galeriji članka i u galeriji grupe, kao i preuzimanje iz galerije, nosi Inovatic logo kao vodeni žig; izvorna slika ostaje nedirnuta.',
+        ],
+      },
+      {
+        area: 'Dolazak',
+        changes: [
+          'Evidencija dolaska ima novi, pregledniji izgled: jasnije se vidi što je označeno, što je spremljeno i što još nije evidentirano.',
+        ],
+      },
+      {
+        area: 'Učenici',
+        changes: [
+          'Popis učenika preseljen je u odjeljak Školska godina i prati godinu odabranu u izborniku: prikazuju se djeca koja imaju upis u toj školskoj godini.',
+        ],
+      },
+      {
+        area: 'Pretraga upita i učenika',
+        changes: [
+          'Učenici se pretražuju i po imenu roditelja i e-mail adresi, a ime se nalazi i kad se piše bez kvačica („Testic” nalazi Testić).',
+        ],
+      },
+      {
+        area: 'Polaznički portal',
+        changes: [
+          'Stranica grupe ima novi, uredniji izgled, a RoboCamp materijali prikazuju se u vlastitom odjeljku Interaktivni vodič.',
+        ],
+      },
+      {
+        area: 'Nastavnički panel',
+        changes: [
+          'Kartica Materijali dobiva gumb Prezentiraj interaktivni vodič, koji vodič otvara preko cijelog ekrana.',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-08-22',
     title:
