@@ -17,7 +17,7 @@ import { computeGroupCapacity } from '@/lib/group-capacity'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { formatGroupSchedule } from '@/lib/format'
 import type { Grade } from '@/lib/inquiry-status'
-import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
+import { candidateWheres, isIdentityMatch } from '@/lib/student-match'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
 import type { ReturningFilter } from '@/lib/returning-filter'
 import { isRadionica } from '@/lib/program-kind'
@@ -177,10 +177,9 @@ export async function getReturningStudentInfo(input: {
   const { city } = await requireAdminCtx()
 
   // Strict tier (name + DOB) plus the legacy tier for DOB-less imported
-  // accounts (name + parent email) — one query, strict preferred below.
-  const wheres = [studentIdentityWhere(input), legacyIdentityWhere(input)].filter(
-    (w): w is NonNullable<typeof w> => w !== null,
-  )
+  // accounts (name + parent email) — one candidate query, the name decided in
+  // memory by the shared key, strict preferred below.
+  const wheres = candidateWheres(input)
   if (wheres.length === 0) return null
 
   const students = await db.user.findMany({
@@ -191,6 +190,7 @@ export async function getReturningStudentInfo(input: {
       firstName: true,
       lastName: true,
       dateOfBirth: true,
+      parentEmail: true,
       enrollments: {
         select: {
           schoolYear: true,
@@ -206,7 +206,9 @@ export async function getReturningStudentInfo(input: {
     },
   })
 
-  const candidates = students.filter((s) => s.id !== input.excludeStudentId)
+  const candidates = students.filter(
+    (s) => s.id !== input.excludeStudentId && isIdentityMatch(s, input),
+  )
   if (candidates.length === 0) return null
   // The same identity can exist in both cities — prefer the own-city record
   // (full behavior) and only fall back to the masked flag when every match

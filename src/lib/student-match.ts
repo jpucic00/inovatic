@@ -2,9 +2,16 @@ import type { Prisma } from '@prisma/client'
 
 /**
  * The canonical "same child" rule: first name + last name + date of birth.
- * Names compare case-insensitively (DB collation); DOB is an exact string match.
- * Shared by student dedup-on-create (`findOrCreateStudent`) and returning-student
- * detection on inquiries so the two can never drift apart.
+ * Shared by student dedup-on-create (`findOrCreateStudent`), the create dialog's
+ * returning-student lookup and the "Ponovni upis" marker so the three can never
+ * drift apart.
+ *
+ * Names are compared through {@link identityKey}, which folds whitespace, case,
+ * diacritics and Unicode composition — on 2026-09-06 a second upit whose child
+ * name carried a trailing space produced a second account for the same child,
+ * because the old `ILIKE` comparison tolerated case and nothing else. The DB
+ * therefore only narrows CANDIDATES by the exact parts (DOB; parent e-mail for
+ * DOB-less imports) and the name is decided in memory, where the rule lives once.
  */
 type ChildIdentity = {
   firstName: string
@@ -13,58 +20,45 @@ type ChildIdentity = {
   parentEmail?: string | null
 }
 
-/**
- * Prisma `where` that matches the single existing STUDENT for this identity, or
- * `null` when DOB is missing — name alone is never enough to assert identity, so
- * a DOB-less identity intentionally matches nobody.
- *
- * Matching is intentionally GLOBAL across cities (owner decision 2026-07-10):
- * the same child must never get a second account in the other city. Callers
- * that act on a match are responsible for the cross-city handling — reuse is
- * blocked with an escalation error and the match is surfaced only in masked
- * form, never with the other city's credentials or history.
- */
-export function studentIdentityWhere(
-  identity: ChildIdentity,
-): Prisma.UserWhereInput | null {
-  if (!identity.dateOfBirth) return null
-  return {
-    role: 'STUDENT',
-    firstName: { equals: identity.firstName, mode: 'insensitive' },
-    lastName: { equals: identity.lastName, mode: 'insensitive' },
-    dateOfBirth: identity.dateOfBirth,
-  }
+/** The columns a consumer must select so a row can be keyed. */
+type MatchableStudent = {
+  firstName: string
+  lastName: string
+  dateOfBirth: string | null
+  parentEmail: string | null
 }
 
 /**
- * Legacy fallback for DOB-less accounts (the historical-workbook import, which
- * had no dates of birth): child name + parent email asserts identity, but ONLY
- * against students whose `dateOfBirth` is still NULL — an account with a DOB is
- * exclusively the strict rule's territory. Callers that reuse a legacy match
- * must backfill the inquiry's DOB so the account graduates to the strict rule
- * and leaves the fuzzy pool for good (`findOrCreateStudent` does this).
+ * The form a name is PERSISTED in: NFC, trimmed, internal runs of whitespace
+ * collapsed to one space. Applied at account creation and edit — never to the
+ * inquiry, which stays exactly as the parent typed it (owner decision).
  */
-export function legacyIdentityWhere(
-  identity: ChildIdentity,
-): Prisma.UserWhereInput | null {
-  const parentEmail = identity.parentEmail?.trim()
-  if (!parentEmail || !identity.firstName.trim() || !identity.lastName.trim()) {
-    return null
-  }
-  return {
-    role: 'STUDENT',
-    dateOfBirth: null,
-    firstName: { equals: identity.firstName, mode: 'insensitive' },
-    lastName: { equals: identity.lastName, mode: 'insensitive' },
-    parentEmail: { equals: parentEmail, mode: 'insensitive' },
-  }
+export function normalizeName(value: string): string {
+  return value.normalize('NFC').trim().replaceAll(/\s+/g, ' ')
+}
+
+/** Trimmed e-mail for persistence; blank collapses to null. */
+export function normalizeEmail(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
 }
 
 /**
- * Normalized key for in-memory batch matching (e.g. flagging a page of inquiries
- * against the set of existing students). Lower-cased + trimmed names mirror the
- * DB's case-insensitive comparison; `null` when DOB is missing, matching the
- * "no DOB → no match" rule of `studentIdentityWhere`.
+ * Comparison form of a name: {@link normalizeName}, lower-cased, diacritics
+ * stripped (`Anić` ≡ `Anic`). `đ` has no Unicode decomposition, so it is mapped
+ * by hand — every other Croatian letter falls out of NFD + mark removal.
+ */
+function nameKey(value: string): string {
+  return normalizeName(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replaceAll(/\p{M}/gu, '')
+    .replaceAll('đ', 'd')
+}
+
+/**
+ * Strict identity key: `name|name|dob`, `null` when DOB is missing — name alone
+ * is never enough to assert identity, so a DOB-less identity matches nobody.
  */
 export function identityKey(
   firstName: string,
@@ -72,20 +66,73 @@ export function identityKey(
   dateOfBirth?: string | null,
 ): string | null {
   if (!dateOfBirth) return null
-  return `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${dateOfBirth}`
+  return `${nameKey(firstName)}|${nameKey(lastName)}|${dateOfBirth}`
 }
 
 /**
- * In-memory counterpart of {@link legacyIdentityWhere}: name + parent email,
- * `null` when any part is missing. Only meaningful for students whose stored
- * DOB is NULL — the caller is responsible for keying just those.
+ * Legacy key for DOB-less accounts (the historical-workbook import, which had
+ * no dates of birth): child name + parent email. `null` when any part is blank,
+ * so a PARTY inquiry can never match by e-mail alone. Only meaningful for a
+ * student whose stored DOB is NULL — {@link studentMatchKey} enforces that.
  */
 export function legacyIdentityKey(
   firstName: string,
   lastName: string,
   parentEmail?: string | null,
 ): string | null {
-  const email = parentEmail?.trim().toLowerCase()
-  if (!email || !firstName.trim() || !lastName.trim()) return null
-  return `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${email}`
+  const email = normalizeEmail(parentEmail)?.toLowerCase()
+  const first = nameKey(firstName)
+  const last = nameKey(lastName)
+  if (!email || !first || !last) return null
+  return `${first}|${last}|${email}`
+}
+
+/**
+ * A stored student is keyed under exactly ONE tier — strict when it has a DOB,
+ * legacy when it does not — so the tiers can never claim the same account, and
+ * an account healed with a DOB leaves the fuzzy pool for good.
+ */
+export function studentMatchKey(row: MatchableStudent): string | null {
+  return row.dateOfBirth
+    ? identityKey(row.firstName, row.lastName, row.dateOfBirth)
+    : legacyIdentityKey(row.firstName, row.lastName, row.parentEmail)
+}
+
+/** Does this stored student match the identity under either tier? */
+export function isIdentityMatch(row: MatchableStudent, identity: ChildIdentity): boolean {
+  const key = studentMatchKey(row)
+  if (!key) return false
+  return (
+    key === identityKey(identity.firstName, identity.lastName, identity.dateOfBirth) ||
+    key === legacyIdentityKey(identity.firstName, identity.lastName, identity.parentEmail)
+  )
+}
+
+/**
+ * Prisma `where` clauses that fetch every student who COULD match: same DOB
+ * (strict tier) or same parent e-mail with no DOB (legacy tier). Deliberately
+ * name-free — the name is compared in memory via {@link isIdentityMatch}, since
+ * SQL equality would reintroduce the whitespace/diacritic blindness this exists
+ * to remove. Empty when the identity can match nobody.
+ *
+ * Matching is intentionally GLOBAL across cities (owner decision 2026-07-10):
+ * the same child must never get a second account in the other city. Callers
+ * that act on a match are responsible for the cross-city handling — reuse is
+ * blocked with an escalation error and the match is surfaced only in masked
+ * form, never with the other city's credentials or history.
+ */
+export function candidateWheres(identity: ChildIdentity): Prisma.UserWhereInput[] {
+  const wheres: Prisma.UserWhereInput[] = []
+  if (identity.dateOfBirth) {
+    wheres.push({ role: 'STUDENT', dateOfBirth: identity.dateOfBirth })
+  }
+  const email = normalizeEmail(identity.parentEmail)
+  if (email && nameKey(identity.firstName) && nameKey(identity.lastName)) {
+    wheres.push({
+      role: 'STUDENT',
+      dateOfBirth: null,
+      parentEmail: { equals: email, mode: 'insensitive' },
+    })
+  }
+  return wheres
 }

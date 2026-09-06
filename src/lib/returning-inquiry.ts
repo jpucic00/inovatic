@@ -1,10 +1,10 @@
 import type { City } from '@prisma/client'
 import { db } from '@/lib/db'
 import {
+  candidateWheres,
   identityKey,
   legacyIdentityKey,
-  legacyIdentityWhere,
-  studentIdentityWhere,
+  studentMatchKey,
 } from '@/lib/student-match'
 
 type ReturningFlaggable = {
@@ -27,7 +27,9 @@ type ReturningFlaggable = {
  * Two tiers, mirroring `findOrCreateStudent`: the strict rule (name + DOB) and
  * the legacy fallback (name + parent email against DOB-less imported accounts).
  * A student is keyed under exactly one tier — by its DOB when present, by its
- * parent email when not — so the tiers can never claim the same account.
+ * parent email when not — so the tiers can never claim the same account. The
+ * DB only narrows candidates; the name is decided by the shared key, which
+ * folds whitespace, case and diacritics.
  *
  * Identity matching is deliberately GLOBAL across cities (owner decision), but
  * the result is split by tenant: a match in the inquiry's own city sets
@@ -42,17 +44,14 @@ type ReturningFlaggable = {
 export async function flagReturningInquiries<T extends ReturningFlaggable>(
   rows: T[],
 ): Promise<(T & { isReturning: boolean; isReturningOtherCity: boolean })[]> {
-  const orClauses = rows
-    .flatMap((r) => {
-      const identity = {
-        firstName: r.childFirstName ?? '',
-        lastName: r.childLastName ?? '',
-        dateOfBirth: r.childDateOfBirth,
-        parentEmail: r.parentEmail,
-      }
-      return [studentIdentityWhere(identity), legacyIdentityWhere(identity)]
-    })
-    .filter((w): w is NonNullable<typeof w> => w !== null)
+  const orClauses = rows.flatMap((r) =>
+    candidateWheres({
+      firstName: r.childFirstName ?? '',
+      lastName: r.childLastName ?? '',
+      dateOfBirth: r.childDateOfBirth,
+      parentEmail: r.parentEmail,
+    }),
+  )
 
   const matchesByKey = new Map<string, { id: string; city: City }[]>()
   if (orClauses.length > 0) {
@@ -68,9 +67,7 @@ export async function flagReturningInquiries<T extends ReturningFlaggable>(
       },
     })
     for (const s of students) {
-      const key = s.dateOfBirth
-        ? identityKey(s.firstName, s.lastName, s.dateOfBirth)
-        : legacyIdentityKey(s.firstName, s.lastName, s.parentEmail)
+      const key = studentMatchKey(s)
       if (!key) continue
       const list = matchesByKey.get(key) ?? []
       list.push({ id: s.id, city: s.city })

@@ -24,7 +24,12 @@ import {
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
 import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
-import { legacyIdentityWhere, studentIdentityWhere } from '@/lib/student-match'
+import {
+  candidateWheres,
+  isIdentityMatch,
+  normalizeEmail,
+  normalizeName,
+} from '@/lib/student-match'
 import { computeSchoolYear } from '@/lib/school-year'
 import { isMonthlyBilled } from '@/lib/program-kind'
 import { offersPaymentOption } from '@/lib/payment-option'
@@ -239,27 +244,42 @@ async function findOrCreateStudent(
   tx: TxClient,
   input: CoreInput,
 ): Promise<{ user: { id: string; username: string | null }; password: string; isExisting: boolean }> {
+  // Normalization happens HERE, at account creation, never on the inquiry
+  // (owner decision 2026-09-06): the upit stays exactly as the parent typed it,
+  // and what reaches the User row is trimmed, NFC and single-spaced. A trailing
+  // space in a second upit once produced a second account for the same child.
+  const firstName = normalizeName(input.firstName)
+  const lastName = normalizeName(input.lastName)
+  const parentEmail = normalizeEmail(input.parentEmail)
+  const identity = { firstName, lastName, dateOfBirth: input.dateOfBirth, parentEmail }
+
   const matchSelect = {
-    id: true, username: true, plainPassword: true, city: true, dateOfBirth: true,
+    id: true, username: true, plainPassword: true, city: true,
+    firstName: true, lastName: true, dateOfBirth: true, parentEmail: true,
   } as const
-  // Strict identity (name + DOB) wins; the legacy tier (name + parent email vs
-  // DOB-less imported accounts) is only consulted when strict finds nothing.
-  const strictWhere = studentIdentityWhere(input)
-  const legacyWhere = legacyIdentityWhere(input)
-  const existingStudent =
-    (strictWhere
-      ? await tx.user.findFirst({ where: strictWhere, select: matchSelect })
-      : null) ??
-    (legacyWhere
-      ? await tx.user.findFirst({ where: legacyWhere, select: matchSelect })
-      : null)
+  // The DB narrows candidates by the exact parts (DOB; parent e-mail for the
+  // DOB-less legacy tier); the name is compared in memory through the shared
+  // key, so whitespace, case and diacritics can never split one child in two.
+  const wheres = candidateWheres(identity)
+  const candidates =
+    wheres.length > 0
+      ? await tx.user.findMany({ where: { OR: wheres }, select: matchSelect })
+      : []
+  const matches = candidates.filter((c) => isIdentityMatch(c, identity))
+  // Strict identity (name + DOB) wins; the legacy tier only when strict found nothing.
+  const existingStudent = matches.find((m) => m.dateOfBirth !== null) ?? matches[0] ?? null
 
   if (existingStudent && existingStudent.city !== input.city) {
     throw new CrossCityStudentError()
   }
 
   if (existingStudent) {
-    const backfill = buildParentBackfill(input)
+    const backfill = buildParentBackfill({ ...input, parentEmail })
+    // The newer spelling wins: "Anić" arriving for a stored "Anic" (or the
+    // reverse) renames the account, so the roster shows what the parent wrote
+    // last. Same child either way — the later form is the corrected one.
+    if (existingStudent.firstName !== firstName) backfill.firstName = firstName
+    if (existingStudent.lastName !== lastName) backfill.lastName = lastName
     // Legacy-tier reuse: heal the missing DOB so this account matches the
     // strict rule from now on and stops being fuzzy-matchable.
     if (!existingStudent.dateOfBirth && input.dateOfBirth) {
@@ -292,7 +312,7 @@ async function findOrCreateStudent(
     }
   }
 
-  const username = await generateUsername(tx, input.firstName, input.lastName)
+  const username = await generateUsername(tx, firstName, lastName)
   const password = generateSimplePassword(6)
   const passwordHash = await hashPassword(password)
 
@@ -302,12 +322,12 @@ async function findOrCreateStudent(
       username,
       plainPassword: password,
       passwordHash,
-      firstName: input.firstName,
-      lastName: input.lastName,
+      firstName,
+      lastName,
       dateOfBirth: input.dateOfBirth ?? null,
       role: 'STUDENT',
       parentName: input.parentName ?? null,
-      parentEmail: input.parentEmail ?? null,
+      parentEmail,
       parentPhone: input.parentPhone ?? null,
       childSchool: input.childSchool ?? null,
       gdprConsentAt: input.gdprConsentAt ?? null,
@@ -693,8 +713,8 @@ export async function updateStudent(
     await db.user.update({
       where: { id },
       data: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        firstName: normalizeName(firstName),
+        lastName: normalizeName(lastName),
         dateOfBirth,
         childSchool: childSchool?.trim() || null,
         parentName: parentName?.trim() || null,
