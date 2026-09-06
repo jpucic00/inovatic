@@ -50,9 +50,10 @@ export type PaymentStatusEnrollment = {
 }
 
 /**
- * Year-independent: a debt counts regardless of which school year the
- * enrollment belongs to. An enrollment is "pending" (still owes money) when it
- * is not marked whole-year-paid AND, per program kind:
+ * Asks about ONE enrollment, and so knows nothing about school years — which
+ * years count is the caller's question, and `computeStudentPaymentStatus` asks
+ * only about the one being looked at. An enrollment is "pending" (still owes
+ * money) when it is not marked whole-year-paid AND, per program kind:
  *
  *   RADIONICA   always — the enrollment itself is the single payable item.
  *   COMPETITION at least one month whose 1st has passed is unpaid. This is what
@@ -111,11 +112,12 @@ export function hasDueItems(enrollment: PaymentStatusEnrollment, now: Date): boo
 }
 
 /**
- * Resolution order:
- *   1. owes anything in ANY year        -> PENDING (debt persists across years)
- *   2. else nothing in referenceYear    -> NONE
- *   3. else something has come due      -> PAID
- *   4. else                             -> NOT_DUE
+ * Every state is decided INSIDE `referenceYear`. Enrollments from other years are
+ * dropped first, then:
+ *   1. nothing left            -> NONE
+ *   2. owes something          -> PENDING
+ *   3. something has come due  -> PAID
+ *   4. else                    -> NOT_DUE
  *
  * `referenceYear` is the year the caller is LOOKING AT, not `computeSchoolYear()`.
  * The two part company every summer: upisi for the year starting in September run
@@ -123,23 +125,27 @@ export function hasDueItems(enrollment: PaymentStatusEnrollment, now: Date): boo
  * made every child enrolled for the coming year read "Bez upisa" — the same trap
  * `getCourseGradeRules` documents.
  *
- * PENDING stays deliberately cross-year (a debt follows a family), but the split
- * between the two settled states is a question about the year in view: last
- * year's paid modules say nothing about whether this year has started.
+ * PENDING used to be cross-year, so that a debt followed a family. That was
+ * reversed on 2026-09-06: `/admin/ucenici` shows one year's rows, and a badge
+ * turning a row red over a year the table is not showing is the one way this
+ * column can lie — the same reason the list stopped being all-kids. The accepted
+ * cost is that last year's debt is invisible until the sidebar year is switched
+ * back to it.
  */
 export function computeStudentPaymentStatus(
   enrollments: PaymentStatusEnrollment[],
   referenceYear: string,
   now: Date,
 ): PaymentStatus {
-  if (enrollments.some((e) => isEnrollmentPending(e, now))) return 'PENDING'
   const inYear = enrollments.filter((e) => e.schoolYear === referenceYear)
   if (inYear.length === 0) return 'NONE'
+  if (inYear.some((e) => isEnrollmentPending(e, now))) return 'PENDING'
   return inYear.some((e) => hasDueItems(e, now)) ? 'PAID' : 'NOT_DUE'
 }
 
 /**
- * Prisma mirror of `isEnrollmentPending` (year-independent). MUST stay in sync.
+ * Prisma mirror of `isEnrollmentPending` (year-blind — the caller adds the year,
+ * exactly like `dueEnrollmentWhere`). MUST stay in sync.
  */
 export function pendingEnrollmentWhere(now: Date): Prisma.EnrollmentWhereInput {
   return {
@@ -193,33 +199,34 @@ export function dueEnrollmentWhere(now: Date): Prisma.EnrollmentWhereInput {
 /**
  * User-level where for the students list payment filter — the SQL twin of
  * `computeStudentPaymentStatus`, so the dropdown and the badge can never
- * disagree about a row.
+ * disagree about a row. Every clause carries `referenceYear`, because every
+ * state the badge can show is now decided inside that one year.
  *
- *   PENDING -> owes something in some year
- *   PAID    -> owes nothing, and something in referenceYear has come due
- *   NOT_DUE -> owes nothing, enrolled in referenceYear, nothing has come due
+ *   PENDING -> owes something in referenceYear
+ *   PAID    -> owes nothing there, and something in referenceYear has come due
+ *   NOT_DUE -> owes nothing there, enrolled in it, nothing has come due
  */
 export function paymentStatusUserWhere(
   filter: PaymentFilter,
   referenceYear: string,
   now: Date,
 ): Prisma.UserWhereInput {
-  const pending = pendingEnrollmentWhere(now)
+  const pendingInYear = { schoolYear: referenceYear, ...pendingEnrollmentWhere(now) }
   if (filter === 'PENDING') {
-    return { enrollments: { some: pending } }
+    return { enrollments: { some: pendingInYear } }
   }
 
   const dueInYear = { schoolYear: referenceYear, ...dueEnrollmentWhere(now) }
-  const owesNothing = { NOT: { enrollments: { some: pending } } }
+  const owesNothingInYear = { NOT: { enrollments: { some: pendingInYear } } }
 
   if (filter === 'PAID') {
     // No separate "enrolled in referenceYear" clause: `dueInYear` carries the
     // year itself, so a match already proves the enrollment exists.
-    return { AND: [owesNothing, { enrollments: { some: dueInYear } }] }
+    return { AND: [owesNothingInYear, { enrollments: { some: dueInYear } }] }
   }
   return {
     AND: [
-      owesNothing,
+      owesNothingInYear,
       { enrollments: { some: { schoolYear: referenceYear } } },
       { NOT: { enrollments: { some: dueInYear } } },
     ],

@@ -110,18 +110,23 @@ describe('getStudents payment filter + computed status', () => {
   let courseX: string
   let adminId: string
 
+  type StandardOpts = {
+    schoolYear: string
+    startDate: Date | null
+    paid: boolean
+    yearPaid?: boolean
+    courseId?: string
+  }
+
   // Build a standard-course enrollment with one module of a given (startDate, paid).
-  async function standardStudent(
-    key: string,
-    opts: {
-      schoolYear: string
-      startDate: Date | null
-      paid: boolean
-      yearPaid?: boolean
-      courseId?: string
-    },
-  ) {
+  async function standardStudent(key: string, opts: StandardOpts) {
     const s = await createStudent({ lastName: `${MARKER}_${key}` })
+    await addStandardEnrollment(s.id, opts)
+    ids[key] = s.id
+    return s.id
+  }
+
+  async function addStandardEnrollment(studentId: string, opts: StandardOpts) {
     const courseId = opts.courseId ?? (await createCourse()).id
     const mod = await createModule(courseId)
     const ms = await createModuleSchedule(mod.id, {
@@ -129,13 +134,11 @@ describe('getStudents payment filter + computed status', () => {
       startDate: opts.startDate,
     })
     const group = await createGroup({ courseId, schoolYear: opts.schoolYear })
-    const enr = await createEnrollment(s.id, group.id, {
+    const enr = await createEnrollment(studentId, group.id, {
       schoolYear: opts.schoolYear,
       fullYearPaidAt: opts.yearPaid ? new Date() : null,
     })
     await createModuleEnrollment(enr.id, ms.id, { paidAt: opts.paid ? new Date() : null })
-    ids[key] = s.id
-    return s.id
   }
 
   async function radionicaStudent(key: string, opts: { paid: boolean }) {
@@ -192,6 +195,15 @@ describe('getStudents payment filter + computed status', () => {
       paid: false,
       courseId: courseX,
     })
+    // The 2026-09-06 reversal, at the SQL level: last year's unpaid module must
+    // not colour this year's row. Both halves live on ONE student, which is the
+    // only shape that can tell a year-scoped rule from a cross-year one.
+    await standardStudent('K_pastdebt', { schoolYear: CY, startDate: FUTURE, paid: false })
+    await addStandardEnrollment(ids.K_pastdebt, {
+      schoolYear: PAST,
+      startDate: PAST_STARTED,
+      paid: false,
+    })
     // A begun month is owed; a month still ahead is not — the competition
     // mirror of A_pending and E_future.
     await competitionStudent('I_comp_pending', { periodStart: STARTED })
@@ -222,15 +234,34 @@ describe('getStudents payment filter + computed status', () => {
     expect(byId.get(ids.I_comp_pending)).toBe('PENDING')
     expect(byId.get(ids.J_comp_notdue)).toBe('NOT_DUE')
     expect(byId.get(ids.F_pastpaid)).toBe('NONE')
-    expect(byId.get(ids.G_pastunpaid)).toBe('PENDING') // cross-year debt
+    // A past-year debt is no longer carried into the year being looked at: with
+    // no current-year enrollment there is nothing here to report at all.
+    expect(byId.get(ids.G_pastunpaid)).toBe('NONE')
+    // ...and where there IS a current-year enrollment, the badge describes that
+    // one only. Nothing in it has started, so nothing is owed yet.
+    expect(byId.get(ids.K_pastdebt)).toBe('NOT_DUE')
     expect(byId.get(ids.H_courseX)).toBe('PENDING')
   })
 
-  it('PENDING filter returns only debtors (incl. cross-year + radionica)', async () => {
+  it('reports the past-year debt when asked about the past year', async () => {
+    // The debt did not disappear — it is a fact about the year it belongs to,
+    // and switching the sidebar year is how an admin reads it.
+    const res = await getStudents({ search: MARKER, schoolYear: PAST, pageSize: 100 })
+    const byId = new Map(res.data.map((r) => [r.id, r.paymentStatus]))
+    expect(byId.get(ids.K_pastdebt)).toBe('PENDING')
+    expect(byId.get(ids.G_pastunpaid)).toBe('PENDING')
+    expect(byId.get(ids.F_pastpaid)).toBe('PAID')
+    // Scoped to PAST, this year's children are not in the list at all.
+    expect(byId.has(ids.A_pending)).toBe(false)
+  })
+
+  it('PENDING filter returns this year\'s debtors only (radionica included)', async () => {
     const got = await fetchIds({ paymentStatus: 'PENDING' })
     expect(got.has(ids.A_pending)).toBe(true)
     expect(got.has(ids.D_radio_unpaid)).toBe(true)
-    expect(got.has(ids.G_pastunpaid)).toBe(true)
+    // Owes money, but in a year this list is not showing.
+    expect(got.has(ids.G_pastunpaid)).toBe(false)
+    expect(got.has(ids.K_pastdebt)).toBe(false)
     expect(got.has(ids.H_courseX)).toBe(true)
     expect(got.has(ids.B_allpaid)).toBe(false)
     expect(got.has(ids.C_yearpaid)).toBe(false)
@@ -255,6 +286,9 @@ describe('getStudents payment filter + computed status', () => {
   it('NOT_DUE filter returns the enrolled whose programme has not started', async () => {
     const got = await fetchIds({ paymentStatus: 'NOT_DUE' })
     expect(got.has(ids.E_future)).toBe(true)
+    // Its only current-year module lies ahead; the past-year debt is not this
+    // year's business, so the filter and the badge agree on NOT_DUE.
+    expect(got.has(ids.K_pastdebt)).toBe(true)
     // Everyone else has either paid something or owes something.
     expect(got.has(ids.A_pending)).toBe(false)
     expect(got.has(ids.B_allpaid)).toBe(false)

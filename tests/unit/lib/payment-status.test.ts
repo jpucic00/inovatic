@@ -5,6 +5,7 @@ import {
   computeStudentPaymentStatus,
   pendingEnrollmentWhere,
   dueEnrollmentWhere,
+  paymentStatusUserWhere,
   type PaymentStatusEnrollment,
 } from '@/lib/payment-status'
 
@@ -222,12 +223,42 @@ describe('computeStudentPaymentStatus', () => {
     ).toBe('PENDING')
   })
 
-  // Cross-year debt persistence.
-  it('PENDING for a past-year unpaid started module even with no current-year enrollment', () => {
+  // The 2026-09-06 reversal: a debt no longer follows a family across years.
+  // The badge answers about the year the list is scoped to, and a past year the
+  // table is not showing must not colour a row in it.
+  it('NONE for a past-year debt with no enrollment in the reference year', () => {
     expect(
       computeStudentPaymentStatus(
         [standardEnrollment([{ paidAt: null, startDate: STARTED }], { schoolYear: PAST_YEAR })],
         CURRENT_YEAR,
+        NOW,
+      ),
+    ).toBe('NONE')
+  })
+
+  it('does not let a past-year debt turn this year PENDING', () => {
+    expect(
+      computeStudentPaymentStatus(
+        [
+          standardEnrollment([{ paidAt: null, startDate: STARTED }], {
+            schoolYear: PAST_YEAR,
+          }),
+          standardEnrollment([{ paidAt: null, startDate: FUTURE }]),
+        ],
+        CURRENT_YEAR,
+        NOW,
+      ),
+    ).toBe('NOT_DUE')
+    // ...and the debt is still readable — by asking about its own year.
+    expect(
+      computeStudentPaymentStatus(
+        [
+          standardEnrollment([{ paidAt: null, startDate: STARTED }], {
+            schoolYear: PAST_YEAR,
+          }),
+          standardEnrollment([{ paidAt: null, startDate: FUTURE }]),
+        ],
+        PAST_YEAR,
         NOW,
       ),
     ).toBe('PENDING')
@@ -254,9 +285,7 @@ describe('computeStudentPaymentStatus', () => {
     expect(computeStudentPaymentStatus(nextYearOnly, '2027/2028', NOW)).toBe('NOT_DUE')
   })
 
-  // Last year's settled modules say nothing about whether this year has begun,
-  // so PAID is decided inside the reference year — unlike PENDING, which is
-  // deliberately cross-year because a debt follows a family.
+  // Last year's settled modules say nothing about whether this year has begun.
   it('does not let a previous year\'s paid modules read as PAID for this one', () => {
     expect(
       computeStudentPaymentStatus(
@@ -302,5 +331,27 @@ describe('dueEnrollmentWhere (drift guard)', () => {
     // due includes it. If they ever agreed, PAID and NOT_DUE would collapse.
     expect(pendingEnrollmentWhere(NOW).fullYearPaidAt).toBeNull()
     expect(dueEnrollmentWhere(NOW).OR?.[0]).toEqual({ fullYearPaidAt: { not: null } })
+  })
+})
+
+describe('paymentStatusUserWhere', () => {
+  // The SQL twin of the rule above: every branch narrows to the reference year,
+  // so the dropdown cannot hand back a debtor the column calls settled.
+  it('scopes the PENDING branch to the reference year', () => {
+    const where = paymentStatusUserWhere('PENDING', CURRENT_YEAR, NOW)
+    const some = where.enrollments?.some as Record<string, unknown>
+    expect(some.schoolYear).toBe(CURRENT_YEAR)
+    expect(some.fullYearPaidAt).toBeNull()
+  })
+
+  it('measures "owes nothing" inside the reference year for PAID and NOT_DUE', () => {
+    for (const filter of ['PAID', 'NOT_DUE'] as const) {
+      const clauses = paymentStatusUserWhere(filter, CURRENT_YEAR, NOW).AND
+      expect(Array.isArray(clauses)).toBe(true)
+      const owesNothing = (clauses as Record<string, never>[])[0].NOT as {
+        enrollments: { some: Record<string, unknown> }
+      }
+      expect(owesNothing.enrollments.some.schoolYear).toBe(CURRENT_YEAR)
+    }
   })
 })

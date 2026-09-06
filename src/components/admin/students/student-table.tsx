@@ -80,7 +80,10 @@ const buildColumns = (schoolYear: string): ColumnDef<StudentRow>[] => [
   },
   {
     key: 'payment',
-    header: 'Plaćanje',
+    // Names the year for the same reason the column beside it does: this badge
+    // answers only about the selected year, and a debt from an earlier one is
+    // deliberately not in it.
+    header: `Plaćanje (${schoolYear})`,
     sortable: true,
     sortValue: (row) => PAYMENT_STATUS_SORT_KEY[row.paymentStatus],
     cell: (row) => <PaymentStatusBadge status={row.paymentStatus} />,
