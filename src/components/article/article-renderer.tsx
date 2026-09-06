@@ -1,7 +1,11 @@
 import type { PartialBlock } from '@blocknote/core'
 import React from 'react'
 
-type InlineStyle = { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; code?: boolean }
+/* `strike`, not `strikethrough` — BlockNote's own key for the style, and what
+   the stored article JSON carries. Reading the other spelling drops the mark
+   silently rather than failing, which is how it went unnoticed. Same note in
+   `src/lib/email-rich-text.ts`, which renders the identical marks for e-mail. */
+type InlineStyle = { bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean; code?: boolean }
 
 type InlineItem =
   | { type: 'text'; text: string; styles: InlineStyle }
@@ -33,7 +37,7 @@ function renderInline(items: InlineItem[], keyPrefix: string): React.ReactNode {
     if (item.styles?.bold) node = <strong>{node}</strong>
     if (item.styles?.italic) node = <em>{node}</em>
     if (item.styles?.underline) node = <u>{node}</u>
-    if (item.styles?.strikethrough) node = <s>{node}</s>
+    if (item.styles?.strike) node = <s>{node}</s>
     if (item.styles?.code) node = <code>{node}</code>
     return <React.Fragment key={key}>{node}</React.Fragment>
   })

@@ -58,6 +58,43 @@ describe('ArticleRenderer', () => {
     expect(screen.getByText('Citat koji ne smije nestati.')).toBeTruthy()
   })
 
+  it('renders every inline mark BlockNote actually stores', () => {
+    // Keyed on BlockNote's own spelling — `strike`, not `strikethrough`. The
+    // renderer read the latter until 2026-09-06, so struck-through text was
+    // published as plain text with nothing to signal the loss.
+    const { container } = renderBlocks([
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'Podebljano', styles: { bold: true } },
+          { type: 'text', text: 'Kurziv', styles: { italic: true } },
+          { type: 'text', text: 'Podcrtano', styles: { underline: true } },
+          { type: 'text', text: 'Precrtano', styles: { strike: true } },
+          { type: 'text', text: 'Kod', styles: { code: true } },
+        ],
+      },
+    ])
+
+    expect(container.querySelector('strong')?.textContent).toBe('Podebljano')
+    expect(container.querySelector('em')?.textContent).toBe('Kurziv')
+    expect(container.querySelector('u')?.textContent).toBe('Podcrtano')
+    expect(container.querySelector('s')?.textContent).toBe('Precrtano')
+    expect(container.querySelector('code')?.textContent).toBe('Kod')
+  })
+
+  it('combines marks on one run, innermost text intact', () => {
+    const { container } = renderBlocks([
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Stara cijena', styles: { bold: true, strike: true } }],
+      },
+    ])
+
+    const struck = container.querySelector('s')
+    expect(struck).not.toBeNull()
+    expect(struck?.querySelector('strong')?.textContent).toBe('Stara cijena')
+  })
+
   it('does not throw on a table, whose content is an object not an array', () => {
     expect(() =>
       renderBlocks([
