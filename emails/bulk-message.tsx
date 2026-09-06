@@ -2,15 +2,28 @@ import { Hr, Link, Section, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
 import { EvaluationCardBlock } from './components/evaluation-card'
 import { CredentialsCardBlock } from './components/credentials-card'
+import { RichTextBody } from './components/rich-text'
 import type { GroupOption } from './schedule-options'
+import type { EmailRichBlock } from '../src/lib/email-rich-text'
 import type { EvaluationCard } from '../src/lib/evaluation-email-cards'
 import type { CredentialsCard } from '../src/lib/credentials-email-recipients'
 
 interface BulkMessageProps {
   /** Admin-authored plain text; newline-separated paragraphs. Sent exactly as
    * written — no auto-prepended greeting (parent names are missing on many
-   * imported previous-year students, so the admin writes their own salutation). */
+   * imported previous-year students, so the admin writes their own salutation).
+   *
+   * Still the fallback body, and still what the campaign stores for its
+   * history: `bodyBlocks` overrides it for display only. */
   bodyText: string
+  /**
+   * The same message with its formatting, as composed in the editor. When
+   * absent the plain-text path above renders instead — which is the state of
+   * every campaign written before rich text existed, and therefore also of a
+   * PENDING run being resumed from one. Neither may start rendering
+   * differently on its second half.
+   */
+  bodyBlocks?: EmailRichBlock[] | null
   /** When present, renders the schedule boxes ("Termini u novoj školskoj godini"). */
   options?: GroupOption[]
   /** When present, renders the centered "Ispunite prijavu" CTA button. */
@@ -40,6 +53,7 @@ interface BulkMessageProps {
  */
 function BulkMessageEmail({
   bodyText,
+  bodyBlocks,
   options,
   signupUrl,
   cards,
@@ -53,11 +67,15 @@ function BulkMessageEmail({
 
   return (
     <EmailLayout preview={subject}>
-      {paragraphs.map((paragraph, i) => (
-        <Text key={i} style={emailStyles.text}>
-          {paragraph}
-        </Text>
-      ))}
+      {bodyBlocks && bodyBlocks.length > 0 ? (
+        <RichTextBody blocks={bodyBlocks} />
+      ) : (
+        paragraphs.map((paragraph, i) => (
+          <Text key={i} style={emailStyles.text}>
+            {paragraph}
+          </Text>
+        ))
+      )}
       {options && options.length > 0 && (
         <>
           <Hr style={emailStyles.hr} />
@@ -172,6 +190,47 @@ BulkMessageEmail.PreviewProps = {
       schedule: 'Četvrtak, 18:30–20:00',
       locationName: 'Velebitska 32',
       locationAddress: 'Velebitska 32, 21000 Split',
+    },
+  ],
+  // Exercises the rich path — the plain `bodyText` above stays as the fallback
+  // sample, so switching this one field to `undefined` previews the other
+  // branch without rewriting the copy.
+  bodyBlocks: [
+    { type: 'paragraph', content: [{ type: 'text', text: 'Poštovani,', styles: {} }] },
+    {
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'Upisi u novu školsku godinu su ', styles: {} },
+        { type: 'text', text: 'otvoreni', styles: { bold: true } },
+        { type: 'text', text: ' — broj mjesta po grupi je ograničen.', styles: {} },
+      ],
+    },
+    { type: 'heading', props: { level: 2 }, content: [{ type: 'text', text: 'Kako se prijaviti', styles: {} }] },
+    {
+      type: 'numberedListItem',
+      content: [{ type: 'text', text: 'Odaberite termin iz popisa ispod.', styles: {} }],
+    },
+    {
+      type: 'numberedListItem',
+      content: [
+        { type: 'text', text: 'Ispunite prijavu na ', styles: {} },
+        {
+          type: 'link',
+          href: 'https://udruga-inovatic.hr/prijava',
+          content: [{ type: 'text', text: 'udruga-inovatic.hr/prijava', styles: {} }],
+        },
+        { type: 'text', text: '.', styles: {} },
+      ],
+    },
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'Javit ćemo vam se s potvrdom termina.',
+          styles: { italic: true, fontSize: 'sm' },
+        },
+      ],
     },
   ],
   signupUrl: 'https://udruga-inovatic.hr/prijava',

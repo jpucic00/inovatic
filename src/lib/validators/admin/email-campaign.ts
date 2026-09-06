@@ -1,5 +1,10 @@
 import { z } from 'zod'
 import { decodeRecommendation } from '@/lib/assessment-rubric'
+import {
+  EMAIL_BODY_MAX_LENGTH,
+  EMAIL_BODY_MIN_LENGTH,
+  resolveEmailBody,
+} from '@/lib/email-rich-text'
 
 const schoolYearField = z
   .string()
@@ -100,8 +105,39 @@ const subjectField = z
 const bodyTextField = z
   .string()
   .trim()
-  .min(10, 'Tekst poruke je obavezan.')
-  .max(5000, 'Maksimalno 5000 znakova.')
+  .min(EMAIL_BODY_MIN_LENGTH, 'Tekst poruke je obavezan.')
+  .max(EMAIL_BODY_MAX_LENGTH, `Maksimalno ${EMAIL_BODY_MAX_LENGTH} znakova.`)
+
+/**
+ * The formatted body from the composer, unvalidated here on purpose: the block
+ * shape has exactly one definition (`parseRichBlocks`), and a Zod mirror of it
+ * would be a second one free to drift. `validateBody` below runs the real
+ * normalizer and rejects what does not survive it; the cap is only to bound the
+ * payload before that walk.
+ */
+const bodyBlocksField = z.array(z.unknown()).max(2000, 'Poruka je predugačka.').optional()
+
+/**
+ * Enforce the message bounds on the text a PARENT will read.
+ *
+ * `bodyTextField` above still guards the plain-text path, but once blocks are
+ * present the plain text is re-derived from them, so it is the derived value
+ * that has to fit — otherwise a short `bodyText` would wave a 6000-character
+ * formatted body through.
+ */
+function validateBody(
+  value: { bodyText?: string; bodyBlocks?: unknown[] },
+  ctx: z.RefinementCtx,
+) {
+  if (value.bodyBlocks === undefined) return
+  const resolved = resolveEmailBody({
+    bodyText: value.bodyText ?? '',
+    bodyBlocks: value.bodyBlocks,
+  })
+  if (!resolved.ok) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: resolved.error, path: ['bodyText'] })
+  }
+}
 
 // Unchecked rows from the recipient curation list. The server re-resolves the
 // cohort from the filters and only SUBTRACTS these — a tampered client can
@@ -126,6 +162,7 @@ const customContent = {
   kind: z.literal('CUSTOM'),
   subject: subjectField,
   bodyText: bodyTextField,
+  bodyBlocks: bodyBlocksField,
 }
 
 /**
@@ -138,6 +175,7 @@ const evaluationContent = {
   kind: z.literal('EVALUATION'),
   subject: subjectField,
   bodyText: bodyTextField,
+  bodyBlocks: bodyBlocksField,
 }
 
 /**
@@ -160,12 +198,14 @@ const credentialsContent = {
   kind: z.literal('CREDENTIALS'),
   subject: subjectField,
   bodyText: bodyTextField,
+  bodyBlocks: bodyBlocksField,
 }
 
 const reenrollmentContent = {
   kind: z.literal('REENROLLMENT'),
   subject: subjectField,
   bodyText: bodyTextField,
+  bodyBlocks: bodyBlocksField,
   targetCourseId: z.string().min(1, 'Odaberite program.'),
   targetGroupIds: z
     .array(z.string().min(1))
@@ -197,6 +237,7 @@ export const sendEmailCampaignSchema = z
     }),
   ])
   .superRefine(requireExactlyOneSelection)
+  .superRefine(validateBody)
 
 // The step-2 live recipient resolution; targetCourseId lets the invitation
 // kind compute its "već poslano" skip-set alongside the cohort.
@@ -209,12 +250,14 @@ export const previewRecipientsSchema = z
   .superRefine(requireExactlyOneSelection)
 
 // The step-1 email preview needs content only — no cohort yet.
-export const previewEmailSchema = z.discriminatedUnion('kind', [
-  z.object(customContent),
-  z.object(reenrollmentContent),
-  z.object(evaluationContent),
-  z.object(credentialsContent),
-])
+export const previewEmailSchema = z
+  .discriminatedUnion('kind', [
+    z.object(customContent),
+    z.object(reenrollmentContent),
+    z.object(evaluationContent),
+    z.object(credentialsContent),
+  ])
+  .superRefine(validateBody)
 
 /**
  * "Show me exactly what THIS parent will receive" — the cohort filters plus the
@@ -229,6 +272,7 @@ export const previewEvaluationRecipientSchema = z
     assessmentId: z.string().min(1).max(50),
   })
   .superRefine(requireExactlyOneSelection)
+  .superRefine(validateBody)
 
 export type SendEmailCampaignInput = z.infer<typeof sendEmailCampaignSchema>
 export type PreviewRecipientsInput = z.infer<typeof previewRecipientsSchema>

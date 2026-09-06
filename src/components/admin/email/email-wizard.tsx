@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Eye, Send } from 'lucide-react'
@@ -8,6 +9,12 @@ import { croatianPlural, formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
 import type { RecommendationOption } from '@/lib/assessment-rubric'
 import { SKIP_REASON_SHORT } from '@/lib/bulk-email-recipients'
+import {
+  EMAIL_BODY_MAX_LENGTH,
+  flattenRichText,
+  plainTextToBlocks,
+  type EmailRichBlock,
+} from '@/lib/email-rich-text'
 import {
   EMAIL_CAMPAIGN_KINDS,
   EMAIL_CAMPAIGN_KIND_ORDER,
@@ -26,6 +33,21 @@ import {
   type SendEmailCampaignResult,
 } from '@/actions/admin/email-campaign'
 import { EmailPreviewDialog } from './email-preview-dialog'
+
+/**
+ * Client-only and lazily loaded — BlockNote is a large bundle and touches
+ * `document` on import, so it must not be part of the wizard's own chunk. Same
+ * treatment the article editor already gets.
+ */
+const EmailBodyEditor = dynamic(
+  () => import('./email-body-editor').then((m) => m.EmailBodyEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-56 rounded-lg border border-gray-200 bg-gray-50 animate-pulse" />
+    ),
+  },
+)
 
 type StartedSend = Extract<SendEmailCampaignResult, { success: true }>
 
@@ -170,7 +192,14 @@ export function EmailWizard({
 
   // Step 1 — content
   const [subject, setSubject] = useState('')
-  const [bodyText, setBodyText] = useState('')
+  const [bodyBlocks, setBodyBlocks] = useState<EmailRichBlock[]>([])
+  /**
+   * Derived, never typed into. The server re-derives it the same way from the
+   * same function, so the character count the admin watches is the one their
+   * message is actually measured against — and the limit stays a limit on what
+   * a parent reads rather than on the JSON encoding it.
+   */
+  const bodyText = useMemo(() => flattenRichText(bodyBlocks), [bodyBlocks])
   const [targetCourseId, setTargetCourseId] = useState('')
   const [targetGroups, setTargetGroups] = useState<TargetGroup[]>([])
   const [targetGroupIds, setTargetGroupIds] = useState<string[]>([])
@@ -225,21 +254,21 @@ export function EmailWizard({
     if (next !== 'CREDENTIALS' && selectionMode === 'STUDENTS') setSelectionMode('GROUPS')
     if (next === 'REENROLLMENT') {
       setSubject(`Upisi u školsku godinu ${selectedYear} – Inovatic`)
-      setBodyText(DEFAULT_INVITATION_BODY)
+      setBodyBlocks(plainTextToBlocks(DEFAULT_INVITATION_BODY))
       setSourceYear(previousYear)
     } else if (next === 'EVALUATION') {
       // No child name here — the send appends it per recipient.
       setSubject('Evaluacija po završetku programa – Inovatic')
-      setBodyText(DEFAULT_EVALUATION_BODY)
+      setBodyBlocks(plainTextToBlocks(DEFAULT_EVALUATION_BODY))
       setSourceYear(selectedYear)
     } else if (next === 'CREDENTIALS') {
       // No child name here either — the send appends it per recipient.
       setSubject('Pristupni podaci za polaznički portal – Inovatic')
-      setBodyText(DEFAULT_CREDENTIALS_BODY)
+      setBodyBlocks(plainTextToBlocks(DEFAULT_CREDENTIALS_BODY))
       setSourceYear(selectedYear)
     } else {
       setSubject('')
-      setBodyText('')
+      setBodyBlocks([])
       setSourceYear(selectedYear)
     }
   }
@@ -522,6 +551,7 @@ export function EmailWizard({
       kind: 'EVALUATION',
       subject,
       bodyText,
+      bodyBlocks,
       sourceSchoolYear: sourceYear,
       sourceGroupIds,
       assessmentId: rowKey,
@@ -559,13 +589,20 @@ export function EmailWizard({
     setRowPreviewKey(null)
     let input
     if (kind === 'REENROLLMENT') {
-      input = { kind: 'REENROLLMENT' as const, subject, bodyText, targetCourseId, targetGroupIds }
+      input = {
+        kind: 'REENROLLMENT' as const,
+        subject,
+        bodyText,
+        bodyBlocks,
+        targetCourseId,
+        targetGroupIds,
+      }
     } else if (kind === 'EVALUATION') {
-      input = { kind: 'EVALUATION' as const, subject, bodyText }
+      input = { kind: 'EVALUATION' as const, subject, bodyText, bodyBlocks }
     } else if (kind === 'CREDENTIALS') {
-      input = { kind: 'CREDENTIALS' as const, subject, bodyText }
+      input = { kind: 'CREDENTIALS' as const, subject, bodyText, bodyBlocks }
     } else {
-      input = { kind: 'CUSTOM' as const, subject, bodyText }
+      input = { kind: 'CUSTOM' as const, subject, bodyText, bodyBlocks }
     }
     previewEmailHtml(input)
       .then((res) => {
@@ -596,6 +633,7 @@ export function EmailWizard({
         sourceStudentIds: selectionMode === 'STUDENTS' ? sourceStudentIds : undefined,
         subject,
         bodyText,
+        bodyBlocks,
       }
       let input
       if (kind === 'REENROLLMENT') {
@@ -774,25 +812,31 @@ export function EmailWizard({
               />
             </div>
             <div>
-              <label htmlFor="email-body" className="block text-sm font-medium text-gray-700 mb-1.5">
+              {/* Not a <label>: the editor is a contenteditable surface, not a
+                  form control an htmlFor can point at. The group below names
+                  itself with aria-labelledby instead. */}
+              <p id="email-body-label" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Tekst poruke <span className="text-red-600">*</span>
-              </label>
-              <textarea
-                id="email-body"
-                value={bodyText}
-                onChange={(e) => setBodyText(e.target.value)}
-                maxLength={5000}
-                rows={10}
-                placeholder="Tekst koji će roditelji primiti. Prazan red započinje novi odlomak."
-                className={`${INPUT_CLASS} resize-y`}
-              />
+              </p>
+              {/* Keyed on the kind so switching it remounts the editor with that
+                  kind's preset: `useCreateBlockNote` reads `initialContent`
+                  once, so without this the new default would be in state but
+                  the old text still on screen. Same remount-to-reset pattern as
+                  <SessionPanel key={sessionDate}>. */}
+              <div role="group" aria-labelledby="email-body-label">
+                <EmailBodyEditor key={kind} initialContent={bodyBlocks} onChange={setBodyBlocks} />
+              </div>
               <p className="text-xs text-gray-500 mt-1.5">
-                Poruka se šalje točno kako je napisana — uključite i pozdrav po želji
+                Označite tekst za podebljavanje, kurziv, veličinu slova i poveznice. Poruka
+                se šalje točno kako je napisana — uključite i pozdrav po želji
                 {kind === 'REENROLLMENT' &&
                   '; ispod teksta automatski slijede termini odabranih grupa i gumb za prijavu'}
                 {kind === 'EVALUATION' &&
                   '; ispod teksta automatski slijedi kartica djeteta, a njegovo se ime dodaje u predmet poruke'}
-                . <span className="text-gray-400">{bodyText.trim().length}/5000</span>
+                .{' '}
+                <span className={bodyText.length > EMAIL_BODY_MAX_LENGTH ? 'text-red-600' : 'text-gray-400'}>
+                  {bodyText.length}/{EMAIL_BODY_MAX_LENGTH}
+                </span>
               </p>
             </div>
             <div className="flex items-center justify-between pt-1">

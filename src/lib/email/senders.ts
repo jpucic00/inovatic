@@ -4,6 +4,7 @@ import type { City } from '@prisma/client'
 import type { EvaluationCard } from '@/lib/evaluation-email-cards'
 import type { ReleaseNote } from '@/lib/releases'
 import type { CredentialsCard } from '@/lib/credentials-email-recipients'
+import type { EmailRichBlock } from '@/lib/email-rich-text'
 import { ASSOCIATION_EMAIL, cityInboxEmail, sendTransactionalEmail } from './client'
 import type { InquiryNextStep } from '@/lib/inquiry-next-step'
 import type { RadionicaPaymentPlan } from '@/lib/radionica-deposit'
@@ -345,6 +346,13 @@ type BulkMessageParams = {
    * (no auto greeting — parent names are missing on many imported students). */
   subject: string
   bodyText: string
+  /**
+   * The formatted body, when the campaign was composed with one. Absent for a
+   * campaign written before rich text existed — the template then falls back to
+   * splitting `bodyText` on newlines, which is what keeps an old campaign's
+   * resumed send rendering the way its first half did.
+   */
+  bodyBlocks?: EmailRichBlock[] | null
   /** The campaign's city — decides which inbox it is sent from and replied to. */
   city: City
   options?: GroupOption[]
@@ -375,6 +383,7 @@ function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>)
   return createElement(BulkMessageEmail, {
     subject: params.subject,
     bodyText: params.bodyText,
+    bodyBlocks: params.bodyBlocks,
     options: params.options,
     cards: params.cards,
     credentials: params.credentials,

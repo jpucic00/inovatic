@@ -1718,6 +1718,57 @@ describe('reading back what was sent', () => {
     }
   })
 
+  it('stores the formatted body, flattens it for the history, and mails both back formatted', async () => {
+    await loginAdmin()
+    const { group } = await makeSourceGroup()
+    await enrollStudent(group.id, { parentEmail: uniqEmail('archive-rich') })
+
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      subject: 'Formatirana poruka – Inovatic',
+      // Deliberately disagrees with the blocks: the server re-derives the plain
+      // text, so a client cannot make the stored history say something the
+      // parent was never sent.
+      bodyText: 'ovo se mora zanemariti',
+      bodyBlocks: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Upisi su ', styles: {} },
+            { type: 'text', text: 'otvoreni', styles: { bold: true } },
+            { type: 'text', text: '.', styles: {} },
+          ],
+        },
+      ],
+    })
+    expect(res.success).toBe(true)
+    if (!res.success) return
+
+    const campaign = await db.emailCampaign.findUniqueOrThrow({
+      where: { id: res.campaignId },
+    })
+    // The history column carries the readable message, not the JSON and not the
+    // client's claim.
+    expect(campaign.bodyText).toBe('Upisi su otvoreni.')
+    expect(campaign.bodyBlocks).not.toBeNull()
+
+    // What actually went out: `sendMock` is Resend's own `emails.send`, so the
+    // payload carries the composed element — its props are the send path's
+    // final word on what this parent receives.
+    expect(sendMock).toHaveBeenCalledTimes(1)
+    expect(sendMock.mock.calls[0][0].react.props.bodyBlocks).toHaveLength(1)
+
+    // And what the archive re-renders from the row alone.
+    const html = await getCampaignEmailHtml(res.campaignId)
+    expect(html.success).toBe(true)
+    if (html.success) {
+      expect(html.html).toContain('<strong>otvoreni</strong>')
+      expect(html.html).not.toContain('ovo se mora zanemariti')
+    }
+  })
+
   it('rebuilds an invitation’s termin boxes, and survives a target group deleted since', async () => {
     await loginAdmin()
     const { group: source } = await makeSourceGroup()

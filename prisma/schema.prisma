@@ -877,6 +877,14 @@ model EmailCampaign {
   targetGroupIds   String[] @default([])
   subject          String
   bodyText         String            @db.Text
+  /// The composed body WITH its formatting, as written in the editor. Null on
+  /// every campaign sent before rich text existed and never backfilled — the
+  /// template falls back to splitting `bodyText` on newlines for exactly those,
+  /// so an interrupted old campaign's resumed half renders like its first.
+  /// `bodyText` stays the flattened plain text: the history view reads it, the
+  /// composer's character limit is measured on it, and it is the only form that
+  /// survives a shape change here.
+  bodyBlocks       Json?
   sentById         String
   // Incremented per recipient while the send runs, so progress polling and an
   // interrupted campaign both read accurate numbers. Recipient rows remain the

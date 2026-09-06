@@ -43,6 +43,11 @@ import { generateSimplePassword, hashPassword } from '@/lib/password'
 // subject and hard-requires a single group, neither of which fits a campaign.
 import { renderBulkMessageHtml, sendBulkMessageEmail } from '@/lib/email'
 import {
+  parseRichBlocks,
+  resolveEmailBody,
+  type EmailRichBlock,
+} from '@/lib/email-rich-text'
+import {
   previewEmailSchema,
   previewEvaluationRecipientSchema,
   previewRecipientsSchema,
@@ -814,9 +819,13 @@ export async function previewEvaluationEmailForRecipient(
     const built = await buildCardsForRecipient(recipient, city)
     if (!built.ok) return { success: false, error: built.reason }
 
+    const body = resolveEmailBody(parsed.data)
+    if (!body.ok) return { success: false, error: body.error }
+
     const html = await renderBulkMessageHtml({
       subject: `${parsed.data.subject} – ${built.childName}`,
-      bodyText: parsed.data.bodyText,
+      bodyText: body.bodyText,
+      bodyBlocks: body.bodyBlocks,
       cards: built.cards,
     })
     return { success: true, html }
@@ -916,9 +925,13 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
       previewSubject = `${parsed.data.subject} – ${SAMPLE_CREDENTIALS_CARD.childName}`
     }
 
+    const body = resolveEmailBody(parsed.data)
+    if (!body.ok) return { success: false, error: body.error }
+
     const html = await renderBulkMessageHtml({
       subject: previewSubject,
-      bodyText: parsed.data.bodyText,
+      bodyText: body.bodyText,
+      bodyBlocks: body.bodyBlocks,
       options,
       signupPath,
       cards,
@@ -1091,6 +1104,13 @@ export async function sendEmailCampaign(
   const data = parsed.data
 
   try {
+    // Resolved ONCE, and every use below reads `body` rather than `data`: the
+    // persisted row, the running send and a later resume all have to carry the
+    // same message, and `bodyText` is re-derived from the blocks here rather
+    // than taken from the client (see resolveEmailBody).
+    const body = resolveEmailBody(data)
+    if (!body.ok) return { success: false, error: body.error }
+
     const targetYear = await getSelectedSchoolYear()
 
     const prep = await prepareReenrollment(city, targetYear, data)
@@ -1134,7 +1154,15 @@ export async function sendEmailCampaign(
           targetCourseId: data.kind === 'REENROLLMENT' ? data.targetCourseId : null,
           targetGroupIds: data.kind === 'REENROLLMENT' ? data.targetGroupIds : [],
           subject: data.subject,
-          bodyText: data.bodyText,
+          bodyText: body.bodyText,
+          // Prisma's InputJsonValue does not accept a typed array (its index
+          // signature is structural), so the shape is asserted here rather than
+          // loosened at the source. DbNull, not JsonNull: the column's absent
+          // state is SQL NULL, which is what `parseRichBlocks` reads back as
+          // "no formatting, fall back to the plain text".
+          bodyBlocks: body.bodyBlocks
+            ? (body.bodyBlocks as unknown as Prisma.InputJsonValue)
+            : Prisma.DbNull,
           sentById: session.user.id,
           skippedCount: cohort.skipped.length,
           excludedCount: excluded,
@@ -1198,7 +1226,8 @@ export async function sendEmailCampaign(
       kind: data.kind,
       city,
       subject: data.subject,
-      bodyText: data.bodyText,
+      bodyText: body.bodyText,
+      bodyBlocks: body.bodyBlocks,
       options,
       signupPath,
       sentKey,
@@ -1254,6 +1283,13 @@ type SendJob = {
   city: City
   subject: string
   bodyText: string
+  /**
+   * The formatted body. Safe to live on the job for the same reason `bodyText`
+   * is: it is the campaign's own message, identical for every recipient. The
+   * per-recipient content this file guards so carefully is still built inside
+   * the loop.
+   */
+  bodyBlocks: EmailRichBlock[] | null
   options: GroupOption[] | undefined
   /** Where the invitation's CTA points — `/prijava/<target-slug>`. */
   signupPath: string | undefined
@@ -1517,6 +1553,7 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
       to: recipient.parentEmail,
       subject,
       bodyText: job.bodyText,
+      bodyBlocks: job.bodyBlocks,
       city: job.city,
       options: job.options,
       signupPath: job.signupPath,
@@ -1629,6 +1666,7 @@ export async function resumeEmailCampaign(
       kind: true,
       subject: true,
       bodyText: true,
+      bodyBlocks: true,
       sourceSchoolYear: true,
       targetCourseId: true,
       targetSchoolYear: true,
@@ -1673,6 +1711,9 @@ export async function resumeEmailCampaign(
     city,
     subject: campaign.subject,
     bodyText: campaign.bodyText,
+    // Re-read from the row, never re-composed: the resumed half must render
+    // exactly like the half that already went out.
+    bodyBlocks: parseRichBlocks(campaign.bodyBlocks),
     sourceSchoolYear: campaign.sourceSchoolYear,
     options,
     signupPath,
@@ -1777,6 +1818,7 @@ export async function getCampaignEmailHtml(campaignId: string): Promise<PreviewE
       kind: true,
       subject: true,
       bodyText: true,
+      bodyBlocks: true,
       targetCourseId: true,
       targetGroupIds: true,
       targetSchoolYear: true,
@@ -1816,6 +1858,7 @@ export async function getCampaignEmailHtml(campaignId: string): Promise<PreviewE
     const html = await renderBulkMessageHtml({
       subject: campaign.subject,
       bodyText: campaign.bodyText,
+      bodyBlocks: parseRichBlocks(campaign.bodyBlocks),
       options,
       signupPath,
     })
@@ -1846,7 +1889,7 @@ export async function getRecipientEmailHtml(recipientId: string): Promise<Previe
     select: {
       parentEmail: true,
       assessmentIds: true,
-      campaign: { select: { kind: true, subject: true, bodyText: true } },
+      campaign: { select: { kind: true, subject: true, bodyText: true, bodyBlocks: true } },
     },
   })
   if (!recipient) notFound()
@@ -1860,6 +1903,7 @@ export async function getRecipientEmailHtml(recipientId: string): Promise<Previe
       // Rebuilt exactly as the send composed it, child's name included.
       subject: `${recipient.campaign.subject} – ${built.childName}`,
       bodyText: recipient.campaign.bodyText,
+      bodyBlocks: parseRichBlocks(recipient.campaign.bodyBlocks),
       cards: built.cards,
     })
     return { success: true, html }

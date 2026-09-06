@@ -33,12 +33,27 @@ vi.mock('@/actions/admin/email-campaign', () => ({
   sendEmailCampaign: sendEmailCampaignMock,
 }))
 vi.mock('@/actions/admin/inquiry', () => ({ getGroupsForCourse: vi.fn() }))
+/**
+ * The body editor is BlockNote behind a `next/dynamic` boundary — a
+ * contenteditable surface that jsdom cannot drive and that this suite is not
+ * testing. Stood in by a textarea speaking the same contract (plain text in,
+ * blocks out) so the payload assertions below stay about payloads.
+ */
+vi.mock('@/components/admin/email/email-body-editor', () => ({
+  EmailBodyEditor: ({ onChange }: { onChange: (b: unknown[]) => void }) => (
+    <textarea
+      aria-label="Tekst poruke"
+      onChange={(e) => onChange(plainTextToBlocks(e.target.value))}
+    />
+  ),
+}))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }))
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 import { EmailWizard } from '@/components/admin/email/email-wizard'
+import { plainTextToBlocks } from '@/lib/email-rich-text'
 
 type WizardProps = ComponentProps<typeof EmailWizard>
 
@@ -89,7 +104,9 @@ async function fillContentAndGoToStep2(kindLabel?: string) {
   fireEvent.change(screen.getByLabelText(/Predmet/), {
     target: { value: 'Testni predmet' },
   })
-  fireEvent.change(screen.getByLabelText(/Tekst poruke/), {
+  // By role, not by label text: the editor's own wrapper is a labelled
+  // `role="group"`, so a bare label query matches it as well as the field.
+  fireEvent.change(await screen.findByRole('textbox', { name: /Tekst poruke/ }), {
     target: { value: 'Dovoljno dugačak tekst poruke za formu.' },
   })
   fireEvent.click(screen.getByRole('button', { name: /Dalje: primatelji/ }))
