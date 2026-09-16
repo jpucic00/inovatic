@@ -107,6 +107,31 @@ describe('createStudentFromInquiry — one child, one account', () => {
     expect(healed?.lastName).toBe(`Anić${tag}`)
   })
 
+  it('does not rename over a difference in case alone', async () => {
+    await adminSession()
+    const dob = '2018-05-05'
+    const tag = uniq()
+    const stored = await createStudent({
+      firstName: 'Ana',
+      lastName: `Anić${tag}`,
+      dateOfBirth: dob,
+      city: 'SPLIT',
+    })
+
+    const result = await acceptInquiry({
+      childFirstName: 'ana',
+      childLastName: `ANIĆ${tag}`,
+      childDateOfBirth: dob,
+    })
+    expect(result.isExisting).toBe(true)
+    expect(result.studentId).toBe(stored.id)
+
+    // Matched, but a hurried lowercase upit is not a correction of the roster.
+    const account = await db.user.findUniqueOrThrow({ where: { id: stored.id } })
+    expect(account.firstName).toBe('Ana')
+    expect(account.lastName).toBe(`Anić${tag}`)
+  })
+
   it('matches a decomposed (NFD) spelling and stores the composed (NFC) form', async () => {
     await adminSession()
     const dob = '2018-05-05'
@@ -211,6 +236,43 @@ describe('legacy tier (DOB-less imported account) with the same tolerance', () =
     expect(healed?.dateOfBirth).toBe('2016-09-09')
     expect(healed?.lastName).toBe(`Coric${tag}`)
     expect(healed?.parentEmail).toBe(parentEmail.toUpperCase())
+  })
+})
+
+describe('when both tiers match at once', () => {
+  it('reuses the DOB-bearing account and leaves the DOB-less import untouched', async () => {
+    await adminSession()
+    const dob = '2016-09-09'
+    const tag = uniq()
+    const email = `oba-${tag}@test.hr`
+    const strict = await createStudent({
+      firstName: 'Ana',
+      lastName: `Anić${tag}`,
+      dateOfBirth: dob,
+      parentEmail: email,
+      city: 'SPLIT',
+    })
+    const legacy = await createStudent({
+      firstName: 'Ana',
+      lastName: `Anic${tag}`,
+      dateOfBirth: null,
+      parentEmail: email,
+      city: 'SPLIT',
+    })
+
+    const result = await acceptInquiry({
+      childFirstName: 'Ana',
+      childLastName: `Anić${tag}`,
+      childDateOfBirth: dob,
+      parentEmail: email,
+    })
+    expect(result.isExisting).toBe(true)
+    // Strict identity (name + DOB) wins; the fuzzy legacy pool is only for when
+    // strict finds nothing, so the import must not be healed or renamed here.
+    expect(result.studentId).toBe(strict.id)
+    const untouched = await db.user.findUniqueOrThrow({ where: { id: legacy.id } })
+    expect(untouched.dateOfBirth).toBeNull()
+    expect(untouched.lastName).toBe(`Anic${tag}`)
   })
 })
 

@@ -40,7 +40,7 @@ export function normalizeName(value: string): string {
 /** Trimmed e-mail for persistence; blank collapses to null. */
 export function normalizeEmail(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
-  return trimmed ? trimmed : null
+  return trimmed || null
 }
 
 /**

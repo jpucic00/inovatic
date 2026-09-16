@@ -204,6 +204,15 @@ describe('getStudents payment filter + computed status', () => {
       startDate: PAST_STARTED,
       paid: false,
     })
+    // The PAID branch of the same reversal: this year's started module is paid,
+    // last year's is not. K only reaches NOT_DUE, so without L the
+    // `owesNothingInYear` clause under PAID is proven by shape alone.
+    await standardStudent('L_pastdebt_paid', { schoolYear: CY, startDate: STARTED, paid: true })
+    await addStandardEnrollment(ids.L_pastdebt_paid, {
+      schoolYear: PAST,
+      startDate: PAST_STARTED,
+      paid: false,
+    })
     // A begun month is owed; a month still ahead is not — the competition
     // mirror of A_pending and E_future.
     await competitionStudent('I_comp_pending', { periodStart: STARTED })
@@ -241,6 +250,17 @@ describe('getStudents payment filter + computed status', () => {
     // one only. Nothing in it has started, so nothing is owed yet.
     expect(byId.get(ids.K_pastdebt)).toBe('NOT_DUE')
     expect(byId.get(ids.H_courseX)).toBe('PENDING')
+  })
+
+  it('reads a settled current year as PAID even when last year is still owed', async () => {
+    const current = await getStudents({ search: MARKER, pageSize: 100 })
+    expect(new Map(current.data.map((r) => [r.id, r.paymentStatus])).get(ids.L_pastdebt_paid)).toBe('PAID')
+    const past = await getStudents({ search: MARKER, schoolYear: PAST, pageSize: 100 })
+    expect(new Map(past.data.map((r) => [r.id, r.paymentStatus])).get(ids.L_pastdebt_paid)).toBe('PENDING')
+
+    // And the dropdown agrees with the badge in both directions.
+    expect((await fetchIds({ paymentStatus: 'PAID' })).has(ids.L_pastdebt_paid)).toBe(true)
+    expect((await fetchIds({ paymentStatus: 'PENDING' })).has(ids.L_pastdebt_paid)).toBe(false)
   })
 
   it('reports the past-year debt when asked about the past year', async () => {

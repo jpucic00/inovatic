@@ -256,7 +256,8 @@ erDiagram
         string targetCourseId FK "nullable - SetNull"
         string targetGroupIds "String[] - termini offered; lets a resume rebuild the same boxes"
         string subject
-        string bodyText "db.Text"
+        string bodyText "db.Text - flattened plain text; the history reads it and the 5000-char limit is measured on it"
+        json bodyBlocks "nullable - the composed body WITH its formatting (BlockNote blocks). Null on every campaign sent before rich text existed, never backfilled; the template then splits bodyText on newlines, so a resumed old campaign renders like its first half"
         string sentById FK
         int sentCount "incremented per recipient while sending"
         int failedCount

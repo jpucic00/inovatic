@@ -14,11 +14,13 @@ import type { ComponentProps } from 'react'
 
 const {
   getEmailGroupTreeMock,
+  previewEmailHtmlMock,
   previewEmailRecipientsMock,
   sendEmailCampaignMock,
   getCampaignProgressMock,
 } = vi.hoisted(() => ({
   getEmailGroupTreeMock: vi.fn(),
+  previewEmailHtmlMock: vi.fn(),
   previewEmailRecipientsMock: vi.fn(),
   sendEmailCampaignMock: vi.fn(),
   getCampaignProgressMock: vi.fn(),
@@ -27,7 +29,7 @@ const {
 vi.mock('@/actions/admin/email-campaign', () => ({
   getCampaignProgress: getCampaignProgressMock,
   getEmailGroupTree: getEmailGroupTreeMock,
-  previewEmailHtml: vi.fn(),
+  previewEmailHtml: previewEmailHtmlMock,
   previewEmailRecipients: previewEmailRecipientsMock,
   previewEvaluationEmailForRecipient: vi.fn(),
   sendEmailCampaign: sendEmailCampaignMock,
@@ -104,8 +106,8 @@ async function fillContentAndGoToStep2(kindLabel?: string) {
   fireEvent.change(screen.getByLabelText(/Predmet/), {
     target: { value: 'Testni predmet' },
   })
-  // By role, not by label text: the editor's own wrapper is a labelled
-  // `role="group"`, so a bare label query matches it as well as the field.
+  // By role, not by label text: the editor sits in a fieldset whose legend is
+  // "Tekst poruke", so a bare label query matches the group as well as the field.
   fireEvent.change(await screen.findByRole('textbox', { name: /Tekst poruke/ }), {
     target: { value: 'Dovoljno dugačak tekst poruke za formu.' },
   })
@@ -132,6 +134,71 @@ beforeEach(() => {
     alreadySent: 0,
     excluded: 0,
     skipped: [],
+  })
+  previewEmailHtmlMock.mockResolvedValue({ success: true, html: '<p>pregled</p>' })
+})
+
+describe('EmailWizard — the formatted body travels with the plain text', () => {
+  const TEXT = 'Dovoljno dugačak tekst poruke za formu.'
+
+  it('previews the blocks alongside the flattened text', async () => {
+    render(<EmailWizard {...BASE_PROPS} />)
+
+    fireEvent.change(screen.getByLabelText(/Predmet/), { target: { value: 'Testni predmet' } })
+    fireEvent.change(await screen.findByRole('textbox', { name: /Tekst poruke/ }), {
+      target: { value: TEXT },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Pregled e-maila/ }))
+    await waitFor(() =>
+      expect(previewEmailHtmlMock).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'CUSTOM', bodyText: TEXT, bodyBlocks: plainTextToBlocks(TEXT) }),
+      ),
+    )
+  })
+
+  it('sends the blocks alongside the flattened text', async () => {
+    previewEmailRecipientsMock.mockResolvedValue({
+      success: true,
+      recipients: [recipient('mama@test.hr', 'mama@test.hr', 'Ana Anić')],
+      skipped: [],
+      alreadySent: [],
+    })
+    render(<EmailWizard {...BASE_PROPS} />)
+
+    fireEvent.change(screen.getByLabelText(/Predmet/), { target: { value: 'Testni predmet' } })
+    fireEvent.change(await screen.findByRole('textbox', { name: /Tekst poruke/ }), {
+      target: { value: TEXT },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Dalje: primatelji/ }))
+    await screen.findByText('Odaberi sve grupe')
+    fireEvent.click(screen.getByRole('checkbox', { name: /Odaberi sve grupe/ }))
+    await screen.findByText(/Ana Anić/)
+    fireEvent.click(screen.getByRole('button', { name: /Pošalji \(1\)/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Potvrdi slanje \(1\)/ }))
+
+    await waitFor(() => expect(sendEmailCampaignMock).toHaveBeenCalledTimes(1))
+    // Dropping `bodyBlocks` from the send input would mail every campaign
+    // unformatted while the preview still showed the formatting.
+    expect(sendEmailCampaignMock.mock.calls[0][0]).toMatchObject({
+      bodyText: TEXT,
+      bodyBlocks: plainTextToBlocks(TEXT),
+    })
+  })
+
+  it('turns the counter red and holds the wizard on step 1 past the limit', async () => {
+    render(<EmailWizard {...BASE_PROPS} />)
+    fireEvent.change(screen.getByLabelText(/Predmet/), { target: { value: 'Testni predmet' } })
+    const tooLong = 'x'.repeat(5001)
+    fireEvent.change(await screen.findByRole('textbox', { name: /Tekst poruke/ }), {
+      target: { value: tooLong },
+    })
+
+    const counter = screen.getByText('5001/5000')
+    expect(counter.className).toContain('text-red-600')
+    // The textarea this editor replaced hard-stopped at 5000; the gate has to
+    // do that job now, or the limit is only discovered on send.
+    fireEvent.click(screen.getByRole('button', { name: /Dalje: primatelji/ }))
+    expect(screen.queryByText('Odaberi sve grupe')).toBeNull()
   })
 })
 

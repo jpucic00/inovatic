@@ -202,6 +202,7 @@ describe('getStudents — ponovni upis filter', () => {
 describe('getInquiries — ponovni upis filter', () => {
   const DOB = '2014-04-04'
   let returningInquiryId: string
+  let spacedInquiryId: string
   let freshInquiryId: string
   let partyInquiryId: string
 
@@ -216,6 +217,23 @@ describe('getInquiries — ponovni upis filter', () => {
       await createInquiry({
         childFirstName: 'Ana',
         childLastName: `${MARKER}Poznata`,
+        childDateOfBirth: DOB,
+        schoolYear: YEAR,
+      })
+    ).id
+
+    // The 2026-09-06 shape: the account exists as "Anić", the upit arrives as
+    // "Anic " with a trailing space. The marker alone was already covered on
+    // flagReturningInquiries; this runs it through the two-phase list filter.
+    await createStudent({
+      firstName: 'Iva',
+      lastName: `${MARKER}Razmak`,
+      dateOfBirth: DOB,
+    })
+    spacedInquiryId = (
+      await createInquiry({
+        childFirstName: 'Iva ',
+        childLastName: `${MARKER}Razmak `,
         childDateOfBirth: DOB,
         schoolYear: YEAR,
       })
@@ -265,6 +283,8 @@ describe('getInquiries — ponovni upis filter', () => {
   it('RETURNING keeps only the upit whose child already has an account', async () => {
     const ids = await inquiryIds({ returning: 'RETURNING' })
     expect(ids.has(returningInquiryId)).toBe(true)
+    // A trailing space in the upit does not make the child a stranger.
+    expect(ids.has(spacedInquiryId)).toBe(true)
     expect(ids.has(freshInquiryId)).toBe(false)
     expect(ids.has(partyInquiryId)).toBe(false)
   })
@@ -273,6 +293,7 @@ describe('getInquiries — ponovni upis filter', () => {
     const ids = await inquiryIds({ returning: 'NEW' })
     expect(ids.has(freshInquiryId)).toBe(true)
     expect(ids.has(returningInquiryId)).toBe(false)
+    expect(ids.has(spacedInquiryId)).toBe(false)
     // A birthday party is not somebody's first enrollment.
     expect(ids.has(partyInquiryId)).toBe(false)
   })

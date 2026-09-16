@@ -53,6 +53,14 @@ describe('StudentTable — every year-sensitive cell follows the scoped year', (
     ).toBeTruthy()
   })
 
+  it('names the scoped year in the Plaćanje header, since the badge answers only about that year', () => {
+    render(<StudentTable data={[TWO_YEAR_ROW]} schoolYear="2026/2027" />)
+
+    expect(
+      screen.getByRole('columnheader', { name: /Plaćanje \(2026\/2027\)/ }),
+    ).toBeTruthy()
+  })
+
   it('names the scoped year in the empty state, so an unfilled year does not read as missing data', () => {
     render(<StudentTable data={[]} schoolYear="2026/2027" />)
 

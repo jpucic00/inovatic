@@ -240,6 +240,9 @@ function buildParentBackfill(input: CoreInput): Prisma.UserUpdateInput {
   return backfill
 }
 
+const sameIgnoringCase = (a: string, b: string) =>
+  a.toLocaleLowerCase('hr') === b.toLocaleLowerCase('hr')
+
 async function findOrCreateStudent(
   tx: TxClient,
   input: CoreInput,
@@ -277,9 +280,12 @@ async function findOrCreateStudent(
     const backfill = buildParentBackfill({ ...input, parentEmail })
     // The newer spelling wins: "Anić" arriving for a stored "Anic" (or the
     // reverse) renames the account, so the roster shows what the parent wrote
-    // last. Same child either way — the later form is the corrected one.
-    if (existingStudent.firstName !== firstName) backfill.firstName = firstName
-    if (existingStudent.lastName !== lastName) backfill.lastName = lastName
+    // last. Same child either way — the later form is the corrected one. A
+    // difference in CASE alone is not a correction, though: "ana anic" typed
+    // in a hurry must not lowercase a roster entry that was already right
+    // (owner decision 2026-09-16).
+    if (!sameIgnoringCase(existingStudent.firstName, firstName)) backfill.firstName = firstName
+    if (!sameIgnoringCase(existingStudent.lastName, lastName)) backfill.lastName = lastName
     // Legacy-tier reuse: heal the missing DOB so this account matches the
     // strict rule from now on and stops being fuzzy-matchable.
     if (!existingStudent.dateOfBirth && input.dateOfBirth) {

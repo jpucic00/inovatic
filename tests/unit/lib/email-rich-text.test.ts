@@ -36,6 +36,19 @@ describe('isSafeEmailHref', () => {
     expect(isSafeEmailHref('data:text/html;base64,PHNjcmlwdD4=')).toBe(false)
   })
 
+  it('caps the href length and stores it trimmed', () => {
+    expect(isSafeEmailHref(`https://udruga-inovatic.hr/${'a'.repeat(2000)}`)).toBe(false)
+    const parsed = parseRichBlocks([
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'link', href: '  https://udruga-inovatic.hr/prijava ', content: [{ type: 'text', text: 'x', styles: {} }] },
+        ],
+      },
+    ])
+    expect(parsed?.[0].content[0]).toMatchObject({ type: 'link', href: 'https://udruga-inovatic.hr/prijava' })
+  })
+
   it('refuses hrefs an inbox cannot resolve', () => {
     // Relative — meaningless once the mail has left the site.
     expect(isSafeEmailHref('/prijava')).toBe(false)
@@ -91,6 +104,17 @@ describe('flattenRichText', () => {
     expect(flattenRichText(blocks)).toBe('1. Prvo\n2. Drugo\nZatim:\n• A\n1. Opet prvo')
   })
 
+  it('does not skip a number over an empty list item', () => {
+    // The mail renders no marker for an empty item, so the flattened history
+    // must not read "1. A / 3. C" for a list the parent saw as 1, 2.
+    const text = flattenRichText([
+      { type: 'numberedListItem', content: [{ type: 'text', text: 'A', styles: {} }] },
+      { type: 'numberedListItem', content: [] },
+      { type: 'numberedListItem', content: [{ type: 'text', text: 'C', styles: {} }] },
+    ])
+    expect(text).toBe('1. A\n2. C')
+  })
+
   it('walks nested children and drops empty blocks', () => {
     const blocks: EmailRichBlock[] = [
       {
@@ -107,6 +131,24 @@ describe('flattenRichText', () => {
 })
 
 describe('parseRichBlocks', () => {
+  it('stops descending past the depth cap instead of overflowing the stack', () => {
+    // A payload nested thousands deep is what an admin session could post;
+    // validation must answer with a refusal, not a RangeError.
+    let deep: unknown = para('dno')
+    for (let i = 0; i < 5000; i++) {
+      deep = { type: 'bulletListItem', content: [], children: [deep] }
+    }
+    const parsed = parseRichBlocks([deep])
+    expect(parsed).not.toBeNull()
+    expect(flattenRichText(parsed!)).not.toContain('dno')
+
+    // A realistic indent survives untouched.
+    const shallow = parseRichBlocks([
+      { type: 'bulletListItem', content: [], children: [{ type: 'bulletListItem', content: [], children: [para('treća razina')] }] },
+    ])
+    expect(flattenRichText(shallow!)).toContain('treća razina')
+  })
+
   it('reads back what the editor stores', () => {
     const stored = [
       {
@@ -205,6 +247,13 @@ describe('resolveEmailBody', () => {
       content: [{ type: 'text', text: 'riječ', styles: { bold: true, fontSize: 'lg' } }],
     }))
     expect(resolveEmailBody({ bodyText: '', bodyBlocks: blocks }).ok).toBe(true)
+  })
+
+  it('treats an explicit null — the stored value of a pre-rich-text row — like an omitted field', () => {
+    const omitted = resolveEmailBody({ bodyText: 'Poruka bez formatiranja.' })
+    const nulled = resolveEmailBody({ bodyText: 'Poruka bez formatiranja.', bodyBlocks: null })
+    expect(nulled).toEqual(omitted)
+    expect(nulled).toEqual({ ok: true, bodyText: 'Poruka bez formatiranja.', bodyBlocks: null })
   })
 
   it('falls back to the plain text when no blocks were submitted', () => {

@@ -30,15 +30,66 @@ describe('bulk-message rich body', () => {
     expect(html).toContain('<em>traju</em>')
   })
 
-  it('carries the font size inline', async () => {
+  it('carries the font size inline, on the run itself', async () => {
     const html = await render([
       {
         type: 'paragraph',
-        content: [{ type: 'text', text: 'Sitno', styles: { fontSize: 'sm' } }],
+        content: [
+          { type: 'text', text: 'Sitno', styles: { fontSize: 'sm' } },
+          { type: 'text', text: ' i ', styles: {} },
+          { type: 'text', text: 'Veliko', styles: { fontSize: 'lg' } },
+        ],
       },
     ])
-    expect(html).toMatch(/font-size:13px[^>]*>Sitno|Sitno/)
-    expect(html).toContain('13px')
+    // Anchored on the run's own element: the layout's footer is 13px too, so a
+    // bare `toContain('13px')` would pass with the fontSize branch deleted.
+    expect(html).toMatch(/<span style="font-size:13px">Sitno<\/span>/)
+    expect(html).toMatch(/<span style="font-size:19px">Veliko<\/span>/)
+  })
+
+  it('renders underline and strike as elements — the marks a wrong key would drop silently', async () => {
+    const html = await render([
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'Podcrtano', styles: { underline: true } },
+          { type: 'text', text: ' ', styles: {} },
+          { type: 'text', text: 'Precrtano', styles: { strike: true } },
+          { type: 'text', text: ' ', styles: {} },
+          { type: 'text', text: 'Oboje', styles: { bold: true, strike: true } },
+        ],
+      },
+    ])
+    expect(html).toContain('<u>Podcrtano</u>')
+    expect(html).toContain('<s>Precrtano</s>')
+    expect(html).toContain('<s><strong>Oboje</strong></s>')
+  })
+
+  it('renders a heading as an h2 whose size travels inline', async () => {
+    const html = await render([
+      { type: 'heading', props: { level: 1 }, content: [{ type: 'text', text: 'Naslov', styles: {} }] },
+      { type: 'heading', props: { level: 3 }, content: [{ type: 'text', text: 'Podnaslov', styles: {} }] },
+    ])
+    expect(html).toMatch(/<h2[^>]*font-size:22px[^>]*>Naslov<\/h2>/)
+    expect(html).toMatch(/<h2[^>]*font-size:17px[^>]*>Podnaslov<\/h2>/)
+  })
+
+  it('numbers an ordered list and nests an indented item inside its parent', async () => {
+    const html = await render([
+      { type: 'numberedListItem', content: [{ type: 'text', text: 'Prvo', styles: {} }] },
+      {
+        type: 'numberedListItem',
+        content: [{ type: 'text', text: 'Drugo', styles: {} }],
+        children: [{ type: 'bulletListItem', content: [{ type: 'text', text: 'Ugniježđeno', styles: {} }] }],
+      },
+      { type: 'paragraph', content: [{ type: 'text', text: 'Između.', styles: {} }] },
+      { type: 'numberedListItem', content: [{ type: 'text', text: 'Treće', styles: {} }] },
+    ])
+    // A paragraph splits the run: two <ol>, and the nested bullet's <ul> sits
+    // inside the second <li> rather than after the list.
+    expect(html.match(/<ol[ >]/g)).toHaveLength(2)
+    expect(html.match(/<ul[ >]/g)).toHaveLength(1)
+    expect(html).toMatch(/<li[^>]*>Drugo<ul[^>]*><li[^>]*>Ugniježđeno<\/li><\/ul><\/li>/)
   })
 
   it('renders a link with its href', async () => {

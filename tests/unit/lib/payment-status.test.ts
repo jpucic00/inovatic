@@ -264,6 +264,27 @@ describe('computeStudentPaymentStatus', () => {
     ).toBe('PENDING')
   })
 
+  it('applies a whole-year mark only to the year it was set on', () => {
+    const pastPaidUpfront = standardEnrollment(
+      [{ paidAt: null, startDate: new Date('2025-10-01T00:00:00.000Z') }],
+      { schoolYear: PAST_YEAR, fullYearPaidAt: new Date('2025-09-01T00:00:00.000Z') },
+    )
+    const currentOwing = standardEnrollment([{ paidAt: null, startDate: STARTED }])
+    // Last year's upfront payment settles nothing this year...
+    expect(computeStudentPaymentStatus([pastPaidUpfront, currentOwing], CURRENT_YEAR, NOW)).toBe('PENDING')
+    // ...and this year's mark settles nothing last year.
+    const currentPaidUpfront = standardEnrollment(
+      [{ paidAt: null, startDate: STARTED }],
+      { fullYearPaidAt: new Date('2026-09-01T00:00:00.000Z') },
+    )
+    const pastOwing = standardEnrollment(
+      [{ paidAt: null, startDate: new Date('2025-10-01T00:00:00.000Z') }],
+      { schoolYear: PAST_YEAR },
+    )
+    expect(computeStudentPaymentStatus([currentPaidUpfront, pastOwing], CURRENT_YEAR, NOW)).toBe('PAID')
+    expect(computeStudentPaymentStatus([currentPaidUpfront, pastOwing], PAST_YEAR, NOW)).toBe('PENDING')
+  })
+
   it('NONE for a past-year fully-paid student with no current enrollment', () => {
     expect(
       computeStudentPaymentStatus(

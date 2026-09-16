@@ -17,7 +17,7 @@ import {
 import { BlockNoteView } from '@blocknote/mantine'
 import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
-import { EMAIL_FONT_SIZES, type EmailRichBlock } from '@/lib/email-rich-text'
+import { EMAIL_FONT_SIZES, parseRichBlocks, type EmailRichBlock } from '@/lib/email-rich-text'
 
 /**
  * The three size steps, as the picker labels them. `''` is normal — the ABSENCE
@@ -103,6 +103,24 @@ function FontSizeSelect() {
   )
 }
 
+/**
+ * Replaces the default toolbar rather than extending it: the defaults include
+ * colour pickers and file buttons that this schema has no blocks for.
+ */
+function EmailFormattingToolbar() {
+  return (
+    <FormattingToolbar>
+      <BlockTypeSelect key="blockTypeSelect" />
+      <BasicTextStyleButton basicTextStyle="bold" key="boldStyleButton" />
+      <BasicTextStyleButton basicTextStyle="italic" key="italicStyleButton" />
+      <BasicTextStyleButton basicTextStyle="underline" key="underlineStyleButton" />
+      <BasicTextStyleButton basicTextStyle="strike" key="strikeStyleButton" />
+      <FontSizeSelect key="fontSizeSelect" />
+      <CreateLinkButton key="createLinkButton" />
+    </FormattingToolbar>
+  )
+}
+
 interface Props {
   initialContent?: EmailRichBlock[] | null
   onChange: (blocks: EmailRichBlock[]) => void
@@ -131,7 +149,11 @@ export function EmailBodyEditor({ initialContent, onChange }: Readonly<Props>) {
 
   useEffect(() => {
     return editor.onChange(() => {
-      onChangeRef.current(editor.document as unknown as EmailRichBlock[])
+      // Narrowed through the same function the server stores with, so the
+      // parent holds exactly the shape that will be persisted and the character
+      // count it shows is measured on the text the server will measure. An
+      // editor document made only of empty blocks reads as nothing written.
+      onChangeRef.current(parseRichBlocks(editor.document) ?? [])
     })
   }, [editor])
 
@@ -141,22 +163,7 @@ export function EmailBodyEditor({ initialContent, onChange }: Readonly<Props>) {
     // like it does not fit.
     <div className="min-h-[220px] rounded-lg border border-gray-200 bg-white py-2">
       <BlockNoteView editor={editor} theme="light" formattingToolbar={false}>
-        {/* Replaces the default toolbar rather than extending it: the defaults
-            include colour pickers and file buttons that this schema has no
-            blocks for. */}
-        <FormattingToolbarController
-          formattingToolbar={() => (
-            <FormattingToolbar>
-              <BlockTypeSelect key="blockTypeSelect" />
-              <BasicTextStyleButton basicTextStyle="bold" key="boldStyleButton" />
-              <BasicTextStyleButton basicTextStyle="italic" key="italicStyleButton" />
-              <BasicTextStyleButton basicTextStyle="underline" key="underlineStyleButton" />
-              <BasicTextStyleButton basicTextStyle="strike" key="strikeStyleButton" />
-              <FontSizeSelect key="fontSizeSelect" />
-              <CreateLinkButton key="createLinkButton" />
-            </FormattingToolbar>
-          )}
-        />
+        <FormattingToolbarController formattingToolbar={EmailFormattingToolbar} />
       </BlockNoteView>
     </div>
   )

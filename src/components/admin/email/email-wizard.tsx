@@ -583,18 +583,24 @@ export function EmailWizard({
       })
   }
 
+  // The upper bound is checked here as well as by the counter: the textarea
+  // this replaced hard-stopped typing at the limit, and without the gate the
+  // wizard would let an over-long message through to a server rejection.
   const contentValid =
     subject.trim().length >= 3 &&
     bodyText.trim().length >= 10 &&
+    bodyText.length <= EMAIL_BODY_MAX_LENGTH &&
     (kind !== 'REENROLLMENT' || (targetCourseId !== '' && targetGroupIds.length > 0))
 
   const handlePreview = () => {
     if (!contentValid) {
-      toast.error(
-        kind === 'REENROLLMENT'
-          ? 'Ispunite predmet i tekst te odaberite ciljni program i grupe.'
-          : 'Ispunite predmet i tekst poruke.',
-      )
+      let message = 'Ispunite predmet i tekst poruke.'
+      if (bodyText.length > EMAIL_BODY_MAX_LENGTH) {
+        message = `Tekst poruke je predugačak — najviše ${EMAIL_BODY_MAX_LENGTH} znakova.`
+      } else if (kind === 'REENROLLMENT') {
+        message = 'Ispunite predmet i tekst te odaberite ciljni program i grupe.'
+      }
+      toast.error(message)
       return
     }
     setPreviewHtml(null)
@@ -836,21 +842,20 @@ export function EmailWizard({
                 className={INPUT_CLASS}
               />
             </div>
-            <div>
-              {/* Not a <label>: the editor is a contenteditable surface, not a
-                  form control an htmlFor can point at. The group below names
-                  itself with aria-labelledby instead. */}
-              <p id="email-body-label" className="block text-sm font-medium text-gray-700 mb-1.5">
+            {/* A fieldset, not a <label>: the editor is a contenteditable
+                surface, not a form control an htmlFor can point at, and the
+                legend is what names the group natively. Tailwind's preflight
+                does not reset fieldset/legend, hence the explicit zeroing. */}
+            <fieldset className="m-0 min-w-0 border-0 p-0">
+              <legend className="mb-1.5 block p-0 text-sm font-medium text-gray-700">
                 Tekst poruke <span className="text-red-600">*</span>
-              </p>
+              </legend>
               {/* Keyed on the kind so switching it remounts the editor with that
                   kind's preset: `useCreateBlockNote` reads `initialContent`
                   once, so without this the new default would be in state but
                   the old text still on screen. Same remount-to-reset pattern as
                   <SessionPanel key={sessionDate}>. */}
-              <div role="group" aria-labelledby="email-body-label">
-                <EmailBodyEditor key={kind} initialContent={bodyBlocks} onChange={setBodyBlocks} />
-              </div>
+              <EmailBodyEditor key={kind} initialContent={bodyBlocks} onChange={setBodyBlocks} />
               <p className="text-xs text-gray-500 mt-1.5">
                 Označite tekst za podebljavanje, kurziv, veličinu slova i poveznice. Poruka
                 se šalje točno kako je napisana — uključite i pozdrav po želji
@@ -865,7 +870,7 @@ export function EmailWizard({
                   {bodyText.length}/{EMAIL_BODY_MAX_LENGTH}
                 </span>
               </p>
-            </div>
+            </fieldset>
             <div className="flex items-center justify-between pt-1">
               <button type="button" onClick={handlePreview} className={SECONDARY_BUTTON}>
                 <span className="inline-flex items-center gap-2">

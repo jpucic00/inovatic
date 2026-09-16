@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   previewEmailSchema,
+  previewEvaluationRecipientSchema,
   previewRecipientsSchema,
   sendEmailCampaignSchema,
 } from '@/lib/validators/admin/email-campaign'
@@ -66,6 +67,44 @@ describe('sendEmailCampaignSchema', () => {
         bodyText: 'kratko',
       }).success,
     ).toBe(false)
+  })
+})
+
+/**
+ * The formatted body is checked by the SAME normalizer the send stores with,
+ * on every schema that carries content. Each case below would pass with the
+ * `.superRefine(validateBody)` hook removed from one schema, which is exactly
+ * the drift this guards against.
+ */
+describe('formatted body (bodyBlocks) on every content schema', () => {
+  const para = (text: string) => ({ type: 'paragraph', content: [{ type: 'text', text, styles: {} }] })
+  const cases: [string, (input: Record<string, unknown>) => { success: boolean; error?: unknown }][] = [
+    ['sendEmailCampaignSchema', (i) => sendEmailCampaignSchema.safeParse({ kind: 'CUSTOM', ...baseFilters, ...i })],
+    ['previewEmailSchema', (i) => previewEmailSchema.safeParse({ kind: 'CUSTOM', ...i })],
+    [
+      'previewEvaluationRecipientSchema',
+      (i) => previewEvaluationRecipientSchema.safeParse({ kind: 'EVALUATION', ...baseFilters, assessmentId: 'a1', ...i }),
+    ],
+  ]
+
+  it.each(cases)('%s: measures the limit on the flattened blocks, not on the short bodyText beside them', (_, parse) => {
+    const res = parse({ ...content, bodyBlocks: [para('x'.repeat(5001))] })
+    expect(res.success).toBe(false)
+    const issues = (res as { error?: { issues: { path: unknown[]; message: string }[] } }).error?.issues ?? []
+    expect(issues.some((i) => i.path[0] === 'bodyText' && i.message === 'Maksimalno 5000 znakova.')).toBe(true)
+  })
+
+  it.each(cases)('%s: refuses blocks that leave nothing behind even when bodyText looks fine', (_, parse) => {
+    expect(parse({ ...content, bodyBlocks: [{ type: 'image', props: { url: 'x' } }] }).success).toBe(false)
+  })
+
+  it.each(cases)('%s: bounds the payload before the walk', (_, parse) => {
+    expect(parse({ ...content, bodyBlocks: Array.from({ length: 2001 }, () => para('a')) }).success).toBe(false)
+  })
+
+  it.each(cases)('%s: still accepts a plain-text-only payload and a well-formed formatted one', (_, parse) => {
+    expect(parse({ ...content }).success).toBe(true)
+    expect(parse({ ...content, bodyBlocks: [para('Pozivamo vas na upis u novu školsku godinu.')] }).success).toBe(true)
   })
 })
 

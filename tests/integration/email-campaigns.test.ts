@@ -666,6 +666,56 @@ describe('sendEmailCampaign — REENROLLMENT', () => {
     expect(detail.finished).toBe(true)
   })
 
+  it('resumes a formatted campaign from the row, so the second half renders like the first', async () => {
+    await loginAdmin()
+    const source = await makeSourceGroup()
+    const done = uniqEmail('resume-rich-done')
+    const left = uniqEmail('resume-rich-left')
+    await enrollStudent(source.group.id, { parentEmail: done })
+    await enrollStudent(source.group.id, { parentEmail: left })
+
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.group.id],
+      subject: CONTENT.subject,
+      bodyText: 'zanemareno',
+      bodyBlocks: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Upisi su ', styles: {} },
+            { type: 'text', text: 'otvoreni', styles: { bold: true } },
+            { type: 'text', text: ' od ponedjeljka.', styles: {} },
+          ],
+        },
+      ],
+    })
+    if (!res.success) throw new Error('send failed')
+
+    await db.emailCampaignRecipient.updateMany({
+      where: { campaignId: res.campaignId, parentEmail: left },
+      data: { status: 'PENDING', sentKey: null },
+    })
+    await db.emailCampaign.update({
+      where: { id: res.campaignId },
+      data: { sentCount: 1, finishedAt: null },
+    })
+
+    sendMock.mockClear()
+    const resumed = await resumeEmailCampaign(res.campaignId)
+    expect(resumed).toMatchObject({ success: true, remaining: 1 })
+    await settle(res.campaignId)
+
+    expect(sendMock).toHaveBeenCalledTimes(1)
+    const props = sendMock.mock.calls[0][0].react.props
+    // Re-read from the row, not re-composed: the blocks and the flattened text
+    // the first half went out with, nothing from the client's original claim.
+    expect(props.bodyBlocks).toHaveLength(1)
+    expect(props.bodyBlocks[0].content[1]).toMatchObject({ text: 'otvoreni', styles: { bold: true } })
+    expect(props.bodyText).toBe('Upisi su otvoreni od ponedjeljka.')
+  })
+
   it('surfaces each child’s source-year preporuka in the invitation recipient preview', async () => {
     const admin = await loginAdmin()
     const source = await makeSourceGroup()
@@ -1074,6 +1124,40 @@ describe('previewEmailHtml', () => {
       expect(res.html).not.toContain('Termini u novoj školskoj godini:')
       expect(res.html).not.toContain('/prijava')
     }
+  })
+
+  it('renders the formatting the composer sent, from the same builder the send uses', async () => {
+    await loginAdmin()
+    const res = await previewEmailHtml({
+      kind: 'CUSTOM',
+      subject: CONTENT.subject,
+      bodyText: 'ovo se ne prikazuje',
+      bodyBlocks: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Molimo ', styles: {} },
+            { type: 'text', text: 'potvrdu', styles: { bold: true } },
+            { type: 'text', text: ' termina.', styles: {} },
+          ],
+        },
+      ],
+    })
+    expect(res.success).toBe(true)
+    if (res.success) {
+      expect(res.html).toContain('<strong>potvrdu</strong>')
+      expect(res.html).not.toContain('ovo se ne prikazuje')
+    }
+  })
+
+  it('refuses a formatted body made of blocks the schema does not carry, rather than previewing bodyText', async () => {
+    await loginAdmin()
+    const res = await previewEmailHtml({
+      kind: 'CUSTOM',
+      ...CONTENT,
+      bodyBlocks: [{ type: 'image', props: { url: 'https://example.com/x.png' } }],
+    })
+    expect(res.success).toBe(false)
   })
 
   it('rejects an invalid target group id', async () => {

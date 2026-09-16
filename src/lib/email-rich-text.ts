@@ -89,13 +89,13 @@ export interface EmailRichBlock {
  * meaningless in an inbox, and `//host/path` would resolve against a scheme the
  * mail client picks.
  */
-const SAFE_HREF_SCHEMES = ['http:', 'https:', 'mailto:']
+const SAFE_HREF_SCHEMES = new Set(['http:', 'https:', 'mailto:'])
 
 export function isSafeEmailHref(href: string): boolean {
   const trimmed = href.trim()
   if (trimmed.length === 0 || trimmed.length > 2000) return false
   try {
-    return SAFE_HREF_SCHEMES.includes(new URL(trimmed).protocol)
+    return SAFE_HREF_SCHEMES.has(new URL(trimmed).protocol)
   } catch {
     // Not absolute — nothing an inbox can follow.
     return false
@@ -131,10 +131,15 @@ export function flattenRichText(blocks: readonly EmailRichBlock[]): string {
   const walk = (items: readonly EmailRichBlock[]) => {
     let ordinal = 0
     for (const block of items) {
-      // Numbering restarts per run of list items, matching what the reader saw.
-      ordinal = block.type === 'numberedListItem' ? ordinal + 1 : 0
       const text = inlineText(block.content).trim()
-      if (text.length > 0) lines.push(`${blockPrefix(block, ordinal - 1)}${text}`)
+      // Numbering restarts per run of list items, matching what the reader saw.
+      // An empty item is skipped BEFORE it counts: the mail renders no number
+      // for it, so the flattened text must not skip one either.
+      if (block.type !== 'numberedListItem') ordinal = 0
+      if (text.length > 0) {
+        if (block.type === 'numberedListItem') ordinal += 1
+        lines.push(`${blockPrefix(block, ordinal - 1)}${text}`)
+      }
       if (block.children && block.children.length > 0) walk(block.children)
     }
   }
@@ -155,11 +160,22 @@ export function flattenRichText(blocks: readonly EmailRichBlock[]): string {
  */
 export function parseRichBlocks(value: unknown): EmailRichBlock[] | null {
   if (!Array.isArray(value)) return null
-  const blocks = value.map(normalizeBlock).filter((b): b is EmailRichBlock => b !== null)
+  const blocks = value
+    .map((b) => normalizeBlock(b, 0))
+    .filter((b): b is EmailRichBlock => b !== null)
   return blocks.length > 0 ? blocks : null
 }
 
-function normalizeBlock(value: unknown): EmailRichBlock | null {
+/**
+ * How deep `children` may nest. The composer's lists never go past a handful
+ * of indents; the cap exists because this walk recurses on client JSON, and
+ * without it a payload nested thousands of levels deep would overflow the
+ * stack inside validation rather than fail as a Zod issue.
+ */
+const MAX_BLOCK_DEPTH = 8
+
+function normalizeBlock(value: unknown, depth: number): EmailRichBlock | null {
+  if (depth > MAX_BLOCK_DEPTH) return null
   if (typeof value !== 'object' || value === null) return null
   const raw = value as Record<string, unknown>
   const type = raw.type
@@ -169,7 +185,9 @@ function normalizeBlock(value: unknown): EmailRichBlock | null {
     ? raw.content.map(normalizeInline).filter((i): i is EmailInline => i !== null)
     : []
   const children = Array.isArray(raw.children)
-    ? raw.children.map(normalizeBlock).filter((b): b is EmailRichBlock => b !== null)
+    ? raw.children
+        .map((c) => normalizeBlock(c, depth + 1))
+        .filter((b): b is EmailRichBlock => b !== null)
     : []
 
   const block: EmailRichBlock = { type: type as EmailBlockType, content }

@@ -52,7 +52,8 @@ stateDiagram-v2
 
     note left of ACCOUNT_CREATED
         Guard: status not ACCOUNT_CREATED or DECLINED
-        User created or reused via DOB dedup
+        User created or reused via the two-tier identity match (DOB, or name + parent e-mail for DOB-less imports)
+        Names persisted normalized - NFC, trimmed, single-spaced; a reused account takes the newer spelling unless it differs by case alone
         Parent contact data + GDPR consent copied to User
         Enrollment row created (no status column)
         ModuleEnrollment rows created for standard courses
@@ -347,11 +348,11 @@ something the server refuses, nor stay silent about something it demands.
 
 ```mermaid
 flowchart TD
-    A[createStudentFromInquiry called] --> B[Extract childFirstName, childLastName, childDateOfBirth from inquiry]
-    B --> C{childDateOfBirth available?}
-    C -->|No DOB| NEW[Create new student]
-    C -->|Has DOB| D{Find User where role = STUDENT and firstName + lastName case-insensitive and dateOfBirth matches? GLOBAL - both cities}
-    D -->|Found in the SAME city| REUSE[Reuse existing student]
+    A[createStudentFromInquiry called] --> B["Extract childFirstName, childLastName, childDateOfBirth from the inquiry, then normalizeName / normalizeEmail them - NFC, trimmed, internal whitespace collapsed. The Inquiry row itself is NEVER rewritten - it stays as the parent typed it"]
+    B --> C{"candidateWheres: a DOB, or a parent e-mail for the DOB-less legacy tier?"}
+    C -->|Neither| NEW[Create new student]
+    C -->|Yes| D{"Fetch candidates GLOBALLY - both cities - by the EXACT parts only: same dateOfBirth, or dateOfBirth = null AND same parentEmail. The NAME is decided in memory by isIdentityMatch over a folded key - whitespace, case, diacritics, NFC/NFD (Anic = Anić). A strict match (has DOB) wins over a legacy one"}
+    D -->|Found in the SAME city| REUSE["Reuse existing student - backfill parent contact, heal a missing DOB, rename to the newer spelling when it differs by more than case"]
     D -->|Found in the OTHER city| BLOCK["CrossCityStudentError - accept flow blocked with escalation message; the other city's account and credentials are never surfaced"]
     D -->|Not found| NEW
 
@@ -652,8 +653,8 @@ sequenceDiagram
     Admin->>Server: createStudentFromInquiry inquiryId groupId moduleScheduleIds
     Server->>Server: Guard: status not ACCOUNT_CREATED or DECLINED
 
-    alt childDateOfBirth available
-        Server->>Server: Find existing User where role STUDENT and name + DOB match
+    alt childDateOfBirth or parentEmail available
+        Server->>Server: candidateWheres narrows to STUDENTs by DOB (or by parent e-mail for DOB-less imports), then isIdentityMatch decides the name in memory over the folded key - whitespace, case and diacritics - so a trailing space can no longer split one child into two accounts
     end
 
     alt New student
