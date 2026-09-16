@@ -124,6 +124,32 @@ export interface ReleaseNote {
  */
 export const RELEASES: readonly ReleaseNote[] = [
   {
+    version: '1.3.0',
+    date: '2026-09-16',
+    title: 'Nova verzija aplikacije.',
+    sections: [
+      {
+        area: 'E-mail',
+        changes: [
+          'Formatiranje teksta maila: podebljano, kurziv, podcrtano, poveznice, liste, naslovi i veličina slova.',
+          'Nova vrsta poruke Slanje rasporeda šalje roditelju u koje je grupe dijete upisano — program, dan, vrijeme i lokaciju; dvoje djece na istoj adresi dolazi u jednoj poruci.',
+        ],
+      },
+      {
+        area: 'Prijavnica',
+        changes: [
+          'Potvrda koju roditelj dobiva nakon prijave ispisuje odabrani termin: program, grupu, dan i vrijeme te lokaciju.',
+        ],
+      },
+      {
+        area: 'Učenici',
+        changes: [
+          'Stupac Plaćanje odnosi se samo na školsku godinu odabranu u izborniku i tu godinu nosi u naslovu; dug iz prethodne godine vidi se prebacivanjem na nju.',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-09-02',
     title: 'Nova verzija aplikacije.',
