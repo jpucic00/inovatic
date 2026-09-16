@@ -1,5 +1,6 @@
 import { Heading, Hr, Link, Section, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
+import { GroupTerminBox } from './components/group-termin-box'
 // Relative — `emails/` sits outside the `@/*` alias. Shared with the form's
 // success screen so the two can never disagree about what happens next.
 import {
@@ -7,6 +8,7 @@ import {
   type InquiryNextStep,
 } from '../src/lib/inquiry-next-step'
 import type { RadionicaPaymentPlan } from '../src/lib/radionica-deposit'
+import type { GroupTermin } from '../src/lib/group-termin'
 
 interface InquiryConfirmationProps {
   parentName: string
@@ -15,6 +17,14 @@ interface InquiryConfirmationProps {
   cityLabel?: string
   /** Defaults to the offer-them-termini wording — the pre-dropdown behaviour. */
   nextStep?: InquiryNextStep
+  /**
+   * The termin the parent picked in the form, printed back so the mail answers
+   * "what did I sign up for, and when" on its own. Absent when nothing was
+   * booked — every radionica termin passed, the grade had no open group, or the
+   * competitive parent refused the offered slots — in which case `nextStep`
+   * carries the promise to get back to them instead.
+   */
+  termin?: GroupTermin
   /**
    * The akontacija + ostatak figures for a radionica (see
    * `radionicaPaymentPlan`). Set on radionica sign-ups with a price and on
@@ -31,6 +41,7 @@ function InquiryConfirmationEmail({
   childDateOfBirth,
   cityLabel,
   nextStep = 'TERMIN_TO_OFFER',
+  termin,
   payment,
 }: InquiryConfirmationProps) {
   return (
@@ -44,6 +55,15 @@ function InquiryConfirmationEmail({
         <Text style={emailStyles.text}>
           Odabrani grad: <strong>{cityLabel}</strong>
         </Text>
+      )}
+      {termin && (
+        <>
+          <Text style={terminHeading}>Odabrani termin</Text>
+          <GroupTerminBox termin={termin} />
+          <Text style={emailStyles.textSmall}>
+            Sačuvajte ovu poruku — u njoj je termin koji ste odabrali.
+          </Text>
+        </>
       )}
       <Hr style={emailStyles.hr} />
       {payment && (
@@ -131,6 +151,12 @@ function InquiryConfirmationEmail({
   )
 }
 
+const terminHeading = {
+  ...emailStyles.text,
+  fontWeight: '700' as const,
+  margin: '0 0 8px',
+}
+
 const napomenaHeading = {
   ...emailStyles.text,
   color: '#92400e',
@@ -182,6 +208,13 @@ InquiryConfirmationEmail.PreviewProps = {
   childDateOfBirth: '15.06.2016.',
   cityLabel: 'Šibenik',
   nextStep: 'TERMIN_CHOSEN',
+  termin: {
+    programTitle: 'Ljetna LEGO radionica',
+    groupName: 'Ljetna radionica – 1. termin',
+    schedule: '15.07.2026. – 21.07.2026. · 09:00–11:00',
+    locationName: 'Trokut inkubator',
+    locationAddress: 'Ul. Velimira Škorpika 7/a, 22000 Šibenik',
+  },
   payment: {
     deposit: '30,00',
     remainder: '120,00',

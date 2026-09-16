@@ -159,3 +159,45 @@ describe('previewEmailSchema', () => {
     expect(parsed.success).toBe(true)
   })
 })
+
+describe('SCHEDULE campaign', () => {
+  it('accepts a group selection with per-address exclusions — a row is one inbox', () => {
+    const parsed = sendEmailCampaignSchema.safeParse({
+      kind: 'SCHEDULE',
+      ...baseFilters,
+      ...content,
+      excludedParentEmails: ['obitelj@example.hr'],
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('rejects a preporuka selection — a schedule lists the groups a child is IN', () => {
+    const parsed = sendEmailCampaignSchema.safeParse({
+      kind: 'SCHEDULE',
+      sourceSchoolYear: '2025/2026',
+      recommendations: ['COMPETITION_PROGRAM'],
+      ...content,
+    })
+    expect(parsed.success).toBe(false)
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toBe('Termini se šalju odabirom grupa.')
+    }
+  })
+
+  it('rejects individually picked children — that mode is CREDENTIALS-only', () => {
+    const parsed = sendEmailCampaignSchema.safeParse({
+      kind: 'SCHEDULE',
+      sourceSchoolYear: '2025/2026',
+      sourceStudentIds: ['s1'],
+      ...content,
+    })
+    expect(parsed.success).toBe(false)
+  })
+
+  it('previews with content only, like every other kind', () => {
+    expect(previewEmailSchema.safeParse({ kind: 'SCHEDULE', ...content }).success).toBe(true)
+    expect(
+      previewRecipientsSchema.safeParse({ kind: 'SCHEDULE', ...baseFilters }).success,
+    ).toBe(true)
+  })
+})

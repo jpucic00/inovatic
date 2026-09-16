@@ -123,7 +123,7 @@ function SendProgressPanel({ result }: Readonly<{ result: StartedSend }>) {
   )
 }
 
-type Kind = 'CUSTOM' | 'REENROLLMENT' | 'EVALUATION' | 'CREDENTIALS'
+type Kind = 'CUSTOM' | 'REENROLLMENT' | 'EVALUATION' | 'CREDENTIALS' | 'SCHEDULE'
 /** STUDENTS is CREDENTIALS-only — see the validator's requireExactlyOneSelection. */
 type SelectionMode = 'GROUPS' | 'RECOMMENDATION' | 'STUDENTS'
 type GroupTree = Awaited<ReturnType<typeof getEmailGroupTree>>
@@ -165,6 +165,12 @@ const DEFAULT_CREDENTIALS_BODY = [
   'Poštovani,',
   'U nastavku se nalaze pristupni podaci Vašeg djeteta za polaznički portal. Ondje su dostupni materijali s radionica, fotografije i evaluacija.',
   'Podatke čuvajte — vrijede za tekuću školsku godinu. Za sva pitanja slobodno nam odgovorite na ovu poruku.',
+].join('\n')
+
+const DEFAULT_SCHEDULE_BODY = [
+  'Poštovani,',
+  'U nastavku se nalaze termini grupa u koje je Vaše dijete upisano u ovoj školskoj godini.',
+  'Sačuvajte ovu poruku, a za sva pitanja slobodno nam odgovorite.',
 ].join('\n')
 
 const SELECT_CLASS =
@@ -243,10 +249,12 @@ export function EmailWizard({
     setTargetGroups([])
     setTargetGroupIds([])
     setSourceStudentIds([])
-    // Neither of the per-child kinds can use a preporuka cohort (the server
-    // rejects it too): a preporuka names children, not the card or the account
-    // being sent. Both start on groups.
-    if (next === 'EVALUATION' || next === 'CREDENTIALS') setSelectionMode('GROUPS')
+    // None of the per-child kinds can use a preporuka cohort (the server
+    // rejects it too): a preporuka names children, not the card, the account
+    // or the groups being sent. All start on groups.
+    if (next === 'EVALUATION' || next === 'CREDENTIALS' || next === 'SCHEDULE') {
+      setSelectionMode('GROUPS')
+    }
     // Individual children are a CREDENTIALS-only cohort (the validator refuses
     // them elsewhere). Leaving the kind without resetting the mode left the
     // picker on screen with neither pill highlighted, since the other kinds
@@ -265,6 +273,11 @@ export function EmailWizard({
       // No child name here either — the send appends it per recipient.
       setSubject('Pristupni podaci za polaznički portal – Inovatic')
       setBodyBlocks(plainTextToBlocks(DEFAULT_CREDENTIALS_BODY))
+      setSourceYear(selectedYear)
+    } else if (next === 'SCHEDULE') {
+      // The children's names are appended per recipient here too.
+      setSubject('Termini vaših grupa – Inovatic')
+      setBodyBlocks(plainTextToBlocks(DEFAULT_SCHEDULE_BODY))
       setSourceYear(selectedYear)
     } else {
       setSubject('')
@@ -601,6 +614,8 @@ export function EmailWizard({
       input = { kind: 'EVALUATION' as const, subject, bodyText, bodyBlocks }
     } else if (kind === 'CREDENTIALS') {
       input = { kind: 'CREDENTIALS' as const, subject, bodyText, bodyBlocks }
+    } else if (kind === 'SCHEDULE') {
+      input = { kind: 'SCHEDULE' as const, subject, bodyText, bodyBlocks }
     } else {
       input = { kind: 'CUSTOM' as const, subject, bodyText, bodyBlocks }
     }
@@ -651,6 +666,9 @@ export function EmailWizard({
         // Excluded rows are child accounts here, not inboxes — a sibling on the
         // same address must survive unchecking their brother or sister.
         input = { kind: 'CREDENTIALS' as const, ...base, excludedStudentIds: [...excluded] }
+      } else if (kind === 'SCHEDULE') {
+        // Rows are inboxes again (siblings merged), so exclusion is by address.
+        input = { kind: 'SCHEDULE' as const, ...base, excludedParentEmails: [...excluded] }
       } else {
         input = { kind: 'CUSTOM' as const, ...base, excludedParentEmails: [...excluded] }
       }
@@ -725,6 +743,13 @@ export function EmailWizard({
                 Jedno dijete = jedan e-mail. Braća i sestre na istoj adresi dobivaju dvije
                 odvojene poruke, svaka samo sa svojom karticom — nijedan roditelj ne može
                 primiti evaluaciju tuđeg djeteta.
+              </p>
+            )}
+            {kind === 'SCHEDULE' && (
+              <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                Odabrane grupe određuju kome se šalje; svako dijete u poruci dobiva popis
+                <strong> svih</strong> svojih grupa u odabranoj školskoj godini. Poruka se
+                može slati više puta — npr. nakon što dijete prebacite u drugu grupu.
               </p>
             )}
           </section>
@@ -833,6 +858,8 @@ export function EmailWizard({
                   '; ispod teksta automatski slijede termini odabranih grupa i gumb za prijavu'}
                 {kind === 'EVALUATION' &&
                   '; ispod teksta automatski slijedi kartica djeteta, a njegovo se ime dodaje u predmet poruke'}
+                {kind === 'SCHEDULE' &&
+                  '; ispod teksta automatski slijede grupe svakog djeteta, a imena djece dodaju se u predmet poruke'}
                 .{' '}
                 <span className={bodyText.length > EMAIL_BODY_MAX_LENGTH ? 'text-red-600' : 'text-gray-400'}>
                   {bodyText.length}/{EMAIL_BODY_MAX_LENGTH}
@@ -874,6 +901,9 @@ export function EmailWizard({
                 if (kind === 'CREDENTIALS') {
                   return 'Jedan red = jedno dijete i njegov račun. Dvoje djece na istoj adresi dobiva dvije poruke.'
                 }
+                if (kind === 'SCHEDULE') {
+                  return 'Jedan red = jedan roditelj sa svom svojom djecom iz odabranih grupa. Radionice su uključene.'
+                }
                 return 'Roditelji polaznika odabranih grupa iz odabrane školske godine.'
               })()}
             </p>
@@ -898,10 +928,11 @@ export function EmailWizard({
             </div>
 
             {/* An evaluation is always a group's own report cards, so there is no
-                mode to pick — a preporuka cohort names children, not cards.
-                Credentials swap the preporuka mode for naming children outright:
-                a preporuka says nothing about which ACCOUNT is being sent. */}
-            {kind !== 'EVALUATION' && (
+                mode to pick — a preporuka cohort names children, not cards. The
+                same holds for a schedule mail, which lists the groups a child is
+                IN. Credentials swap the preporuka mode for naming children
+                outright: a preporuka says nothing about which ACCOUNT is sent. */}
+            {kind !== 'EVALUATION' && kind !== 'SCHEDULE' && (
               <div className="mt-4">
                 <span className="block text-sm font-medium text-gray-700 mb-1.5">
                   Način odabira

@@ -35,6 +35,12 @@ import {
   assertCredentialsBelongTo,
   type CredentialsCard,
 } from '@/lib/credentials-email-recipients'
+import {
+  assertScheduleBelongsTo,
+  buildScheduleRecipients,
+  type ScheduleCard,
+} from '@/lib/schedule-email-recipients'
+import { GROUP_TERMIN_SELECT, toGroupTermin } from '@/lib/group-termin'
 import { formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
 import { generateSimplePassword, hashPassword } from '@/lib/password'
@@ -283,6 +289,10 @@ async function resolveCohort(
       filters.sourceStudentIds ?? [],
     )
   }
+  if (kind === 'SCHEDULE') {
+    // Groups only — the validator rejects the other two modes for this kind.
+    return resolveScheduleCohort(city, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
+  }
   if (filters.recommendations?.length) {
     return resolveRecommendationCohort(city, kind, filters.sourceSchoolYear, [
       ...new Set(filters.recommendations),
@@ -492,6 +502,69 @@ async function resolveCredentialsCohort(
         // at campaign creation destroys nothing.
         needsPassword: !s.plainPassword || !s.username,
         alreadySent: s.credentialsSentAt !== null,
+      })),
+    ),
+  }
+}
+
+/**
+ * Schedule mode: every child enrolled in a selected group, merged per parent
+ * inbox (`buildScheduleRecipients`). The selection decides WHO is mailed; the
+ * mail itself lists ALL of each child's groups in the source year, not only the
+ * selected ones — a parent asking "what is my child signed up for" wants the
+ * whole answer, and the same rule already holds for the credentials card.
+ *
+ * Radionice are included (a workshop has a termin too), which is why
+ * `kindExcludesRadionice` does not list this kind.
+ */
+async function resolveScheduleCohort(
+  city: City,
+  sourceSchoolYear: string,
+  sourceGroupIds: string[],
+): Promise<ResolvedCohort> {
+  const validated = await validateSourceGroups(city, 'SCHEDULE', sourceSchoolYear, sourceGroupIds)
+  if (!validated.ok) return validated
+
+  const enrollments = await db.enrollment.findMany({
+    where: {
+      schoolYear: sourceSchoolYear,
+      scheduledGroupId: { in: validated.ids },
+      user: { role: 'STUDENT', deletedAt: null },
+    },
+    select: { userId: true },
+  })
+  const studentIds = [...new Set(enrollments.map((e) => e.userId))]
+  if (studentIds.length === 0) return { ok: true, recipients: [], skipped: [] }
+
+  const students = await db.user.findMany({
+    where: { id: { in: studentIds }, role: 'STUDENT', deletedAt: null, city },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      parentEmail: true,
+      enrollments: {
+        where: { schoolYear: sourceSchoolYear },
+        select: {
+          scheduledGroup: { select: { name: true, course: { select: { title: true } } } },
+        },
+      },
+    },
+  })
+
+  return {
+    ok: true,
+    ...buildScheduleRecipients(
+      students.map((s) => ({
+        studentId: s.id,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        parentEmail: s.parentEmail,
+        groupLabel: s.enrollments
+          .map((e) =>
+            [e.scheduledGroup.name, e.scheduledGroup.course.title].filter(Boolean).join(' · '),
+          )
+          .join(' | '),
       })),
     ),
   }
@@ -886,6 +959,37 @@ const SAMPLE_CREDENTIALS_CARD: CredentialsCard = {
   ],
 }
 
+/**
+ * Stand-in family for the step-1 layout preview — two children on purpose, so
+ * the admin sees what the merged sibling mail looks like before sending one.
+ */
+const SAMPLE_SCHEDULE_CARDS: ScheduleCard[] = [
+  {
+    childName: 'Ana Anić (primjer)',
+    groups: [
+      {
+        programTitle: 'Svijet LEGO robotike 2',
+        groupName: 'SLR 2 – utorkom',
+        schedule: 'Utorak · 17:00–18:30',
+        locationName: 'Velebitska 32',
+        locationAddress: 'Velebitska 32, 21000 Split',
+      },
+    ],
+  },
+  {
+    childName: 'Marko Anić (primjer)',
+    groups: [
+      {
+        programTitle: 'Uvod u Svijet LEGO robotike',
+        groupName: null,
+        schedule: 'Četvrtak · 17:00–18:00',
+        locationName: 'Velebitska 32',
+        locationAddress: 'Velebitska 32, 21000 Split',
+      },
+    ],
+  },
+]
+
 /** Renders the exact email (fixed sample parent name) for the step-1 preview iframe. */
 export async function previewEmailHtml(input: PreviewEmailInput): Promise<PreviewEmailHtmlResult> {
   const { city } = await requireAdminCtx()
@@ -902,6 +1006,7 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
       parsed.data.kind === 'EVALUATION' ? [SAMPLE_EVALUATION_CARD] : undefined
     const credentials =
       parsed.data.kind === 'CREDENTIALS' ? SAMPLE_CREDENTIALS_CARD : undefined
+    const schedules = parsed.data.kind === 'SCHEDULE' ? SAMPLE_SCHEDULE_CARDS : undefined
     if (parsed.data.kind === 'REENROLLMENT') {
       const targetYear = await getSelectedSchoolYear()
       const built = await buildTargetOptions(
@@ -923,6 +1028,8 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
       previewSubject = `${parsed.data.subject} – ${SAMPLE_EVALUATION_CARD.childName}`
     } else if (parsed.data.kind === 'CREDENTIALS') {
       previewSubject = `${parsed.data.subject} – ${SAMPLE_CREDENTIALS_CARD.childName}`
+    } else if (parsed.data.kind === 'SCHEDULE') {
+      previewSubject = `${parsed.data.subject} – ${SAMPLE_SCHEDULE_CARDS.map((c) => c.childName).join(', ')}`
     }
 
     const body = resolveEmailBody(parsed.data)
@@ -936,6 +1043,7 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
       signupPath,
       cards,
       credentials,
+      schedules,
     })
     return { success: true, html }
   } catch (err) {
@@ -1462,6 +1570,71 @@ async function buildCredentialsForRecipient(
   }
 }
 
+/** Everything the schedule guard reads off a student. */
+const SCHEDULE_OWNER_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  parentEmail: true,
+  city: true,
+  deletedAt: true,
+} as const
+
+type BuiltSchedules =
+  | { ok: true; schedules: ScheduleCard[]; childNames: string[] }
+  | { ok: false; reason: string }
+
+/**
+ * Load the children one recipient row covers, prove every one of them still
+ * belongs to that address (`assertScheduleBelongsTo`), and build their cards.
+ *
+ * Same discipline as `buildCardsForRecipient` and `buildCredentialsForRecipient`:
+ * the row's `studentIds` were written when the cohort was resolved, so ownership
+ * is re-derived from the students' CURRENT `parentEmail`, and the whole row
+ * fails closed on any disagreement. Called once per recipient from inside the
+ * send loop — never hoisted.
+ *
+ * The groups are read fresh here rather than snapshotted at campaign creation:
+ * this mail exists to tell a parent where their child is NOW, so a child moved
+ * to another group between the two runs of a resumed campaign must be mailed
+ * the new group, not the old one.
+ */
+async function buildSchedulesForRecipient(
+  recipient: { parentEmail: string; studentIds: string[] },
+  city: City,
+  sourceSchoolYear: string,
+): Promise<BuiltSchedules> {
+  const rows = await db.user.findMany({
+    where: { id: { in: recipient.studentIds }, role: 'STUDENT' },
+    select: SCHEDULE_OWNER_SELECT,
+    orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+  })
+
+  const verdict = assertScheduleBelongsTo(
+    { parentEmail: recipient.parentEmail, city, studentIds: recipient.studentIds },
+    rows,
+  )
+  if (!verdict.ok) return { ok: false, reason: verdict.reason }
+
+  const enrollments = await db.enrollment.findMany({
+    where: { userId: { in: recipient.studentIds }, schoolYear: sourceSchoolYear },
+    select: { userId: true, scheduledGroup: { select: GROUP_TERMIN_SELECT } },
+    orderBy: { createdAt: 'asc' },
+  })
+  const groupsByStudent = new Map<string, ScheduleCard['groups']>()
+  for (const e of enrollments) {
+    const list = groupsByStudent.get(e.userId) ?? []
+    list.push(toGroupTermin(e.scheduledGroup))
+    groupsByStudent.set(e.userId, list)
+  }
+
+  const schedules = rows.map((student) => ({
+    childName: `${student.firstName} ${student.lastName}`.trim(),
+    groups: groupsByStudent.get(student.id) ?? [],
+  }))
+  return { ok: true, schedules, childNames: schedules.map((c) => c.childName) }
+}
+
 /** One PENDING row as the send loop reads it. */
 type PendingRecipient = {
   id: string
@@ -1483,6 +1656,7 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
   // SendJob.
   let cards: EvaluationCard[] | undefined
   let credentials: CredentialsCard | undefined
+  let schedules: ScheduleCard[] | undefined
   let credentialedStudentId: string | undefined
   let subject = job.subject
   if (job.kind === 'EVALUATION') {
@@ -1512,6 +1686,18 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
     credentials = built.card
     credentialedStudentId = built.studentId
     subject = `${job.subject} – ${built.childName}`
+  } else if (job.kind === 'SCHEDULE') {
+    const built = await buildSchedulesForRecipient(recipient, job.city, job.sourceSchoolYear)
+    if (!built.ok) {
+      // Fail closed: a child that can no longer be proven to belong to this
+      // address is not listed, and neither is anything else in the mail.
+      await markRecipientFailed(claimId, job.campaignId, built.reason)
+      return
+    }
+    schedules = built.schedules
+    // Every child on the address, so a parent sees from the inbox list who the
+    // mail is about — siblings are merged here, unlike the two kinds above.
+    subject = `${job.subject} – ${built.childNames.join(', ')}`
   }
 
   // Claim the parent BEFORE sending. Two protections, for two different
@@ -1559,6 +1745,7 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
       signupPath: job.signupPath,
       cards,
       credentials,
+      schedules,
     })
     // "This parent holds a password that currently works." Stamped only after a
     // non-throwing send, and cleared again by resetStudentPassword — so it never
@@ -1870,14 +2057,15 @@ export async function getCampaignEmailHtml(campaignId: string): Promise<PreviewE
 }
 
 /**
- * The e-mail ONE recipient row received — EVALUATION only, where every row
- * carries a different report card.
+ * The e-mail ONE recipient row received — EVALUATION and SCHEDULE, the kinds
+ * where every row carries different content.
  *
- * Loads the card through {@link buildCardsForRecipient}, so `assertCardsBelongTo`
- * remains the only path by which a card is ever read for an e-mail. If it now
- * refuses (the card was deleted, or the parent's address was corrected after the
- * send), the refusal is the answer — it is exactly what an admin looking back at
- * a FAILED row needs to read.
+ * Loads it through {@link buildCardsForRecipient} / {@link buildSchedulesForRecipient},
+ * so the ownership guards remain the only path by which per-child content is
+ * ever read for an e-mail. If one now refuses (the card was deleted, or the
+ * parent's address was corrected after the send), the refusal is the answer —
+ * it is exactly what an admin looking back at a FAILED row needs to read. A
+ * SCHEDULE view reads the groups as they are NOW, same as a resumed send would.
  */
 export async function getRecipientEmailHtml(recipientId: string): Promise<PreviewEmailHtmlResult> {
   const { city } = await requireAdminCtx()
@@ -1889,24 +2077,47 @@ export async function getRecipientEmailHtml(recipientId: string): Promise<Previe
     select: {
       parentEmail: true,
       assessmentIds: true,
-      campaign: { select: { kind: true, subject: true, bodyText: true, bodyBlocks: true } },
+      studentIds: true,
+      campaign: {
+        select: {
+          kind: true,
+          subject: true,
+          bodyText: true,
+          bodyBlocks: true,
+          sourceSchoolYear: true,
+        },
+      },
     },
   })
   if (!recipient) notFound()
-  if (recipient.campaign.kind !== 'EVALUATION') return { success: false, error: INVALID_DATA }
 
   try {
-    const built = await buildCardsForRecipient(recipient, city)
-    if (!built.ok) return { success: false, error: built.reason }
-
-    const html = await renderBulkMessageHtml({
-      // Rebuilt exactly as the send composed it, child's name included.
-      subject: `${recipient.campaign.subject} – ${built.childName}`,
-      bodyText: recipient.campaign.bodyText,
-      bodyBlocks: parseRichBlocks(recipient.campaign.bodyBlocks),
-      cards: built.cards,
-    })
-    return { success: true, html }
+    const { campaign } = recipient
+    const bodyBlocks = parseRichBlocks(campaign.bodyBlocks)
+    if (campaign.kind === 'EVALUATION') {
+      const built = await buildCardsForRecipient(recipient, city)
+      if (!built.ok) return { success: false, error: built.reason }
+      const html = await renderBulkMessageHtml({
+        // Rebuilt exactly as the send composed it, child's name included.
+        subject: `${campaign.subject} – ${built.childName}`,
+        bodyText: campaign.bodyText,
+        bodyBlocks,
+        cards: built.cards,
+      })
+      return { success: true, html }
+    }
+    if (campaign.kind === 'SCHEDULE') {
+      const built = await buildSchedulesForRecipient(recipient, city, campaign.sourceSchoolYear)
+      if (!built.ok) return { success: false, error: built.reason }
+      const html = await renderBulkMessageHtml({
+        subject: `${campaign.subject} – ${built.childNames.join(', ')}`,
+        bodyText: campaign.bodyText,
+        bodyBlocks,
+        schedules: built.schedules,
+      })
+      return { success: true, html }
+    }
+    return { success: false, error: INVALID_DATA }
   } catch (err) {
     console.error('getRecipientEmailHtml failed:', err)
     return { success: false, error: 'Greška pri izradi pregleda.' }

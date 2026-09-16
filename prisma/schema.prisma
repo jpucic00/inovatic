@@ -141,6 +141,14 @@ enum EmailCampaignKind {
   /// Since 2026-08-17 this is the ONLY way credentials leave the building —
   /// neither inquiry acceptance nor manual student creation mails anything.
   CREDENTIALS
+  /// "Which group is my child in, and when?" — every child of the address with
+  /// their groups in the source year, each as a program/day/time/venue card.
+  /// Unlike EVALUATION and CREDENTIALS a row is one parent INBOX with siblings
+  /// merged (owner decision, 2026-09-16): a termin is not a secret, it is the
+  /// same information the public feed shows, and a parent asking "when do my
+  /// kids come" wants one answer. Repeatable — no sentKey — so it can be
+  /// re-sent after a child is moved to another group.
+  SCHEDULE
 }
 
 enum EmailRecipientStatus {
@@ -936,14 +944,17 @@ model EmailCampaignRecipient {
   /// each send (`assertCardsBelongTo`), so a card cannot reach another inbox
   /// even if cohort resolution were wrong. Empty for CUSTOM/REENROLLMENT.
   assessmentIds String[] @default([])
-  /// CREDENTIALS only: the child account(s) this row is mailed — always exactly
-  /// one, since a CREDENTIALS row is one child. A deliberately separate column
-  /// from `assessmentIds` rather than an overload of it: the two are read by
-  /// different guards, and conflating them would let an evaluation guard pass a
-  /// credentials row. Re-verified against the student's current parentEmail
-  /// immediately before each send (`assertCredentialsBelongTo`), which fails
-  /// closed, so a password cannot reach another inbox even if cohort resolution
-  /// were wrong. Empty for every other kind.
+  /// CREDENTIALS: the child account this row is mailed — always exactly one,
+  /// since a CREDENTIALS row is one child. SCHEDULE: every child on this
+  /// address in the cohort (one or more), whose groups the mail lists. A
+  /// deliberately separate column from `assessmentIds` rather than an overload
+  /// of it: the two are read by different guards, and conflating them would let
+  /// an evaluation guard pass a credentials row. Re-verified against the
+  /// students' current parentEmail immediately before each send
+  /// (`assertCredentialsBelongTo` / `assertScheduleBelongsTo`), which fail
+  /// closed, so neither a password nor another family's child can reach the
+  /// wrong inbox even if cohort resolution were wrong. Empty for CUSTOM,
+  /// REENROLLMENT and EVALUATION.
   studentIds String[] @default([])
   /// Why a FAILED send failed, or why a SKIPPED child had no usable address.
   failureReason String?

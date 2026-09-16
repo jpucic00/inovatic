@@ -217,3 +217,79 @@ describe('confirmation says what actually happens next', () => {
     expect(confirmationSent().nextStep).toBe('TERMIN_TO_ARRANGE')
   })
 })
+
+/**
+ * The termin the parent picked is printed back to them. Resolved from the
+ * GROUP (the one thing the client cannot forge into a different program), and
+ * from the very lookup the staff notification's "Željeni termin" row uses.
+ */
+describe('confirmation carries the booked termin', () => {
+  it('names the program, group, weekday, time and venue with its address', async () => {
+    const course = await fx.course({ kind: 'STANDARD', title: 'Svijet LEGO robotike 2' })
+    const location = await fx.location({
+      city: 'SPLIT',
+      name: 'Velebitska 32',
+      address: 'Velebitska 32, 21000 Split',
+    })
+    const group = await fx.group({
+      courseId: course.id,
+      locationId: location.id,
+      city: 'SPLIT',
+      schoolYear: YEAR,
+      name: 'SLR 2 – utorkom',
+      dayOfWeek: 'Utorak',
+      startTime: '17:00',
+      endTime: '18:30',
+    })
+
+    expect(
+      await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id })),
+    ).toMatchObject({ success: true })
+    expect(confirmationSent().termin).toEqual({
+      programTitle: 'Svijet LEGO robotike 2',
+      groupName: 'SLR 2 – utorkom',
+      schedule: 'Utorak · 17:00–18:30',
+      locationName: 'Velebitska 32',
+      locationAddress: 'Velebitska 32, 21000 Split',
+    })
+  })
+
+  it('renders a radionica termin as its date range', async () => {
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: YEAR, price: 150 })
+    const group = await fx.group({
+      courseId: course.id,
+      city: 'SPLIT',
+      schoolYear: YEAR,
+      dateStart: '2099-07-15',
+      dateEnd: '2099-07-21',
+      startTime: '09:00',
+      endTime: '11:00',
+    })
+
+    await submitInquiry(inquiryFor({ courseId: course.id, scheduledGroupId: group.id }))
+    expect(confirmationSent().termin?.schedule).toBe('15.07.2099. – 21.07.2099. · 09:00–11:00')
+  })
+
+  it('carries none when no termin was booked', async () => {
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: YEAR, price: 150 })
+    await fx.group({
+      courseId: course.id,
+      city: 'SPLIT',
+      schoolYear: YEAR,
+      dateStart: relativeDateKey(-30),
+      dateEnd: relativeDateKey(-25),
+    })
+
+    await submitInquiry(inquiryFor({ courseId: course.id }))
+    expect(confirmationSent().termin).toBeUndefined()
+  })
+
+  it('carries none when the competitive parent refused the offered termini', async () => {
+    // "Ne odgovara mi predloženi termin" is an answer, not a group — there is
+    // nothing to print in a box, and the closing paragraph says what happens.
+    const course = await fx.course({ kind: 'COMPETITION' })
+
+    await submitInquiry(inquiryFor({ courseId: course.id, noSuitableTermin: true }))
+    expect(confirmationSent().termin).toBeUndefined()
+  })
+})

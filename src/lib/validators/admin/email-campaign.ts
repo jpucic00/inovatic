@@ -85,6 +85,14 @@ function requireExactlyOneSelection(
       message: 'Pristupni podaci šalju se odabirom grupa ili pojedinačne djece.',
     })
   }
+  // A schedule mail lists the groups a child is IN — a preporuka says which
+  // program a child was recommended for next, which is a different question.
+  if (value.kind === 'SCHEDULE' && hasRecommendations) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Termini se šalju odabirom grupa.',
+    })
+  }
   // The individual-children mode exists for CREDENTIALS only. Every other
   // resolver keys its content off a group or a report card and has nothing to
   // build from a bare student id.
@@ -201,6 +209,18 @@ const credentialsContent = {
   bodyBlocks: bodyBlocksField,
 }
 
+/**
+ * The schedule send carries no target program and no CTA — the content is each
+ * child's own groups for the source year, resolved per recipient at send time.
+ * Selected by groups only (the validator rejects the other two modes above).
+ */
+const scheduleContent = {
+  kind: z.literal('SCHEDULE'),
+  subject: subjectField,
+  bodyText: bodyTextField,
+  bodyBlocks: bodyBlocksField,
+}
+
 const reenrollmentContent = {
   kind: z.literal('REENROLLMENT'),
   subject: subjectField,
@@ -235,6 +255,13 @@ export const sendEmailCampaignSchema = z
       ...selectionFields,
       excludedStudentIds: excludedStudentIdsField,
     }),
+    // A SCHEDULE row is one inbox (siblings merged), so like CUSTOM it is
+    // excluded by address.
+    z.object({
+      ...scheduleContent,
+      ...selectionFields,
+      excludedParentEmails: excludedParentEmailsField,
+    }),
   ])
   .superRefine(requireExactlyOneSelection)
   .superRefine(validateBody)
@@ -243,7 +270,7 @@ export const sendEmailCampaignSchema = z
 // kind compute its "već poslano" skip-set alongside the cohort.
 export const previewRecipientsSchema = z
   .object({
-    kind: z.enum(['CUSTOM', 'REENROLLMENT', 'EVALUATION', 'CREDENTIALS']),
+    kind: z.enum(['CUSTOM', 'REENROLLMENT', 'EVALUATION', 'CREDENTIALS', 'SCHEDULE']),
     ...selectionFields,
     targetCourseId: z.string().min(1).optional(),
   })
@@ -256,6 +283,7 @@ export const previewEmailSchema = z
     z.object(reenrollmentContent),
     z.object(evaluationContent),
     z.object(credentialsContent),
+    z.object(scheduleContent),
   ])
   .superRefine(validateBody)
 

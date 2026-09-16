@@ -43,8 +43,8 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
   // exists for. Five polls (~15 s) without a single sent/failed increment while
   // rows are still owed means nothing is running — offer the resume.
   const [stalled, setStalled] = useState(false)
-  // Per-recipient preview — EVALUATION only, where every row carries a
-  // different report card and the campaign-level preview cannot show it.
+  // Per-recipient preview — EVALUATION and SCHEDULE, where every row carries
+  // different content and the campaign-level preview cannot show it.
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewFor, setPreviewFor] = useState<string | null>(null)
@@ -83,7 +83,7 @@ export function CampaignRecipients({ campaign }: Readonly<{ campaign: CampaignDe
   )
   const pendingCount = rows.filter((r) => r.status === 'PENDING').length
 
-  const showPreviewColumn = campaign.kind === 'EVALUATION'
+  const showPreviewColumn = campaign.kind === 'EVALUATION' || campaign.kind === 'SCHEDULE'
 
   function handlePreview(row: CampaignDetail['recipients'][number]) {
     setPreviewHtml(null)

@@ -32,6 +32,14 @@ future single-child send but currently has no caller; do not wire it back into a
 creation path, because it has none of the campaign's per-child ownership check
 (`assertCredentialsBelongTo`). Note `knip` cannot flag it — two unit tests reference it.
 
+**A booked termin is printed back to the parent (2026-09-16).** `sendInquiryConfirmationEmail`
+takes an optional `termin` (`GroupTermin` from `src/lib/group-termin.ts` — program, group, day
+and time or a radionica's date range, venue with address) and renders it as the "Odabrani
+termin" box via `emails/components/group-termin-box.tsx`. `submitInquiry` resolves it once and
+feeds the same object to the staff notification's "Željeni termin" row, so the two mails can
+never name different groups. The same box is what the SCHEDULE campaign's per-child cards
+(`emails/components/schedule-card.tsx`, `schedules` on `sendBulkMessageEmail`) are built from.
+
 Sender identity **follows the city**: a sender that takes `city` passes it to
 `sendTransactionalEmail`, which uses `cityInboxEmail(city)` as both the From address and the
 default reply-to — `Inovatic <prijave@udruga-inovatic.hr>` for Split, `Inovatic

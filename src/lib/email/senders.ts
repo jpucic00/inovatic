@@ -4,7 +4,9 @@ import type { City } from '@prisma/client'
 import type { EvaluationCard } from '@/lib/evaluation-email-cards'
 import type { ReleaseNote } from '@/lib/releases'
 import type { CredentialsCard } from '@/lib/credentials-email-recipients'
+import type { ScheduleCard } from '@/lib/schedule-email-recipients'
 import type { EmailRichBlock } from '@/lib/email-rich-text'
+import type { GroupTermin } from '@/lib/group-termin'
 import { ASSOCIATION_EMAIL, cityInboxEmail, sendTransactionalEmail } from './client'
 import type { InquiryNextStep } from '@/lib/inquiry-next-step'
 import type { RadionicaPaymentPlan } from '@/lib/radionica-deposit'
@@ -56,6 +58,12 @@ export function sendInquiryConfirmationEmail(params: {
   /** Which "what happens next" paragraph closes the body. */
   nextStep?: InquiryNextStep
   /**
+   * The group the parent booked, printed back to them as the "Odabrani termin"
+   * box. Absent when nothing was booked — the closing paragraph then promises
+   * termini instead.
+   */
+  termin?: GroupTermin
+  /**
    * Already-formatted akontacija + ostatak figures, which add the payment
    * instruction to the body. Radionica sign-ups only — the caller decides,
    * since only it knows which program the inquiry landed on.
@@ -74,6 +82,7 @@ export function sendInquiryConfirmationEmail(params: {
       // body and the office in the From line are the same fact.
       cityLabel: CITY_LABELS[params.city],
       nextStep: params.nextStep,
+      termin: params.termin,
       payment: params.payment,
     }),
   })
@@ -377,6 +386,12 @@ type BulkMessageParams = {
    * per-recipient content, so it never lives on the campaign.
    */
   credentials?: CredentialsCard
+  /**
+   * One card per child on this address with that child's groups — SCHEDULE
+   * campaigns only. Per-recipient content like `cards` and `credentials`, so
+   * it is passed per call; unlike them it holds every child of the inbox.
+   */
+  schedules?: ScheduleCard[]
 }
 
 function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>) {
@@ -387,6 +402,7 @@ function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>)
     options: params.options,
     cards: params.cards,
     credentials: params.credentials,
+    schedules: params.schedules,
     signupUrl: params.signupPath ? `${publicBaseUrl()}${params.signupPath}` : undefined,
   })
 }

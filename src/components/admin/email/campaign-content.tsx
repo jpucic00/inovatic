@@ -21,11 +21,12 @@ export function CampaignContent({
   const [open, setOpen] = useState(false)
   const [html, setHtml] = useState<string | null>(null)
 
-  // The two per-child kinds resolve their content per recipient, so a
+  // The per-child kinds resolve their content per recipient, so a
   // campaign-level preview genuinely cannot show it — say so, or the preview
   // reads as a message that lost its card.
   const isEvaluation = kind === 'EVALUATION'
   const isCredentials = kind === 'CREDENTIALS'
+  const isSchedule = kind === 'SCHEDULE'
 
   function handlePreview() {
     setHtml(null)
@@ -78,6 +79,12 @@ export function CampaignContent({
           jedno dijete i dostupni su na profilu učenika.
         </p>
       )}
+      {isSchedule && (
+        <p className="mt-3 text-xs text-gray-500">
+          Pregled prikazuje poruku bez termina — grupe svakog djeteta otvaraju se iz tablice
+          primatelja, onako kako su u trenutku otvaranja.
+        </p>
+      )}
 
       <EmailPreviewDialog
         open={open}
@@ -89,6 +96,9 @@ export function CampaignContent({
           }
           if (isCredentials) {
             return 'Poruka s primjerom pristupnih podataka — svako je dijete primilo svoje.'
+          }
+          if (isSchedule) {
+            return 'Poruka bez termina — grupe djece otvaraju se po primatelju.'
           }
           return 'Ovako je poruka izgledala roditelju.'
         })()}

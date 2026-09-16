@@ -32,7 +32,7 @@ import {
   assertGroupHasAvailableSpot,
   runWithGroupCapacityGuard,
 } from '@/lib/group-capacity'
-import { formatGroupSchedule } from '@/lib/format'
+import { GROUP_TERMIN_SELECT, toGroupTermin, type GroupTermin } from '@/lib/group-termin'
 import { computeSchoolYear } from '@/lib/school-year'
 import { GRADE_LABELS, NO_SUITABLE_TERMIN_LABEL, isHighSchoolGrade } from '@/lib/inquiry-status'
 import { inquiryNextStep, type InquiryNextStep } from '@/lib/inquiry-next-step'
@@ -96,44 +96,38 @@ async function loadProgramsForCheck(
 }
 
 /**
- * What the staff notification prints in its "Željeni termin" row — the same two
- * answers `/admin/upiti/[id]` shows there. Undefined when nothing was bookable,
- * which is itself the useful signal: this parent still needs termini offered.
+ * The termin the parent booked, as both outgoing mails read it: the
+ * confirmation prints it as an "Odabrani termin" box (program, group, day and
+ * time, venue with address) and the staff notification condenses it into its
+ * "Željeni termin" row. One lookup, so the two can never describe a different
+ * group. Undefined when no group was booked.
  *
  * Read after the transaction commits, so it costs a query only when a termin
  * was actually chosen and can never hold the capacity guard open.
  */
-async function resolveTerminLabel(
+async function resolveBookedTermin(
   scheduledGroupId: string | undefined,
-  noSuitableTermin: boolean | undefined,
-): Promise<string | undefined> {
-  if (noSuitableTermin) return NO_SUITABLE_TERMIN_LABEL
+): Promise<GroupTermin | undefined> {
   if (!scheduledGroupId) return undefined
   const group = await db.scheduledGroup.findUnique({
     where: { id: scheduledGroupId },
-    select: {
-      name: true,
-      dateStart: true,
-      dateEnd: true,
-      dayOfWeek: true,
-      startTime: true,
-      endTime: true,
-      course: { select: { kind: true } },
-      location: { select: { name: true } },
-    },
+    select: GROUP_TERMIN_SELECT,
   })
-  if (!group) return undefined
-  const schedule = formatGroupSchedule({
-    // A radionica runs a closed date range; everything else runs weekly. Same
-    // discriminator the public and admin group lines use.
-    dateRange: isRadionica(group.course.kind),
-    dayOfWeek: group.dayOfWeek,
-    dateStart: group.dateStart,
-    dateEnd: group.dateEnd,
-    startTime: group.startTime,
-    endTime: group.endTime,
-  })
-  return [group.name, schedule, group.location.name].filter(Boolean).join(' · ')
+  return group ? toGroupTermin(group) : undefined
+}
+
+/**
+ * What the staff notification prints in its "Željeni termin" row — the same two
+ * answers `/admin/upiti/[id]` shows there. Undefined when nothing was bookable,
+ * which is itself the useful signal: this parent still needs termini offered.
+ */
+function terminLabelFor(
+  termin: GroupTermin | undefined,
+  noSuitableTermin: boolean | undefined,
+): string | undefined {
+  if (noSuitableTermin) return NO_SUITABLE_TERMIN_LABEL
+  if (!termin) return undefined
+  return [termin.groupName, termin.schedule, termin.locationName].filter(Boolean).join(' · ')
 }
 
 /**
@@ -461,6 +455,11 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       ? radionicaPaymentPlan(targetCourse.price)
       : null
 
+  // Resolved once for both mails below: the parent's confirmation shows the
+  // termin they picked, which is exactly what the staff inbox is told they
+  // picked — the two must never name different groups.
+  const termin = await resolveBookedTermin(scheduledGroupId)
+
   try {
     await sendInquiryConfirmationEmail({
       to: parentEmail,
@@ -469,6 +468,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       childName: `${childFirstName} ${childLastName}`,
       childDateOfBirth: isoToCroatianDate(childDateOfBirth),
       nextStep,
+      termin,
       payment: payment ?? undefined,
     })
   } catch (err) {
@@ -491,7 +491,7 @@ export async function submitInquiry(data: InquiryFormData): Promise<InquiryActio
       childSchool: childSchool || undefined,
       gradeLabel: GRADE_LABELS[grade],
       programName: targetCourse?.title,
-      terminLabel: await resolveTerminLabel(scheduledGroupId, noSuitableTermin),
+      terminLabel: terminLabelFor(termin, noSuitableTermin),
       // Resolved here, like every other label in this payload, so the template
       // stays free of program logic. `storedPaymentOption` rather than the raw
       // answer: the inbox must show what was actually filed, never a value the

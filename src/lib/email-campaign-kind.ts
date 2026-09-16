@@ -38,6 +38,13 @@ export const EMAIL_CAMPAIGN_KINDS: Record<
     description:
       'Korisničko ime i lozinka za portal. Jedan e-mail po djetetu — dvoje djece na istoj adresi dobiva dvije poruke, jer svako ima svoje podatke.',
   },
+  SCHEDULE: {
+    label: 'Slanje rasporeda',
+    badgeLabel: 'Raspored',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    description:
+      'Podsjetnik u koje je grupe dijete upisano — program, dan, vrijeme i lokacija. Jedan e-mail po roditelju: dvoje djece na istoj adresi dolazi u jednoj poruci.',
+  },
 }
 
 /** Ordered for the composer's kind toggle. */
@@ -46,4 +53,5 @@ export const EMAIL_CAMPAIGN_KIND_ORDER: readonly EmailCampaignKind[] = [
   'REENROLLMENT',
   'EVALUATION',
   'CREDENTIALS',
+  'SCHEDULE',
 ]

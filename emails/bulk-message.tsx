@@ -2,11 +2,13 @@ import { Hr, Link, Section, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
 import { EvaluationCardBlock } from './components/evaluation-card'
 import { CredentialsCardBlock } from './components/credentials-card'
+import { ScheduleCardBlock } from './components/schedule-card'
 import { RichTextBody } from './components/rich-text'
 import type { GroupOption } from './schedule-options'
 import type { EmailRichBlock } from '../src/lib/email-rich-text'
 import type { EvaluationCard } from '../src/lib/evaluation-email-cards'
 import type { CredentialsCard } from '../src/lib/credentials-email-recipients'
+import type { ScheduleCard } from '../src/lib/schedule-email-recipients'
 
 interface BulkMessageProps {
   /** Admin-authored plain text; newline-separated paragraphs. Sent exactly as
@@ -42,6 +44,12 @@ interface BulkMessageProps {
    * different logins, so merging would put someone else's account in the mail.
    */
   credentials?: CredentialsCard
+  /**
+   * When present, renders one card per child with that child's groups — the
+   * SCHEDULE kind. Unlike `cards` and `credentials` this legitimately holds
+   * several: siblings on one address are mailed together, by design.
+   */
+  schedules?: ScheduleCard[]
   /** Admin-authored subject — reused as the inbox preview line. */
   subject: string
 }
@@ -49,7 +57,8 @@ interface BulkMessageProps {
 /**
  * One template for every /admin/email campaign kind: a CUSTOM send passes only
  * bodyText; the REENROLLMENT invitation adds `options` + `signupUrl`; the
- * EVALUATION send adds `cards`.
+ * EVALUATION send adds `cards`; CREDENTIALS adds `credentials`; SCHEDULE adds
+ * `schedules`.
  */
 function BulkMessageEmail({
   bodyText,
@@ -58,6 +67,7 @@ function BulkMessageEmail({
   signupUrl,
   cards,
   credentials,
+  schedules,
   subject,
 }: BulkMessageProps) {
   const paragraphs = bodyText
@@ -120,6 +130,14 @@ function BulkMessageEmail({
             </Link>
             . Lozinku možete zatražiti ponovno u bilo kojem trenutku — javite nam se.
           </Text>
+        </>
+      )}
+      {schedules && schedules.length > 0 && (
+        <>
+          <Hr style={emailStyles.hr} />
+          {schedules.map((card, i) => (
+            <ScheduleCardBlock key={i} card={card} />
+          ))}
         </>
       )}
       {signupUrl && (
@@ -234,6 +252,32 @@ BulkMessageEmail.PreviewProps = {
     },
   ],
   signupUrl: 'https://udruga-inovatic.hr/prijava',
+  schedules: [
+    {
+      childName: 'Ana Anić',
+      groups: [
+        {
+          programTitle: 'Svijet LEGO robotike 2',
+          groupName: 'SLR 2 – utorkom',
+          schedule: 'Utorak · 17:00–18:30',
+          locationName: 'Velebitska 32',
+          locationAddress: 'Velebitska 32, 21000 Split',
+        },
+      ],
+    },
+    {
+      childName: 'Marko Anić',
+      groups: [
+        {
+          programTitle: 'Uvod u Svijet LEGO robotike',
+          groupName: null,
+          schedule: 'Četvrtak · 17:00–18:00',
+          locationName: 'OŠ Meje',
+          locationAddress: 'Prilaz braće Kaliterna 10, 21000 Split',
+        },
+      ],
+    },
+  ],
   cards: [
     {
       childName: 'Ana Anić',
