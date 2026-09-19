@@ -228,6 +228,30 @@ describe('getActivePrograms — spots reaching the public feed', () => {
     expect(row?.isFull).toBe(false)
   })
 
+  it('carries the venue the public schedule prints', async () => {
+    const course = await scope.course({ kind: 'STANDARD' })
+    await openWindow(course.id, YEAR)
+    await scheduleModule(course.id, [
+      { schoolYear: YEAR, startDate: daysFromNow(14), endDate: daysFromNow(60) },
+    ])
+    const venue = await scope.location({
+      name: 'Trokut inkubator',
+      address: 'Ul. Velimira Škorpika 7/a, 22000 Šibenik',
+      city: 'SPLIT',
+    })
+    const group = await scope.group({
+      courseId: course.id,
+      schoolYear: YEAR,
+      city: 'SPLIT',
+      locationId: venue.id,
+    })
+
+    expect(await feedGroup(course.id, group.id)).toMatchObject({
+      locationName: 'Trokut inkubator',
+      locationAddress: 'Ul. Velimira Škorpika 7/a, 22000 Šibenik',
+    })
+  })
+
   it('reports a saturated termin as full rather than hiding it', async () => {
     const course = await scope.course({ kind: 'STANDARD' })
     await openWindow(course.id, YEAR)

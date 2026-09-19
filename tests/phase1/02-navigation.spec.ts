@@ -25,7 +25,7 @@ test.describe('Navigation — Main menu links to all public sections', () => {
 
     // Includes the "Lokacije" parent plus its dropdown children (Split / Šibenik),
     // which render in the DOM even before hover (opacity-based reveal).
-    const expectedRoutes = ['/programi', '/o-nama', '/novosti', '/lokacije', '/lokacije/split', '/lokacije/sibenik', '/prijava']
+    const expectedRoutes = ['/programi', '/raspored', '/o-nama', '/novosti', '/lokacije', '/lokacije/split', '/lokacije/sibenik', '/prijava']
     await test.step(`Verify all expected routes are present: ${expectedRoutes.join(', ')}`, async () => {
       for (const route of expectedRoutes) {
         const found = hrefs.some(h => h.includes(route))

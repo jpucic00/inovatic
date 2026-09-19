@@ -19,6 +19,7 @@ import {
 } from '@/lib/inquiry-status'
 import { programsForSelection, type CourseGradeRules } from '@/lib/inquiry-availability'
 import { formatGroupSchedule } from '@/lib/format'
+import { formatAvailableSpots } from '@/lib/available-spots'
 import { FieldError } from './FieldError'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
 import { PAYMENT_OPTION_LABELS, PAYMENT_OPTION_VALUES } from '@/lib/payment-option'
@@ -74,11 +75,7 @@ function formatGroupLabel(g: ActiveProgram['groups'][number], kind: ProgramKind)
     endTime: g.endTime,
   })
   if (schedule) parts.push(schedule)
-  if (g.isFull) {
-    parts.push('(Popunjeno)')
-  } else {
-    parts.push(`(${g.availableSpots} ${g.availableSpots === 1 ? 'slobodno mjesto' : 'slobodnih mjesta'})`)
-  }
+  parts.push(`(${formatAvailableSpots(g.isFull ? 0 : g.availableSpots)})`)
   return parts.join(' · ')
 }
 

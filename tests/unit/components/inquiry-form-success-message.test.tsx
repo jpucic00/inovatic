@@ -48,7 +48,10 @@ const program: ActiveProgram = {
       startTime: '17:00',
       endTime: '18:00',
       availableSpots: 5,
-      isFull: false,    },
+      isFull: false,
+      locationName: 'Velebitska 32',
+      locationAddress: 'Velebitska 32, 21000 Split',
+    },
   ],
 }
 

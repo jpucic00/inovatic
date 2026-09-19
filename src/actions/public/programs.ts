@@ -23,6 +23,9 @@ export type ActiveGroup = {
   availableSpots: number
   isFull: boolean
   currentModuleName?: string
+  /** The venue as stored on the Location row — what the public schedule prints. */
+  locationName: string
+  locationAddress: string
 }
 
 export type ActiveProgram = {
@@ -52,6 +55,7 @@ type GroupRow = Awaited<ReturnType<typeof db.scheduledGroup.findMany>>[number] &
   };
   enrollments: { id: string; moduleEnrollments: { moduleScheduleId: string }[] }[];
   _count: { preferredInquiries: number };
+  location: { name: string; address: string };
 }
 
 function toActiveGroup(
@@ -87,6 +91,8 @@ function toActiveGroup(
     availableSpots,
     isFull,
     ...(nextEnrollingModule ? { currentModuleName: nextEnrollingModule.title } : {}),
+    locationName: g.location.name,
+    locationAddress: g.location.address,
   }
 }
 
@@ -182,6 +188,7 @@ async function loadPrograms(
           preferredInquiries: { where: { status: 'NEW' } },
         },
       },
+      location: { select: { name: true, address: true } },
     },
     orderBy: [{ course: { sortOrder: 'asc' } }, { createdAt: 'asc' }],
   })

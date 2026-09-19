@@ -22,6 +22,8 @@ function group(isFull = false): ActiveGroup {
     endTime: '18:30',
     availableSpots: isFull ? 0 : 4,
     isFull,
+    locationName: 'Velebitska 32',
+    locationAddress: 'Velebitska 32, 21000 Split',
   }
 }
 

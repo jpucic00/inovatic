@@ -19,6 +19,8 @@ test.describe('Public Pages — All routes return HTTP 200', () => {
     { path: '/o-nama', name: 'About — Association history, team, mission' },
     { path: '/novosti', name: 'News — Paginated article listing' },
     { path: '/prijava', name: 'Inquiry form — Multi-step parent registration' },
+    { path: '/raspored', name: 'Schedule — public termini with open spots' },
+    { path: '/raspored?grad=sibenik', name: 'Schedule — Šibenik' },
     { path: '/lokacije', name: 'Locations overview — Split & Šibenik' },
     { path: '/lokacije/split', name: 'Split — venues, coordinators, maps' },
     { path: '/lokacije/sibenik', name: 'Šibenik — Trokut inkubator' },
