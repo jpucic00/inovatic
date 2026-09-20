@@ -113,6 +113,17 @@ export const createTeacher = (overrides: Parameters<typeof createUser>[0] = {}) 
 export const createStudent = (overrides: Parameters<typeof createUser>[0] = {}) =>
   createUser({ ...overrides, role: UserRole.STUDENT })
 
+/**
+ * The shared classroom login of a city — FOUND, never created. The
+ * `classroom_accounts` migration inserts exactly one per city and the tier's
+ * reset runs `migrate deploy`, so the row is always there; a factory that
+ * created one would be the first thing to disagree with production about how
+ * many exist.
+ */
+export async function classroomAccount(city: City = 'SPLIT'): Promise<User> {
+  return db.user.findFirstOrThrow({ where: { role: UserRole.CLASSROOM, city } })
+}
+
 export async function createLocation(
   overrides: Partial<{ name: string; address: string; city: City }> = {},
 ): Promise<Location> {

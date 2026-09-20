@@ -1781,6 +1781,30 @@ async function main() {
     console.log(`✅ Admin created: ${created.email}`)
   }
 
+  // ── Račun za učionicu ────────────────────────────────────────────────────────
+  // In production these two rows come from the `classroom_accounts` migration
+  // with a per-environment password; the full reseed wipes them, so the dev DB
+  // recreates them here under the same usernames with a known password.
+  const classroomPassword = await bcrypt.hash('ucionica', 12)
+  for (const c of [
+    { username: 'ucionica-split', lastName: 'Split', city: 'SPLIT' as City },
+    { username: 'ucionica-sibenik', lastName: 'Šibenik', city: 'SIBENIK' as City },
+  ]) {
+    await prisma.user.create({
+      data: {
+        city: c.city,
+        email: `${c.username}@classroom.inovatic.local`,
+        username: c.username,
+        passwordHash: classroomPassword,
+        plainPassword: 'ucionica',
+        firstName: 'Učionica',
+        lastName: c.lastName,
+        role: UserRole.CLASSROOM,
+      },
+    })
+    console.log(`✅ Classroom account created: ${c.username}`)
+  }
+
   // ── Locations ────────────────────────────────────────────────────────────────
   const velebitska = await prisma.location.create({
     data: {
@@ -1888,6 +1912,8 @@ async function main() {
   console.log('  Admin: jozo.pivac@udruga-inovatic.hr')
   console.log('  Admin: bruno.beslic@udruga-inovatic.hr')
   console.log('  Admin (Šibenik): slavica.jurcevic@udruga-inovatic.hr')
+  console.log('Classroom accounts (password: ucionica):')
+  console.log('  ucionica-split, ucionica-sibenik')
 }
 
 export async function seedArticles(deps: {

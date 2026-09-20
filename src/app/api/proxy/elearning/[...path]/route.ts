@@ -13,7 +13,9 @@ import {
 export const runtime = 'nodejs'
 
 const ALLOWED_ORIGIN = 'https://elearning.robocamp.eu'
-const ALLOWED_ROLES = new Set<UserRole>(['STUDENT', 'TEACHER', 'ADMIN'])
+// CLASSROOM: the shared classroom login opens RoboCamp guides through this same
+// iframe, which is same-origin and carries the session cookie.
+const ALLOWED_ROLES = new Set<UserRole>(['STUDENT', 'TEACHER', 'ADMIN', 'CLASSROOM'])
 const PROXY_PREFIX = '/api/proxy/elearning'
 
 const STRIP_HEADERS = [

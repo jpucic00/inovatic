@@ -5,8 +5,42 @@ import { MIME_TO_EXT, sanitiseFilename } from '@/lib/cloudinary-url'
 import { canManageMaterial, materialTarget } from '@/lib/material-access'
 import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
 import { activeEnrollmentWhere } from '@/lib/enrollment-activity'
+import { classroomGroupWhere } from '@/lib/classroom-access'
+import type { City } from '@prisma/client'
 
 export const runtime = 'nodejs'
+
+type VisibilityGroup = {
+  id: string
+  course: { id: string; modules: { id: string }[] }
+}
+
+const VISIBILITY_GROUP_SELECT = {
+  id: true,
+  course: { select: { id: true, modules: { select: { id: true } } } },
+} as const
+
+/** Whether the material is effectively visible in at least one of `groups`. */
+async function materialVisibleInGroups(
+  groups: VisibilityGroup[],
+  materialId: string,
+): Promise<boolean> {
+  if (groups.length === 0) return false
+
+  const whereClauses = groups.map((g) =>
+    buildEffectiveMaterialsWhere({
+      scheduledGroupId: g.id,
+      courseId: g.course.id,
+      moduleIds: g.course.modules.map((m) => m.id),
+    }),
+  )
+
+  const visible = await db.material.findFirst({
+    where: { AND: [{ id: materialId }, { OR: whereClauses }] },
+    select: { id: true },
+  })
+  return visible !== null
+}
 
 /**
  * A student may download a material iff they are CURRENTLY in a program and the
@@ -32,35 +66,25 @@ async function studentAllowed(
 
   const enrollments = await db.enrollment.findMany({
     where: { userId },
-    select: {
-      scheduledGroup: {
-        select: {
-          id: true,
-          course: {
-            select: {
-              id: true,
-              modules: { select: { id: true } },
-            },
-          },
-        },
-      },
-    },
+    select: { scheduledGroup: { select: VISIBILITY_GROUP_SELECT } },
   })
-  if (enrollments.length === 0) return false
-
-  const whereClauses = enrollments.map((e) =>
-    buildEffectiveMaterialsWhere({
-      scheduledGroupId: e.scheduledGroup.id,
-      courseId: e.scheduledGroup.course.id,
-      moduleIds: e.scheduledGroup.course.modules.map((m) => m.id),
-    }),
+  return materialVisibleInGroups(
+    enrollments.map((e) => e.scheduledGroup),
+    materialId,
   )
+}
 
-  const visible = await db.material.findFirst({
-    where: { AND: [{ id: materialId }, { OR: whereClauses }] },
-    select: { id: true },
+/**
+ * The shared classroom login has no enrollments; its "groups" are every
+ * current-year group of its city (`classroomGroupWhere`), and the material has
+ * to be visible in one of them — the same effective-visibility rule as a child.
+ */
+async function classroomAllowed(city: City, materialId: string): Promise<boolean> {
+  const groups = await db.scheduledGroup.findMany({
+    where: classroomGroupWhere(city),
+    select: VISIBILITY_GROUP_SELECT,
   })
-  return visible !== null
+  return materialVisibleInGroups(groups, materialId)
 }
 
 export async function GET(
@@ -110,6 +134,8 @@ export async function GET(
     allowed = target !== null && (await canManageMaterial(session, target))
   } else if (role === 'STUDENT') {
     allowed = await studentAllowed(session.user.id, materialId)
+  } else if (role === 'CLASSROOM') {
+    allowed = await classroomAllowed(session.user.city, materialId)
   }
 
   if (!allowed) {

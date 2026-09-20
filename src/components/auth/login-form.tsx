@@ -44,6 +44,7 @@ export function LoginForm() {
           setShowPanelChoice(true)
           return
         }
+        // STUDENT and the shared CLASSROOM login both land on the portal.
         let destination = '/portal'
         if (result.role === 'ADMIN') destination = '/admin'
         else if (result.role === 'TEACHER') destination = '/nastavnik'

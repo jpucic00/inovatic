@@ -14,6 +14,13 @@ enum UserRole {
   ADMIN
   TEACHER
   STUDENT
+  // One shared classroom login per city ("Račun za učionicu"), created once by
+  // the `classroom_accounts` migration and never through the app. Identity is
+  // role + `city` — no extra column. It holds NO enrollments, ever: it reads
+  // the materials of every current-year group in its city through
+  // `classroomGroupWhere`, and every `role: 'STUDENT'` query keeps it out of
+  // rosters, counts and campaigns by construction.
+  CLASSROOM
 }
 
 // Tenant key: Split and Šibenik operate as fully separated organizations.

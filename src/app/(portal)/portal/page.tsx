@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 
 import { auth } from '@/lib/auth'
 import { getMyCurrentEnrollments, type StudentEnrollmentSummary } from '@/actions/student/dashboard'
+import { getClassroomPrograms } from '@/actions/classroom'
+import { ClassroomPrograms } from '@/components/portal/classroom-programs'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { GroupCard, groupByCourse } from '@/components/shared/group-card'
 import { formatGroupSchedule } from '@/lib/format'
@@ -27,6 +29,9 @@ export default async function PortalPage() {
   if (!session?.user?.city) return <LoginScreen />
   if (session.user.role === 'ADMIN') redirect('/admin')
   if (session.user.role === 'TEACHER') redirect('/nastavnik')
+  // The shared classroom login picks a program, then a group — it has no
+  // enrollments for the dashboard below to route on.
+  if (session.user.role === 'CLASSROOM') return <ClassroomPrograms programs={await getClassroomPrograms()} />
   return <PortalDashboard />
 }
 

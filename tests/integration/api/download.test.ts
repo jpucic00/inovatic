@@ -4,6 +4,7 @@ import { GET } from '@/app/api/download/[materialId]/route'
 import { db } from '@/lib/db'
 import { mockSession } from '../setup'
 import {
+  classroomAccount,
   createAdmin,
   createCourse,
   createEnrollment,
@@ -228,6 +229,49 @@ describe('GET /api/download/[materialId] — STUDENT', () => {
 
   it('STUDENT with no enrollments → groupA material → 404', async () => {
     mockSession({ id: seeded.studentNone.id, role: 'STUDENT' })
+    const res = await callDownload(seeded.materialGroupA)
+    expect(res.status).toBe(404)
+  })
+})
+
+// The shared classroom login has no enrollments: it may pull what is visible in
+// ANY current-year group of its city, under the same effective-visibility rule
+// as a child — so a per-group hide still blocks it.
+describe('GET /api/download/[materialId] — CLASSROOM', () => {
+  it('Split classroom → groupA material (current year, SPLIT) → 200', async () => {
+    const row = await classroomAccount('SPLIT')
+    mockSession({ id: row.id, role: 'CLASSROOM', city: 'SPLIT' })
+    const res = await callDownload(seeded.materialGroupA)
+    expect(res.status).toBe(200)
+  })
+
+  it('Split classroom → groupB material → 200 (every group of the city, not one)', async () => {
+    const row = await classroomAccount('SPLIT')
+    mockSession({ id: row.id, role: 'CLASSROOM', city: 'SPLIT' })
+    const res = await callDownload(seeded.materialGroupB)
+    expect(res.status).toBe(200)
+  })
+
+  it('Split classroom → MODULE material hidden in A but visible in B → 200; hidden everywhere → 404', async () => {
+    const row = await classroomAccount('SPLIT')
+    mockSession({ id: row.id, role: 'CLASSROOM', city: 'SPLIT' })
+    expect((await callDownload(seeded.materialModule)).status).toBe(200)
+
+    await db.materialGroupHide.create({
+      data: { materialId: seeded.materialModule, scheduledGroupId: seeded.groupBId },
+    })
+    try {
+      expect((await callDownload(seeded.materialModule)).status).toBe(404)
+    } finally {
+      await db.materialGroupHide.deleteMany({
+        where: { materialId: seeded.materialModule, scheduledGroupId: seeded.groupBId },
+      })
+    }
+  })
+
+  it('Šibenik classroom → Split material → 404', async () => {
+    const row = await classroomAccount('SIBENIK')
+    mockSession({ id: row.id, role: 'CLASSROOM', city: 'SIBENIK' })
     const res = await callDownload(seeded.materialGroupA)
     expect(res.status).toBe(404)
   })

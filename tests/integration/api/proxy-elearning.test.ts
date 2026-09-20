@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/proxy/elearning/[...path]/route'
 import { mockSession } from '../setup'
-import { createAdmin, createStudent } from '../helpers/factory'
+import { classroomAccount, createAdmin, createStudent } from '../helpers/factory'
 
 // All 4 remaining tests from tests/phase3/31-proxy-elearning.spec.ts migrated.
 // The 5 pure-rewriter tests live at tests/unit/proxy/*.test.ts (Flux ampbgec).
@@ -99,6 +99,14 @@ describe('Role gate', () => {
     mockUpstream(new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } }))
     const res = await callProxy(['anything'])
     expect(res.status, 'STUDENT must not be 403\'d').not.toBe(403)
+  })
+
+  it('CLASSROOM user passes — the guide iframe on a classroom PC goes through here', async () => {
+    const row = await classroomAccount('SPLIT')
+    mockSession({ id: row.id, role: 'CLASSROOM', city: 'SPLIT' })
+    mockUpstream(new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } }))
+    const res = await callProxy(['anything'])
+    expect(res.status, 'CLASSROOM must not be 403\'d').not.toBe(403)
   })
 })
 

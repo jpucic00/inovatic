@@ -429,11 +429,14 @@ describe('getActivePrograms — a window in one city never opens the shared prog
     createdCourseIds.push(course.id)
     const moduleRow = await createModule(course.id)
     // Only SPLIT has planned the year — its group needs an arc to render.
+    // Relative dates: a module that has already started with nothing after it
+    // reads as a finished arc and `toActiveGroup` drops the group, which is
+    // what the pinned 2026-09-07 start did once the calendar passed it.
     await createModuleSchedule(moduleRow.id, {
       schoolYear: YEAR,
       city: 'SPLIT',
-      startDate: new Date('2026-09-07'),
-      endDate: new Date('2026-11-30'),
+      startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
     })
 
     const splitGroup = await createGroup({ courseId: course.id, city: 'SPLIT', schoolYear: YEAR })

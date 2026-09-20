@@ -1,26 +1,18 @@
 'use server'
 
-import { notFound } from 'next/navigation'
-import { db } from '@/lib/db'
-import { requireActiveStudent } from '@/lib/auth-guard'
+import { assertPortalGroupAccess } from '@/lib/portal-group-access'
 import { buildGroupMaterialsView, type GroupMaterialsView } from '@/lib/group-materials-view'
 
 /**
- * Fetches the effective materials for a group that the logged-in student is
- * enrolled in. Throws a 404 if the student has no enrollment for this group —
- * that's the access gate. The kind-partitioned view shape is built by the
- * shared `buildGroupMaterialsView` core (also used by the teacher scene view).
+ * Fetches the effective materials for a group the caller may open: a child
+ * enrolled in it, or the shared classroom login for a current-year group of its
+ * city (`assertPortalGroupAccess` — a miss 404s, that's the access gate). The
+ * kind-partitioned view shape is built by the shared `buildGroupMaterialsView`
+ * core (also used by the teacher scene view).
  */
 export async function getEffectiveMaterialsForStudent(
   groupId: string,
 ): Promise<GroupMaterialsView> {
-  const session = await requireActiveStudent()
-
-  const enrollment = await db.enrollment.findFirst({
-    where: { userId: session.user.id, scheduledGroupId: groupId },
-    select: { id: true },
-  })
-  if (!enrollment) notFound()
-
+  await assertPortalGroupAccess(groupId)
   return buildGroupMaterialsView(groupId)
 }

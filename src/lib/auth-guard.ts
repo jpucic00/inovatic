@@ -43,6 +43,18 @@ export async function requireStudent() {
 }
 
 /**
+ * A child OR the shared classroom login (`CLASSROOM`) — the two roles the
+ * portal renders for. Only the group materials path accepts both; every other
+ * student read (profile, gallery, evaluation) keeps `requireStudent()`, which
+ * is what keeps a child's photos and report card off the classroom PCs.
+ */
+export async function requirePortalUser() {
+  const session = await requireAuth()
+  if (session.user.role !== 'STUDENT' && session.user.role !== 'CLASSROOM') redirect('/portal')
+  return session
+}
+
+/**
  * requireStudent plus proof the child is currently in a program — the gate for
  * every student-facing read of actual course content.
  *

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { auth } from '@/lib/auth'
 import { getStudentGroupShell } from '@/actions/student/group'
 import { GroupHeader } from '@/components/shared/group-header'
 import { PortalGroupTabs } from '@/components/portal/portal-group-tabs'
@@ -21,6 +22,10 @@ export default async function PortalGroupLayout({ params, children }: Readonly<L
   const { groupId } = await params
   const shell = await getStudentGroupShell(groupId)
   const { group, activeModule, kind } = shell
+  // The shared classroom login gets the materials and nothing else: no tab
+  // strip (Galerija and Evaluacija belong to the child's own account), and the
+  // way back is the program's group list it came from.
+  const classroom = (await auth())?.user?.role === 'CLASSROOM'
 
   const schedule = formatGroupSchedule({
     dateRange: isRadionica(kind),
@@ -32,11 +37,11 @@ export default async function PortalGroupLayout({ params, children }: Readonly<L
   return (
     <div>
       <Link
-        href="/portal"
+        href={classroom ? `/portal/program/${group.course.id}` : '/portal'}
         className="mb-4 inline-flex items-center gap-1 text-sm text-cyan-600 hover:text-cyan-700 hover:underline"
       >
         <ArrowLeft className="h-4 w-4" />
-        Natrag na moje grupe
+        {classroom ? 'Natrag na grupe' : 'Natrag na moje grupe'}
       </Link>
 
       <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -60,7 +65,11 @@ export default async function PortalGroupLayout({ params, children }: Readonly<L
           ) : null}
         </div>
 
-        <PortalGroupTabs groupId={group.id} gradable={isGradable(kind)} />
+        {classroom ? (
+          <div className="h-3" />
+        ) : (
+          <PortalGroupTabs groupId={group.id} gradable={isGradable(kind)} />
+        )}
       </section>
 
       <div className="mt-6">{children}</div>

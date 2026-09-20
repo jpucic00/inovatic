@@ -3,6 +3,7 @@ import { LogOut, BookOpen, User } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { logoutAction } from '@/actions/logout'
 import { Logo } from '@/components/shared/logo'
+import { classroomDisplayName } from '@/lib/classroom-access'
 
 export default async function PortalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   // `/portal` doubles as the login screen, so this layout cannot gate: a guest
@@ -11,10 +12,16 @@ export default async function PortalLayout({ children }: Readonly<{ children: Re
   // Access control still holds: every portal page's data action calls
   // requireStudent() itself.
   const session = await auth()
-  if (session?.user?.role !== 'STUDENT' || !session.user.city) {
+  const role = session?.user?.role
+  if ((role !== 'STUDENT' && role !== 'CLASSROOM') || !session?.user.city) {
     return <>{children}</>
   }
-  const userName = session.user.name ?? session.user.email ?? 'Korisnik'
+  // The shared classroom login is labelled by what it is, not by a name; it
+  // has no profile to link to and picks programs rather than "its" groups.
+  const classroom = role === 'CLASSROOM'
+  const userName = classroom
+    ? classroomDisplayName(session.user.city)
+    : (session.user.name ?? session.user.email ?? 'Korisnik')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -26,12 +33,14 @@ export default async function PortalLayout({ children }: Readonly<{ children: Re
             <span className="text-xs text-gray-400">{userName}</span>
             <Link href="/portal" className="text-sm text-gray-500 hover:text-cyan-500 flex items-center gap-1.5">
               <BookOpen className="w-4 h-4" />
-              Moje grupe
+              {classroom ? 'Programi' : 'Moje grupe'}
             </Link>
-            <Link href="/portal/profil" className="text-sm text-gray-500 hover:text-cyan-500 flex items-center gap-1.5">
-              <User className="w-4 h-4" />
-              Profil
-            </Link>
+            {classroom ? null : (
+              <Link href="/portal/profil" className="text-sm text-gray-500 hover:text-cyan-500 flex items-center gap-1.5">
+                <User className="w-4 h-4" />
+                Profil
+              </Link>
+            )}
             <form action={logoutAction}>
               <button type="submit" className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1.5">
                 <LogOut className="w-4 h-4" />
