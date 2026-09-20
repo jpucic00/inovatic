@@ -7,17 +7,21 @@ import type { PublicSchedule, ScheduleSlot } from '@/lib/public-schedule'
 const PILL_CLASS = {
   full: 'bg-gray-100 text-gray-500 border-gray-200',
   low: 'bg-amber-50 text-amber-800 border-amber-200',
-  open: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 } as const
 
 const DOT_CLASS = {
   full: 'bg-gray-400',
   low: 'bg-amber-500',
-  open: 'bg-emerald-500',
 } as const
 
+/**
+ * Only the two warnings are shown: a termin with room needs no badge, since
+ * the card itself already says it is offered — the pill exists to say hurry
+ * or too late.
+ */
 function SpotsPill({ availableSpots }: Readonly<{ availableSpots: number }>) {
   const tone = availableSpotsTone(availableSpots)
+  if (tone === 'open') return null
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${PILL_CLASS[tone]}`}
@@ -33,7 +37,6 @@ function Legend() {
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
       {(
         [
-          ['open', 'Slobodna mjesta'],
           ['low', 'Zadnja mjesta'],
           ['full', 'Popunjeno'],
         ] as const
@@ -96,9 +99,11 @@ function TerminCard({ slot, showVenue }: Readonly<{ slot: ScheduleSlot; showVenu
           <span>{slot.venues.join(' / ')}</span>
         </p>
       )}
-      <div>
-        <SpotsPill availableSpots={slot.availableSpots} />
-      </div>
+      {availableSpotsTone(slot.availableSpots) !== 'open' && (
+        <div>
+          <SpotsPill availableSpots={slot.availableSpots} />
+        </div>
+      )}
     </article>
   )
 }
