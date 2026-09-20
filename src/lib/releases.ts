@@ -124,6 +124,26 @@ export interface ReleaseNote {
  */
 export const RELEASES: readonly ReleaseNote[] = [
   {
+    version: '1.4.0',
+    date: '2026-09-20',
+    title: 'Nova verzija aplikacije.',
+    sections: [
+      {
+        area: 'Javna stranica',
+        changes: [
+          'Nova stranica Raspored (stavka u navigaciji) ispisuje za odabrani grad program, dan i vrijeme te broj slobodnih mjesta prije same prijave; popunjeni termini ostaju vidljivi zasivljeni.',
+        ],
+      },
+      {
+        area: 'Nastavnički panel',
+        changes: [
+          'Na početnoj stranici piše korisničko ime i lozinka učioničkog računa: zajednički račun kojim nastavnik na računalima na radionici otvara djeci materijale, bez potrebe za njihovim lozinkama.',
+          'Učionički račun nakon prijave bira program pa grupu i otvara materijale te grupe u tekućoj školskoj godini, uključujući interaktivne vodiče i preuzimanja.',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-09-16',
     title: 'Nova verzija aplikacije.',
