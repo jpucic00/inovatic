@@ -58,7 +58,7 @@ test.describe('Navbar Login Link', () => {
     await page.goto(`${BASE}/`)
     const hamburger = page.locator('button[aria-label*="meni"]')
     // The mobile menu login link is inside the absolutely-positioned dropdown
-    const mobileMenu = page.locator('.md\\:hidden[class*="absolute"]')
+    const mobileMenu = page.locator('.lg\\:hidden[class*="absolute"]')
     const loginLink = mobileMenu.locator('a[href="/portal"]')
     await clickUntilVisible(hamburger, loginLink)
   })

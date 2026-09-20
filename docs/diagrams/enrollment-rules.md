@@ -532,8 +532,10 @@ flowchart TD
     E -->|No| EXCLUDE2[Excluded - graduated past M4 or schedule incomplete]
 
     INCLUDE --> I[Group shown in public form dropdown]
+    INCLUDE --> I2["Same rows → buildPublicSchedule → public /raspored page"]
 
     style EMPTY fill:#fee2e2
+    style I2 fill:#d1fae5
     style EXCLUDE fill:#fee2e2
     style EXCLUDE2 fill:#fee2e2
     style EXCLUDE3 fill:#fee2e2
@@ -545,6 +547,10 @@ flowchart TD
 > The standard-course second gate is the per-group race-ahead arc (`getGroupModuleArc` → next-enrolling module), not a raw `ModuleSchedule.startDate > now` check. Closing the running module early (`closeModuleSchedule` sets `endDate = today`) reshapes the arc so a later module becomes the next-enrolling one. The radionica second gate is the start-day cutoff (`isRadionicaOpenForSignup` in `toActiveGroup`) — a workshop with both date bounds blank has no start to compare against and stays bookable. Competition groups have no second gate: they run a whole season.
 >
 > **The feed split is only the course filter**: `getActivePrograms(city)` calls the shared `loadPrograms` with `kind: { not: 'COMPETITION' }`; `getSignupProgram(city, slug)` calls it with `{ slug }` (competition included), and `getSignupProgramById` with `{ id }` for the per-program link's live availability poll. Window, capacity, holiday and cutoff logic are identical across all three, so the feeds can never drift.
+>
+> **The public `/raspored` page is a projection of this very feed, not a second loader (2026-09-19).** `buildPublicSchedule` (`src/lib/public-schedule.ts` — pure, so the page passes the feed in and the rules are unit-tested without a DB) takes the `ActiveProgram[]` `getActivePrograms(city)` already returns, which is what makes it impossible for the schedule to name a termin `/prijava` refuses or to hide one it offers. What it adds is the reading a parent wants: termini **grouped by weekday and sorted by time**, radionice set apart as **date ranges** (they have no weekday), a group whose weekday is blank bucketed as **"Dan u dogovoru"** rather than dropped, and venues printed through `formatVenue(locationName, locationAddress)` — the two fields `ActiveGroup` gained for this (`src/actions/public/programs.ts`). It carries **no group names**, and that is exactly why two groups of one program at the same day **and** time collapse into **ONE** slot with their `availableSpots` summed: without a name the second line is indistinguishable from the first and reads as a duplicate.
+
+> **One wording for the remaining seats, everywhere.** `computeGroupCapacity` produces `availableSpots` / `isFull`; `formatAvailableSpots` and `availableSpotsTone` (`src/lib/available-spots.ts`) are the single rendering of them — Croatian last-digit agreement ("1 slobodno mjesto" · "2–4 slobodna mjesta" · "5+ slobodnih mjesta"), **"Još N …"** in the amber *low* tone at ≤ 2, **"Popunjeno"** at 0. Used by the admin capacity chip, the `/prijava` termin dropdown and `/raspored`, so a parent and an admin read the same number the same way.
 
 ---
 

@@ -87,6 +87,16 @@ async function classroomAllowed(city: City, materialId: string): Promise<boolean
   return materialVisibleInGroups(groups, materialId)
 }
 
+/** GROUP materials are per-city; MODULE/COURSE curriculum stays shared. */
+async function adminAllowed(scheduledGroupId: string | null, city: City | undefined): Promise<boolean> {
+  if (!scheduledGroupId) return true
+  const group = await db.scheduledGroup.findUnique({
+    where: { id: scheduledGroupId },
+    select: { city: true },
+  })
+  return group !== null && group.city === city
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ materialId: string }> },
@@ -119,23 +129,17 @@ export async function GET(
   let allowed = false
 
   if (role === 'ADMIN') {
-    if (material.scheduledGroupId) {
-      // GROUP materials are per-city; MODULE/COURSE curriculum stays shared.
-      const group = await db.scheduledGroup.findUnique({
-        where: { id: material.scheduledGroupId },
-        select: { city: true },
-      })
-      allowed = group !== null && group.city === session.user.city
-    } else {
-      allowed = true
-    }
+    allowed = await adminAllowed(material.scheduledGroupId, session.user.city)
   } else if (role === 'TEACHER') {
     const target = materialTarget(material)
     allowed = target !== null && (await canManageMaterial(session, target))
   } else if (role === 'STUDENT') {
     allowed = await studentAllowed(session.user.id, materialId)
   } else if (role === 'CLASSROOM') {
-    allowed = await classroomAllowed(session.user.city, materialId)
+    // `city` is typed but may be undefined on a legacy token kept alive through a
+    // transient DB error; Prisma reads `city: undefined` as "no filter", which
+    // would open BOTH cities. Fail closed, like the ADMIN branch above.
+    allowed = !!session.user.city && (await classroomAllowed(session.user.city, materialId))
   }
 
   if (!allowed) {

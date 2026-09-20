@@ -48,6 +48,8 @@ export default async function ClassroomProgramPage({
                 dayOfWeek: g.dayOfWeek,
                 startTime: g.startTime,
                 endTime: g.endTime,
+                dateStart: g.dateStart,
+                dateEnd: g.dateEnd,
               })}
               locationName={g.location.name}
               extraRows={

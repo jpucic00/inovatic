@@ -275,4 +275,13 @@ describe('GET /api/download/[materialId] — CLASSROOM', () => {
     const res = await callDownload(seeded.materialGroupA)
     expect(res.status).toBe(404)
   })
+
+  it('classroom session without a city claim → 404, never every city', async () => {
+    // `city: null` mocks the legacy-token case the session callback documents;
+    // `city: undefined` in a Prisma where is "no filter", so this must fail closed.
+    const row = await classroomAccount('SPLIT')
+    mockSession({ id: row.id, role: 'CLASSROOM', city: null })
+    const res = await callDownload(seeded.materialGroupA)
+    expect(res.status).toBe(404)
+  })
 })

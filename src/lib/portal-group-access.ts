@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import type { Session } from 'next-auth'
 import { db } from '@/lib/db'
 import { requireActiveStudent, requirePortalUser } from '@/lib/auth-guard'
 import { classroomGroupWhere } from '@/lib/classroom-access'
@@ -19,11 +18,11 @@ import { classroomGroupWhere } from '@/lib/classroom-access'
  * behind `requireStudent()`, which is what keeps them off the classroom PCs.
  *
  * Plain module, not a `'use server'` file: an export from one of those is a
- * callable endpoint, and this returns a session.
+ * callable endpoint, and this is a guard, not an action.
  */
 export async function assertPortalGroupAccess(
   groupId: string,
-): Promise<{ session: Session; viewer: 'STUDENT' | 'CLASSROOM' }> {
+): Promise<void> {
   const session = await requirePortalUser()
 
   if (session.user.role === 'CLASSROOM') {
@@ -32,7 +31,7 @@ export async function assertPortalGroupAccess(
       select: { id: true },
     })
     if (!group) notFound()
-    return { session, viewer: 'CLASSROOM' }
+    return
   }
 
   await requireActiveStudent()
@@ -41,5 +40,4 @@ export async function assertPortalGroupAccess(
     select: { id: true },
   })
   if (!enrollment) notFound()
-  return { session, viewer: 'STUDENT' }
 }

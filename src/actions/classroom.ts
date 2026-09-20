@@ -19,6 +19,9 @@ type ClassroomGroup = {
   dayOfWeek: string | null
   startTime: string | null
   endTime: string | null
+  /** Radionice only — the cycle a teacher is picking between. */
+  dateStart: string | null
+  dateEnd: string | null
   location: { name: string }
   teacherNames: string[]
   activeModule: { id: string; title: string } | null
@@ -130,6 +133,8 @@ export async function getClassroomGroups(
         dayOfWeek: g.dayOfWeek,
         startTime: g.startTime,
         endTime: g.endTime,
+        dateStart: g.dateStart,
+        dateEnd: g.dateEnd,
         location: { name: g.location.name },
         teacherNames: g.teacherAssignments.map((t) => `${t.user.firstName} ${t.user.lastName}`),
         activeModule: activeModule ? { id: activeModule.id, title: activeModule.title } : null,

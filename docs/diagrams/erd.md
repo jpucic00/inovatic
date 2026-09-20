@@ -155,7 +155,7 @@ erDiagram
         string lastName
         string phone "nullable"
         string dateOfBirth "nullable - YYYY-MM-DD for students"
-        UserRole role "ADMIN - TEACHER - STUDENT"
+        UserRole role "ADMIN - TEACHER - STUDENT - CLASSROOM"
         string parentName "nullable - migrated from Inquiry"
         string parentEmail "nullable - migrated from Inquiry"
         string parentPhone "nullable - migrated from Inquiry"
@@ -409,7 +409,7 @@ erDiagram
 | Enum | Values |
 |------|--------|
 | City | `SPLIT`, `SIBENIK` — the tenant boundary; **no `@default`**, every create stamps it explicitly |
-| UserRole | `ADMIN`, `TEACHER`, `STUDENT` |
+| UserRole | `ADMIN`, `TEACHER`, `STUDENT`, `CLASSROOM` — `CLASSROOM` is the shared classroom login (2026-09-20), one permanent row per city; see *City Tenancy* below |
 | CourseLevel | `UVOD`, `SLR_1`, `SLR_2`, `SLR_3`, `SLR_4` — `UVOD` (predškolci, WeDo 2.0) is a rung *before* the ladder; the SLR levels were deliberately **not** renumbered (each one's name is its level). The competition program has `level = null` |
 | ProgramKind | `STANDARD`, `RADIONICA`, `COMPETITION` — the authoritative program discriminator on `Course.kind`. Branch through the predicates in `src/lib/program-kind.ts` (`isRadionica`, `isCompetition`, `hasDatedModules`, `hasModules`, `showsAllModules`, `isMonthlyBilled`, `isGradable`, `isEditableCourse`), never on a bare enum comparison |
 | InquiryType | `COURSE`, `PARTY` |
@@ -523,6 +523,8 @@ Split and Šibenik run as fully separated tenants inside one app. "City" is the 
 **Deliberately shared (no city):** the `SchoolYear` label registry, the `Tag` taxonomy, `CourseModule` templates, and MODULE/COURSE-scoped `Material` rows (one curriculum for both cities). GROUP-scoped materials are per-group, hence per-city.
 
 **No `@default` on any city column** — a create that forgets to stamp `city` is a compile/DB error, never a silent SPLIT mis-stamp. Scoping is session-driven: `session.user.city` is a JWT claim (re-checked against the DB every 60s), and admin/teacher/student queries filter by it server-side. There is no city switcher and no super-admin.
+
+**`UserRole.CLASSROOM` — exactly one row per city (2026-09-20).** `ucionica-split` and `ucionica-sibenik` are the shared logins teachers type on the classroom PCs so children reach materials without their own passwords. They are created **only** by migration `20260920160100_classroom_accounts` (password generated in SQL with pgcrypto `crypt(pw, gen_salt('bf', 12))`, so it differs per environment and is never in git; `ON CONFLICT (username)` makes a re-run or a restored backup a no-op) — there is deliberately **no admin CRUD** to create, rotate or delete one. Its identity is **role + `city`, with no extra column**, and it holds **no `Enrollment` rows, ever**: an upis would put it on rosters, into capacity and into payment status. Its membership is computed instead — `classroomGroupWhere(city)` (`src/lib/classroom-access.ts`) = every `ScheduledGroup` of its **own city** in the **CURRENT** school year, deliberately narrower than `activeEnrollmentWhere` (current **plus next**): a child enrolled over the summer must be able to log in, but a classroom PC in June has nothing to offer from September's groups. Because it is a separate role rather than a flag on `STUDENT`, every `role: 'STUDENT'` query — `/admin/ucenici`, the Učenici counter, campaign cohorts, `student-match`, the importers — excludes it **by construction**, and each surface that admits it is an explicit opt-in.
 
 ## Schedule Pattern
 

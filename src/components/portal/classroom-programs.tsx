@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight, Layers } from 'lucide-react'
 import type { ClassroomProgram } from '@/actions/classroom'
+import { croatianPlural } from '@/lib/format'
 
 /**
  * Step one for the shared classroom login: pick the program. One tile per
@@ -35,7 +36,7 @@ export function ClassroomPrograms({ programs }: Readonly<{ programs: ClassroomPr
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-lg font-semibold text-gray-900">{course.title}</span>
                 <span className="block text-sm text-gray-500">
-                  {groupCount === 1 ? '1 grupa' : `${groupCount} grupe`}
+                  {`${groupCount} ${croatianPlural(groupCount, 'grupa', 'grupe', 'grupa')}`}
                 </span>
               </span>
               <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-300" />

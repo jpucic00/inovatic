@@ -4,6 +4,8 @@
 
 **City tenancy:** `Material` deliberately has **no `city` column**. MODULE/COURSE-scoped rows are the shared curriculum — one standard SLR program taught identically in Split and Šibenik; any city's admin can manage them and both cities' staff/students see and download them. GROUP-scoped rows are per-group and therefore per-city: `canManageMaterial` bounds the ADMIN branch to `group.city === session.user.city`, and the download route applies the same check for GROUP-scope files (`src/lib/material-access.ts`, `src/app/api/download/[materialId]/route.ts`). Since 2026-08-17 that route also gates the **student** branch on being currently in a program: `studentAllowed()` counts enrollments against `activeEnrollmentWhere()` (`src/lib/enrollment-activity.ts` — current year **plus next**) and returns false at zero, before any scope resolution; `getEffectiveMaterialsForStudent` uses `requireActiveStudent()` for the same reason. Without it, "no longer part of any program" would hold at the login form and not here, for as long as a JWT minted while the child was still enrolled survives (≤60 s). The student's per-group lookup stays deliberately **unfiltered by year** — an enrolled child re-opening their own previous group is legitimate. Teachers are city-bound implicitly through their same-city `TeacherAssignment`s.
 
+**The shared classroom login is the third download branch (2026-09-20).** `role === 'CLASSROOM'` resolves to `!!session.user.city && classroomAllowed(city, materialId)` — the `!!city` half **fails closed** exactly like the ADMIN branch, because Prisma reads `city: undefined` as "no filter" and a legacy token would otherwise open both cities. The account holds no enrollments, so its "groups" are every `ScheduledGroup` matching `classroomGroupWhere(city)` (`src/lib/classroom-access.ts` — own city, **current school year**), and the material still has to be effectively visible in one of them. Both branches call the same `materialVisibleInGroups(groups, materialId)`, so the rules cannot drift: same `buildEffectiveMaterialsWhere` union, same `MaterialGroupHide` exclusion — **only the group set differs**. The asymmetry is deliberate: a child's group list is not year-filtered, the classroom account is current-year only. The elearning proxy admits `CLASSROOM` too (`ALLOWED_ROLES`), since the RoboCamp guide iframe is same-origin and rides the session cookie.
+
 ## Schema shape
 
 ```mermaid
@@ -72,6 +74,13 @@ flowchart TD
 
 ```mermaid
 flowchart LR
+    V["assertPortalGroupAccess(groupId)<br/>requirePortalUser → STUDENT or CLASSROOM"] --> VW{Which viewer?}
+    VW -->|STUDENT| VS["requireActiveStudent() AND an enrollment<br/>in THIS group — any year"]
+    VW -->|CLASSROOM| VC["group matches classroomGroupWhere(city)<br/>own city, CURRENT school year"]
+    VW -->|neither| VN["notFound() — never redirect, that would loop"]
+    VS --> CTX
+    VC --> CTX
+
     CTX["MaterialScopeContext<br/>{scheduledGroupId, courseId, moduleIds[]}"]
     CTX --> B1["scope=GROUP AND scheduledGroupId = ctx.scheduledGroupId"]
     CTX --> B3["scope=COURSE AND courseId = ctx.courseId"]
@@ -91,8 +100,11 @@ flowchart LR
     style VISIBLE fill:#d1fae5
     style HIDDEN fill:#fee2e2
     style SK1 fill:#f3f4f6
+    style VN fill:#fee2e2
 ```
 
+> The viewer split in front is `assertPortalGroupAccess` (`src/lib/portal-group-access.ts`) — the only gate that admits both the child and the shared classroom login. Everything downstream of it is identical for the two; what differs is how the group was reached (a child's enrollment, or its city's current-year list). Gallery, evaluation and profile keep `requireStudent()` and are therefore closed to CLASSROOM.
+>
 > Source: `buildEffectiveMaterialsWhere(ctx)` in `src/lib/material-query.ts:24-43`. COURSE branch is always included — both standard programs (program-wide materials) and radionice (course-wide materials). MODULE branch only added when `moduleIds.length > 0`. Returns a `Prisma.MaterialWhereInput` with `NOT hiddenInGroups.some(...)` applied uniformly across all branches.
 
 ## Who fills `MaterialScopeContext.moduleIds` — kind-driven visibility

@@ -39,7 +39,7 @@ export function Navbar() {
           <Logo variant="dark" onClick={() => setIsOpen(false)} />
 
           {/* Desktop navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {navLinks.map((link) =>
               link.children ? (
                 <div key={link.href} className="relative group">
@@ -101,17 +101,18 @@ export function Navbar() {
 
           {/* CTA + Login + Mobile toggle */}
           <div className="flex items-center gap-3">
-            {/* Between md and xl the full nav sits alongside this cluster, and the
+            {/* Between lg and xl the full nav sits alongside this cluster, and the
                 long label overflows the bar — drop to the icon alone in that band.
-                (It was lg until "Raspored" made eight items; at exactly 1024px the
-                label pushed "O nama" and both buttons onto two lines.) */}
+                The desktop nav itself starts at lg, not md: with "Raspored" as the
+                eighth item, 768px pushed the logo off-screen and the whole bar
+                past the viewport. */}
             <Link
               href="/portal"
               aria-label="Polaznički portal"
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:text-cyan-600 hover:bg-gray-50 rounded-md transition-colors"
             >
               <LogIn className="w-4 h-4" />
-              <span className="md:hidden xl:inline">Polaznički portal</span>
+              <span className="lg:hidden xl:inline">Polaznički portal</span>
             </Link>
             <Link
               href="/prijava"
@@ -120,7 +121,7 @@ export function Navbar() {
               Prijavi se
             </Link>
             <button
-              className="md:hidden p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              className="lg:hidden p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
               onClick={() => setIsOpen(!isOpen)}
               aria-label={isOpen ? 'Zatvori meni' : 'Otvori meni'}
             >
@@ -132,7 +133,7 @@ export function Navbar() {
 
       {/* Mobile menu — absolutely positioned so it overlays content */}
       {isOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-white border-t border-gray-100 shadow-lg">
+        <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-t border-gray-100 shadow-lg">
           <div className="container mx-auto px-4 py-3 flex flex-col gap-1">
             {navLinks.map((link) =>
               link.children ? (
