@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { assignLanes } from '@/lib/calendar-lanes'
 import type { ProgramKind } from '@prisma/client'
 import { isRadionica } from '@/lib/program-kind'
@@ -261,9 +262,10 @@ export function WeeklySchedule({ groups, activeFilter }: Readonly<WeeklySchedule
                           ].join('\n')
 
                           return (
-                            <div
+                            <Link
                               key={g.id}
-                              className={`absolute rounded border px-1 overflow-hidden ${color.bg} ${color.border}`}
+                              href={`/admin/grupe/${g.id}`}
+                              className={`absolute rounded border px-1 overflow-hidden transition-shadow hover:shadow-md hover:ring-1 hover:ring-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${color.bg} ${color.border}`}
                               style={{
                                 top,
                                 height,
@@ -280,7 +282,7 @@ export function WeeklySchedule({ groups, activeFilter }: Readonly<WeeklySchedule
                                   {timeRange}
                                 </p>
                               )}
-                            </div>
+                            </Link>
                           )
                         })}
                       </div>
