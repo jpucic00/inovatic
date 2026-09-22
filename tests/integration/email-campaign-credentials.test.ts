@@ -16,10 +16,23 @@ import { computeSchoolYear } from '@/lib/school-year'
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
 
-const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
+type ResendPayload = { to: string; subject: string; react: { props: Record<string, unknown> } }
+
+// Admin copies (`[Kopija] …`, one per city admin per campaign) go to their own
+// mock, so every parent-send count below stays about parents.
+const { sendMock, adminCopyMock } = vi.hoisted(() => ({
+  sendMock: vi.fn(),
+  adminCopyMock: vi.fn<(p: ResendPayload) => Promise<unknown>>(async () => ({
+    data: { id: 'copy' },
+    error: null,
+  })),
+}))
 vi.mock('resend', () => ({
   Resend: class {
-    emails = { send: sendMock }
+    emails = {
+      send: (p: ResendPayload) =>
+        p.subject?.startsWith('[Kopija] ') ? adminCopyMock(p) : sendMock(p),
+    }
   },
 }))
 

@@ -19,10 +19,23 @@ vi.mock('next/headers', () => ({ cookies: vi.fn() }))
 
 // Mock the Resend SDK so the real sender service runs but nothing hits the
 // network; `sendMock` is the controllable emails.send.
-const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
+type ResendPayload = { to: string; subject: string; react: { props: Record<string, unknown> } }
+
+// Admin copies (`[Kopija] …`, one per city admin per campaign) go to their own
+// mock, so every parent-send count below stays about parents.
+const { sendMock, adminCopyMock } = vi.hoisted(() => ({
+  sendMock: vi.fn(),
+  adminCopyMock: vi.fn<(p: ResendPayload) => Promise<unknown>>(async () => ({
+    data: { id: 'copy' },
+    error: null,
+  })),
+}))
 vi.mock('resend', () => ({
   Resend: class {
-    emails = { send: sendMock }
+    emails = {
+      send: (p: ResendPayload) =>
+        p.subject?.startsWith('[Kopija] ') ? adminCopyMock(p) : sendMock(p),
+    }
   },
 }))
 
@@ -176,6 +189,7 @@ afterAll(() => {
 })
 
 beforeEach(() => {
+  adminCopyMock.mockClear()
   sendMock.mockReset()
   sendMock.mockResolvedValue({ data: { id: 'sent' }, error: null })
   setCookie(TARGET_YEAR)
@@ -2010,5 +2024,111 @@ describe('reading back what was sent', () => {
       expect(html.html).toContain(EVAL_CONTENT.bodyText)
       expect(html.html).not.toContain('Vito Kartić')
     }
+  })
+})
+
+describe('sendEmailCampaign — admin copy', () => {
+  const copiesTo = (email: string) =>
+    adminCopyMock.mock.calls.filter((c) => c[0].to === email).map((c) => c[0])
+
+  it('mails every admin of the campaign city exactly one copy, and no admin of the other city', async () => {
+    const sender = await loginAdmin()
+    const colleague = await createAdmin({ city: 'SPLIT' })
+    const retired = await createAdmin({ city: 'SPLIT', deletedAt: new Date() })
+    const otherCity = await createAdmin({ city: 'SIBENIK' })
+    const { group } = await makeSourceGroup()
+    await enrollStudent(group.id, { parentEmail: uniqEmail('copy-a') })
+    await enrollStudent(group.id, { parentEmail: uniqEmail('copy-b') })
+
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...CONTENT,
+    })
+    expect(res).toMatchObject({ success: true, sent: 2 })
+
+    // One per campaign, not one per parent.
+    for (const admin of [sender, colleague]) {
+      const copies = copiesTo(admin.email)
+      expect(copies).toHaveLength(1)
+      expect(copies[0].subject).toBe(`[Kopija] ${CONTENT.subject}`)
+      expect(copies[0].react.props.bodyText).toBe(CONTENT.bodyText)
+    }
+    expect(copiesTo(retired.email)).toHaveLength(0)
+    expect(copiesTo(otherCity.email)).toHaveLength(0)
+    // The copies are not parents: counters and recipient rows ignore them.
+    expect(sendMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('carries only the shared message on a per-child kind — never a report card', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const student = await enrollStudent(group.id, {
+      parentEmail: uniqEmail('copy-eval'),
+      firstName: 'Lana',
+      lastName: 'Kopić',
+    })
+    await createAssessment(student.id, group.id, admin.id)
+
+    const res = await sendAndSettle({
+      kind: 'EVALUATION',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...EVAL_CONTENT,
+    })
+    expect(res.success).toBe(true)
+
+    const [copy] = copiesTo(admin.email)
+    expect(copy.subject).toBe(`[Kopija] ${EVAL_CONTENT.subject}`)
+    expect(copy.react.props.cards).toBeUndefined()
+    expect(copy.react.props.credentials).toBeUndefined()
+    expect(copy.react.props.schedules).toBeUndefined()
+  })
+
+  it('does not mail the admins again when a campaign is resumed', async () => {
+    const admin = await loginAdmin()
+    const { group } = await makeSourceGroup()
+    const failing = uniqEmail('copy-resume')
+    await enrollStudent(group.id, { parentEmail: failing })
+    sendMock.mockRejectedValueOnce(new Error('resend down'))
+
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...CONTENT,
+    })
+    if (!res.success) throw new Error('send failed')
+    expect(copiesTo(admin.email)).toHaveLength(1)
+
+    // Put the failed row back in the queue, the way a killed run leaves it.
+    await db.emailCampaignRecipient.updateMany({
+      where: { campaignId: res.campaignId, status: 'FAILED' },
+      data: { status: 'PENDING' },
+    })
+    const resumed = await resumeEmailCampaign(res.campaignId)
+    expect(resumed.success).toBe(true)
+    await settle(res.campaignId)
+
+    expect(copiesTo(admin.email)).toHaveLength(1)
+  })
+
+  it('a failed copy never stops the parents’ send', async () => {
+    await loginAdmin()
+    adminCopyMock.mockRejectedValueOnce(new Error('admin inbox down'))
+    const { group } = await makeSourceGroup()
+    const parent = uniqEmail('copy-fail')
+    await enrollStudent(group.id, { parentEmail: parent })
+
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...CONTENT,
+    })
+
+    expect(res).toMatchObject({ success: true, sent: 1, failed: [] })
+    expect(sendMock.mock.calls.map((c) => c[0].to)).toEqual([parent])
   })
 })

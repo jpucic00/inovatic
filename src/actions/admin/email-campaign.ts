@@ -1329,18 +1329,21 @@ export async function sendEmailCampaign(
         ? invitationSentKey(city, data.targetCourseId, targetYear)
         : null
 
-    await startSendJob({
-      campaignId: campaign.id,
-      kind: data.kind,
-      city,
-      subject: data.subject,
-      bodyText: body.bodyText,
-      bodyBlocks: body.bodyBlocks,
-      options,
-      signupPath,
-      sentKey,
-      sourceSchoolYear: data.sourceSchoolYear,
-    })
+    await startSendJob(
+      {
+        campaignId: campaign.id,
+        kind: data.kind,
+        city,
+        subject: data.subject,
+        bodyText: body.bodyText,
+        bodyBlocks: body.bodyBlocks,
+        options,
+        signupPath,
+        sentKey,
+        sourceSchoolYear: data.sourceSchoolYear,
+      },
+      { withAdminCopy: true },
+    )
 
     revalidatePath('/admin/email')
     return {
@@ -1365,14 +1368,66 @@ export async function sendEmailCampaign(
  * Under test we await instead: the integration suite shares one database, and a
  * job outliving its test file writes into the next one's data.
  */
-async function startSendJob(job: SendJob): Promise<void> {
-  if (process.env.NODE_ENV === 'test') {
+async function startSendJob(
+  job: SendJob,
+  { withAdminCopy = false }: { withAdminCopy?: boolean } = {},
+): Promise<void> {
+  const run = async () => {
+    if (withAdminCopy) await sendAdminCopies(job)
     await runSendJob(job)
+  }
+  if (process.env.NODE_ENV === 'test') {
+    await run()
     return
   }
-  void runSendJob(job).catch((err) => {
+  void run().catch((err) => {
     console.error('runSendJob crashed:', err)
   })
+}
+
+/** Prefixed so the copy never reads as a mail addressed to the admin as a parent. */
+const ADMIN_COPY_SUBJECT_PREFIX = '[Kopija] '
+
+/**
+ * One copy of the campaign to every admin of ITS city, once per campaign — a
+ * resume passes no `withAdminCopy`, so finishing a killed run does not mail the
+ * office again.
+ *
+ * Only the campaign's shared message goes out: no report card, password or
+ * schedule, because those belong to one child and `sendToRecipient` is the only
+ * place allowed to build them. The per-child mails stay viewable per recipient
+ * on `/admin/email/[campaignId]`. Admins are mailed at their real `User.email`
+ * (they sign in with it, unlike a student's synthetic address).
+ *
+ * A failed copy is logged and nothing more — it must never stop the parents'
+ * send that follows.
+ */
+async function sendAdminCopies(job: SendJob): Promise<void> {
+  try {
+    const admins = await db.user.findMany({
+      where: { role: 'ADMIN', city: job.city, deletedAt: null },
+      select: { email: true },
+    })
+    for (const admin of admins) {
+      try {
+        await sendBulkMessageEmail({
+          to: admin.email,
+          subject: `${ADMIN_COPY_SUBJECT_PREFIX}${job.subject}`,
+          bodyText: job.bodyText,
+          bodyBlocks: job.bodyBlocks,
+          city: job.city,
+          options: job.options,
+          signupPath: job.signupPath,
+        })
+      } catch (err) {
+        console.error(`sendAdminCopies: copy to ${admin.email} failed:`, err)
+      }
+      const throttle = sendThrottleMs()
+      if (throttle > 0 && process.env.RESEND_API_KEY) await sleep(throttle)
+    }
+  } catch (err) {
+    console.error('sendAdminCopies failed:', err)
+  }
 }
 
 /**
