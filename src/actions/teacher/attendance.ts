@@ -25,6 +25,11 @@ import {
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { resolveTrialDateForGroup } from '@/lib/trial-week'
 import {
+  effectiveStaffFor,
+  type RegularStaffMember,
+  type StaffChange,
+} from '@/lib/session-staff'
+import {
   bulkMarkSessionSchema,
   type BulkMarkSessionInput,
 } from '@/lib/validators/attendance'
@@ -69,11 +74,10 @@ export type AttendanceModuleSection = {
   lastSession: string | null
 }
 
-export type TeacherAttendanceRow = {
+/** Anyone the group knows as staff: regular, on a termin change, or with past hours. */
+type TeacherAttendanceRow = {
   userId: string
   name: string
-  /** False for a teacher who worked here in the past but is no longer assigned. */
-  assigned: boolean
 }
 
 export type TeacherAttendanceRecord = {
@@ -92,8 +96,14 @@ type GroupAttendanceBase = {
   endTime: string | null
   roster: AttendanceRosterRow[]
   records: AttendanceRecord[]
-  /** Assigned teachers first, then anyone with historic hours on this group. */
+  /**
+   * The marker builds each date's staff from `regularStaff` + `staffChanges`
+   * (`sessionTeacherRows`); `teachers` names everyone else it may have to show
+   * read-only because they already hold hours on a date.
+   */
   teachers: TeacherAttendanceRow[]
+  regularStaff: RegularStaffMember[]
+  staffChanges: StaffChange[]
   teacherRecords: TeacherAttendanceRecord[]
   /** The dates this viewer may still write. Null for an admin — no limit. */
   markingWindow: MarkingWindow | null
@@ -191,18 +201,32 @@ type AttendanceEnrollment = Awaited<
 type HolidayDateKeys = Awaited<ReturnType<typeof loadHolidayDateKeys>>
 
 /**
- * Teaching-hours roster for the marker: everyone currently assigned, plus any
- * teacher who already has hours here (kept visible read-only, because those
- * rows survive an unassignment).
+ * Teaching-hours data for the marker: the regular staff with their roles, every
+ * per-termin change an admin made, and everyone who already has hours here
+ * (kept visible read-only, because those rows survive an unassignment).
  */
 async function loadTeacherAttendance(groupId: string): Promise<{
   teachers: TeacherAttendanceRow[]
+  regularStaff: RegularStaffMember[]
+  staffChanges: StaffChange[]
   teacherRecords: TeacherAttendanceRecord[]
 }> {
-  const [assignments, rows] = await Promise.all([
+  const nameOf = (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`
+  const [assignments, changes, rows] = await Promise.all([
     db.teacherAssignment.findMany({
       where: { scheduledGroupId: groupId },
-      select: { user: { select: { id: true, firstName: true, lastName: true } } },
+      select: { role: true, user: { select: { id: true, firstName: true, lastName: true } } },
+    }),
+    db.sessionStaffChange.findMany({
+      where: { scheduledGroupId: groupId },
+      select: {
+        sessionDate: true,
+        userId: true,
+        role: true,
+        replacesUserId: true,
+        user: { select: { firstName: true, lastName: true } },
+        replaces: { select: { firstName: true, lastName: true } },
+      },
     }),
     db.teacherAttendance.findMany({
       where: { scheduledGroupId: groupId },
@@ -215,27 +239,33 @@ async function loadTeacherAttendance(groupId: string): Promise<{
     }),
   ])
 
+  const regularStaff = assignments.map((a) => ({
+    userId: a.user.id,
+    name: nameOf(a.user),
+    role: a.role,
+  }))
+  const staffChanges = changes.map((c) => ({
+    sessionDate: toDateKey(c.sessionDate),
+    userId: c.userId,
+    name: nameOf(c.user),
+    role: c.role,
+    replacesUserId: c.replacesUserId,
+    replacesName: c.replaces ? nameOf(c.replaces) : null,
+  }))
+
   const teachers = new Map<string, TeacherAttendanceRow>()
-  for (const a of assignments) {
-    teachers.set(a.user.id, {
-      userId: a.user.id,
-      name: `${a.user.firstName} ${a.user.lastName}`,
-      assigned: true,
-    })
+  for (const r of regularStaff) teachers.set(r.userId, { userId: r.userId, name: r.name })
+  for (const c of staffChanges) {
+    if (!teachers.has(c.userId)) teachers.set(c.userId, { userId: c.userId, name: c.name })
   }
   for (const r of rows) {
-    if (teachers.has(r.userId)) continue
-    teachers.set(r.userId, {
-      userId: r.userId,
-      name: `${r.user.firstName} ${r.user.lastName}`,
-      assigned: false,
-    })
+    if (!teachers.has(r.userId)) teachers.set(r.userId, { userId: r.userId, name: nameOf(r.user) })
   }
 
   return {
-    teachers: Array.from(teachers.values()).sort(
-      (a, b) => Number(b.assigned) - Number(a.assigned) || a.name.localeCompare(b.name, 'hr'),
-    ),
+    teachers: Array.from(teachers.values()).sort((a, b) => a.name.localeCompare(b.name, 'hr')),
+    regularStaff,
+    staffChanges,
     teacherRecords: rows.map((r) => ({
       userId: r.userId,
       sessionDate: toDateKey(r.sessionDate),
@@ -454,6 +484,8 @@ export async function getGroupAttendance(
     roster,
     records,
     teachers: teacherData.teachers,
+    regularStaff: teacherData.regularStaff,
+    staffChanges: teacherData.staffChanges,
     teacherRecords: teacherData.teacherRecords,
     // Admins keep the unrestricted correction path; teachers see past sessions
     // read-only so the arc stays visible without offering a dead Save button.
@@ -556,21 +588,24 @@ function pickDefaultSelectedDate(
 /**
  * Resolve the teaching hours to write for this session.
  *
- * Explicit entries win (the marker sends one per assigned teacher whenever the
- * group has more than one). A group with a single teacher needs no interaction:
- * marking the students books that teacher's hour. Nothing is ever booked for
- * someone who isn't assigned to the group — a stand-in must be assigned first.
+ * "Staff" is the termin's EFFECTIVE staff (`effectiveStaffFor`): the group's
+ * regular teachers minus anyone an admin replaced for this date, plus whoever
+ * the admin put on it. Explicit entries win (the marker sends one per staff
+ * member whenever the termin has more than one). A termin with a single staff
+ * member needs no interaction: marking the students books that person's hour —
+ * which is what books a substitute rather than the teacher they replaced.
+ * Nothing is ever booked for someone who is not on the termin's staff.
  */
 function resolveTeacherEntries(
   provided: { userId: string; present: boolean }[] | undefined,
-  assignedUserIds: string[],
+  staffUserIds: string[],
 ): { userId: string; present: boolean }[] {
-  const assigned = new Set(assignedUserIds)
-  const entries = (provided ?? []).filter((e) => assigned.has(e.userId))
+  const staff = new Set(staffUserIds)
+  const entries = (provided ?? []).filter((e) => staff.has(e.userId))
   const covered = new Set(entries.map((e) => e.userId))
 
-  if (assignedUserIds.length === 1 && !covered.has(assignedUserIds[0])) {
-    entries.push({ userId: assignedUserIds[0], present: true })
+  if (staffUserIds.length === 1 && !covered.has(staffUserIds[0])) {
+    entries.push({ userId: staffUserIds[0], present: true })
   }
   return entries
 }
@@ -652,13 +687,30 @@ export async function bulkMarkSession(
           })
         }
 
-        const assignments = await tx.teacherAssignment.findMany({
-          where: { scheduledGroupId: data.groupId },
-          select: { userId: true },
-        })
+        const [assignments, changes] = await Promise.all([
+          tx.teacherAssignment.findMany({
+            where: { scheduledGroupId: data.groupId },
+            select: { userId: true, role: true },
+          }),
+          tx.sessionStaffChange.findMany({
+            where: { scheduledGroupId: data.groupId, sessionDate },
+            select: { userId: true, role: true, replacesUserId: true },
+          }),
+        ])
+        // Names play no part in who may be booked, only ids and the date do.
+        const staff = effectiveStaffFor(
+          assignments.map((a) => ({ ...a, name: '' })),
+          changes.map((c) => ({
+            ...c,
+            sessionDate: data.sessionDate,
+            name: '',
+            replacesName: null,
+          })),
+          data.sessionDate,
+        )
         const teacherEntries = resolveTeacherEntries(
           data.teacherEntries,
-          assignments.map((a) => a.userId),
+          staff.map((t) => t.userId),
         )
         for (const t of teacherEntries) {
           await tx.teacherAttendance.upsert({

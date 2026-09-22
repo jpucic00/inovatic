@@ -101,7 +101,7 @@ const baseEnrollmentSelect = {
       course: { select: courseSelect },
       location: { select: { name: true, address: true } },
       teacherAssignments: {
-        select: { user: { select: { firstName: true, lastName: true } } },
+        select: { role: true, user: { select: { firstName: true, lastName: true } } },
       },
     },
   },

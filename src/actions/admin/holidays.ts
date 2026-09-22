@@ -89,6 +89,22 @@ async function deleteAffectedAttendance(
   await tx.teacherAttendance.deleteMany({ where: scope.teacher })
 }
 
+/**
+ * A holiday cancels the termin, so a zamjena booked for it has nothing left to
+ * cover. Unlike attendance these rows are not payout evidence (hours come from
+ * TeacherAttendance), so they go without a confirmation step.
+ */
+async function deleteStaffChangesOn(
+  tx: Pick<typeof db, 'sessionStaffChange'>,
+  dateValues: Date[],
+  schoolYear: string,
+  city: City,
+): Promise<void> {
+  await tx.sessionStaffChange.deleteMany({
+    where: { sessionDate: { in: dateValues }, scheduledGroup: { schoolYear, city } },
+  })
+}
+
 export type HolidayRow = {
   id: string
   schoolYear: string
@@ -182,6 +198,7 @@ export async function upsertHolidayRange(
           throw new AttendanceConfirmationRequired(attendanceCount, [])
         }
       }
+      await deleteStaffChangesOn(tx, dateValues, data.schoolYear, city)
       for (const dateUtc of dateValues) {
         await tx.schoolYearHoliday.upsert({
           where: { schoolYear_city_date: { schoolYear: data.schoolYear, city, date: dateUtc } },
@@ -450,6 +467,7 @@ export async function bulkImportHolidays(
         }
       }
 
+      await deleteStaffChangesOn(tx, dateValues, data.schoolYear, city)
       for (const [dateKey, name] of dateToName) {
         const dateUtc = fromDateKey(dateKey)
         await tx.schoolYearHoliday.upsert({

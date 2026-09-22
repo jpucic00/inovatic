@@ -59,7 +59,7 @@ export function StudentGradebookSection({
             <p className="mt-0.5 text-xs text-gray-500">
               Grupa: {section.groupLabel}
               {section.teacherNames.length > 0
-                ? ` · Predavač: ${section.teacherNames.join(', ')}`
+                ? ` · Nastavnici: ${section.teacherNames.join(', ')}`
                 : ''}
             </p>
           </div>

@@ -17,9 +17,12 @@ import {
   unassignTeacherFromGroup,
 } from '@/actions/admin/teacher'
 import { toast } from 'sonner'
+import { RoleBadge } from '@/components/admin/groups/staff-role'
+import type { StaffRole } from '@/lib/session-staff'
 
 type Assignment = {
   id: string
+  role: StaffRole
   scheduledGroup: {
     id: string
     name: string | null
@@ -342,6 +345,7 @@ export function TeacherAssignmentPanel({
               </div>
               {/* No per-row year badge — the active tab already names it. */}
               <div className="flex items-center gap-2 shrink-0">
+                <RoleBadge role={a.role} />
                 <button
                   onClick={() => handleUnassign(a.id)}
                   disabled={isPending}

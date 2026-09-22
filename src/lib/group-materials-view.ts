@@ -8,6 +8,7 @@ import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { displayKindOf, kindOf, EXTRA_KIND_ORDER } from '@/lib/material-display'
+import { staffDisplayNames } from '@/lib/session-staff'
 
 export type MaterialItem = {
   id: string
@@ -287,8 +288,11 @@ export const buildGroupShell = cache(async function buildGroupShell(
         kind,
       },
       location: { name: group.location.name },
-      teacherNames: group.teacherAssignments.map(
-        (t) => `${t.user.firstName} ${t.user.lastName}`,
+      teacherNames: staffDisplayNames(
+        group.teacherAssignments.map((t) => ({
+          role: t.role,
+          name: `${t.user.firstName} ${t.user.lastName}`,
+        })),
       ),
     },
     courseId: group.course.id,

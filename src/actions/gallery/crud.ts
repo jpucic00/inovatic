@@ -4,6 +4,7 @@ import type { Session } from 'next-auth'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireTeacher } from '@/lib/auth-guard'
+import { teacherGroupAccessWhere } from '@/lib/teacher-guard'
 import type { AdminActionResult } from '@/lib/action-types'
 import {
   addGalleryImagesSchema,
@@ -39,16 +40,13 @@ async function canManageGroupImages(
     return group !== null && group.city === session.user.city
   }
   if (session.user.role !== 'TEACHER') return false
-  const assigned = await db.teacherAssignment.findUnique({
-    where: {
-      userId_scheduledGroupId: {
-        userId: session.user.id,
-        scheduledGroupId,
-      },
-    },
+  // A substitute photographs the termin they cover, so the same access rule as
+  // the group page itself.
+  const group = await db.scheduledGroup.findFirst({
+    where: { id: scheduledGroupId, ...teacherGroupAccessWhere(session.user.id) },
     select: { id: true },
   })
-  return assigned !== null
+  return group !== null
 }
 
 function revalidateGalleryPaths(groupId: string) {

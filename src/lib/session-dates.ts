@@ -29,7 +29,7 @@ const DAY_INDEX: Record<string, number> = {
 
 const DAY_MS = 86_400_000
 
-function parseCroatianWeekday(name: string | null | undefined): number | null {
+export function parseCroatianWeekday(name: string | null | undefined): number | null {
   if (!name) return null
   const key = name.trim()
   const idx = DAY_INDEX[key]

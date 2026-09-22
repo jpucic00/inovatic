@@ -27,6 +27,7 @@ const assignable = (id: string, schoolYear: string, name: string) => ({
 
 const assignment = (id: string, schoolYear: string, groupName: string) => ({
   id,
+  role: 'LEAD' as const,
   scheduledGroup: {
     id: `g-${id}`,
     name: groupName,

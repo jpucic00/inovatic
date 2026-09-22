@@ -2,11 +2,37 @@ import { notFound, redirect } from 'next/navigation'
 import type { Session } from 'next-auth'
 import { db } from '@/lib/db'
 import { requireTeacher } from '@/lib/auth-guard'
+import { staffChangeAccessFrom } from '@/lib/session-staff'
+import type { Prisma } from '@prisma/client'
+
+/**
+ * The groups a TEACHER may open: every group they are regular staff on, plus
+ * any group an admin put them on for a termin that has not passed yet
+ * (`SessionStaffChange`, Europe/Zagreb day). The second arm is what lets a
+ * substitute prepare and mark the session, and what takes the group away from
+ * them the day after without anything having to run.
+ */
+export function teacherGroupAccessWhere(
+  userId: string,
+  now: Date = new Date(),
+): Prisma.ScheduledGroupWhereInput {
+  return {
+    OR: [
+      { teacherAssignments: { some: { userId } } },
+      {
+        sessionStaffChanges: {
+          some: { userId, sessionDate: { gte: staffChangeAccessFrom(now) } },
+        },
+      },
+    ],
+  }
+}
 
 /**
  * Gates access to a ScheduledGroup-scoped teacher resource.
  *
- * TEACHER users may access only groups they have a TeacherAssignment for.
+ * TEACHER users may access only groups they have a TeacherAssignment for, or
+ * an upcoming per-termin change on (`teacherGroupAccessWhere`).
  * ADMIN users may access any group IN THEIR CITY (support + Slavica teaching
  * her own Šibenik groups); cross-city groups 404 like nonexistent ones.
  * If the group doesn't exist OR the teacher lacks an assignment → notFound().
@@ -39,16 +65,11 @@ export async function assertTeacherOwnsGroup(groupId: string): Promise<{
     // the other city's groups.
     if (group.city !== session.user.city) notFound()
   } else {
-    const assignment = await db.teacherAssignment.findUnique({
-      where: {
-        userId_scheduledGroupId: {
-          userId: session.user.id,
-          scheduledGroupId: groupId,
-        },
-      },
+    const access = await db.scheduledGroup.findFirst({
+      where: { id: groupId, ...teacherGroupAccessWhere(session.user.id) },
       select: { id: true },
     })
-    if (!assignment) notFound()
+    if (!access) notFound()
   }
 
   return { session, isAdmin }
@@ -80,9 +101,7 @@ export async function assertTeacherCanViewStudent(studentId: string): Promise<{
     const shared = await db.enrollment.findFirst({
       where: {
         userId: studentId,
-        scheduledGroup: {
-          teacherAssignments: { some: { userId: session.user.id } },
-        },
+        scheduledGroup: teacherGroupAccessWhere(session.user.id),
       },
       select: { id: true },
     })

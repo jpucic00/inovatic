@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Users } from 'lucide-react'
 import type { TeacherGroupSummary } from '@/actions/teacher/dashboard'
-import { formatGroupSchedule } from '@/lib/format'
+import { formatDateKey, formatGroupSchedule } from '@/lib/format'
 import { GroupCard, groupByCourse } from '@/components/shared/group-card'
 import { isRadionica } from '@/lib/program-kind'
 
@@ -90,10 +90,13 @@ export function TeacherGroupsBoard({ groups, currentYear }: Readonly<Props>) {
                     })}
                     locationName={g.location.name}
                     extraRows={
-                      <div className="flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-gray-400" />
-                        {g.enrollmentCount} {g.enrollmentCount === 1 ? 'polaznik' : 'polaznika'}
-                      </div>
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-gray-400" />
+                          {g.enrollmentCount} {g.enrollmentCount === 1 ? 'polaznik' : 'polaznika'}
+                        </div>
+                        <MyStaffBadges myRole={g.myRole} changeDates={g.myChangeDates} />
+                      </>
                     }
                   />
                 ))}
@@ -102,6 +105,36 @@ export function TeacherGroupsBoard({ groups, currentYear }: Readonly<Props>) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Why this group is on the caller's list when it is not the plain case: they
+ * assist here, or an admin put them on specific termini. A group reached only
+ * through a zamjena disappears the day after its termin, so naming the date is
+ * what keeps that from reading as a glitch.
+ */
+function MyStaffBadges({
+  myRole,
+  changeDates,
+}: Readonly<{ myRole: TeacherGroupSummary['myRole']; changeDates: string[] }>) {
+  if (myRole !== 'ASSISTANT' && changeDates.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {myRole === 'ASSISTANT' ? (
+        <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
+          Asistent
+        </span>
+      ) : null}
+      {changeDates.map((d) => (
+        <span
+          key={d}
+          className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800"
+        >
+          {myRole ? 'Promjena' : 'Zamjena'} · {formatDateKey(d)}
+        </span>
+      ))}
     </div>
   )
 }

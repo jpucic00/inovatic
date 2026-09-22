@@ -7,6 +7,7 @@ import { requirePortalUser } from '@/lib/auth-guard'
 import { classroomGroupWhere } from '@/lib/classroom-access'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
 import { loadHolidayDateKeys } from '@/lib/holidays'
+import { staffDisplayNames } from '@/lib/session-staff'
 
 export type ClassroomProgram = {
   course: { id: string; title: string; kind: ProgramKind }
@@ -136,7 +137,12 @@ export async function getClassroomGroups(
         dateStart: g.dateStart,
         dateEnd: g.dateEnd,
         location: { name: g.location.name },
-        teacherNames: g.teacherAssignments.map((t) => `${t.user.firstName} ${t.user.lastName}`),
+        teacherNames: staffDisplayNames(
+          g.teacherAssignments.map((t) => ({
+            role: t.role,
+            name: `${t.user.firstName} ${t.user.lastName}`,
+          })),
+        ),
         activeModule: activeModule ? { id: activeModule.id, title: activeModule.title } : null,
       }
     }),

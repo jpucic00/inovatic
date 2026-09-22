@@ -19,7 +19,6 @@ import type {
   AttendanceRosterRow,
   GroupAttendance,
   TeacherAttendanceRecord,
-  TeacherAttendanceRow,
 } from '@/actions/teacher/attendance'
 import {
   hasUnrecordedEntries,
@@ -33,6 +32,11 @@ import {
   type TeacherDraft,
 } from '@/lib/attendance-draft'
 import { assignAdhocDateToSection } from '@/lib/attendance-sections'
+import {
+  sessionTeacherRows,
+  STAFF_ROLE_LABELS,
+  type SessionTeacherRow,
+} from '@/lib/session-staff'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { fromDateKey, todayUtc, toDateKey } from '@/lib/session-dates'
@@ -111,9 +115,9 @@ function makeDraftHandlers(setDraft: Dispatch<SetStateAction<AttendanceDraft>>):
   }
 }
 
-/** Only assigned teachers are bookable; the server enforces the same rule. */
+/** Only the termin's staff is bookable; the server enforces the same rule. */
 function toTeacherEntries(
-  teachers: TeacherAttendanceRow[],
+  teachers: SessionTeacherRow[],
   draft: TeacherDraft,
 ): { userId: string; present: boolean }[] {
   return teachers
@@ -232,7 +236,7 @@ function allChecked(marked: number, total: number): boolean | 'mixed' {
 // ─── Teacher section ────────────────────────────────────────────────────────
 
 interface TeacherSectionProps {
-  teachers: TeacherAttendanceRow[]
+  teachers: SessionTeacherRow[]
   draft: TeacherDraft
   existing: Map<string, boolean> | undefined
   onToggle: (userId: string) => void
@@ -241,8 +245,11 @@ interface TeacherSectionProps {
 }
 
 /**
- * Teaching hours for the selected session. Only shown when the group has more
- * than one teacher — a single teacher is booked automatically on save.
+ * Teaching hours for the selected session: its effective staff, with each
+ * person's role and any admin change for this date. Only shown when the termin
+ * has more than one staff member — a single one is booked automatically on save
+ * — or when someone off the staff already holds hours on it. Who is ON the
+ * termin is the admin's call; here a teacher only ticks who actually taught.
  */
 function TeacherSection({
   teachers,
@@ -298,23 +305,39 @@ function TeacherSection({
               )}
             >
               <CheckBox checked={present} disabled={readOnly} />
-              <span className="text-sm font-medium text-gray-900">{t.name}</span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-gray-900">{t.name}</span>
+                <StaffRoleLine row={t} />
+              </span>
             </button>
           )
         })}
         {historic.map((t) => (
           <span
             key={t.userId}
-            title="Više nije dodijeljen ovoj grupi — evidentirani sati ostaju."
+            title="Nije na postavi ovog termina — evidentirani sati ostaju."
             className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-500"
           >
             <CheckBox checked={existing?.get(t.userId) ?? false} disabled />
             {t.name}
-            <span className="text-[9px] uppercase tracking-wide">bivši</span>
+            <span className="text-[9px] uppercase tracking-wide">nije na terminu</span>
           </span>
         ))}
       </div>
     </div>
+  )
+}
+
+/** "Asistent" / "Predavač · Zamjena · umjesto: Ivo Horvat" under a staff name. */
+function StaffRoleLine({ row }: Readonly<{ row: SessionTeacherRow }>) {
+  if (!row.role) return null
+  return (
+    <span className="block text-[11px] text-gray-500">
+      {STAFF_ROLE_LABELS[row.role]}
+      {row.changeLabel ? (
+        <span className="font-medium text-amber-700"> · {row.changeLabel}</span>
+      ) : null}
+    </span>
   )
 }
 
@@ -560,7 +583,7 @@ interface SessionPanelProps {
   sectionTitle: string | null
   visibleRoster: AttendanceRosterRow[]
   existing: Map<string, AttendanceRecord> | undefined
-  teachers: TeacherAttendanceRow[]
+  teachers: SessionTeacherRow[]
   teacherExisting: Map<string, boolean> | undefined
   markingWindow: MarkingWindow | null
 }
@@ -1033,6 +1056,8 @@ function FlatAttendanceMarker({
   roster,
   records,
   teachers,
+  regularStaff,
+  staffChanges,
   teacherRecords,
   markingWindow,
 }: Readonly<FlatProps>) {
@@ -1118,7 +1143,7 @@ function FlatAttendanceMarker({
         sectionTitle={null}
         visibleRoster={roster}
         existing={recordIndex.get(selected)}
-        teachers={teachers}
+        teachers={sessionTeacherRows(regularStaff, staffChanges, selected, teachers)}
         teacherExisting={teacherIndex.get(selected)}
         markingWindow={markingWindow}
       />
@@ -1169,6 +1194,8 @@ function StandardAttendanceMarker({
   roster,
   records,
   teachers,
+  regularStaff,
+  staffChanges,
   teacherRecords,
   markingWindow,
 }: Readonly<StandardProps>) {
@@ -1365,7 +1392,7 @@ function StandardAttendanceMarker({
         sectionTitle={sectionTitleFor(selectedSection, sections)}
         visibleRoster={visibleRoster}
         existing={recordIndex.get(selected)}
-        teachers={teachers}
+        teachers={sessionTeacherRows(regularStaff, staffChanges, selected, teachers)}
         teacherExisting={teacherIndex.get(selected)}
         markingWindow={markingWindow}
       />

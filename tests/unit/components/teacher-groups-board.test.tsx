@@ -20,6 +20,8 @@ const group = (
   location: { id: 'l1', name: 'Velebitska 32' },
   enrollmentCount: 8,
   materialCount: 0,
+  myRole: 'LEAD',
+  myChangeDates: [],
   ...overrides,
 })
 
@@ -65,5 +67,27 @@ describe('TeacherGroupsBoard — school-year tabs', () => {
     expect(screen.getByText('Školska godina:')).toBeTruthy()
     expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([CURRENT])
     expect(screen.getByText('Grupa a')).toBeTruthy()
+  })
+})
+
+describe('TeacherGroupsBoard — staff badges', () => {
+  it('marks an asistent and names the date of a zamjena', () => {
+    render(
+      <TeacherGroupsBoard
+        groups={[
+          group('a', CURRENT, { myRole: 'ASSISTANT' }),
+          group('b', CURRENT, { myRole: null, myChangeDates: ['2025-10-14'] }),
+        ]}
+        currentYear={CURRENT}
+      />,
+    )
+    expect(screen.getByText('Asistent')).toBeInTheDocument()
+    expect(screen.getByText('Zamjena · 14.10.2025.')).toBeInTheDocument()
+  })
+
+  it('shows no badge for a plain predavač', () => {
+    render(<TeacherGroupsBoard groups={[group('a', CURRENT)]} currentYear={CURRENT} />)
+    expect(screen.queryByText('Asistent')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Zamjena/)).not.toBeInTheDocument()
   })
 })

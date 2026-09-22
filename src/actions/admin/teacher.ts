@@ -167,6 +167,7 @@ export async function getTeacher(id: string) {
       teacherAssignments: {
         select: {
           id: true,
+          role: true,
           scheduledGroup: {
             select: {
               id: true,
@@ -411,7 +412,7 @@ export async function assignTeacherToGroup(
 
   const parsed = assignTeacherSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
-  const { teacherId, scheduledGroupId } = parsed.data
+  const { teacherId, scheduledGroupId, role } = parsed.data
 
   // Both must live in the admin's city (which also forces assignee city ===
   // group city). Outside the try so the notFound() throw isn't swallowed.
@@ -444,7 +445,7 @@ export async function assignTeacherToGroup(
     }
 
     await db.teacherAssignment.create({
-      data: { userId: teacherId, scheduledGroupId },
+      data: { userId: teacherId, scheduledGroupId, role },
     })
 
     revalidatePath(`/admin/nastavnici/${teacherId}`)

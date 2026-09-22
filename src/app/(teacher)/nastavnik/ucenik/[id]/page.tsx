@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { requireTeacher } from '@/lib/auth-guard'
+import { teacherGroupAccessWhere } from '@/lib/teacher-guard'
 import {
   getStudentAttendanceForTeacher,
   getStudentForTeacher,
@@ -71,7 +72,7 @@ export default async function TeacherStudentDetailPage({
         await db.scheduledGroup.findMany({
           where: {
             schoolYear: computeSchoolYear(),
-            teacherAssignments: { some: { userId: viewerId } },
+            ...teacherGroupAccessWhere(viewerId),
           },
           select: { id: true },
         })

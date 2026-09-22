@@ -2,6 +2,7 @@ import type { ProgramKind, RecommendationKind, SkillLevel } from '@prisma/client
 import { isGradable } from '@/lib/program-kind'
 import type { StudentDetail } from '@/lib/student-detail'
 import type { CommentListItem } from '@/components/shared/comment-list'
+import { staffDisplayNames } from '@/lib/session-staff'
 
 export type AssessmentValue = {
   slaganje: SkillLevel | null
@@ -92,8 +93,11 @@ export function buildGradebookTabs(
       hasEnrollment: true,
       program: sg.course.title,
       groupLabel: sg.name ?? sg.dayOfWeek ?? '—',
-      teacherNames: sg.teacherAssignments.map((ta) =>
-        `${ta.user.firstName} ${ta.user.lastName}`.trim(),
+      teacherNames: staffDisplayNames(
+        sg.teacherAssignments.map((ta) => ({
+          role: ta.role,
+          name: `${ta.user.firstName} ${ta.user.lastName}`.trim(),
+        })),
       ),
     })
   }

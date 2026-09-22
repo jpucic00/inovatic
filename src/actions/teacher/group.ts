@@ -4,6 +4,7 @@ import type { ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
 import { computeSchoolYear } from '@/lib/school-year'
+import { staffDisplayNames } from '@/lib/session-staff'
 
 type TeacherGroupDetail = {
   id: string
@@ -87,8 +88,11 @@ export async function getTeacherGroupDetail(groupId: string): Promise<TeacherGro
       }),
     },
     location: { id: group.location.id, name: group.location.name },
-    teacherNames: group.teacherAssignments.map(
-      (t) => `${t.user.firstName} ${t.user.lastName}`,
+    teacherNames: staffDisplayNames(
+      group.teacherAssignments.map((t) => ({
+        role: t.role,
+        name: `${t.user.firstName} ${t.user.lastName}`,
+      })),
     ),
   }
 }

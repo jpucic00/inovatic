@@ -85,6 +85,13 @@ enum PaymentOption {
   CIJELA_GODINA
 }
 
+/// What a teacher does on a group: runs the lesson or helps. Display only — pay
+/// stays one `User.hourlyRateCents` per person (owner decision 2026-09-23).
+enum TeacherRole {
+  LEAD
+  ASSISTANT
+}
+
 enum InquiryStatus {
   NEW
   ACCOUNT_CREATED
@@ -228,6 +235,9 @@ model User {
   recordedAttendances  Attendance[]        @relation("AttendanceRecorder")
   teacherAttendances   TeacherAttendance[] @relation("TeacherAttendanceTeacher")
   recordedTeacherAttendances TeacherAttendance[] @relation("TeacherAttendanceRecorder")
+  sessionStaffChanges  SessionStaffChange[] @relation("SessionStaffMember")
+  replacedInSessions   SessionStaffChange[] @relation("SessionStaffReplaced")
+  createdSessionStaffChanges SessionStaffChange[] @relation("SessionStaffCreator")
   createdHolidays      SchoolYearHoliday[] @relation("HolidayCreator")
   sentEmailCampaigns   EmailCampaign[]     @relation("EmailCampaignSender")
 
@@ -485,6 +495,7 @@ model ScheduledGroup {
   location           Location            @relation(fields: [locationId, city], references: [id, city])
   teacherAssignments TeacherAssignment[]
   teacherAttendances TeacherAttendance[]
+  sessionStaffChanges SessionStaffChange[]
   enrollments        Enrollment[]
   materials          Material[]
   materialHides      MaterialGroupHide[]
@@ -499,9 +510,10 @@ model ScheduledGroup {
 }
 
 model TeacherAssignment {
-  id               String @id @default(cuid())
+  id               String      @id @default(cuid())
   userId           String
   scheduledGroupId String
+  role             TeacherRole @default(LEAD)
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id], onDelete: Cascade)
@@ -753,6 +765,32 @@ model Attendance {
 /// (user, group, date) and NOT on TeacherAssignment: unassigning a teacher — or
 /// a stand-in covering one session — must never rewrite who worked which hour.
 /// The admin payout report reads these rows and nothing else.
+/// A one-termin change to a group's staff, set by an admin only. Applies to its
+/// own `sessionDate` and nothing else, so a substitute "comes off" the group the
+/// day after without a cron — the row stays as history of who covered whom.
+/// `replacesUserId` null = an extra person on that termin; set = the regular
+/// staff member stepping aside for that date. See `src/lib/session-staff.ts`.
+model SessionStaffChange {
+  id               String      @id @default(cuid())
+  scheduledGroupId String
+  sessionDate      DateTime    @db.Date
+  userId           String
+  role             TeacherRole
+  replacesUserId   String?
+  createdById      String
+  createdAt        DateTime    @default(now())
+
+  // Cascade, unlike TeacherAttendance: a change only schedules someone, the
+  // hours they worked live in TeacherAttendance, which still blocks deletion.
+  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id], onDelete: Cascade)
+  user           User           @relation("SessionStaffMember", fields: [userId], references: [id], onDelete: Cascade)
+  replaces       User?          @relation("SessionStaffReplaced", fields: [replacesUserId], references: [id], onDelete: SetNull)
+  createdBy      User           @relation("SessionStaffCreator", fields: [createdById], references: [id])
+
+  @@unique([scheduledGroupId, sessionDate, userId])
+  @@index([userId, sessionDate])
+}
+
 model TeacherAttendance {
   id               String   @id @default(cuid())
   userId           String

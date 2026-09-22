@@ -33,6 +33,8 @@ function props(records: GroupAttendance['records'] = []): GroupAttendance {
     roster: [ANA, LUKA],
     records,
     teachers: [],
+    regularStaff: [],
+    staffChanges: [],
     teacherRecords: [],
     // null = admin: never outside the marking window, so nothing is read-only.
     markingWindow: null,

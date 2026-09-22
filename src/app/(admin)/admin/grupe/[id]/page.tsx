@@ -9,6 +9,10 @@ import { getAssignableTeachers } from '@/actions/admin/teacher'
 import { db } from '@/lib/db'
 import { ModuleEnrollmentPanel } from '@/components/admin/groups/module-enrollment-panel'
 import { GroupTeachersPanel } from '@/components/admin/groups/group-teachers-panel'
+import { getGroupStaffChanges } from '@/actions/admin/session-staff'
+import { getGroupAttendance } from '@/actions/teacher/attendance'
+import { zagrebDateKey } from '@/lib/attendance-window'
+import { upcomingTerminSections } from '@/lib/session-staff'
 import { GroupInfoPanel } from '@/components/admin/groups/group-info-panel'
 import { GroupGalleryPanel } from '@/components/admin/groups/group-gallery-panel'
 import { GroupMaterialsPanel } from '@/components/admin/groups/group-materials-panel'
@@ -27,7 +31,7 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   const { city } = await requireAdminCtx()
 
   const { id } = await params
-  const [group, allTeachers, courses, locations] = await Promise.all([
+  const [group, allTeachers, courses, locations, staffChanges, attendance] = await Promise.all([
     getGroupDetail(id),
     getAssignableTeachers(),
     db.course.findMany({
@@ -41,6 +45,9 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     }),
+    getGroupStaffChanges(id),
+    // The substitute picker offers exactly the termini the Dolazak tab lists.
+    getGroupAttendance(id),
   ])
 
   if (!group) notFound()
@@ -55,6 +62,12 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   const assignableTeachers = allTeachers.filter((t) => !assignedUserIds.has(t.id))
 
   const enrolledCount = group.enrollments.length
+
+  // A substitute is listed only until their termin is over — the same window
+  // in which they can open the group.
+  const todayKey = zagrebDateKey(new Date())
+  const upcomingChanges = staffChanges.filter((c) => c.sessionDate >= todayKey)
+  const terminSections = upcomingTerminSections(attendance, todayKey)
 
   // Signup window is inherited from the program for this group's school year.
   const window = group.course.enrollmentWindows[0] ?? null
@@ -120,6 +133,9 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
           groupId={group.id}
           assignments={group.teacherAssignments}
           assignableTeachers={assignableTeachers}
+          people={allTeachers}
+          changes={upcomingChanges}
+          terminSections={terminSections}
           editable={editable}
         />
       </div>

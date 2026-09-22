@@ -3,6 +3,9 @@
 import type { ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireTeacher } from '@/lib/auth-guard'
+import { teacherGroupAccessWhere } from '@/lib/teacher-guard'
+import { staffChangeAccessFrom, type StaffRole } from '@/lib/session-staff'
+import { toDateKey } from '@/lib/session-dates'
 
 export type TeacherGroupSummary = {
   id: string
@@ -15,6 +18,14 @@ export type TeacherGroupSummary = {
   location: { id: string; name: string }
   enrollmentCount: number
   materialCount: number
+  /** The caller's regular role on this group; null when not regular staff. */
+  myRole: StaffRole | null
+  /**
+   * Upcoming termini (YYYY-MM-DD) an admin put the caller on as a one-off
+   * change. A group reached ONLY through these drops off the list the day
+   * after its last one.
+   */
+  myChangeDates: string[]
 }
 
 /**
@@ -31,7 +42,7 @@ export async function getMyAssignedGroups(): Promise<TeacherGroupSummary[]> {
   const groups = await db.scheduledGroup.findMany({
     where: isAdmin
       ? { city: session.user.city }
-      : { teacherAssignments: { some: { userId: session.user.id } } },
+      : teacherGroupAccessWhere(session.user.id),
     orderBy: [
       { schoolYear: 'desc' },
       { course: { sortOrder: 'asc' } },
@@ -42,6 +53,18 @@ export async function getMyAssignedGroups(): Promise<TeacherGroupSummary[]> {
       course: { select: { id: true, title: true, kind: true } },
       location: { select: { id: true, name: true } },
       _count: { select: { enrollments: true, materials: true } },
+      teacherAssignments: {
+        where: { userId: session.user.id },
+        select: { role: true },
+      },
+      sessionStaffChanges: {
+        where: {
+          userId: session.user.id,
+          sessionDate: { gte: staffChangeAccessFrom(new Date()) },
+        },
+        orderBy: { sessionDate: 'asc' },
+        select: { sessionDate: true },
+      },
     },
   })
 
@@ -56,5 +79,7 @@ export async function getMyAssignedGroups(): Promise<TeacherGroupSummary[]> {
     location: g.location,
     enrollmentCount: g._count.enrollments,
     materialCount: g._count.materials,
+    myRole: g.teacherAssignments[0]?.role ?? null,
+    myChangeDates: g.sessionStaffChanges.map((c) => toDateKey(c.sessionDate)),
   }))
 }

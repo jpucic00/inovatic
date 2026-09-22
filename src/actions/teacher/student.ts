@@ -1,7 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { assertTeacherCanViewStudent } from '@/lib/teacher-guard'
+import { assertTeacherCanViewStudent, teacherGroupAccessWhere } from '@/lib/teacher-guard'
 import { buildStudentDetailForTeacher } from '@/lib/student-detail'
 import { buildStudentAttendanceHistory } from '@/lib/student-attendance'
 
@@ -22,7 +22,7 @@ export async function getStudentAttendanceForTeacher(studentId: string) {
  * foreign or hand-edited id costs the caller its back link, never the page —
  * 404-ing a student profile over a query param would be a worse bug than the
  * one this fixes. The group must both hold this student and be one the caller
- * may actually open (own assignment; for an admin, own city), so the link can
+ * may actually open (own assignment or upcoming zamjena; for an admin, own city), so the link can
  * never point somewhere that 404s on click.
  */
 export async function getStudentGroupContext(studentId: string, groupId: string) {
@@ -32,9 +32,7 @@ export async function getStudentGroupContext(studentId: string, groupId: string)
     where: {
       id: groupId,
       enrollments: { some: { userId: studentId } },
-      ...(isAdmin
-        ? { city: session.user.city }
-        : { teacherAssignments: { some: { userId: session.user.id } } }),
+      ...(isAdmin ? { city: session.user.city } : teacherGroupAccessWhere(session.user.id)),
     },
     select: { id: true, name: true },
   })

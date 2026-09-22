@@ -20,6 +20,7 @@ export const updateTeacherSchema = z.object({
 export const assignTeacherSchema = z.object({
   teacherId: z.string().min(1),
   scheduledGroupId: z.string().min(1),
+  role: z.enum(['LEAD', 'ASSISTANT']).default('LEAD'),
 })
 
 /**
@@ -56,6 +57,6 @@ export const updateTeacherHourlyRateSchema = z.object({
 
 export type CreateTeacherInput = z.infer<typeof createTeacherSchema>
 export type UpdateTeacherInput = z.infer<typeof updateTeacherSchema>
-export type AssignTeacherInput = z.infer<typeof assignTeacherSchema>
+export type AssignTeacherInput = z.input<typeof assignTeacherSchema>
 /** `hourlyRateCents` is what the form typed (a string) on the way in, cents on the way out. */
 export type UpdateTeacherHourlyRateInput = z.input<typeof updateTeacherHourlyRateSchema>
