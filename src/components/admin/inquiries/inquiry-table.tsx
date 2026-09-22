@@ -6,6 +6,7 @@ import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { InquiryStatusBadge } from './inquiry-status-badge'
 import { InquiryTypeBadge } from './inquiry-type-badge'
 import { ReturningBadge } from '@/components/admin/returning-badge'
+import { WaitlistBadge } from './waitlist-badge'
 import { formatChildName, formatDate } from '@/lib/format'
 import { GRADE_LABELS, GRADE_SORT_KEY, type Grade } from '@/lib/inquiry-status'
 
@@ -21,6 +22,7 @@ type InquiryRow = {
   childGrade: string | null
   status: string
   isReturning?: boolean
+  waitlistedAt?: Date | null
   createdAt: Date
 }
 
@@ -91,6 +93,7 @@ const columns: ColumnDef<InquiryRow>[] = [
         <InquiryStatusBadge status={row.status} />
         <InquiryTypeBadge type={row.type} />
         {row.isReturning && <ReturningBadge />}
+        {row.waitlistedAt && <WaitlistBadge />}
       </div>
     ),
   },

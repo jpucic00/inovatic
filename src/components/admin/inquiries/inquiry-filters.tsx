@@ -22,10 +22,12 @@ interface InquiryFiltersProps {
   currentGrade: string
   currentType: string
   currentReturning: string
+  /** The active tab (`?view=`). Filters narrow within it, so every push keeps it. */
+  currentView?: string
   courses: { id: string; title: string }[]
 }
 
-export function InquiryFilters({ currentStatus, currentSearch, currentCourse, currentGrade, currentType, currentReturning, courses }: Readonly<InquiryFiltersProps>) {
+export function InquiryFilters({ currentStatus, currentSearch, currentCourse, currentGrade, currentType, currentReturning, currentView, courses }: Readonly<InquiryFiltersProps>) {
   const router = useRouter()
   const pathname = usePathname()
   const [, startTransition] = useTransition()
@@ -33,6 +35,7 @@ export function InquiryFilters({ currentStatus, currentSearch, currentCourse, cu
 
   const pushUrl = (params: { status?: string; search?: string; course?: string; grade?: string; type?: string; returning?: string }) => {
     const sp = new URLSearchParams()
+    if (currentView) sp.set('view', currentView)
     const s = params.status ?? currentStatus
     const q = params.search ?? currentSearch
     const c = params.course ?? currentCourse

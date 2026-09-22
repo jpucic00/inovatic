@@ -534,7 +534,10 @@ export async function createStudentFromInquiry(
   if (inquiryPreview.status === 'ACCOUNT_CREATED') {
     return { success: false, error: 'Račun je već stvoren za ovaj upit.' }
   }
-  if (inquiryPreview.status === 'DECLINED') {
+  // A declined upit that sits on the lista čekanja is exactly the family the
+  // list exists to place once a suitable spot opens — only a declined upit
+  // nobody is waiting on stays closed.
+  if (inquiryPreview.status === 'DECLINED' && !inquiryPreview.waitlistedAt) {
     return { success: false, error: 'Upit je odbijen.' }
   }
 
@@ -549,7 +552,7 @@ export async function createStudentFromInquiry(
       if (fresh.status === 'ACCOUNT_CREATED') {
         throw new InquiryAlreadyProcessedError()
       }
-      if (fresh.status === 'DECLINED') {
+      if (fresh.status === 'DECLINED' && !fresh.waitlistedAt) {
         throw new InquiryDeclinedError()
       }
       // Party inquiries carry no enrolling child and never reach this action
@@ -562,9 +565,11 @@ export async function createStudentFromInquiry(
       // Free this inquiry's reservation BEFORE the capacity assertion so the
       // count doesn't include the spot we're about to claim. Inquiry-mark
       // first; backfill studentId/assignedGroupId once we have them.
+      // Placing the child also takes the upit off the lista čekanja.
+      await tx.inquiryWaitlistGroup.deleteMany({ where: { inquiryId } })
       await tx.inquiry.update({
         where: { id: inquiryId },
-        data: { status: 'ACCOUNT_CREATED' },
+        data: { status: 'ACCOUNT_CREATED', waitlistedAt: null, waitlistNote: null },
       })
 
       const created = await createStudentCore(tx, {

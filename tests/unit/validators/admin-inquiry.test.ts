@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { declineInquirySchema } from '@/lib/validators/admin/inquiry'
+import { declineInquirySchema, waitlistInquirySchema } from '@/lib/validators/admin/inquiry'
 
 describe('declineInquirySchema', () => {
   it('accepts a valid id + reason', () => {
@@ -53,5 +53,34 @@ describe('declineInquirySchema', () => {
       reason: 'a'.repeat(2000),
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('waitlistInquirySchema', () => {
+  it('accepts groups without a note, and stores a blank note as null', () => {
+    const r = waitlistInquirySchema.parse({ id: 'i1', groupIds: ['g1'], note: '   ' })
+    expect(r.note).toBeNull()
+    expect(r.groupIds).toEqual(['g1'])
+  })
+
+  it('accepts a note without groups, trimmed', () => {
+    const r = waitlistInquirySchema.parse({ id: 'i1', groupIds: [], note: '  samo petak ' })
+    expect(r.note).toBe('samo petak')
+  })
+
+  it('rejects an entry with neither groups nor a note', () => {
+    expect(waitlistInquirySchema.safeParse({ id: 'i1', groupIds: [], note: '  ' }).success).toBe(false)
+  })
+
+  it('dedupes group ids and caps them at 20', () => {
+    expect(waitlistInquirySchema.parse({ id: 'i1', groupIds: ['g', 'g'], note: '' }).groupIds).toEqual(['g'])
+    const many = Array.from({ length: 21 }, (_, i) => `g${i}`)
+    expect(waitlistInquirySchema.safeParse({ id: 'i1', groupIds: many, note: '' }).success).toBe(false)
+  })
+
+  it('caps the note at 1000 characters', () => {
+    expect(
+      waitlistInquirySchema.safeParse({ id: 'i1', groupIds: [], note: 'a'.repeat(1001) }).success,
+    ).toBe(false)
   })
 })

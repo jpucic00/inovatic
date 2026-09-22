@@ -3,17 +3,24 @@
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertInquiryInCity } from '@/lib/city-guard'
-import { InquiryStatus, InquiryType, type Prisma } from '@prisma/client'
+import { InquiryStatus, InquiryType, type City, type Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import {
   declineInquirySchema,
   schedulePartySchema,
+  waitlistInquirySchema,
   type SchedulePartyInput,
+  type WaitlistInquiryInput,
 } from '@/lib/validators/admin/inquiry'
+import {
+  loadWaitlistGroupViews,
+  loadWaitlistPositions,
+  type WaitlistGroupView,
+} from '@/lib/waitlist'
 import type { AdminActionResult, PaginatedResult } from '@/lib/action-types'
 import { sendScheduleOptionsEmail } from '@/lib/email'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
-import { computeGroupCapacity } from '@/lib/group-capacity'
+import { computeGroupCapacity, RESERVING_INQUIRY_WHERE } from '@/lib/group-capacity'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { formatGroupSchedule } from '@/lib/format'
 import type { Grade } from '@/lib/inquiry-status'
@@ -30,6 +37,8 @@ type InquiryFilters = {
   grade?: Grade
   type?: InquiryType | 'ALL'
   returning?: ReturningFilter
+  /** WAITLIST narrows to the lista čekanja, in queue order (oldest first). */
+  view?: 'ALL' | 'WAITLIST'
   page?: number
   pageSize?: number
 }
@@ -43,6 +52,12 @@ function courseIdFilter(courseId: string | undefined) {
 type InquiryListRow = Awaited<ReturnType<typeof db.inquiry.findMany>>[number] & {
   isReturning: boolean
   isReturningOtherCity: boolean
+  /** Lista čekanja view only — see enrichWaitlistRows. */
+  waitlist?: {
+    position: number | null
+    groups: WaitlistGroupView[]
+    hasFreeSpot: boolean
+  }
 }
 
 /**
@@ -96,7 +111,8 @@ export async function getInquiries(
 ): Promise<PaginatedResult<InquiryListRow>> {
   const { city } = await requireAdminCtx()
 
-  const { status, search, courseId, grade, type, returning, page = 1, pageSize = 20 } = filters
+  const { status, search, courseId, grade, type, returning, view, page = 1, pageSize = 20 } = filters
+  const isWaitlistView = view === 'WAITLIST'
   const schoolYear = await getSelectedSchoolYear()
   // Parent name, child name and parent e-mail, matched case- AND
   // accent-insensitively so "Testic" finds "Testić" — see unaccent-search.ts.
@@ -109,6 +125,7 @@ export async function getInquiries(
     ...(type && type !== 'ALL' ? { type } : {}),
     ...(courseIdFilter(courseId)),
     ...(grade ? { childGrade: grade } : {}),
+    ...(isWaitlistView ? { waitlistedAt: { not: null } } : {}),
     ...searchFilter,
   }
 
@@ -121,15 +138,71 @@ export async function getInquiries(
   const [data, total] = await Promise.all([
     db.inquiry.findMany({
       where: scopedWhere,
-      orderBy: { createdAt: 'desc' },
+      orderBy: isWaitlistView
+        ? [{ waitlistedAt: 'asc' }, { id: 'asc' }]
+        : { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
     db.inquiry.count({ where: scopedWhere }),
   ])
 
-  const enriched = await flagReturningInquiries(data)
+  const flagged = await flagReturningInquiries(data)
+  const enriched = isWaitlistView
+    ? await enrichWaitlistRows(flagged, city, schoolYear)
+    : flagged
   return { data: enriched, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
+}
+
+/**
+ * Attaches each waitlisted row's queue position and its acceptable groups with
+ * live free-seat counts. One group query for the whole page, never per row.
+ * A group's count excludes nobody's reservation here: a waitlisted upit holds
+ * no seat anyway (RESERVING_INQUIRY_WHERE).
+ */
+async function enrichWaitlistRows<T extends { id: string }>(
+  rows: T[],
+  city: City,
+  schoolYear: string,
+): Promise<(T & { waitlist: NonNullable<InquiryListRow['waitlist']> })[]> {
+  const links = await db.inquiryWaitlistGroup.findMany({
+    where: { inquiryId: { in: rows.map((r) => r.id) } },
+    select: { inquiryId: true, scheduledGroupId: true },
+  })
+  const groupIds = [...new Set(links.map((l) => l.scheduledGroupId))]
+  const [groups, positions] = await Promise.all([
+    groupIds.length > 0
+      ? loadWaitlistGroupViews({ id: { in: groupIds }, city })
+      : Promise.resolve([]),
+    loadWaitlistPositions(city, schoolYear),
+  ])
+  const byId = new Map(groups.map((g) => [g.id, g]))
+
+  return rows.map((row) => {
+    const own = links
+      .filter((l) => l.inquiryId === row.id)
+      .map((l) => byId.get(l.scheduledGroupId))
+      .filter((g): g is WaitlistGroupView => Boolean(g))
+    return {
+      ...row,
+      waitlist: {
+        position: positions.get(row.id) ?? null,
+        groups: own,
+        hasFreeSpot: own.some((g) => !g.isFull),
+      },
+    }
+  })
+}
+
+/** Tab counts for /admin/upiti — both scoped to the sidebar year and the city. */
+export async function getInquiryTabCounts(): Promise<{ all: number; waitlist: number }> {
+  const { city } = await requireAdminCtx()
+  const schoolYear = await getSelectedSchoolYear()
+  const [all, waitlist] = await Promise.all([
+    db.inquiry.count({ where: { city, schoolYear } }),
+    db.inquiry.count({ where: { city, schoolYear, waitlistedAt: { not: null } } }),
+  ])
+  return { all, waitlist }
 }
 
 type ReturningStudentInfo = {
@@ -352,9 +425,12 @@ export async function getGroupsForCourse(courseId: string, excludeInquiryId?: st
   if (excludeInquiryId) {
     const excluded = await db.inquiry.findUnique({
       where: { id: excludeInquiryId },
-      select: { status: true, scheduledGroupId: true },
+      select: { status: true, scheduledGroupId: true, waitlistedAt: true },
     })
-    if (excluded?.status === 'NEW') reservedGroupId = excluded.scheduledGroupId
+    // A waitlisted upit has released its seat, so there is nothing to flag.
+    if (excluded?.status === 'NEW' && !excluded.waitlistedAt) {
+      reservedGroupId = excluded.scheduledGroupId
+    }
   }
 
   // Session city == inquiry city for every inquiry-driven picker (cross-city
@@ -392,8 +468,8 @@ export async function getGroupsForCourse(courseId: string, excludeInquiryId?: st
         select: {
           preferredInquiries: {
             where: excludeInquiryId
-              ? { status: 'NEW', id: { not: excludeInquiryId } }
-              : { status: 'NEW' },
+              ? { ...RESERVING_INQUIRY_WHERE, id: { not: excludeInquiryId } }
+              : RESERVING_INQUIRY_WHERE,
           },
         },
       },
@@ -452,7 +528,7 @@ export async function getGroupsForCourseInSelectedYear(courseId: string) {
       _count: {
         select: {
           preferredInquiries: {
-            where: { status: 'NEW' },
+            where: RESERVING_INQUIRY_WHERE,
           },
         },
       },
@@ -615,4 +691,160 @@ export async function getScheduledParties(schoolYear: string) {
     },
     orderBy: { partyConfirmedDate: 'asc' },
   })
+}
+
+// ---------------------------------------------------------------------------
+// Lista čekanja — orthogonal to status (see the Inquiry.waitlistedAt comment).
+// ---------------------------------------------------------------------------
+
+/**
+ * Groups a family could wait for: the given program's groups in the upit's own
+ * city and school year, with live free-seat counts. Keyed on the UPIT's year,
+ * not the sidebar cookie — a waitlist entry belongs to the year the family
+ * signed up for, whatever year the admin happens to be looking at.
+ */
+export async function getWaitlistGroupOptions(
+  inquiryId: string,
+  courseId: string,
+): Promise<WaitlistGroupView[]> {
+  const { city } = await requireAdminCtx()
+  if (!inquiryId || !courseId) return []
+
+  const inquiry = await db.inquiry.findFirst({
+    where: { id: inquiryId, city },
+    select: { schoolYear: true },
+  })
+  if (!inquiry) return []
+  const schoolYear = inquiry.schoolYear ?? (await getSelectedSchoolYear())
+
+  return loadWaitlistGroupViews({ courseId, city, schoolYear }, inquiryId)
+}
+
+/** The upit's waitlist entry with live availability, or null when not on the list. */
+export async function getInquiryWaitlist(inquiryId: string) {
+  const { city } = await requireAdminCtx()
+
+  const inquiry = await db.inquiry.findFirst({
+    where: { id: inquiryId, city },
+    select: {
+      schoolYear: true,
+      waitlistedAt: true,
+      waitlistNote: true,
+      waitlistGroups: { select: { scheduledGroupId: true } },
+    },
+  })
+  if (!inquiry?.waitlistedAt) return null
+
+  const groupIds = inquiry.waitlistGroups.map((g) => g.scheduledGroupId)
+  const [groups, positions] = await Promise.all([
+    groupIds.length > 0
+      ? loadWaitlistGroupViews({ id: { in: groupIds }, city }, inquiryId)
+      : Promise.resolve([]),
+    loadWaitlistPositions(city, inquiry.schoolYear),
+  ])
+
+  return {
+    waitlistedAt: inquiry.waitlistedAt,
+    note: inquiry.waitlistNote,
+    position: positions.get(inquiryId) ?? null,
+    groups,
+  }
+}
+
+/**
+ * Puts a COURSE upit on the lista čekanja, or edits its entry. Any status is
+ * allowed — that is the point of the list. `waitlistedAt` is stamped only on
+ * the way ON, so editing the groups or note never costs the family its place
+ * in the queue.
+ */
+export async function setInquiryWaitlist(
+  input: WaitlistInquiryInput,
+): Promise<AdminActionResult> {
+  const { city } = await requireAdminCtx()
+
+  const parsed = waitlistInquirySchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Nevaljani podaci.' }
+  }
+  const { id, groupIds, note } = parsed.data
+
+  // Outside the try so the notFound() throw isn't swallowed.
+  await assertInquiryInCity(id, city)
+
+  const inquiry = await db.inquiry.findUnique({
+    where: { id },
+    select: { type: true, schoolYear: true, waitlistedAt: true },
+  })
+  if (!inquiry) return { success: false, error: 'Upit nije pronađen.' }
+  if (inquiry.type !== InquiryType.COURSE) {
+    return { success: false, error: 'Proslave se ne stavljaju na listu čekanja.' }
+  }
+
+  if (groupIds.length > 0) {
+    const groups = await db.scheduledGroup.findMany({
+      where: { id: { in: groupIds } },
+      select: { city: true, schoolYear: true, courseId: true },
+    })
+    const valid =
+      groups.length === groupIds.length &&
+      groups.every(
+        (g) =>
+          g.city === city &&
+          (inquiry.schoolYear === null || g.schoolYear === inquiry.schoolYear),
+      ) &&
+      new Set(groups.map((g) => g.courseId)).size === 1
+    if (!valid) {
+      return {
+        success: false,
+        error: 'Grupe moraju biti iz istog programa, grada i školske godine kao upit.',
+      }
+    }
+  }
+
+  try {
+    await db.$transaction([
+      db.inquiryWaitlistGroup.deleteMany({ where: { inquiryId: id } }),
+      db.inquiry.update({
+        where: { id },
+        data: {
+          waitlistNote: note,
+          ...(inquiry.waitlistedAt ? {} : { waitlistedAt: new Date() }),
+          waitlistGroups: {
+            create: groupIds.map((scheduledGroupId) => ({ scheduledGroupId })),
+          },
+        },
+      }),
+    ])
+  } catch (err) {
+    console.error('setInquiryWaitlist failed:', err)
+    return { success: false, error: 'Greška pri spremanju liste čekanja.' }
+  }
+
+  revalidatePath('/admin/upiti')
+  revalidatePath(`/admin/upiti/${id}`)
+  return { success: true }
+}
+
+export async function removeInquiryFromWaitlist(id: string): Promise<AdminActionResult> {
+  const { city } = await requireAdminCtx()
+  if (!id) return { success: false, error: 'ID nije pronađen.' }
+
+  await assertInquiryInCity(id, city)
+
+  try {
+    await db.$transaction([
+      db.inquiryWaitlistGroup.deleteMany({ where: { inquiryId: id } }),
+      db.inquiry.update({
+        where: { id },
+        data: { waitlistedAt: null, waitlistNote: null },
+      }),
+    ])
+  } catch (err) {
+    console.error('removeInquiryFromWaitlist failed:', err)
+    return { success: false, error: 'Greška pri uklanjanju s liste čekanja.' }
+  }
+
+  revalidatePath('/admin/upiti')
+  revalidatePath(`/admin/upiti/${id}`)
+  return { success: true }
 }

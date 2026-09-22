@@ -29,6 +29,10 @@ export const INQUIRY_TYPE_COLORS: Record<string, string> = {
 // lifecycle status, since it is orthogonal to NEW / ACCOUNT_CREATED / DECLINED.
 export const RETURNING_INQUIRY_LABEL = 'Ponovni upis'
 
+// Label for the lista čekanja marker — like "Ponovni upis", orthogonal to the
+// lifecycle status, so it renders beside the status badge rather than as one.
+export const WAITLIST_LABEL = 'Lista čekanja'
+
 // The parent's answer when none of a program's proposed termini work for them.
 // One string for both the public dropdown option and the admin "Željeni termin"
 // row, so the admin reads back verbatim what the parent picked.

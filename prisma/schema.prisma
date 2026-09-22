@@ -491,6 +491,7 @@ model ScheduledGroup {
   galleryImages      GalleryImage[]
   assignedInquiries  Inquiry[]           @relation("AssignedGroup")
   preferredInquiries Inquiry[]           @relation("PreferredGroup")
+  waitlistEntries    InquiryWaitlistGroup[]
   studentComments    StudentComment[]
   studentAssessments StudentAssessment[]
 
@@ -550,6 +551,13 @@ model Inquiry {
   declineReason      String?       @db.Text
   assignedGroupId    String?
   studentId          String?
+  // Lista čekanja — orthogonal to `status`: any COURSE upit (new, account
+  // created, declined) can wait for a spot in a group the family can attend.
+  // null = not on the list; the timestamp is also the queue order, so editing
+  // the entry never moves the family back. A waitlisted NEW upit no longer
+  // reserves a seat in its picked group (RESERVING_INQUIRY_WHERE).
+  waitlistedAt       DateTime?
+  waitlistNote       String?       @db.Text
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -557,6 +565,7 @@ model Inquiry {
   scheduledGroup ScheduledGroup? @relation("PreferredGroup", fields: [scheduledGroupId], references: [id])
   assignedGroup  ScheduledGroup? @relation("AssignedGroup", fields: [assignedGroupId], references: [id])
   student        User?           @relation("CreatedStudent", fields: [studentId], references: [id])
+  waitlistGroups InquiryWaitlistGroup[]
 
   @@index([scheduledGroupId])
   @@index([status])
@@ -566,6 +575,21 @@ model Inquiry {
   @@index([schoolYear])
   @@index([type, status])
   @@index([city, schoolYear, status])
+  @@index([city, schoolYear, waitlistedAt])
+}
+
+// The groups a waitlisted family CAN attend. A join table rather than an id
+// array so deleting a group cleans up by FK; a wish is not evidence, so it
+// never blocks that delete.
+model InquiryWaitlistGroup {
+  inquiryId        String
+  scheduledGroupId String
+
+  inquiry        Inquiry        @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  scheduledGroup ScheduledGroup @relation(fields: [scheduledGroupId], references: [id], onDelete: Cascade)
+
+  @@id([inquiryId, scheduledGroupId])
+  @@index([scheduledGroupId])
 }
 
 model Enrollment {

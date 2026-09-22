@@ -9,6 +9,8 @@ import {
   getInquiryCourses,
   getGroupsForCourse,
   getReturningStudentInfo,
+  getInquiryWaitlist,
+  getWaitlistGroupOptions,
 } from '@/actions/admin/inquiry'
 import { InquiryStatusBadge } from '@/components/admin/inquiries/inquiry-status-badge'
 import { InquiryTypeBadge } from '@/components/admin/inquiries/inquiry-type-badge'
@@ -18,6 +20,10 @@ import { DeleteDialog } from '@/components/admin/inquiries/delete-dialog'
 import { SendScheduleDialog } from '@/components/admin/inquiries/send-schedule-dialog'
 import { CreateAccountDialog } from '@/components/admin/inquiries/create-account-dialog'
 import { SchedulePartyDialog } from '@/components/admin/inquiries/schedule-party-dialog'
+import { WaitlistBadge } from '@/components/admin/inquiries/waitlist-badge'
+import { WaitlistCard } from '@/components/admin/inquiries/waitlist-card'
+import { WaitlistDialog } from '@/components/admin/inquiries/waitlist-dialog'
+import { RemoveFromWaitlistButton } from '@/components/admin/inquiries/remove-from-waitlist-button'
 import {
   INQUIRY_STATUS_LABELS,
   STATUS_FLOW,
@@ -258,9 +264,12 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
 
   const isDeclined = inquiry.status === 'DECLINED'
   const isAccountCreated = inquiry.status === 'ACCOUNT_CREATED'
+  const isWaitlisted = inquiry.waitlistedAt !== null
   const canDecline = !isDeclined && !isAccountCreated
   const canSendSchedule = !isDeclined && !isAccountCreated
-  const canCreateAccount = !isDeclined && !isAccountCreated
+  // A declined upit on the lista čekanja can still be placed once a spot opens
+  // — createStudentFromInquiry applies the same exception.
+  const canCreateAccount = !isAccountCreated && (!isDeclined || isWaitlisted)
 
   // Groups for the dropdowns — strip to plain objects (Decimal fields are not serializable).
   // Capacity fields (availableSpots / isFull) come from getGroupsForCourse so the dialogs
@@ -312,6 +321,25 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   const courseGroups = groupsForInitial.map(toGroupOption)
   const allCourses = await getInquiryCourses()
 
+  // Lista čekanja: the entry (if any) and the dialog's initial program + groups.
+  // The program defaults to the one the family is waiting on, else the upit's own.
+  const waitlist = await getInquiryWaitlist(inquiry.id)
+  const waitlistCourseId = waitlist?.groups[0]?.courseId ?? inquiry.courseId ?? ''
+  const waitlistGroupOptions = waitlistCourseId
+    ? await getWaitlistGroupOptions(inquiry.id, waitlistCourseId)
+    : []
+
+  // Placing a waitlisted child: open "Kreiraj račun" on the program they are
+  // waiting on, with the first acceptable group that has room preselected.
+  const freeWaitlistGroup = waitlist?.groups.find((g) => !g.isFull)
+  const createCourseId = waitlist?.groups[0]?.courseId ?? inquiry.courseId ?? undefined
+  const createGroups =
+    createCourseId && createCourseId !== inquiry.courseId
+      ? (await getGroupsForCourse(createCourseId, inquiry.id)).map(toGroupOption)
+      : courseGroups
+  const createPreferredGroupId =
+    freeWaitlistGroup?.id ?? inquiry.scheduledGroupId ?? undefined
+
   // Returning-student detection: a child (name + DOB) already in the system,
   // other than the account this inquiry itself created. Parent email feeds the
   // legacy fallback for DOB-less imported accounts.
@@ -356,6 +384,7 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {returningStudent && <ReturningBadge className="text-sm px-3 py-1" />}
+          {isWaitlisted && <WaitlistBadge className="text-sm px-3 py-1" />}
           <InquiryStatusBadge status={inquiry.status} className="text-sm px-3 py-1" />
         </div>
       </div>
@@ -388,6 +417,36 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
           </>
         )}
       </div>
+
+      {waitlist && (
+        <WaitlistCard
+          waitlistedAt={waitlist.waitlistedAt}
+          position={waitlist.position}
+          note={waitlist.note}
+          groups={waitlist.groups}
+          actions={
+            <>
+              <WaitlistDialog
+                inquiryId={inquiry.id}
+                childName={formatChildName(inquiry)}
+                courses={allCourses}
+                initialCourseId={waitlistCourseId}
+                initialGroups={waitlistGroupOptions}
+                initialSelectedIds={waitlist.groups.map((g) => g.id)}
+                initialNote={waitlist.note ?? ''}
+                originalGroupId={inquiry.scheduledGroupId}
+                releasesSeat={false}
+                isEditing
+                compactTrigger
+              />
+              <RemoveFromWaitlistButton
+                inquiryId={inquiry.id}
+                childName={formatChildName(inquiry)}
+              />
+            </>
+          }
+        />
+      )}
 
       {/* Parent info */}
       <div className="bg-white rounded-xl border p-6 mb-6">
@@ -619,10 +678,24 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
           <CreateAccountDialog
             inquiryId={inquiry.id}
             childName={formatChildName(inquiry)}
-            initialGroups={courseGroups}
+            initialGroups={createGroups}
             courses={allCourses}
-            preferredCourseId={inquiry.courseId ?? undefined}
-            preferredGroupId={inquiry.scheduledGroupId ?? undefined}
+            preferredCourseId={createCourseId}
+            preferredGroupId={createPreferredGroupId}
+          />
+        )}
+        {!isWaitlisted && (
+          <WaitlistDialog
+            inquiryId={inquiry.id}
+            childName={formatChildName(inquiry)}
+            courses={allCourses}
+            initialCourseId={waitlistCourseId}
+            initialGroups={waitlistGroupOptions}
+            initialSelectedIds={[]}
+            initialNote=""
+            originalGroupId={inquiry.scheduledGroupId}
+            releasesSeat={inquiry.status === 'NEW' && inquiry.scheduledGroupId !== null}
+            isEditing={false}
           />
         )}
         {canDecline && (

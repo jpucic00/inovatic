@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
-import { getInquiries, getInquiryCourses } from '@/actions/admin/inquiry'
+import Link from 'next/link'
+import { getInquiries, getInquiryCourses, getInquiryTabCounts } from '@/actions/admin/inquiry'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { InquiryFilters } from '@/components/admin/inquiries/inquiry-filters'
 import { InquiryTable } from '@/components/admin/inquiries/inquiry-table'
+import { WaitlistTable } from '@/components/admin/inquiries/waitlist-table'
+import { cn } from '@/lib/utils'
 import { Pagination } from '@/components/admin/pagination'
 import {
   ListFilterMemory,
@@ -24,6 +27,10 @@ const VALID_TYPES = Object.values(InquiryType) as string[]
 const VALID_GRADES = GRADE_VALUES as readonly string[]
 const PAGE_SIZE = 20
 
+// `?view=cekanje` selects the Lista čekanja tab. A URL param, not React state,
+// so ListFilterMemory, BackToListLink and browser Back all carry it.
+const WAITLIST_VIEW = 'cekanje'
+
 const STATUS_LABELS: Record<InquiryStatus, string> = {
   NEW: 'Nove',
   ACCOUNT_CREATED: 'Račun stvoren',
@@ -32,7 +39,7 @@ const STATUS_LABELS: Record<InquiryStatus, string> = {
 }
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; course?: string; grade?: string; type?: string; returning?: string; page?: string }>
+  searchParams: Promise<{ status?: string; search?: string; course?: string; grade?: string; type?: string; returning?: string; view?: string; page?: string }>
 }
 
 export default async function InquiriesPage({ searchParams }: Readonly<PageProps>) {
@@ -40,7 +47,8 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
   const selectedYear = await getSelectedSchoolYear()
 
   const params = await searchParams
-  const { status, search, course, grade, type, returning, page: pageParam } = params
+  const { status, search, course, grade, type, returning, view, page: pageParam } = params
+  const isWaitlistView = view === WAITLIST_VIEW
 
   const statusFilter =
     status && VALID_STATUSES.includes(status) ? (status as InquiryStatus) : undefined
@@ -55,7 +63,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
 
   const currentPage = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1)
 
-  const [{ data: inquiries, total }, courses] = await Promise.all([
+  const [{ data: inquiries, total }, courses, tabCounts] = await Promise.all([
     getInquiries({
       status: statusFilter ?? 'ALL',
       search: search?.trim() || undefined,
@@ -63,10 +71,12 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
       grade: gradeFilter,
       type: typeFilter ?? 'ALL',
       returning: returningFilter,
+      view: isWaitlistView ? 'WAITLIST' : 'ALL',
       page: currentPage,
       pageSize: PAGE_SIZE,
     }),
     getInquiryCourses(),
+    getInquiryTabCounts(),
   ])
 
   const currentStatus = status && VALID_STATUSES.includes(status) ? status : 'ALL'
@@ -99,9 +109,19 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
 
       <ListFilterMemory listPath="/admin/upiti" chips={chips} />
 
-      <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} currentCourse={currentCourse} currentGrade={currentGrade} currentType={currentType} currentReturning={returningFilter ?? ''} courses={courses} />
+      <nav aria-label="Pregled upita" className="flex gap-1 border-b mb-6">
+        <TabLink href="/admin/upiti" active={!isWaitlistView} label="Svi upiti" count={tabCounts.all} />
+        <TabLink
+          href={`/admin/upiti?view=${WAITLIST_VIEW}`}
+          active={isWaitlistView}
+          label="Lista čekanja"
+          count={tabCounts.waitlist}
+        />
+      </nav>
 
-      <InquiryTable data={inquiries} />
+      <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} currentCourse={currentCourse} currentGrade={currentGrade} currentType={currentType} currentReturning={returningFilter ?? ''} currentView={isWaitlistView ? WAITLIST_VIEW : undefined} courses={courses} />
+
+      {isWaitlistView ? <WaitlistTable data={inquiries} /> : <InquiryTable data={inquiries} />}
 
       <Pagination
         total={total}
@@ -111,6 +131,29 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
         basePath="/admin/upiti"
       />
     </div>
+  )
+}
+
+function TabLink({
+  href,
+  active,
+  label,
+  count,
+}: Readonly<{ href: string; active: boolean; label: string; count: number }>) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        '-mb-px px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+        active
+          ? 'border-cyan-600 text-cyan-700'
+          : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300',
+      )}
+    >
+      {label}
+      <span className="ml-1.5 text-xs text-gray-400 tabular-nums">{count}</span>
+    </Link>
   )
 }
 

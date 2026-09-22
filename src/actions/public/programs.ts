@@ -3,7 +3,7 @@
 import type { City, Prisma, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
-import { computeGroupCapacity } from '@/lib/group-capacity'
+import { computeGroupCapacity, RESERVING_INQUIRY_WHERE } from '@/lib/group-capacity'
 import { hasDatedModules, isRadionica } from '@/lib/program-kind'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import {
@@ -185,7 +185,7 @@ async function loadPrograms(
       },
       _count: {
         select: {
-          preferredInquiries: { where: { status: 'NEW' } },
+          preferredInquiries: { where: RESERVING_INQUIRY_WHERE },
         },
       },
       location: { select: { name: true, address: true } },

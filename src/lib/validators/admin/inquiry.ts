@@ -21,3 +21,25 @@ export const schedulePartySchema = z.object({
 })
 
 export type SchedulePartyInput = z.infer<typeof schedulePartySchema>
+
+// Lista čekanja entry: the groups the family CAN attend plus a free-text note.
+// An entry with neither says nothing about what the family is waiting for.
+export const waitlistInquirySchema = z
+  .object({
+    id: z.string().min(1),
+    groupIds: z
+      .array(z.string().min(1))
+      .max(20, 'Odaberite najviše 20 grupa.')
+      .transform((ids) => [...new Set(ids)]),
+    note: z
+      .string()
+      .trim()
+      .max(1000, 'Maksimalno 1000 znakova.')
+      .transform((v) => v || null),
+  })
+  .refine((v) => v.groupIds.length > 0 || v.note !== null, {
+    message: 'Odaberite barem jednu grupu ili upišite napomenu.',
+    path: ['groupIds'],
+  })
+
+export type WaitlistInquiryInput = z.input<typeof waitlistInquirySchema>

@@ -8,6 +8,18 @@ import {
 import { computeSchoolYear } from '@/lib/school-year'
 import { toDateKey } from '@/lib/session-dates'
 
+/**
+ * Which upiti hold a seat in their picked group: a NEW one that is NOT on the
+ * lista čekanja. A waitlisted family has said they cannot attend that group,
+ * so keeping its seat would block another family for nothing. Every capacity
+ * count (public feed, admin dialogs, the conversion guard) reads this one
+ * predicate so they cannot disagree about who is holding a seat.
+ */
+export const RESERVING_INQUIRY_WHERE = {
+  status: 'NEW',
+  waitlistedAt: null,
+} satisfies Prisma.InquiryWhereInput
+
 export function computeAvailableSpots(capacity: number, activeEnrollments: number): number {
   return Math.max(0, capacity - activeEnrollments)
 }
@@ -137,7 +149,7 @@ export function computeGroupCapacity(
   }
 
   const reservedInquiriesCount = group._count.preferredInquiries
-  // Only NEW inquiries reserve a spot — DECLINED and ACCOUNT_CREATED do not.
+  // Only NEW, non-waitlisted inquiries reserve a spot (RESERVING_INQUIRY_WHERE).
   const availableSpots = Math.max(0, group.maxStudents - enrolledCount - reservedInquiriesCount)
   return {
     enrolledCount,
@@ -168,7 +180,7 @@ export async function assertGroupHasAvailableSpot(
       _count: {
         select: {
           preferredInquiries: {
-            where: { status: 'NEW' },
+            where: RESERVING_INQUIRY_WHERE,
           },
         },
       },
