@@ -83,13 +83,25 @@ describe('addSessionStaffChangeSchema', () => {
     'rejects malformed date key %j',
     (bad) => {
       expect(
-        addSessionStaffChangeSchema.safeParse({
-          ...base,
-          sessionDates: ['2026-10-13', bad],
-        }).success,
-      ).toBe(false)
+        messagesFor({ ...base, sessionDates: ['2026-10-13', bad] }, 'sessionDates'),
+      ).toEqual(['Neispravan datum termina.'])
     },
   )
+
+  it.each(['2026-02-31', '2026-13-01', '2026-00-10', '2027-02-29'])(
+    'rejects impossible calendar date %j',
+    (bad) => {
+      expect(
+        messagesFor({ ...base, sessionDates: ['2026-10-13', bad] }, 'sessionDates'),
+      ).toEqual(['Neispravan datum termina.'])
+    },
+  )
+
+  it('accepts 29 February in a leap year', () => {
+    expect(
+      addSessionStaffChangeSchema.parse({ ...base, sessionDates: ['2028-02-29'] }).sessionDates,
+    ).toEqual(['2028-02-29'])
+  })
 
   it("maps replacesUserId '' to null (Dodatno na terminu)", () => {
     expect(
