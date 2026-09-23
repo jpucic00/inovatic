@@ -18,6 +18,7 @@ created: 2026-05-11
 | Type check | ✅ configured | `npx tsc --noEmit` (also part of `lint:all`) |
 | Tests | ✅ configured | Three tiers: unit (`test:unit`, vitest jsdom) · integration (`test:integration`, vitest node + `inovatic_test` DB reset) · E2E (Playwright `tests/phase{1,2,3}`) |
 | SonarQube | ✅ configured | Local Docker; dashboard http://localhost:9000/dashboard?id=inovatic — token in `.env.local` is double-quoted: strip quotes when exporting it |
+| Sonar coverage | ✅ configured | `npm run test:coverage:all` (unit + integration, resets `inovatic_test`) → `coverage/lcov.info`; `test:coverage` = unit only (under-reports ~26 pts). Wired 2026-09-23 |
 | Diagrams | ✅ configured | `docs/diagrams/*.md` — 6 Mermaid files |
 | Dev server | ✅ configured | `.claude/launch.json` name `inovatic-dev`, port 3000 |
 
@@ -35,6 +36,7 @@ created: 2026-05-11
 | Test (one spec) | `npx playwright test tests/phase3/NN-foo.spec.ts` |
 | Sonar start | `npm run sonar:start` |
 | Sonar stop | `npm run sonar:stop` |
+| Coverage (before every scan) | `npm run test:coverage:all` — doubles as the full unit + integration run |
 | Sonar scan | `SONAR_TOKEN=<from .env.local> npm run sonar:scan` |
 | Dev server | `.claude/launch.json` name `inovatic-dev`, port 3000 |
 

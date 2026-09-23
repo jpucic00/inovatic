@@ -326,6 +326,23 @@ async function loadWaitlistContext(
   }
 }
 
+function inquiryPermissions(inquiry: { status: string; waitlistedAt: Date | null }) {
+  const isDeclined = inquiry.status === 'DECLINED'
+  const isAccountCreated = inquiry.status === 'ACCOUNT_CREATED'
+  const isWaitlisted = inquiry.waitlistedAt !== null
+  const isOpen = !isDeclined && !isAccountCreated
+  return {
+    isDeclined,
+    isAccountCreated,
+    isWaitlisted,
+    canDecline: isOpen,
+    canSendSchedule: isOpen,
+    // A declined upit on the lista čekanja can still be placed once a spot opens
+    // — createStudentFromInquiry applies the same exception.
+    canCreateAccount: !isAccountCreated && (!isDeclined || isWaitlisted),
+  }
+}
+
 export default async function InquiryDetailPage({ params }: Readonly<PageProps>) {
   await requireAdmin()
 
@@ -338,14 +355,8 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
     return <PartyInquiryDetail inquiry={inquiry} />
   }
 
-  const isDeclined = inquiry.status === 'DECLINED'
-  const isAccountCreated = inquiry.status === 'ACCOUNT_CREATED'
-  const isWaitlisted = inquiry.waitlistedAt !== null
-  const canDecline = !isDeclined && !isAccountCreated
-  const canSendSchedule = !isDeclined && !isAccountCreated
-  // A declined upit on the lista čekanja can still be placed once a spot opens
-  // — createStudentFromInquiry applies the same exception.
-  const canCreateAccount = !isAccountCreated && (!isDeclined || isWaitlisted)
+  const { isDeclined, isAccountCreated, isWaitlisted, canDecline, canSendSchedule, canCreateAccount } =
+    inquiryPermissions(inquiry)
 
   // The inquiry's own NEW reservation is excluded from the counts (and the
   // group holding it flagged) — see getGroupsForCourse: without this, a group

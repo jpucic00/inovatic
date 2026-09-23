@@ -1700,6 +1700,40 @@ type PendingRecipient = {
 }
 
 /**
+ * Claim the parent BEFORE sending. Two protections, for two different
+ * overlaps: conditioning on PENDING makes concurrent runs of THIS campaign
+ * per-row exclusive (a resume overlapping a still-live job — both read the
+ * same snapshot, only one flips each row), while the unique (sentKey, email)
+ * slot blocks a re-invite from an EARLIER campaign. Without the status
+ * condition the same-campaign overlap re-updated the row to the same values
+ * and mailed everyone in the window twice. `false` = do not send.
+ */
+async function claimRecipient(job: SendJob, claimId: string): Promise<boolean> {
+  try {
+    const claimed = await db.emailCampaignRecipient.updateMany({
+      where: { id: claimId, status: 'PENDING' },
+      data: { status: 'SENT', sentKey: job.sentKey },
+    })
+    // 0 = another live run of this campaign already owns the row — its writer
+    // records the outcome; touching it here would clobber that.
+    return claimed.count > 0
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      // Already invited — by an overlapping send or an earlier campaign.
+      await db.emailCampaignRecipient
+        .update({
+          where: { id: claimId },
+          data: { status: 'ALREADY_SENT', failureReason: 'Roditelj je već primio pozivnicu.' },
+        })
+        .catch(() => {})
+      return false
+    }
+    console.error('runSendJob: could not claim recipient:', err)
+    return false
+  }
+}
+
+/**
  * One recipient, start to finish: prove the content (EVALUATION), claim the
  * row, send, record the outcome. Every early return leaves the row in a state
  * the detail page explains.
@@ -1756,37 +1790,7 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
     subject = `${job.subject} – ${built.childNames.join(', ')}`
   }
 
-  // Claim the parent BEFORE sending. Two protections, for two different
-  // overlaps: conditioning on PENDING makes concurrent runs of THIS campaign
-  // per-row exclusive (a resume overlapping a still-live job — both read the
-  // same snapshot, only one flips each row), while the unique (sentKey,
-  // email) slot blocks a re-invite from an EARLIER campaign. Without the
-  // status condition the same-campaign overlap re-updated the row to the
-  // same values and mailed everyone in the window twice.
-  try {
-    const claimed = await db.emailCampaignRecipient.updateMany({
-      where: { id: claimId, status: 'PENDING' },
-      data: { status: 'SENT', sentKey: job.sentKey },
-    })
-    if (claimed.count === 0) {
-      // Another live run of this campaign already owns the row — its writer
-      // records the outcome; touching it here would clobber that.
-      return
-    }
-  } catch (err) {
-    if (isUniqueViolation(err)) {
-      // Already invited — by an overlapping send or an earlier campaign.
-      await db.emailCampaignRecipient
-        .update({
-          where: { id: claimId },
-          data: { status: 'ALREADY_SENT', failureReason: 'Roditelj je već primio pozivnicu.' },
-        })
-        .catch(() => {})
-      return
-    }
-    console.error('runSendJob: could not claim recipient:', err)
-    return
-  }
+  if (!(await claimRecipient(job, claimId))) return
 
   try {
     // Non-throw counts as sent — matches app-wide semantics (the no-key

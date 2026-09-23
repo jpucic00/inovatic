@@ -348,6 +348,16 @@ export function HolidayCalendar({
   // While a range start is staged, the cell currently under the cursor — it
   // drives the live "what you'd select" preview band between the two clicks.
   const [hoverKey, setHoverKey] = useState<string | null>(null)
+  // Leaving the months drops the preview. Bound natively: the grid is layout,
+  // not a control, and a JSX mouse handler would make it read as one.
+  const monthsGridRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const grid = monthsGridRef.current
+    if (!grid) return
+    const clearHover = () => setHoverKey(null)
+    grid.addEventListener('mouseleave', clearHover)
+    return () => grid.removeEventListener('mouseleave', clearHover)
+  }, [])
   // Click-vs-double-click disambiguation. The first click on an empty cell
   // doesn't commit `rangeStart` immediately — it goes into a ref and a 250 ms
   // timer. If a second click arrives in time we resolve it without ever
@@ -692,8 +702,8 @@ export function HolidayCalendar({
       )}
 
       <div
+        ref={monthsGridRef}
         className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3"
-        onMouseLeave={() => setHoverKey(null)}
       >
         {monthGrids.map(({ year, month, label, cells }) => (
           <section

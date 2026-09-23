@@ -6,6 +6,16 @@ const alias = { '@': resolve(__dirname, 'src') }
 
 export default defineConfig({
   test: {
+    // Written to coverage/lcov.info, which sonar-project.properties reads.
+    // Root-level only: vitest merges both projects into one report.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      reporter: ['text-summary', 'lcov'],
+      reportsDirectory: 'coverage',
+      // A red run must still overwrite lcov.info, or Sonar reads the last one.
+      reportOnFailure: true,
+    },
     projects: [
       {
         plugins: [react()],

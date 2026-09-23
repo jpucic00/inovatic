@@ -753,8 +753,8 @@ export function EmailWizard({
             )}
             {kind === 'SCHEDULE' && (
               <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-                Odabrane grupe određuju kome se šalje; svako dijete u poruci dobiva popis
-                <strong> svih</strong> svojih grupa u odabranoj školskoj godini. Poruka se
+                Odabrane grupe određuju kome se šalje; svako dijete u poruci dobiva popis{' '}
+                <strong>svih</strong> svojih grupa u odabranoj školskoj godini. Poruka se
                 može slati više puta — npr. nakon što dijete prebacite u drugu grupu.
               </p>
             )}

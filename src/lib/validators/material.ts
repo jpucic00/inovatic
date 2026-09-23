@@ -136,13 +136,10 @@ function validateRobocampPairing(
   }
 }
 
-function validateVideoPairing(
-  val: MaterialPairingInput,
-  ctx: z.RefinementCtx,
-  hasFile: boolean,
-  hasExternal: boolean,
-) {
+function validateVideoPairing(val: MaterialPairingInput, ctx: z.RefinementCtx) {
   // Exactly one of fileUrl OR externalUrl; externalUrl must be YT/Vimeo.
+  const hasFile = nonEmpty(val.fileUrl)
+  const hasExternal = nonEmpty(val.externalUrl)
   if (hasFile && hasExternal) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -213,7 +210,7 @@ function validateTypeUrlPairing(val: MaterialPairingInput, ctx: z.RefinementCtx)
   const hasExternal = nonEmpty(val.externalUrl)
 
   if (val.type === 'ROBOCAMP') return validateRobocampPairing(val, ctx, hasFile, hasExternal)
-  if (val.type === 'VIDEO') return validateVideoPairing(val, ctx, hasFile, hasExternal)
+  if (val.type === 'VIDEO') return validateVideoPairing(val, ctx)
   if (val.type === 'LINK') return validateLinkPairing(ctx, hasFile, hasExternal)
   return validateUploadPairing(ctx, hasFile, hasExternal)
 }
