@@ -10,7 +10,9 @@ There is no `ClassSession` model. Expected session dates are derived on the fly 
 
 > A holiday is pre-filtered out of the expected set so attendance never shows a slot for it. Any further cancellation (snow day, ad-hoc) is the teacher's call — they leave the row unmarked or write a note.
 
-Since 2026-07 there are **two** record tables sharing that derived session date: `Attendance`, keyed `(enrollmentId, sessionDate)`, for students; and `TeacherAttendance`, keyed `(userId, scheduledGroupId, sessionDate)`, for teaching hours. Both are written by the same `bulkMarkSession` transaction. `TeacherAttendance` is keyed on the **group**, not on `TeacherAssignment`, so the rows outlive an unassignment — they are the sole source of **hours** for the payout report (`getTeacherWorkReport` → `src/lib/teacher-work-report.ts`, each present row worth the group's `endTime − startTime`), which prices those hours at the teacher's current `User.hourlyRateCents` — a null rate makes every amount null rather than 0, and there is deliberately no six-month total. Marking a date as a holiday after the fact deletes **both** tables' rows for that date, city-filtered, so a cancelled class is never still billed.
+Since 2026-07 there are **two** record tables sharing that derived session date: `Attendance`, keyed `(enrollmentId, sessionDate)`, for students; and `TeacherAttendance`, keyed `(userId, scheduledGroupId, sessionDate)`, for teaching hours. Both are written by the same `bulkMarkSession` transaction. `TeacherAttendance` is keyed on the **group**, not on `TeacherAssignment`, so the rows outlive an unassignment or a removed zamjena — they are the sole source of **hours** for the payout report (`getTeacherWorkReport` → `src/lib/teacher-work-report.ts`, each present row worth the group's `endTime − startTime`), which prices those hours at the teacher's current `User.hourlyRateCents` — a null rate makes every amount null rather than 0, and there is deliberately no six-month total. Marking a date as a holiday after the fact deletes **both** tables' rows for that date, city-filtered, so a cancelled class is never still billed.
+
+Since 2026-09-23 **who may be booked for a termin** is not the group's `TeacherAssignment` list but the termin's **effective staff**: `effectiveStaffFor(regular TeacherAssignment rows, SessionStaffChange rows, date)` in `src/lib/session-staff.ts` — the regular staff, minus anyone a change on that date replaces, plus the change users (a regular who is also the subject of a change that day appears once, with the change's role). Changes are written by an admin only (see *Per-termin staff changes* below). The server's booking and the Dolazak marker's per-date teacher rows (`sessionTeacherRows`) both read that one function, so the hours booked can never disagree with the names shown.
 
 ## Standard groups — per-group race-ahead arc
 
@@ -114,6 +116,7 @@ flowchart TD
 flowchart TD
     A["getGroupAttendance(groupId)"] --> B["assertTeacherOwnsGroup, then load group + holidays + roster + records + teacher hours + markingWindow"]
     B --> C{group.course.kind}
+    B -.-> STF["also returns regularStaff (TeacherAssignment + role)<br/>and staffChanges (SessionStaffChange rows) —<br/>the marker derives each date's teacher rows via sessionTeacherRows"]
     C -->|"RADIONICA (isRadionica)"| R["buildFlatAttendance(base, 'custom', computeRadionicaSessions(dateStart, dateEnd, holidays))"]
     C -->|"COMPETITION (isCompetition)"| S["season = course.seasons row for this (schoolYear, city)<br/>buildFlatAttendance(base, 'season', computeSeasonSessions(dayOfWeek, season dates, holidays))"]
     C -->|STANDARD| ST["buildStandardAttendance — race-ahead arc sliced into per-module sections"]
@@ -121,6 +124,7 @@ flowchart TD
     style R fill:#fef3c7
     style S fill:#fef3c7
     style ST fill:#dbeafe
+    style STF fill:#e0f2fe
 ```
 
 > The return type is a union on `kind`: the two flat branches share one shape — `{ kind: 'custom' | 'season', expectedSessions[], extraSessions[] }` (`'custom'` = radionica, `'season'` = competition) — while standard returns `{ kind: 'standard', sections[], otherDates[], defaultSelectedDate }`. On the client, `AttendanceMarker` routes `kind === 'standard'` to `StandardAttendanceMarker` and both flat kinds to one `FlatAttendanceMarker`, whose default date comes from `pickFlatDefault` (today if expected, else nearest past, else first). The header line is `scheduleHint(dateRange = kind === 'custom', …)` — a radionica reads as its date range, while a competition group reads as its weekday, exactly like a standard group.
@@ -154,13 +158,13 @@ sequenceDiagram
 
     Teacher->>UI: Selects a session date from the date picker
     UI->>UI: SessionPanel remounts (key = sessionDate) — initAttendanceDraft(roster, records)
-    Note over UI: BLANK start (2026-08-24). A checkbox states the teacher's decision, never the DB —<br/>only a student with an existing Attendance row is pre-ticked. Assigned TEACHERS are the<br/>deliberate exception (initTeacherDraft): still present-by-default, because an unticked<br/>box there is a lost payout hour noticed a month later.
+    Note over UI: BLANK start (2026-08-24). A checkbox states the teacher's decision, never the DB —<br/>only a student with an existing Attendance row is pre-ticked. The termin's STAFF are the<br/>deliberate exception (initTeacherDraft): still present-by-default, because an unticked<br/>box there is a lost payout hour noticed a month later.
 
     Teacher->>UI: Ticks the present students (whole row is the tap target, except the note field)
     Note over UI: Tri-state "Označi sve prisutne": none → all · partial → all · all → clear
     UI->>UI: sessionStatus(...) — Nije evidentirano / Nespremljene izmjene / Evidentirano · spremljeno HH:mm
-    Teacher->>UI: (group with 2+ assigned teachers) ticks who actually taught
-    Note over UI: A single-teacher group shows no teacher control at all
+    Teacher->>UI: (termin with 2+ effective staff) ticks who actually taught
+    Note over UI: Rows come from sessionTeacherRows(regularStaff, staffChanges, date) —<br/>a zamjena replaces the regular on that date only. A termin with a single<br/>staff member shows no teacher control at all
     Teacher->>UI: Clicks Save
     alt zero students marked present
         UI->>Teacher: ConfirmDialog "Spremiti bez ijednog prisutnog?" — destructive styling ONLY when existing records would be overwritten
@@ -170,7 +174,7 @@ sequenceDiagram
     UI->>Server: bulkMarkSession(groupId, sessionDate, entries[], teacherEntries?[])
 
     Server->>Server: Zod validation (bulkMarkSessionSchema)
-    Server->>Server: assertTeacherOwnsGroup(groupId) — ADMIN pass-through is city-bound (cross-city group 404s)
+    Server->>Server: assertTeacherOwnsGroup(groupId) — teacherGroupAccessWhere: a TeacherAssignment OR a SessionStaffChange with sessionDate ≥ today (Europe/Zagreb). ADMIN pass-through is city-bound (cross-city group 404s)
     Server->>Server: TEACHER only — teacherMarkingError(sessionDate)
     Note right of Server: Outside [1st of current Zagreb month .. today] → reject before the<br/>transaction, nothing written. Admins are unrestricted.
 
@@ -181,9 +185,10 @@ sequenceDiagram
         Note right of Server: If count mismatch → throw ENROLLMENT_MISMATCH (rolls back transaction)
         Server->>DB: Upsert Attendance for each entry
         Note right of DB: Upsert key: (enrollmentId, sessionDate). Sets present, note, recordedById.<br/>The row's updatedAt is what the marker reads back as recordedAt → "spremljeno HH:mm",<br/>so an optimisation that skips touching updatedAt on a no-op upsert breaks the status line.
-        Server->>DB: Fetch TeacherAssignment userIds for this group
-        Server->>Server: resolveTeacherEntries(teacherEntries, assignedUserIds)
-        Note right of Server: Drops entries for non-assigned users.<br/>Single-teacher group with no entry → auto { present: true }.
+        Server->>DB: Fetch TeacherAssignment rows for this group + SessionStaffChange rows for this sessionDate
+        Server->>Server: staff = effectiveStaffFor(assignments, changes, sessionDate)
+        Server->>Server: resolveTeacherEntries(teacherEntries, staff userIds)
+        Note right of Server: Drops entries for anyone off the termin's effective staff.<br/>Single-staff termin with no entry → auto { present: true } for that person —<br/>the substitute, when one replaces the only teacher.
         Server->>DB: Upsert TeacherAttendance for each resolved entry
         Note right of DB: Upsert key: (userId, scheduledGroupId, sessionDate). Sets present, recordedById.
     end
@@ -213,11 +218,11 @@ An empty checkbox means two different things either side of a save — "not aske
 
 ```mermaid
 flowchart TD
-    A["bulkMarkSession input.teacherEntries (optional)"] --> B["assigned = TeacherAssignment userIds for this group"]
-    B --> C["entries = provided.filter(e => assigned.has(e.userId))"]
-    C --> H["Entries for non-assigned users are DROPPED — a stand-in must be assigned to the group first"]
-    C --> D{"assigned.length === 1 AND that teacher not already covered?"}
-    D -->|Yes| E["Auto-add { userId: assigned[0], present: true }"]
+    A["bulkMarkSession input.teacherEntries (optional)"] --> B["staff = effectiveStaffFor(TeacherAssignment rows,<br/>SessionStaffChange rows on sessionDate, sessionDate)<br/>regular − replaced on that date + change users"]
+    B --> C["entries = provided.filter(e => staff.has(e.userId))"]
+    C --> H["Entries for anyone off the termin's effective staff are DROPPED —<br/>a stand-in is put on the termin by an admin via addSessionStaffChange"]
+    C --> D{"staff.length === 1 AND that person not already covered?"}
+    D -->|Yes| E["Auto-add { userId: staff[0], present: true }<br/>(the substitute, if one replaces the only teacher)"]
     D -->|No| F["Use the filtered entries as-is"]
     E --> G["Upsert TeacherAttendance (userId, scheduledGroupId, sessionDate)"]
     F --> G
@@ -227,7 +232,42 @@ flowchart TD
     style G fill:#e0f2fe
 ```
 
-> Source: `resolveTeacherEntries()` in `src/actions/teacher/attendance.ts`. Explicit entries win; a one-teacher group needs no interaction — marking the students books that teacher's hour. Nothing is ever booked for someone not assigned to the group, so a tampered payload cannot invent payable hours. Re-saving the same date updates rather than duplicates, exactly like the student upsert.
+> Source: `resolveTeacherEntries()` in `src/actions/teacher/attendance.ts`, fed by `effectiveStaffFor()` in `src/lib/session-staff.ts` inside the same `Serializable` transaction. Explicit entries win; a single-staff termin needs no interaction — marking the students books that person's hour, which is what books a substitute rather than the teacher they replaced. Nothing is ever booked for someone off the termin's effective staff, so a tampered payload cannot invent payable hours. Re-saving the same date updates rather than duplicates, exactly like the student upsert. **Removing a change never rewrites hours already booked** — `removeSessionStaffChange` deletes only the `SessionStaffChange` row; `TeacherAttendance` stays as the payout record.
+
+## Per-termin staff changes — `addSessionStaffChange`
+
+A `SessionStaffChange` puts someone on **one termin** of a group: a zamjena (`replacesUserId` set), an extra person (null), or a regular in a different role for that day only. Admin-only on both levels (regular roles via `setTeacherAssignmentRole`, changes via `addSessionStaffChange`); a teacher only ticks, on Dolazak, who of the resulting staff actually taught.
+
+```mermaid
+flowchart TD
+    A["addSessionStaffChange(scheduledGroupId, sessionDates[], userId, role, replacesUserId?)"] --> B["requireAdminCtx + Zod (1–60 dates, deduped + sorted)<br/>assertGroupInCity — cross-city group 404s"]
+    B --> AY{"Group's school year archived?"}
+    AY -->|Yes| ERR
+    AY -->|No| C{"replacesUserId === userId?"}
+    C -->|Yes| ERR["Refuse the whole batch — nothing written"]
+    C -->|No| D{"userId is an active (not deleted) TEACHER or ADMIN<br/>of the group's city?"}
+    D -->|No| ERR
+    D -->|Yes| E{"replacesUserId set AND not on the group's<br/>regular staff (TeacherAssignment)?"}
+    E -->|Yes| ERR
+    E -->|No| E2{"No replacesUserId AND userId is already<br/>a regular in the same role?"}
+    E2 -->|Yes| ERR
+    E2 -->|No| F["For EACH date"]
+    F --> G{"today or later (Europe/Zagreb)<br/>AND inside the group's schoolYear?"}
+    G -->|No| ERR
+    G -->|Yes| H{"staffChangeDateError: not a holiday,<br/>on the group's weekday (standard / competition)<br/>or inside the radionica range?"}
+    H -->|No| ERR
+    H -->|Yes| I{"sameDayConflict: this person already has a change that day,<br/>or the replaced person is already replaced / changed that day?"}
+    I -->|Yes| ERR
+    I -->|No| OK["createMany — one row per date, all or nothing<br/>(P2002 race → 'već ima promjenu na jednom od termina')"]
+
+    style ERR fill:#fee2e2
+    style OK fill:#d1fae5
+    style F fill:#e0f2fe
+```
+
+> Source: `addSessionStaffChange` / `staffChangeError` / `termErrorOutsideYear` / `sameDayConflict` in `src/actions/admin/session-staff.ts`, `staffChangeDateError` in `src/lib/session-staff.ts`. A refusal names the offending date, so an admin never ends up with half a run of termini covered. The date rule is deliberately "a day the group could meet", not "a computed termin", so a hand-added Dolazak date can be covered too.
+>
+> **Access follows the change.** `teacherGroupAccessWhere` (`src/lib/teacher-guard.ts`) — the one predicate behind `assertTeacherOwnsGroup`, `assertTeacherCanViewStudent`, `getMyAssignedGroups` and the gallery guard — admits a TeacherAssignment **or** a `SessionStaffChange` with `sessionDate ≥ staffChangeAccessFrom(now)` (today's Europe/Zagreb date). A substitute sees the group from the moment the admin adds them until the end of the termin's day, and loses it the day after with no cleanup step. `deleteTeacher` removes that teacher's changes from today on and keeps past ones as history.
 
 ## The teacher marking window
 
@@ -243,23 +283,25 @@ Hours are money, so a **TEACHER** may only record the current calendar month, up
 
 ## Retroactive holidays
 
-Marking a date as a holiday *after* attendance exists deletes both record tables for that date, inside one transaction and filtered by `(schoolYear, city)`:
+Marking a date as a holiday *after* attendance exists deletes both record tables for that date, inside one transaction and filtered by `(schoolYear, city)`. That date's `SessionStaffChange` rows go in the same transaction **without any confirmation** — they only schedule someone and are not payout evidence:
 
 ```mermaid
 flowchart LR
     A["Admin marks date(s) as holiday"] --> B{Existing records?}
-    B -->|No| SAVE["Upsert SchoolYearHoliday rows"]
+    B -->|No| SSC["deleteMany SessionStaffChange on those dates<br/>(via scheduledGroup: schoolYear + city) — no confirmation"]
     B -->|Yes| WARN["requiresConfirmation + count of BOTH student and teacher rows"]
     WARN --> C{Admin confirms?}
     C -->|No| STOP["Nothing written"]
     C -->|Yes| DEL["deleteMany Attendance (via enrollment.scheduledGroup)<br/>deleteMany TeacherAttendance (via scheduledGroup)"]
-    DEL --> SAVE
+    DEL --> SSC
+    SSC --> SAVE["Upsert SchoolYearHoliday rows"]
 
     style DEL fill:#fee2e2
+    style SSC fill:#fef3c7
     style SAVE fill:#d1fae5
 ```
 
-> Source: `src/actions/admin/holidays.ts` (`upsertHolidayRange` and `bulkImportHolidays` share the same scoped helper). The city filter is load-bearing — this delete is irreversible, and a Šibenik closure must never destroy Split rows. Deleting the teacher rows too is what stops a cancelled class from still being billed.
+> Source: `src/actions/admin/holidays.ts` (`upsertHolidayRange` and `bulkImportHolidays` share the same scoped helpers, `deleteAffectedAttendance` and `deleteStaffChangesOn`). The city filter is load-bearing — this delete is irreversible, and a Šibenik closure must never destroy Split rows. Deleting the teacher rows too is what stops a cancelled class from still being billed.
 
 ## Default Session Selection (standard groups)
 

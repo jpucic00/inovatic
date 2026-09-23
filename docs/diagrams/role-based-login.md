@@ -154,7 +154,7 @@ flowchart TD
 Two layers cover slightly different concerns:
 
 - **Middleware** runs at the edge before any React rendering, so it bounces stale URLs cheaply and never paints a flash of unauthorized content.
-- **Guards** run inside Server Components and Server Actions, where role checks can be more granular (e.g. `assertTeacherOwnsGroup` builds on top of `requireTeacher` to also check `TeacherAssignment`). They also handle the case of someone calling a Server Action directly without crossing the middleware boundary.
+- **Guards** run inside Server Components and Server Actions, where role checks can be more granular (e.g. `assertTeacherOwnsGroup` builds on top of `requireTeacher` to also check `teacherGroupAccessWhere` — a `TeacherAssignment`, or a `SessionStaffChange` on that group with `sessionDate` ≥ today, Europe/Zagreb). They also handle the case of someone calling a Server Action directly without crossing the middleware boundary.
 
 If you change a route's role expectation, update **both** layers — and the post-login switch in `LoginForm` if the new route should be the default landing page for that role, including the dual-role chooser branch, which hardcodes its two destinations.
 

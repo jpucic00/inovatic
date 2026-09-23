@@ -6,6 +6,7 @@ import { canManageMaterial, materialTarget } from '@/lib/material-access'
 import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
 import { activeEnrollmentWhere } from '@/lib/enrollment-activity'
 import { classroomGroupWhere } from '@/lib/classroom-access'
+import { teacherGroupAccessWhere } from '@/lib/teacher-guard'
 import type { City } from '@prisma/client'
 
 export const runtime = 'nodejs'
@@ -87,6 +88,21 @@ async function classroomAllowed(city: City, materialId: string): Promise<boolean
   return materialVisibleInGroups(groups, materialId)
 }
 
+/**
+ * A teacher on a group only through a per-termin change (a zamjena) holds no
+ * TeacherAssignment, so `canManageMaterial` refuses them — rightly, since
+ * managing materials stays with the regular staff. Reading is another matter:
+ * the access window exists so they can prepare with the group's materials, so
+ * they may download what is effectively visible in a group they can open.
+ */
+async function teacherReadAllowed(userId: string, materialId: string): Promise<boolean> {
+  const groups = await db.scheduledGroup.findMany({
+    where: teacherGroupAccessWhere(userId),
+    select: VISIBILITY_GROUP_SELECT,
+  })
+  return materialVisibleInGroups(groups, materialId)
+}
+
 /** GROUP materials are per-city; MODULE/COURSE curriculum stays shared. */
 async function adminAllowed(scheduledGroupId: string | null, city: City | undefined): Promise<boolean> {
   if (!scheduledGroupId) return true
@@ -132,7 +148,9 @@ export async function GET(
     allowed = await adminAllowed(material.scheduledGroupId, session.user.city)
   } else if (role === 'TEACHER') {
     const target = materialTarget(material)
-    allowed = target !== null && (await canManageMaterial(session, target))
+    allowed =
+      (target !== null && (await canManageMaterial(session, target))) ||
+      (await teacherReadAllowed(session.user.id, materialId))
   } else if (role === 'STUDENT') {
     allowed = await studentAllowed(session.user.id, materialId)
   } else if (role === 'CLASSROOM') {

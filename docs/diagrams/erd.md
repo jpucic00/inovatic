@@ -114,6 +114,18 @@ erDiagram
         string id PK
         string userId FK
         string scheduledGroupId FK
+        TeacherRole role "LEAD - ASSISTANT, default LEAD - display only; pay stays one User.hourlyRateCents per person"
+    }
+
+    SessionStaffChange {
+        string id PK
+        string scheduledGroupId FK "Cascade - hours live in TeacherAttendance, which still blocks deletion"
+        datetime sessionDate "db.Date - the ONE termin this change applies to"
+        string userId FK "the person on the termin - Cascade"
+        TeacherRole role "their role on this termin only"
+        string replacesUserId FK "nullable - SetNull; set = zamjena for a regular, null = extra person"
+        string createdById FK "the admin who added it - default referential action"
+        datetime createdAt "default now"
     }
 
     Inquiry {
@@ -143,6 +155,13 @@ erDiagram
         string schoolYear "nullable - submission-year bucket; NOT derived from party dates"
         string declineReason "nullable - db.Text - reason captured on DECLINE"
         City city "required - parent's Step-1 choice; PARTY stamps SPLIT server-side"
+        datetime waitlistedAt "nullable - lista cekanja marker, orthogonal to status; stamped only on the way ON and is the queue order; a waitlisted NEW upit reserves no seat"
+        string waitlistNote "nullable - db.Text"
+    }
+
+    InquiryWaitlistGroup {
+        string inquiryId PK "composite PK + FK to Inquiry - Cascade"
+        string scheduledGroupId PK "composite PK + FK to ScheduledGroup - Cascade; a wish never blocks a group delete"
     }
 
     User {
@@ -384,6 +403,8 @@ erDiagram
     ScheduledGroup ||--o{ Inquiry : "scheduledGroupId - preferred"
     ScheduledGroup ||--o{ Inquiry : "assignedGroupId - final"
     User ||--o{ Inquiry : "studentId - created student"
+    Inquiry        ||--o{ InquiryWaitlistGroup : "groups the family can attend - Cascade"
+    ScheduledGroup ||--o{ InquiryWaitlistGroup : "waitlist entries - Cascade"
 
     User ||--o{ Enrollment : "enrolled in"
     Enrollment ||--o{ ModuleEnrollment : "modules taken"
@@ -394,6 +415,11 @@ erDiagram
     User           ||--o{ TeacherAttendance : "teacher hours - Cascade"
     User           ||--o{ TeacherAttendance : "recordedBy - no cascade"
     ScheduledGroup ||--o{ TeacherAttendance : "sessions taught - RESTRICT"
+
+    ScheduledGroup ||--o{ SessionStaffChange : "per-termin staff changes - Cascade"
+    User           ||--o{ SessionStaffChange : "on the termin - Cascade"
+    User           |o--o{ SessionStaffChange : "replaces - SetNull"
+    User           ||--o{ SessionStaffChange : "createdBy"
 
     User          ||--o{ EmailCampaign : "sentBy"
     Course        ||--o{ EmailCampaign : "targetCourse - SetNull"
@@ -413,7 +439,8 @@ erDiagram
 | CourseLevel | `UVOD`, `SLR_1`, `SLR_2`, `SLR_3`, `SLR_4` — `UVOD` (predškolci, WeDo 2.0) is a rung *before* the ladder; the SLR levels were deliberately **not** renumbered (each one's name is its level). The competition program has `level = null` |
 | ProgramKind | `STANDARD`, `RADIONICA`, `COMPETITION` — the authoritative program discriminator on `Course.kind`. Branch through the predicates in `src/lib/program-kind.ts` (`isRadionica`, `isCompetition`, `hasDatedModules`, `hasModules`, `showsAllModules`, `isMonthlyBilled`, `isGradable`, `isEditableCourse`), never on a bare enum comparison |
 | InquiryType | `COURSE`, `PARTY` |
-| InquiryStatus | `NEW`, `PARTY_SCHEDULED`, `ACCOUNT_CREATED`, `DECLINED` |
+| InquiryStatus | `NEW`, `PARTY_SCHEDULED`, `ACCOUNT_CREATED`, `DECLINED` — the lista čekanja is **not** a status: it is `Inquiry.waitlistedAt`, orthogonal to all four |
+| TeacherRole | `LEAD`, `ASSISTANT` — predavač / asistent on `TeacherAssignment.role` (default `LEAD`) and `SessionStaffChange.role`. **Display only** — pay stays one `User.hourlyRateCents` per person, so no role is snapshotted onto `TeacherAttendance` |
 | SkillLevel | `POCETNO`, `U_RAZVOJU`, `OSTVARENO` — the three report-card skill grades |
 | RecommendationKind | `COURSE`, `COMPETITION_PREP`, `COMPETITION_PROGRAM`, `COMPETITION_FLL`, `COMPETITION_WRO` — `COURSE` pairs with `recommendedCourseId`; the rest are the `RECOMMENDATION_SPECIALS` tracks (the per-team FLL/WRO values let a mentor recommend the *team* a child should join, which no catalog entry can express) |
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
@@ -432,9 +459,11 @@ erDiagram
 | CourseModule → ModuleSchedule | One template module has one schedule per `schoolYear` (historized instance) |
 | Course → ScheduledGroup | One course has many groups - time slots |
 | ScheduledGroup → Location | Each group meets at one location — composite FK `(locationId, city) → Location(id, city)`, so a group can never drift to another city than its venue |
-| ScheduledGroup → TeacherAssignment → User | Teachers assigned to groups - many-to-many |
+| ScheduledGroup → TeacherAssignment → User | Teachers assigned to groups - many-to-many; `role` (`LEAD`/`ASSISTANT`) is display only |
+| ScheduledGroup → SessionStaffChange → User | A **one-termin** change to a group's staff, admin-only (`src/actions/admin/session-staff.ts`). `replacesUserId` set = zamjena for a regular; null = an extra person; a regular appearing as `userId` = a different role for that day only. Applies to its own `sessionDate` and nothing else, so a substitute comes off the group the day after **with no cron**; the row stays as history. `effectiveStaffFor` (`src/lib/session-staff.ts`) is the one definition of who staffs a termin: regular staff, minus anyone a change on that date replaces, plus the change users. Group FK is **Cascade** (unlike `TeacherAttendance`): a change only schedules someone, the hours live in `TeacherAttendance`. `user` Cascade, `replaces` SetNull, `createdBy` default. A retroactive holiday deletes that date's changes in the same transaction, without confirmation. `deleteTeacher` (soft delete, `src/actions/admin/teacher.ts`) removes the teacher's own changes **from today on** (`sessionDate >= staffChangeAccessFrom(now)`) and keeps past ones as history. A change also grants access: `teacherGroupAccessWhere` admits the person until the end of the termin's Europe/Zagreb day. |
 | Inquiry → Course | Parent preferred program - optional |
-| Inquiry.scheduledGroupId → ScheduledGroup | Parent preferred group from form - reserves spot |
+| Inquiry.scheduledGroupId → ScheduledGroup | Parent preferred group from form — reserves a spot **only while `status = NEW` and `waitlistedAt` is null** (`RESERVING_INQUIRY_WHERE`, `src/lib/group-capacity.ts`, read by every seat count). Kept as history ("prvotno odabrana") once the upit is waitlisted |
+| Inquiry → InquiryWaitlistGroup → ScheduledGroup | The groups a waitlisted family **can** attend (lista čekanja). A join table so a group delete cleans up by FK; cascades from both sides, and a wish never blocks the delete. Groups must share the upit's city, its **own** `schoolYear` and one program (`setInquiryWaitlist`). `Inquiry.waitlistedAt` is stamped only on the way on and is the queue order; `createStudentFromInquiry` clears the entry in the same transaction that sets `ACCOUNT_CREATED` |
 | Inquiry.assignedGroupId → ScheduledGroup | Admin final group assignment - set on account creation |
 | Inquiry → User | Student account created from this inquiry |
 | User → Enrollment → ScheduledGroup | Student enrolled in group for a school year |
@@ -453,7 +482,7 @@ erDiagram
 | SchoolYear → SchoolYearHoliday | Per-year non-class days (holidays, breaks, ad-hoc closures). Excluded from `computeExpectedSessions` / `computeRadionicaSessions` / `computeSeasonSessions`. `SchoolYearHoliday.schoolYear` is a real Prisma FK to `SchoolYear.label` (`onDelete: Cascade`). |
 | User → SchoolYearHoliday | `createdBy` relation (nullable) — admin who added the holiday. |
 | SchoolYear | Standalone registry of valid year labels (`YYYY/YYYY`). The `schoolYear` string columns on `ScheduledGroup`, `ModuleSchedule`, `Enrollment`, `Inquiry`, `Course` (radionice) and `CourseEnrollmentWindow` reference `SchoolYear.label` by string with **no** Prisma FK relation; only `SchoolYearHoliday.schoolYear` is a true FK. |
-| User → TeacherAttendance ← ScheduledGroup | Teaching hours, keyed `(userId, scheduledGroupId, sessionDate)` — deliberately **not** keyed on `TeacherAssignment`, so unassigning a teacher or a stand-in covering one session never rewrites who worked which hour. Sole source of **hours** for the admin payout report (`src/lib/teacher-work-report.ts`), which prices them at the teacher's current `User.hourlyRateCents` over the last `REPORT_MONTH_COUNT` (6) months — a null rate makes every `amountCents` null rather than 0, and changing the rate re-prices all six months, including ones already paid. Cascades from `User`, but **RESTRICT** from `ScheduledGroup`: these rows are payout evidence, so `deleteGroup`/`deleteCourse` block on them explicitly and the FK is the backstop. `recordedBy` is a separate non-cascading `User` relation — authorship, not entitlement. |
+| User → TeacherAttendance ← ScheduledGroup | Teaching hours, keyed `(userId, scheduledGroupId, sessionDate)` — deliberately **not** keyed on `TeacherAssignment`, so unassigning a teacher or a stand-in covering one session never rewrites who worked which hour. Sole source of **hours** for the admin payout report (`src/lib/teacher-work-report.ts`), which prices them at the teacher's current `User.hourlyRateCents` over the last `REPORT_MONTH_COUNT` (12) months — a null rate makes every `amountCents` null rather than 0, and changing the rate re-prices every month in the window, including ones already paid. Cascades from `User`, but **RESTRICT** from `ScheduledGroup`: these rows are payout evidence, so `deleteGroup`/`deleteCourse` block on them explicitly and the FK is the backstop. `recordedBy` is a separate non-cascading `User` relation — authorship, not entitlement. |
 | EmailCampaign → EmailCampaignRecipient | One row per parent inbox per send — except EVALUATION, where a row is one **child** (two siblings on one address get two rows, each mailing exactly one card via the row's `assessmentIds`, re-verified by `assertCardsBelongTo` immediately before each send). Rows cascade (`onDelete: Cascade`) and are written as `PENDING` **before** any mail goes out. A `SENT` row carries `sentKey`, and the `(sentKey, parentEmail)` unique index is what actually prevents a double invitation — two overlapping sends can't both win the insert. Cleared to null on `FAILED` so a retry may re-invite. The four `*Count` columns are display counters; recipient rows are ground truth. |
 | Course → EmailCampaign | `targetCourse` for REENROLLMENT invitations, `onDelete: SetNull` — deleting a program keeps the send history readable. |
 
@@ -481,6 +510,8 @@ erDiagram
 | MaterialGroupHide | `(materialId, scheduledGroupId)` |
 | Attendance | `(enrollmentId, sessionDate)` |
 | TeacherAttendance | `(userId, scheduledGroupId, sessionDate)` |
+| SessionStaffChange | `(scheduledGroupId, sessionDate, userId)` — one change per person per termin |
+| InquiryWaitlistGroup | `(inquiryId, scheduledGroupId)` composite PK |
 | StudentAssessment | `(studentId, groupId)` — one report card per student per group |
 | EmailCampaignRecipient | `(sentKey, parentEmail)` — NULLs are distinct in Postgres, so CUSTOM and FAILED rows (both `sentKey = null`) never collide; only SENT invitations are constrained |
 | ArticleTag | `(articleId, tagId)` composite PK |
@@ -492,7 +523,7 @@ erDiagram
 | User | `(role, city)` |
 | Location | `city` |
 | ScheduledGroup | `(city, schoolYear)` |
-| Inquiry | `scheduledGroupId`, `status`, `assignedGroupId`, `courseId`, `studentId`, `schoolYear`, `(type, status)`, `(city, schoolYear, status)` |
+| Inquiry | `scheduledGroupId`, `status`, `assignedGroupId`, `courseId`, `studentId`, `schoolYear`, `(type, status)`, `(city, schoolYear, status)`, `(city, schoolYear, waitlistedAt)` |
 | Article | `(city, isPublished)` |
 | CourseEnrollmentWindow | `schoolYear` |
 | CourseSeason | `schoolYear` |
@@ -505,6 +536,8 @@ erDiagram
 | StudentAssessment | `groupId` |
 | Attendance | `sessionDate` |
 | TeacherAttendance | `(userId, sessionDate)`, `(scheduledGroupId, sessionDate)`, `recordedById` |
+| SessionStaffChange | `(userId, sessionDate)` |
+| InquiryWaitlistGroup | `scheduledGroupId` |
 | EmailCampaign | `(city, createdAt)`, `(city, kind, targetCourseId, targetSchoolYear)`, `sentById`, `targetCourseId` |
 | EmailCampaignRecipient | `campaignId` |
 
@@ -516,7 +549,7 @@ Split and Šibenik run as fully separated tenants inside one app. "City" is the 
 
 **Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `CourseSeason` (each city runs the shared competition program's season on its own dates), `CourseGradeRule` (each city offers the shared standard program to its own razredi), `TrialWeek` (each city picks its own probni-sat week), `SchoolYearHoliday`, `EmailCampaign` (the sending admin's city — the tenant boundary for both recipient resolution and the `/admin/email` history list), and `Course` (nullable — `null` = shared standard SLR program and the competition program, set = per-city radionica).
 
-**Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`EnrollmentMonth`/`Attendance`/`TeacherAttendance`/`GalleryImage`/`TeacherAssignment`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `ArticleImage`/`ArticleTag` through their article, `EmailCampaignRecipient` through its campaign.
+**Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`EnrollmentMonth`/`Attendance`/`TeacherAttendance`/`GalleryImage`/`TeacherAssignment`/`SessionStaffChange`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `InquiryWaitlistGroup` through its inquiry (and its group, which must be in the same city), `ArticleImage`/`ArticleTag` through their article, `EmailCampaignRecipient` through its campaign.
 
 `ReleaseAnnouncement` is the one model with **no city at all, not even transitively**.
 

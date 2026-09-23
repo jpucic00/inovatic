@@ -43,6 +43,7 @@ const OTHER_YEAR = `${Number(YEAR.slice(0, 4)) + 1}/${Number(YEAR.slice(0, 4)) +
 const {
   setInquiryWaitlist,
   removeInquiryFromWaitlist,
+  declineInquiry,
   getInquiries,
   getInquiryWaitlist,
   getGroupsForCourse,
@@ -109,6 +110,9 @@ describe('setInquiryWaitlist / removeInquiryFromWaitlist', () => {
     expect(edited.waitlistNote).toBeNull()
     expect(edited.waitlistGroups).toHaveLength(2)
 
+    // Declined directly in the DB — declineInquiry itself would already clear
+    // the entry, and a NEW upit cannot leave the list (see below).
+    await db.inquiry.update({ where: { id: inquiry.id }, data: { status: 'DECLINED' } })
     expect((await removeInquiryFromWaitlist(inquiry.id)).success).toBe(true)
     const removed = await db.inquiry.findUniqueOrThrow({
       where: { id: inquiry.id },
@@ -116,6 +120,64 @@ describe('setInquiryWaitlist / removeInquiryFromWaitlist', () => {
     })
     expect(removed.waitlistedAt).toBeNull()
     expect(removed.waitlistGroups).toHaveLength(0)
+  })
+
+  it('refuses to take a NEW upit off the list and changes nothing', async () => {
+    const { course, group, other } = await radionica()
+    const inquiry = await upit(group.id, course.id)
+    await setInquiryWaitlist({ id: inquiry.id, groupIds: [other.id], note: 'samo petak' })
+
+    const res = await removeInquiryFromWaitlist(inquiry.id)
+    expect(res).toEqual({
+      success: false,
+      error: 'Novi upit se ne može maknuti s liste čekanja. Najprije kreirajte račun ili odbijte upit.',
+    })
+    const row = await db.inquiry.findUniqueOrThrow({
+      where: { id: inquiry.id },
+      include: { waitlistGroups: true },
+    })
+    expect(row.waitlistedAt).not.toBeNull()
+    expect(row.waitlistNote).toBe('samo petak')
+    expect(row.waitlistGroups.map((g) => g.scheduledGroupId)).toEqual([other.id])
+  })
+
+  it('removes a declined or account-created upit', async () => {
+    const { course, other } = await radionica()
+    for (const status of ['DECLINED', 'ACCOUNT_CREATED'] as const) {
+      const inquiry = await upit(null, course.id, { status })
+      await setInquiryWaitlist({ id: inquiry.id, groupIds: [other.id], note: '' })
+      expect((await removeInquiryFromWaitlist(inquiry.id)).success).toBe(true)
+    }
+  })
+
+  it('declining a waitlisted upit takes it off the list too', async () => {
+    const { course, group, other } = await radionica()
+    const inquiry = await upit(group.id, course.id)
+    await setInquiryWaitlist({ id: inquiry.id, groupIds: [other.id], note: 'samo petak' })
+
+    expect((await declineInquiry(inquiry.id, 'Obitelj je odustala.')).success).toBe(true)
+    const row = await db.inquiry.findUniqueOrThrow({
+      where: { id: inquiry.id },
+      include: { waitlistGroups: true },
+    })
+    expect(row.status).toBe('DECLINED')
+    expect(row.waitlistedAt).toBeNull()
+    expect(row.waitlistNote).toBeNull()
+    expect(row.waitlistGroups).toHaveLength(0)
+  })
+
+  // The case the rule exists for: the family's seat was released onto the list,
+  // another family booked it, and taking the first one off the list used to
+  // re-take the same seat — 3 of 2.
+  it('never pushes the form group over capacity', async () => {
+    const { course, group, other } = await radionica(1)
+    const first = await upit(group.id, course.id)
+    await setInquiryWaitlist({ id: first.id, groupIds: [other.id], note: '' })
+    await upit(group.id, course.id)
+    expect(await spotsFor(course.id, group.id)).toBe(0)
+
+    expect((await removeInquiryFromWaitlist(first.id)).success).toBe(false)
+    expect(await spotsFor(course.id, group.id)).toBe(0)
   })
 
   it('accepts any status, including declined and account-created', async () => {

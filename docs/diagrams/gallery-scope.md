@@ -8,7 +8,7 @@
 
 Unlike `MaterialScope`, this invariant has **no DB-level `CHECK` constraint** — `Course.kind` lives on a sibling row, not on `GalleryImage` itself, so a single-row check can't express the rule. Instead the rule lives in the `moduleScopeError` helper called from `addGalleryImages()` in `src/actions/gallery/crud.ts`. This diagram is the most accessible reference for the rule.
 
-**City tenancy:** galleries are per-group, hence per-city — `GalleryImage` needs no `city` column of its own. `canManageGroupImages` bounds the ADMIN pass-through to `group.city === session.user.city` (a cross-city admin gets "Nemate dopuštenje za ovu grupu."); teachers are bound through their same-city assignments; students through their enrollment.
+**City tenancy:** galleries are per-group, hence per-city — `GalleryImage` needs no `city` column of its own. `canManageGroupImages` bounds the ADMIN pass-through to `group.city === session.user.city` (a cross-city admin gets "Nemate dopuštenje za ovu grupu."); teachers are bound through `teacherGroupAccessWhere` (`src/lib/teacher-guard.ts` — a same-city `TeacherAssignment` **or** a `SessionStaffChange` with `sessionDate` ≥ today, Europe/Zagreb, so a substitute can photograph the termin they cover); students through their enrollment.
 
 ## Validation flow on write
 
@@ -16,7 +16,7 @@ Unlike `MaterialScope`, this invariant has **no DB-level `CHECK` constraint** �
 flowchart TD
     A["addGalleryImages(input)"] --> Z[Zod parse: addGalleryImagesSchema]
     Z -->|fail| ZE["error: parsed.error.issues[0]?.message<br/>or 'Nevažeći podaci.'"]
-    Z -->|pass| P{canManageGroupImages?<br/>ADMIN pass-through city-bound:<br/>group.city === admin.city<br/>OR TeacherAssignment row}
+    Z -->|pass| P{"canManageGroupImages?<br/>ADMIN pass-through city-bound:<br/>group.city === admin.city<br/>TEACHER: group matches teacherGroupAccessWhere<br/>(TeacherAssignment OR SessionStaffChange sessionDate ≥ today)"}
     P -->|No| PE["error: 'Nemate dopuštenje za ovu grupu.'"]
     P -->|Yes| L[Load group + schoolYear + course.kind + module ids]
     L -->|not found| NF["error: 'Grupa nije pronađena.'"]
@@ -99,7 +99,7 @@ flowchart LR
     style K fill:#dbeafe
 ```
 
-> The reader mirrors the writer's invariant, but the partitioning is **client-side**: `buildGroupGalleryView` (`src/lib/group-gallery-view.ts`) returns every image of the group in one list, and `GalleryTabsAndGrid` filters by `moduleId` per tab (`flatLayout` filters `moduleId === null`). `activeModuleId` comes from `getCurrentActiveModuleForGroup`, which returns null for anything without dated modules — so a standard group's gallery opens on the module it is working on now, while a competition group's opens on the URL's `?tab=` or the first natjecanje. The view only runs after the caller's gate passes (student enrollment row here; teacher assignment / same-city admin on the staff pages) — students of other groups get a 404, not a leaked image list.
+> The reader mirrors the writer's invariant, but the partitioning is **client-side**: `buildGroupGalleryView` (`src/lib/group-gallery-view.ts`) returns every image of the group in one list, and `GalleryTabsAndGrid` filters by `moduleId` per tab (`flatLayout` filters `moduleId === null`). `activeModuleId` comes from `getCurrentActiveModuleForGroup`, which returns null for anything without dated modules — so a standard group's gallery opens on the module it is working on now, while a competition group's opens on the URL's `?tab=` or the first natjecanje. The view only runs after the caller's gate passes (student enrollment row here; `teacherGroupAccessWhere` — an assignment or an upcoming per-termin change — / same-city admin on the staff pages) — students of other groups get a 404, not a leaked image list.
 
 ## Summary
 

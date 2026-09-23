@@ -19,6 +19,7 @@ import {
 } from './helpers/factory'
 import { fixtureScope } from './helpers/cleanup'
 import { fromDateKey } from '@/lib/session-dates'
+import { zagrebDateKey } from '@/lib/attendance-window'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
@@ -33,6 +34,7 @@ const { getMyAssignedGroups } = await import('@/actions/teacher/dashboard')
 const { assertTeacherOwnsGroup } = await import('@/lib/teacher-guard')
 const { upsertHoliday } = await import('@/actions/admin/holidays')
 const { deleteGroup } = await import('@/actions/admin/group')
+const { deleteTeacher } = await import('@/actions/admin/teacher')
 
 const SY = '2026/2027'
 // A Monday — the factory's default group weekday — no other file uses.
@@ -41,6 +43,15 @@ const TUESDAY = '2027-03-16'
 const NEXT_MONDAY = '2027-03-22'
 
 const fixtures = fixtureScope()
+
+/** Days from today on the Europe/Zagreb calendar, which is what the access rule reads. */
+function zagrebDaysFromToday(days: number): string {
+  const d = fromDateKey(zagrebDateKey(new Date()))
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+const CROATIAN_WEEKDAYS = ['Nedjelja', 'Ponedjeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota']
 
 beforeAll(async () => {
   await db.schoolYear.upsert({ where: { label: SY }, create: { label: SY }, update: {} })
@@ -351,5 +362,153 @@ describe('the change goes with its termin', () => {
       replacesUserId: lead.id,
     })
     expect(await deleteGroup(group.id)).toEqual({ success: true })
+  })
+})
+
+describe('the action holds the picker date bounds', () => {
+  it('refuses a termin that has already passed', async () => {
+    // Yesterday, on a group that meets on yesterday's weekday in yesterday's
+    // school year — so only the date bound can be what refuses it.
+    const yesterday = zagrebDaysFromToday(-1)
+    const [y, m] = yesterday.split('-').map(Number)
+    const schoolYear = m >= 9 ? `${y}/${y + 1}` : `${y - 1}/${y}`
+    await db.schoolYear.upsert({ where: { label: schoolYear }, create: { label: schoolYear }, update: {} })
+    const admin = await createAdmin()
+    const lead = await createTeacher()
+    const substitute = await createTeacher()
+    const location = await fixtures.location({ city: 'SPLIT' })
+    const group = await fixtures.group({
+      locationId: location.id,
+      city: 'SPLIT',
+      schoolYear,
+      dayOfWeek: CROATIAN_WEEKDAYS[fromDateKey(yesterday).getUTCDay()],
+    })
+    await createTeacherAssignment(lead.id, group.id)
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const res = await addSessionStaffChange({
+      scheduledGroupId: group.id,
+      sessionDates: [yesterday],
+      userId: substitute.id,
+      role: 'LEAD',
+      replacesUserId: lead.id,
+    })
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toMatch(/termin je već prošao|arhiv/i)
+    expect(await db.sessionStaffChange.count({ where: { scheduledGroupId: group.id } })).toBe(0)
+  })
+
+  it('refuses a date outside the group school year', async () => {
+    const { admin, lead, substitute, group } = await staffedGroup()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const res = await addSessionStaffChange({
+      scheduledGroupId: group.id,
+      // A Monday in 2027/2028, a year after the group's.
+      sessionDates: [MONDAY, '2027-09-13'],
+      userId: substitute.id,
+      role: 'LEAD',
+      replacesUserId: lead.id,
+    })
+    expect(res).toEqual({
+      success: false,
+      error: '13.09.2027.: termin nije u školskoj godini grupe.',
+    })
+    expect(await db.sessionStaffChange.count({ where: { scheduledGroupId: group.id } })).toBe(0)
+  })
+})
+
+describe('deleting a teacher', () => {
+  it('drops their zamjene from today on and keeps the past ones as history', async () => {
+    const { admin, lead, substitute, group } = await staffedGroup()
+    for (const days of [-7, 7]) {
+      await db.sessionStaffChange.create({
+        data: {
+          scheduledGroupId: group.id,
+          sessionDate: fromDateKey(zagrebDaysFromToday(days)),
+          userId: substitute.id,
+          role: 'LEAD',
+          replacesUserId: lead.id,
+          createdById: admin.id,
+        },
+      })
+    }
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    expect(await deleteTeacher(substitute.id)).toEqual({ success: true })
+    const left = await db.sessionStaffChange.findMany({ where: { userId: substitute.id } })
+    expect(left.map((c) => c.sessionDate.toISOString().slice(0, 10))).toEqual([
+      zagrebDaysFromToday(-7),
+    ])
+  })
+})
+
+describe('the substitute on their own termin', () => {
+  // Today, on today's weekday: the only date that is both inside the teacher
+  // marking window and still inside the substitute's access window.
+  async function coveredToday() {
+    const today = zagrebDaysFromToday(0)
+    const city = 'SPLIT' as const
+    const admin = await createAdmin({ city })
+    const lead = await createTeacher({ city })
+    const substitute = await createTeacher({ city })
+    const location = await fixtures.location({ city })
+    const group = await fixtures.group({
+      locationId: location.id,
+      city,
+      schoolYear: SY,
+      dayOfWeek: CROATIAN_WEEKDAYS[fromDateKey(today).getUTCDay()],
+    })
+    await createTeacherAssignment(lead.id, group.id)
+    await db.sessionStaffChange.create({
+      data: {
+        scheduledGroupId: group.id,
+        sessionDate: fromDateKey(today),
+        userId: substitute.id,
+        role: 'LEAD',
+        replacesUserId: lead.id,
+        createdById: admin.id,
+      },
+    })
+    const student = await createStudent()
+    const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
+    return { today, lead, substitute, group, enrollment }
+  }
+
+  it('can still open the group on the termin day itself', async () => {
+    const { substitute, group } = await coveredToday()
+    mockSession({ id: substitute.id, role: 'TEACHER' })
+    await expect(assertTeacherOwnsGroup(group.id)).resolves.toBeDefined()
+  })
+
+  it('marks it as a teacher and books their own hour, not the replaced teacher', async () => {
+    const { today, substitute, group, enrollment } = await coveredToday()
+    mockSession({ id: substitute.id, role: 'TEACHER' })
+    const res = await bulkMarkSession({
+      groupId: group.id,
+      sessionDate: today,
+      entries: [{ enrollmentId: enrollment.id, present: true, note: null }],
+    })
+    expect(res).toEqual({ success: true })
+    const booked = await db.teacherAttendance.findMany({
+      where: { scheduledGroupId: group.id },
+      select: { userId: true },
+    })
+    expect(booked.map((b) => b.userId)).toEqual([substitute.id])
+  })
+})
+
+describe('a holiday only clears its own city', () => {
+  it('a Šibenik holiday leaves a Split zamjena on the same date alone', async () => {
+    const { admin, lead, substitute, group } = await staffedGroup('SPLIT')
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    await addSessionStaffChange({
+      scheduledGroupId: group.id,
+      sessionDates: [MONDAY],
+      userId: substitute.id,
+      role: 'LEAD',
+      replacesUserId: lead.id,
+    })
+    const sibenikAdmin = await createAdmin({ city: 'SIBENIK' })
+    mockSession({ id: sibenikAdmin.id, role: 'ADMIN', city: 'SIBENIK' })
+    expect((await upsertHoliday({ schoolYear: SY, date: MONDAY })).success).toBe(true)
+    expect(await db.sessionStaffChange.count({ where: { scheduledGroupId: group.id } })).toBe(1)
   })
 })

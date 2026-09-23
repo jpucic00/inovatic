@@ -22,6 +22,7 @@ stateDiagram-v2
     NEW_PARTY --> DECLINED: Admin declines
 
     PARTY_SCHEDULED --> DECLINED: Admin changes mind
+    DECLINED --> ACCOUNT_CREATED: Admin places a waitlisted child
 
     ACCOUNT_CREATED --> [*]
     DECLINED --> [*]
@@ -35,9 +36,13 @@ stateDiagram-v2
         Email: InquiryNotificationEmail to cityInboxEmail(city),
         reply-to = the parent, so staff answer from Outlook
         Spot reserved if scheduledGroupId provided
+        AND the upit is not waitlisted (RESERVING_INQUIRY_WHERE)
         noSuitableTermin = true answers the termin question
         without reserving anything (COMPETITION link only)
         Admin can send schedule-options email without changing status
+        Lista čekanja (waitlistedAt) is orthogonal to status:
+        any COURSE upit - NEW, ACCOUNT_CREATED or DECLINED - may
+        sit on it; waitlisting a NEW upit releases its seat
     end note
 
     note right of NEW_PARTY
@@ -51,7 +56,10 @@ stateDiagram-v2
     end note
 
     note left of ACCOUNT_CREATED
-        Guard: status not ACCOUNT_CREATED or DECLINED
+        Guard: status not ACCOUNT_CREATED, and not DECLINED
+        unless the upit is waitlisted (a waitlisted DECLINED
+        upit may still be placed)
+        Lista čekanja entry cleared in the same transaction
         User created or reused via the two-tier identity match (DOB, or name + parent e-mail for DOB-less imports)
         Names persisted normalized - NFC, trimmed, single-spaced; a reused account takes the newer spelling unless it differs by case alone
         Parent contact data + GDPR consent copied to User
@@ -77,7 +85,8 @@ stateDiagram-v2
         declineReason captured on Inquiry row
         Spot freed from preferredInquiries count (COURSE)
         No automated email
-        TERMINAL STATE
+        TERMINAL unless waitlisted - a DECLINED COURSE upit
+        on the lista čekanja can still be converted
     end note
 ```
 
@@ -86,21 +95,25 @@ stateDiagram-v2
 | From | To | Action | Guard | Side effects |
 |------|-----|--------|-------|-------------|
 | — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation (`inquirySchema` rejects `scheduledGroupId` + `noSuitableTermin` together); COURSE: high-school grade / `noSuitableTermin` only on a COMPETITION target (`competitionOnlyAnswerError`); with group: `group.city === submitted city`, radionica termin not yet started; **without** group **and** without `noSuitableTermin`: `!isTerminRequired(programs, grade, courseId)` against `loadProgramsForCheck`; on an SLR target `paymentOption` is additionally mandatory (`'Odaberite način plaćanja.'`) | Inquiry created with `city`; confirmation email to the parent **and** a notification to the city's staff inbox (reply-to = parent, swallow-and-log after the row is committed); spot reserved if group selected (COURSE) |
-| `NEW` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED && status !== DECLINED`; `type === COURSE` | User + Enrollment + ModuleEnrollments; **no e-mail**; `studentId` + `assignedGroupId` set |
+| `NEW` (or waitlisted `DECLINED`) | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED`; `status !== DECLINED` **unless `waitlistedAt` is set** (pre-flight and again in the tx); `type === COURSE` | User + Enrollment + ModuleEnrollments; **no e-mail**; `studentId` + `assignedGroupId` set; lista čekanja entry cleared in the same transaction (`InquiryWaitlistGroup` rows deleted, `waitlistedAt`/`waitlistNote` → null) |
 | `NEW` | `PARTY_SCHEDULED` | `schedulePartyInquiry` | `type === PARTY` | `partyConfirmedDate` + `partyStartTime` set; appears on Kalendar |
-| `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000) | `declineReason` persisted; spot freed |
+| `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000) | `declineReason` persisted; spot freed; a waitlisted upit is taken off the lista čekanja in the same transaction |
 | `PARTY_SCHEDULED` | `DECLINED` | `declineInquiry` | — (no status guard on decline) | `declineReason` persisted |
+| `DECLINED` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `waitlistedAt` set (a declined upit nobody waits on stays closed) | Same as `NEW` → `ACCOUNT_CREATED` |
 
 ### Non-status actions
 
 | Action | When | Side effects |
 |--------|------|-------------|
 | `sendScheduleOptions` | Status `NEW` only | Fetches selected groups + sends schedule email. No DB writes, status stays `NEW`. Can be called multiple times. |
+| `setInquiryWaitlist` | Any status, `type === COURSE` (PARTY refused); groups must share the upit's city, its **own** `schoolYear` and one program | Puts the upit on the lista čekanja or edits its entry: replaces its `InquiryWaitlistGroup` rows and `waitlistNote`; stamps `waitlistedAt` **only on the way on**, so an edit never moves the family back in the queue. A waitlisted `NEW` upit **releases its seat** (it drops out of `RESERVING_INQUIRY_WHERE`). |
+| `removeInquiryFromWaitlist` | Waitlisted upit that is **not `NEW`** (ACCOUNT_CREATED or DECLINED) | Deletes its `InquiryWaitlistGroup` rows and clears `waitlistedAt` + `waitlistNote`. A `NEW` upit is **refused** (status re-checked inside the write): off the list it would re-take its `scheduledGroupId` seat, which may have filled meanwhile. It is resolved first — creating the account and declining both clear the entry in the same transaction as their status change — so leaving the list never changes a seat count. |
 
 ### Deletion
 
 - `deleteInquiry` has no status guard — can delete at any status.
 - Does NOT cascade to `User` or `Enrollment` if already created.
+- Its `InquiryWaitlistGroup` rows go with it (FK cascade).
 
 ---
 
@@ -118,7 +131,7 @@ flowchart TD
     C --> D{nextEnrollingModule exists?}
     D -->|No| HIDE[Group hidden from /prijava - graduated past M4 or schedule incomplete]
     D -->|Yes| E["enrolledCount = enrollments whose moduleEnrollments include nextEnrollingModule.moduleScheduleId"]
-    E --> F[preferredCount = inquiries where status = NEW]
+    E --> F["preferredCount = inquiries matching RESERVING_INQUIRY_WHERE<br/>(status = NEW AND waitlistedAt IS NULL)"]
     F --> G["available = maxStudents - enrolledCount - preferredCount"]
     G --> H{available > 0?}
     H -->|Yes| SHOW[Group shown with 'next module' label]
@@ -141,7 +154,7 @@ flowchart TD
     B --> R0{"Radionica whose dateStart has arrived? (isRadionicaOpenForSignup false)"}
     R0 -->|Yes| HIDE["Group hidden — workshop already started (from midnight of dateStart, Europe/Zagreb). Competition groups run a whole season and never expire this way"]
     R0 -->|No| C[enrolledCount = all enrollments in group, presence only]
-    C --> D[preferredCount = inquiries where status = NEW]
+    C --> D["preferredCount = inquiries matching RESERVING_INQUIRY_WHERE<br/>(status = NEW AND waitlistedAt IS NULL)"]
     D --> E["available = maxStudents - enrolledCount - preferredCount"]
     E --> F{available > 0?}
     F -->|Yes| SHOW[Group shown as available]
@@ -173,6 +186,7 @@ flowchart LR
         F3[deleteEnrollment - hard delete row]
         F4[deleteModuleEnrollment - hard delete row]
         F5["closeModuleSchedule - endDate set to now, next module takes over"]
+        F6["setInquiryWaitlist on a NEW upit - waitlisting releases the seat<br/>removal is refused while NEW, so it never comes back from the list"]
     end
 
     style R1 fill:#fee2e2
@@ -186,22 +200,23 @@ flowchart LR
     style F3 fill:#d1fae5
     style F4 fill:#d1fae5
     style F5 fill:#d1fae5
+    style F6 fill:#d1fae5
 ```
 
-> The preferred-inquiry count is `status === NEW` only. When an inquiry transitions to `ACCOUNT_CREATED` (or `DECLINED`) it stops counting as a preferred inquiry; the new enrollment takes over the slot so the net count stays the same.
+> The preferred-inquiry count is `RESERVING_INQUIRY_WHERE` (`src/lib/group-capacity.ts`: `status === NEW` **and** `waitlistedAt === null`) — the one predicate behind the public feed, both admin group pickers and the `assertGroupHasAvailableSpot` conversion guard; never inline `{ status: 'NEW' }` for a seat count. When an inquiry transitions to `ACCOUNT_CREATED` (or `DECLINED`) it stops counting as a preferred inquiry; the new enrollment takes over the slot so the net count stays the same. Putting a `NEW` upit on the lista čekanja also stops it counting (the family has said they cannot attend that group); `scheduledGroupId` is kept as history. Taking it off the list makes it count again **without a capacity check** — accepted gap.
 
 ### The inquiry being converted must not block itself (2026-09-01)
 
-The `status === NEW` count above is what **the public feed and every other picker** see. The two upit dialogs see one seat less, because the seat they would block with is the one the conversion is about to free.
+The `RESERVING_INQUIRY_WHERE` count above is what **the public feed and every other picker** see. The two upit dialogs see one seat less, because the seat they would block with is the one the conversion is about to free.
 
 ```mermaid
 flowchart TD
     A["Admin opens upit X (status NEW, preferred group G)"] --> B["getGroupsForCourse(courseId, excludeInquiryId: X)"]
-    B --> C{"Excluded inquiry loaded — status === NEW?"}
-    C -->|"No — ACCOUNT_CREATED / DECLINED / unknown id / other city"| D["reservedGroupId = null<br/>counts identical to the public feed"]
+    B --> C{"Excluded inquiry loaded — status === NEW<br/>AND waitlistedAt IS NULL?"}
+    C -->|"No — ACCOUNT_CREATED / DECLINED / waitlisted / unknown id / other city"| D["reservedGroupId = null<br/>counts identical to the public feed"]
     C -->|Yes| E["reservedGroupId = inquiry.scheduledGroupId"]
-    D --> F2["_count.preferredInquiries where { status: NEW }"]
-    E --> F1["_count.preferredInquiries where { status: NEW, id: { not: X } }"]
+    D --> F2["_count.preferredInquiries where RESERVING_INQUIRY_WHERE"]
+    E --> F1["_count.preferredInquiries where { ...RESERVING_INQUIRY_WHERE, id: { not: X } }"]
     F1 --> G["computeGroupCapacity → availableSpots, isFull"]
     F2 --> G
     G --> H{"group.id === reservedGroupId AND not isFull?"}
@@ -215,7 +230,7 @@ flowchart TD
 
 > Source: `getGroupsForCourse` in `src/actions/admin/inquiry.ts`, consumed by `CreateAccountDialog`, `SendScheduleDialog` and the server prefetch on `/admin/upiti/[id]`. **A view, never a write.** The exclusion mirrors — it does not create — the free-before-assert step inside `createStudentFromInquiry`: the transaction flips the inquiry to `ACCOUNT_CREATED` *before* `assertGroupHasAvailableSpot` runs, so the seat the picker hides is genuinely gone by the time capacity is re-checked under `Serializable`. Without the exclusion the last seat in a group would gray out the one conversion that releases it.
 >
-> **Only these two callers pass an inquiry id.** `getActivePrograms` / `getSignupProgram` (the public feed) and `getGroupsForCourseInSelectedYear` (manual student creation) count every `NEW` inquiry, so a group can legitimately read *puna* on `/prijava` and *1 mjesto* on that child's own upit at the same second. That is why the flag exists: the row says **whose** seat it is, or the discrepancy reads as a capacity bug. Only a `NEW` inquiry reserves anything, so an already-processed or cross-city id resolves to `reservedGroupId = null` and the counts fall back to the public ones (integration-tested: the cross-city call is deep-equal to the plain one).
+> **Only these two callers pass an inquiry id.** `getActivePrograms` / `getSignupProgram` (the public feed) and `getGroupsForCourseInSelectedYear` (manual student creation) count every reserving inquiry (`RESERVING_INQUIRY_WHERE`), so a group can legitimately read *puna* on `/prijava` and *1 mjesto* on that child's own upit at the same second. That is why the flag exists: the row says **whose** seat it is, or the discrepancy reads as a capacity bug. Only a `NEW`, non-waitlisted inquiry reserves anything, so an already-processed, waitlisted or cross-city id resolves to `reservedGroupId = null` and the counts fall back to the public ones (integration-tested: the cross-city call is deep-equal to the plain one).
 
 ### Capacity guard pattern (write path)
 
@@ -227,7 +242,7 @@ flowchart TD
 
     B --> C["assertGroupHasAvailableSpot(tx, groupId)<br/>loads group + holidays inside the tx"]
     C --> D["computeGroupCapacity<br/>hasDatedModules (standard): enrollments on the per-group<br/>next-enrolling module (weekday + holiday arc)<br/>radionica + competition: enrollments.length"]
-    D --> E{"Spot free?<br/>enrolled + reservedInquiries(NEW) &lt; maxStudents"}
+    D --> E{"Spot free?<br/>enrolled + reservedInquiries(RESERVING_INQUIRY_WHERE) &lt; maxStudents"}
 
     E -->|Yes| F["Run the mutation, commit, return result"]
     E -->|No| G["throw GroupFullError"]
@@ -624,7 +639,7 @@ sequenceDiagram
             Server->>Server: assertGroupHasAvailableSpot then create Inquiry
             Note right of Server: P2034 serialization failure retried once. Second P2034 returns "Pokusajte ponovno.". GroupFullError returns code GROUP_FULL with fresh programs. A radionica already past its dateStart throws RadionicaStartedError and returns code TERMIN_CLOSED with fresh programs.
         end
-        Server->>Server: Spot reserved via preferredInquiries count
+        Server->>Server: Spot reserved via preferredInquiries count (RESERVING_INQUIRY_WHERE)
     end
 
     Server->>Email: Send InquiryConfirmationEmail
@@ -657,7 +672,9 @@ sequenceDiagram
     Note right of Admin: Standard courses: admin picks at least one ModuleSchedule. Radionice: step skipped.
 
     Admin->>Server: createStudentFromInquiry inquiryId groupId moduleScheduleIds
-    Server->>Server: Guard: status not ACCOUNT_CREATED or DECLINED
+    Server->>Server: Guard: status not ACCOUNT_CREATED, and not DECLINED unless waitlisted
+    Server->>Server: In one transaction: delete InquiryWaitlistGroup rows, set Inquiry status ACCOUNT_CREATED + clear waitlistedAt, waitlistNote
+    Note right of Server: Flipped BEFORE createStudentCore on purpose - the upit stops reserving its own seat, so assertGroupHasAvailableSpot does not count the spot this conversion is about to claim
 
     alt childDateOfBirth or parentEmail available
         Server->>Server: candidateWheres narrows to STUDENTs by DOB (or by parent e-mail for DOB-less imports), then isIdentityMatch decides the name in memory over the folded key - whitespace, case and diacritics - so a trailing space can no longer split one child into two accounts
@@ -672,7 +689,7 @@ sequenceDiagram
     Server->>Server: Create Enrollment (and ModuleEnrollments for standard courses)
     Note right of Server: Enrollment.paymentOption is seeded from the upit on CREATE only, and refused outright on a kind that offers no choice
     Note right of Server: Monthly-billed COMPETITION groups instead get EnrollmentMonth rows (createSeasonMonths in ensureEnrollment) - join month through season end, skipDuplicates. An unplanned season writes nothing. Setting dates later backfills via upsertCourseSeason, whose same-transaction syncSeasonMonths adds newly covered months and deletes only unpaid out-of-range ones.
-    Server->>Server: Update Inquiry status ACCOUNT_CREATED, studentId, assignedGroupId
+    Server->>Server: assertGroupHasAvailableSpot, then backfill Inquiry studentId, assignedGroupId (same transaction)
     Note right of Server: NO e-mail is sent on acceptance (2026-08-17). Credentials leave only through a CREDENTIALS campaign on /admin/email, run once contracts are signed - one mail per CHILD, ownership re-derived per recipient by assertCredentialsBelongTo. Passwords for accounts that have none are minted up front at campaign creation (hashed outside the transaction), and User.credentialsSentAt records the delivery. The password also stays readable on the student profile, which is the primary early hand-over.
 
     Note over Parent, Admin: ALTERNATE ENTRY PATHS
@@ -695,7 +712,7 @@ sequenceDiagram
     alt Admin declines inquiry
         Admin->>Server: declineInquiry id reason
         Server->>Server: Validate reason min 3 trimmed max 2000
-        Server->>Server: status DECLINED, declineReason persisted, spot freed
+        Server->>Server: status DECLINED, declineReason persisted, spot freed, lista čekanja entry cleared (same transaction)
     end
 
     alt Admin schedules a party inquiry

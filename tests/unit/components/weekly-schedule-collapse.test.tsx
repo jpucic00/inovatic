@@ -89,3 +89,17 @@ describe('WeeklySchedule empty-hour collapsing', () => {
     expect(screen.queryByText('⋯')).toBeNull()
   })
 })
+
+describe('WeeklySchedule group blocks', () => {
+  it('each block is a real link to that group page', () => {
+    const { container } = render(
+      <WeeklySchedule
+        activeFilter="all"
+        groups={[group({ id: 'g-1', name: 'Jutarnja', startTime: '09:00', endTime: '10:30' })]}
+      />,
+    )
+    const block = container.querySelector<HTMLElement>('[title^="Jutarnja"]')!
+    expect(block.tagName).toBe('A')
+    expect(block.getAttribute('href')).toBe('/admin/grupe/g-1')
+  })
+})

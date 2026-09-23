@@ -17,6 +17,7 @@ import {
 } from '@/lib/validators/admin/teacher'
 import { hashPassword, generateSimplePassword } from '@/lib/password'
 import { sendTeacherCredentialsEmail } from '@/lib/email'
+import { staffChangeAccessFrom } from '@/lib/session-staff'
 
 type TeacherRow = {
   id: string
@@ -392,8 +393,14 @@ export async function deleteTeacher(id: string): Promise<AdminActionResult> {
       return { success: false, error: 'Nastavnik je već obrisan.' }
     }
 
+    // Their zamjene from today on go too — left behind they would keep a
+    // deleted account on the termin (and bookable for hours) while the regular
+    // they replace stays off it. Past changes are history and stay.
     await db.$transaction([
       db.teacherAssignment.deleteMany({ where: { userId: id } }),
+      db.sessionStaffChange.deleteMany({
+        where: { userId: id, sessionDate: { gte: staffChangeAccessFrom(new Date()) } },
+      }),
       db.user.update({ where: { id }, data: { deletedAt: new Date() } }),
     ])
 

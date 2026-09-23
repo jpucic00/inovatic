@@ -147,59 +147,62 @@ export function GroupTeachersPanel({
         <p className="text-sm text-gray-400 italic">Nema dodijeljenih nastavnika.</p>
       ) : (
         <div className="space-y-2">
-          {regulars.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <Users className="w-4 h-4 text-gray-400 shrink-0" />
-                <div className="min-w-0">
-                  <Link
-                    href={`/admin/nastavnici/${a.user.id}`}
-                    className="text-sm font-medium text-gray-900 hover:text-cyan-700 transition-colors"
-                  >
-                    {fullName(a.user)}
-                  </Link>
-                  <p className="text-xs text-gray-500 truncate">{a.user.email}</p>
-                  {replacedOn.has(a.user.id) && (
-                    <p className="text-xs text-amber-700">
-                      Mijenja se: {replacedOn.get(a.user.id)!.map(formatDateKey).join(', ')}
-                    </p>
+          {regulars.map((a) => {
+            const replacedDates = replacedOn.get(a.user.id)
+            return (
+              <div
+                key={a.id}
+                className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Users className="w-4 h-4 text-gray-400 shrink-0" />
+                  <div className="min-w-0">
+                    <Link
+                      href={`/admin/nastavnici/${a.user.id}`}
+                      className="text-sm font-medium text-gray-900 hover:text-cyan-700 transition-colors"
+                    >
+                      {fullName(a.user)}
+                    </Link>
+                    <p className="text-xs text-gray-500 truncate">{a.user.email}</p>
+                    {replacedDates && (
+                      <p className="text-xs text-amber-700">
+                        Mijenja se: {replacedDates.map(formatDateKey).join(', ')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {editable ? (
+                    <RoleSelect
+                      value={a.role}
+                      onChange={(role) =>
+                        run(
+                          () => setTeacherAssignmentRole({ assignmentId: a.id, role }),
+                          'Uloga promijenjena.',
+                        )
+                      }
+                      disabled={isPending}
+                      ariaLabel={`Uloga: ${fullName(a.user)}`}
+                      compact
+                    />
+                  ) : (
+                    <RoleBadge role={a.role} />
+                  )}
+                  {editable && (
+                    <button
+                      onClick={() => run(() => unassignTeacherFromGroup(a.id), 'Nastavnik uklonjen.')}
+                      disabled={isPending}
+                      className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 shrink-0"
+                      aria-label="Ukloni nastavnika"
+                      title="Ukloni nastavnika"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {editable ? (
-                  <RoleSelect
-                    value={a.role}
-                    onChange={(role) =>
-                      run(
-                        () => setTeacherAssignmentRole({ assignmentId: a.id, role }),
-                        'Uloga promijenjena.',
-                      )
-                    }
-                    disabled={isPending}
-                    ariaLabel={`Uloga: ${fullName(a.user)}`}
-                    compact
-                  />
-                ) : (
-                  <RoleBadge role={a.role} />
-                )}
-                {editable && (
-                  <button
-                    onClick={() => run(() => unassignTeacherFromGroup(a.id), 'Nastavnik uklonjen.')}
-                    disabled={isPending}
-                    className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 shrink-0"
-                    aria-label="Ukloni nastavnika"
-                    title="Ukloni nastavnika"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+            )
+          })}
 
           {substitutes.map((s) => (
             <div
@@ -646,6 +649,7 @@ function TerminCheckbox({
         className="size-4 accent-cyan-600"
       />
       {formatDateKey(dateKey)}
+      {reason && <span className="sr-only">{` — na ovom terminu ${reason}`}</span>}
     </label>
   )
 }

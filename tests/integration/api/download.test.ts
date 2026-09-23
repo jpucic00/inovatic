@@ -3,6 +3,7 @@ import { MaterialType } from '@prisma/client'
 import { GET } from '@/app/api/download/[materialId]/route'
 import { db } from '@/lib/db'
 import { mockSession } from '../setup'
+import { zagrebDateKey } from '@/lib/attendance-window'
 import {
   classroomAccount,
   createAdmin,
@@ -204,6 +205,43 @@ describe('GET /api/download/[materialId] — TEACHER', () => {
     mockSession({ id: seeded.teacherUnassigned.id, role: 'TEACHER' })
     const res = await callDownload(seeded.materialGroupA)
     expect(res.status).toBe(404)
+  })
+})
+
+describe('GET /api/download/[materialId] — TEACHER on a zamjena', () => {
+  // Access through a per-termin change only: no TeacherAssignment anywhere, so
+  // canManageMaterial refuses and the read-only fallback has to carry it.
+  async function substituteOn(groupId: string, daysFromToday: number) {
+    const teacher = await createTeacher()
+    const today = zagrebDateKey(new Date())
+    const date = new Date(`${today}T00:00:00Z`)
+    date.setUTCDate(date.getUTCDate() + daysFromToday)
+    await db.sessionStaffChange.create({
+      data: {
+        scheduledGroupId: groupId,
+        sessionDate: date,
+        userId: teacher.id,
+        role: 'LEAD',
+        createdById: seeded.admin.id,
+      },
+    })
+    mockSession({ id: teacher.id, role: 'TEACHER' })
+    return teacher
+  }
+
+  it('an upcoming zamjena on groupA → groupA material → 200', async () => {
+    await substituteOn(seeded.groupAId, 3)
+    expect((await callDownload(seeded.materialGroupA)).status).toBe(200)
+  })
+
+  it('an upcoming zamjena on groupA → groupB material → 404', async () => {
+    await substituteOn(seeded.groupAId, 3)
+    expect((await callDownload(seeded.materialGroupB)).status).toBe(404)
+  })
+
+  it('a zamjena whose termin has passed → groupA material → 404', async () => {
+    await substituteOn(seeded.groupAId, -1)
+    expect((await callDownload(seeded.materialGroupA)).status).toBe(404)
   })
 })
 

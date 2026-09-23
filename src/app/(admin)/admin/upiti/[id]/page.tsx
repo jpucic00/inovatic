@@ -250,6 +250,82 @@ function PartyInquiryDetail({
   )
 }
 
+// Groups for the dropdowns — strip to plain objects (Decimal fields are not serializable).
+// Capacity fields (availableSpots / isFull) come from getGroupsForCourse so the dialogs
+// render "X slobodnih mjesta" / "Popunjeno" immediately on first open without an extra
+// client-side fetch.
+function toGroupOption(sg: {
+  id: string
+  name: string | null
+  dayOfWeek: string | null
+  dateStart: string | null
+  dateEnd: string | null
+  startTime: string | null
+  endTime: string | null
+  availableSpots: number
+  isFull: boolean
+  reservedByThisInquiry: boolean
+  location: { name: string }
+  course: {
+    title: string
+    kind: ProgramKind
+    modules?: {
+      id: string
+      title: string
+      sortOrder: number
+      schedules: { id: string; startDate: Date | null; endDate: Date | null }[]
+    }[]
+  }
+}) {
+  return {
+    id: sg.id,
+    name: sg.name,
+    dayOfWeek: sg.dayOfWeek,
+    dateStart: sg.dateStart,
+    dateEnd: sg.dateEnd,
+    startTime: sg.startTime,
+    endTime: sg.endTime,
+    availableSpots: sg.availableSpots,
+    isFull: sg.isFull,
+    reservedByThisInquiry: sg.reservedByThisInquiry,
+    location: { name: sg.location.name },
+    course: { title: sg.course.title, kind: sg.course.kind, modules: sg.course.modules },
+  }
+}
+
+/**
+ * Lista čekanja: the entry (if any) and the dialog's initial program + groups.
+ * The program defaults to the one the family is waiting on, else the upit's own.
+ * Placing a waitlisted child opens "Kreiraj račun" on that program, with the
+ * first acceptable group that has room preselected.
+ */
+async function loadWaitlistContext(
+  inquiry: { id: string; courseId: string | null; scheduledGroupId: string | null },
+  courseGroups: ReturnType<typeof toGroupOption>[],
+) {
+  const waitlist = await getInquiryWaitlist(inquiry.id)
+  const waitlistCourseId = waitlist?.groups[0]?.courseId ?? inquiry.courseId ?? ''
+  const waitlistGroupOptions = waitlistCourseId
+    ? await getWaitlistGroupOptions(inquiry.id, waitlistCourseId)
+    : []
+
+  const freeWaitlistGroup = waitlist?.groups.find((g) => !g.isFull)
+  const createCourseId = waitlist?.groups[0]?.courseId ?? inquiry.courseId ?? undefined
+  const createGroups =
+    createCourseId && createCourseId !== inquiry.courseId
+      ? (await getGroupsForCourse(createCourseId, inquiry.id)).map(toGroupOption)
+      : courseGroups
+  const createPreferredGroupId = freeWaitlistGroup?.id ?? inquiry.scheduledGroupId ?? undefined
+  return {
+    waitlist,
+    waitlistCourseId,
+    waitlistGroupOptions,
+    createCourseId,
+    createGroups,
+    createPreferredGroupId,
+  }
+}
+
 export default async function InquiryDetailPage({ params }: Readonly<PageProps>) {
   await requireAdmin()
 
@@ -271,47 +347,6 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   // — createStudentFromInquiry applies the same exception.
   const canCreateAccount = !isAccountCreated && (!isDeclined || isWaitlisted)
 
-  // Groups for the dropdowns — strip to plain objects (Decimal fields are not serializable).
-  // Capacity fields (availableSpots / isFull) come from getGroupsForCourse so the dialogs
-  // render "X slobodnih mjesta" / "Popunjeno" immediately on first open without an extra
-  // client-side fetch.
-  const toGroupOption = (sg: {
-    id: string
-    name: string | null
-    dayOfWeek: string | null
-    dateStart: string | null
-    dateEnd: string | null
-    startTime: string | null
-    endTime: string | null
-    availableSpots: number
-    isFull: boolean
-    reservedByThisInquiry: boolean
-    location: { name: string }
-    course: {
-      title: string
-      kind: ProgramKind
-      modules?: {
-        id: string
-        title: string
-        sortOrder: number
-        schedules: { id: string; startDate: Date | null; endDate: Date | null }[]
-      }[]
-    }
-  }) => ({
-    id: sg.id,
-    name: sg.name,
-    dayOfWeek: sg.dayOfWeek,
-    dateStart: sg.dateStart,
-    dateEnd: sg.dateEnd,
-    startTime: sg.startTime,
-    endTime: sg.endTime,
-    availableSpots: sg.availableSpots,
-    isFull: sg.isFull,
-    reservedByThisInquiry: sg.reservedByThisInquiry,
-    location: { name: sg.location.name },
-    course: { title: sg.course.title, kind: sg.course.kind, modules: sg.course.modules },
-  })
-
   // The inquiry's own NEW reservation is excluded from the counts (and the
   // group holding it flagged) — see getGroupsForCourse: without this, a group
   // full only of reservations grays out the very conversion that would free one.
@@ -321,24 +356,14 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
   const courseGroups = groupsForInitial.map(toGroupOption)
   const allCourses = await getInquiryCourses()
 
-  // Lista čekanja: the entry (if any) and the dialog's initial program + groups.
-  // The program defaults to the one the family is waiting on, else the upit's own.
-  const waitlist = await getInquiryWaitlist(inquiry.id)
-  const waitlistCourseId = waitlist?.groups[0]?.courseId ?? inquiry.courseId ?? ''
-  const waitlistGroupOptions = waitlistCourseId
-    ? await getWaitlistGroupOptions(inquiry.id, waitlistCourseId)
-    : []
-
-  // Placing a waitlisted child: open "Kreiraj račun" on the program they are
-  // waiting on, with the first acceptable group that has room preselected.
-  const freeWaitlistGroup = waitlist?.groups.find((g) => !g.isFull)
-  const createCourseId = waitlist?.groups[0]?.courseId ?? inquiry.courseId ?? undefined
-  const createGroups =
-    createCourseId && createCourseId !== inquiry.courseId
-      ? (await getGroupsForCourse(createCourseId, inquiry.id)).map(toGroupOption)
-      : courseGroups
-  const createPreferredGroupId =
-    freeWaitlistGroup?.id ?? inquiry.scheduledGroupId ?? undefined
+  const {
+    waitlist,
+    waitlistCourseId,
+    waitlistGroupOptions,
+    createCourseId,
+    createGroups,
+    createPreferredGroupId,
+  } = await loadWaitlistContext(inquiry, courseGroups)
 
   // Returning-student detection: a child (name + DOB) already in the system,
   // other than the account this inquiry itself created. Parent email feeds the
@@ -439,10 +464,20 @@ export default async function InquiryDetailPage({ params }: Readonly<PageProps>)
                 isEditing
                 compactTrigger
               />
-              <RemoveFromWaitlistButton
-                inquiryId={inquiry.id}
-                childName={formatChildName(inquiry)}
-              />
+              {inquiry.status === 'NEW' ? (
+                // Off the list a NEW upit would re-take its form group's seat,
+                // which may have filled meanwhile — removeInquiryFromWaitlist
+                // refuses it, so the button is not offered.
+                <p className="basis-full text-xs text-orange-800">
+                  Novi upit ostaje na listi dok se ne riješi: kreiranje računa ili odbijanje
+                  upita ga miče s liste.
+                </p>
+              ) : (
+                <RemoveFromWaitlistButton
+                  inquiryId={inquiry.id}
+                  childName={formatChildName(inquiry)}
+                />
+              )}
             </>
           }
         />

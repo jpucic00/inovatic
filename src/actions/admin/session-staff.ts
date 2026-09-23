@@ -10,6 +10,7 @@ import { archivedYearError } from '@/lib/school-year-guard'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { fromDateKey, toDateKey } from '@/lib/session-dates'
 import { formatDateKey } from '@/lib/format'
+import { zagrebDateKey } from '@/lib/attendance-window'
 import { staffChangeDateError, type StaffChange } from '@/lib/session-staff'
 import {
   addSessionStaffChangeSchema,
@@ -146,26 +147,56 @@ async function staffChangeError(
   if (!replacesUserId) {
     // An extra that changes nothing — already on the group in the same role.
     const regular = regulars.find((r) => r.userId === userId)
-    if (regular && regular.role === role) return 'Nastavnik je već na grupi u toj ulozi.'
+    if (regular?.role === role) return 'Nastavnik je već na grupi u toj ulozi.'
   }
 
+  const todayKey = zagrebDateKey(new Date())
   for (const dateKey of dateKeys) {
-    const at = (msg: string) => `${formatDateKey(dateKey)}: ${msg}`
-    const dateError = staffChangeDateError(group, dateKey, holidays)
-    if (dateError) return at(dateError)
+    const error =
+      termErrorOutsideYear(dateKey, todayKey, group.schoolYear) ??
+      staffChangeDateError(group, dateKey, holidays) ??
+      sameDayConflict(
+        existing.filter((c) => toDateKey(c.sessionDate) === dateKey),
+        userId,
+        replacesUserId,
+      )
+    if (error) return `${formatDateKey(dateKey)}: ${error}`
+  }
+  return null
+}
 
-    const sameDay = existing.filter((c) => toDateKey(c.sessionDate) === dateKey)
-    if (sameDay.some((c) => c.userId === userId)) {
-      return at('ovaj nastavnik već ima promjenu na tom terminu.')
-    }
-    if (replacesUserId) {
-      if (sameDay.some((c) => c.replacesUserId === replacesUserId)) {
-        return at('taj nastavnik već ima zamjenu na tom terminu.')
-      }
-      if (sameDay.some((c) => c.userId === replacesUserId)) {
-        return at('taj nastavnik na tom terminu već ima drugu promjenu.')
-      }
-    }
+/**
+ * The picker only offers termini from today onward inside the group's own
+ * school year, and the action holds the same line: a backdated change would
+ * rewrite whose hours an admin correction books, and a far-off one would open
+ * the group to the substitute for that whole stretch.
+ */
+function termErrorOutsideYear(
+  dateKey: string,
+  todayKey: string,
+  schoolYear: string,
+): string | null {
+  if (dateKey < todayKey) return 'termin je već prošao.'
+  const year = Number(dateKey.slice(0, 4))
+  const month = Number(dateKey.slice(5, 7))
+  const dateYear = month >= 9 ? `${year}/${year + 1}` : `${year - 1}/${year}`
+  return dateYear === schoolYear ? null : 'termin nije u školskoj godini grupe.'
+}
+
+function sameDayConflict(
+  sameDay: { userId: string; replacesUserId: string | null }[],
+  userId: string,
+  replacesUserId: string | null,
+): string | null {
+  if (sameDay.some((c) => c.userId === userId)) {
+    return 'ovaj nastavnik već ima promjenu na tom terminu.'
+  }
+  if (!replacesUserId) return null
+  if (sameDay.some((c) => c.replacesUserId === replacesUserId)) {
+    return 'taj nastavnik već ima zamjenu na tom terminu.'
+  }
+  if (sameDay.some((c) => c.userId === replacesUserId)) {
+    return 'taj nastavnik na tom terminu već ima drugu promjenu.'
   }
   return null
 }

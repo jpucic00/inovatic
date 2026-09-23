@@ -16,7 +16,7 @@ export const addSessionStaffChangeSchema = z.object({
     .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
     .min(1, 'Odaberite barem jedan termin.')
     .max(60, 'Previše termina odjednom.')
-    .transform((d) => [...new Set(d)].sort()),
+    .transform((d) => [...new Set(d)].sort((a, b) => a.localeCompare(b))),
   userId: z.string().min(1, 'Odaberite nastavnika.'),
   role: roleSchema,
   // '' from the "Dodatno na terminu" option means nobody is being replaced.

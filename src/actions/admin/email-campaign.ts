@@ -1408,7 +1408,7 @@ async function sendAdminCopies(job: SendJob): Promise<void> {
       where: { role: 'ADMIN', city: job.city, deletedAt: null },
       select: { email: true },
     })
-    for (const admin of admins) {
+    for (const [i, admin] of admins.entries()) {
       try {
         await sendBulkMessageEmail({
           to: admin.email,
@@ -1422,8 +1422,9 @@ async function sendAdminCopies(job: SendJob): Promise<void> {
       } catch (err) {
         console.error(`sendAdminCopies: copy to ${admin.email} failed:`, err)
       }
+      // No pause after the last copy: the parents' send starts right after.
       const throttle = sendThrottleMs()
-      if (throttle > 0 && process.env.RESEND_API_KEY) await sleep(throttle)
+      if (i < admins.length - 1 && throttle > 0 && process.env.RESEND_API_KEY) await sleep(throttle)
     }
   } catch (err) {
     console.error('sendAdminCopies failed:', err)

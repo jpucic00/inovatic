@@ -376,10 +376,21 @@ export async function declineInquiry(
   await assertInquiryInCity(parsed.data.id, city)
 
   try {
-    await db.inquiry.update({
-      where: { id: parsed.data.id },
-      data: { status: 'DECLINED', declineReason: parsed.data.reason },
-    })
+    // Declining settles the upit the same way creating the account does, so it
+    // also takes it off the lista čekanja — in the same transaction, so a
+    // declined family never lingers in the queue.
+    await db.$transaction([
+      db.inquiryWaitlistGroup.deleteMany({ where: { inquiryId: parsed.data.id } }),
+      db.inquiry.update({
+        where: { id: parsed.data.id },
+        data: {
+          status: 'DECLINED',
+          declineReason: parsed.data.reason,
+          waitlistedAt: null,
+          waitlistNote: null,
+        },
+      }),
+    ])
   } catch (err) {
     console.error('declineInquiry failed:', err)
     return { success: false, error: 'Greška pri odbijanju upita.' }
@@ -825,6 +836,9 @@ export async function setInquiryWaitlist(
   return { success: true }
 }
 
+const WAITLIST_NEW_REMOVAL_ERROR =
+  'Novi upit se ne može maknuti s liste čekanja. Najprije kreirajte račun ili odbijte upit.'
+
 export async function removeInquiryFromWaitlist(id: string): Promise<AdminActionResult> {
   const { city } = await requireAdminCtx()
   if (!id) return { success: false, error: 'ID nije pronađen.' }
@@ -832,13 +846,21 @@ export async function removeInquiryFromWaitlist(id: string): Promise<AdminAction
   await assertInquiryInCity(id, city)
 
   try {
-    await db.$transaction([
-      db.inquiryWaitlistGroup.deleteMany({ where: { inquiryId: id } }),
-      db.inquiry.update({
-        where: { id },
+    // A NEW upit may not leave the list: off it, it would take its form group's
+    // seat straight back, and that group may have filled while the family
+    // waited. It is resolved first — the account (which clears the entry) or a
+    // decline — so leaving the list can never move a capacity count. The
+    // status is re-checked inside the write, not only read beforehand.
+    const removed = await db.$transaction(async (tx) => {
+      const cleared = await tx.inquiry.updateMany({
+        where: { id, status: { not: 'NEW' } },
         data: { waitlistedAt: null, waitlistNote: null },
-      }),
-    ])
+      })
+      if (cleared.count === 0) return false
+      await tx.inquiryWaitlistGroup.deleteMany({ where: { inquiryId: id } })
+      return true
+    })
+    if (!removed) return { success: false, error: WAITLIST_NEW_REMOVAL_ERROR }
   } catch (err) {
     console.error('removeInquiryFromWaitlist failed:', err)
     return { success: false, error: 'Greška pri uklanjanju s liste čekanja.' }
