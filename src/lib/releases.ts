@@ -124,6 +124,32 @@ export interface ReleaseNote {
  */
 export const RELEASES: readonly ReleaseNote[] = [
   {
+    version: '1.5.0',
+    date: '2026-09-23',
+    title: 'Nova verzija aplikacije.',
+    sections: [
+      {
+        area: 'Upiti',
+        changes: [
+          '**Lista čekanja**: upit se može staviti na listu s grupama koje obitelj može pohađati i napomenom; upit na listi ne drži mjesto, a kad se u nekoj od tih grupa oslobodi mjesto, to piše uz upit.',
+        ],
+      },
+      {
+        area: 'Grupe',
+        changes: [
+          'Svaki nastavnik na grupi je Predavač ili Asistent, a Dodaj zamjenu postavlja zamjenu na jedan ili više termina; zamjena vidi grupu do kraja svog zadnjeg termina i sat se knjiži njoj.',
+          'Klik na grupu u tjednom rasporedu otvara njezinu stranicu.',
+        ],
+      },
+      {
+        area: 'E-mail',
+        changes: [
+          'Svaki admin grada dobiva jednu kopiju poslane poruke, s „Kopija” u predmetu.',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-09-20',
     title: 'Nova verzija aplikacije.',
