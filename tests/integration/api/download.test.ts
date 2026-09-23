@@ -52,6 +52,7 @@ type Seeded = {
   teacherUnassigned: { id: string }
   studentEnrolled: { id: string }
   studentNone: { id: string }
+  courseId: string
   groupAId: string
   groupBId: string
   materialGroupA: string
@@ -132,6 +133,7 @@ beforeAll(async () => {
     teacherUnassigned: { id: tUnassigned.id },
     studentEnrolled: { id: sEnrolled.id },
     studentNone: { id: sNone.id },
+    courseId: course.id,
     groupAId: groupA.id,
     groupBId: groupB.id,
     materialGroupA: materialGroupA.id,
@@ -242,6 +244,31 @@ describe('GET /api/download/[materialId] — TEACHER on a zamjena', () => {
   it('a zamjena whose termin has passed → groupA material → 404', async () => {
     await substituteOn(seeded.groupAId, -1)
     expect((await callDownload(seeded.materialGroupA)).status).toBe(404)
+  })
+
+  it('a zamjena dated today (Europe/Zagreb) → groupA material → 200 (the termin day still counts)', async () => {
+    await substituteOn(seeded.groupAId, 0)
+    expect((await callDownload(seeded.materialGroupA)).status).toBe(200)
+  })
+
+  it('an upcoming zamjena on groupA → MODULE material hidden in A → 404 (unlike the regular, the hide binds)', async () => {
+    // Visible in groupB, which the substitute cannot open — so only A's hide decides.
+    await substituteOn(seeded.groupAId, 3)
+    expect((await callDownload(seeded.materialModule)).status).toBe(404)
+  })
+
+  it('an upcoming zamjena on groupA → COURSE material of its program → 200', async () => {
+    const material = await createMaterial({
+      scope: 'COURSE',
+      courseId: seeded.courseId,
+      title: 'Program-DL',
+      type: MaterialType.DOCUMENT,
+      fileUrl: 'https://res.cloudinary.com/dgc2tp4f8/raw/upload/v1/test/c.pdf',
+      externalUrl: null,
+      uploadedById: seeded.admin.id,
+    })
+    await substituteOn(seeded.groupAId, 3)
+    expect((await callDownload(material.id)).status).toBe(200)
   })
 })
 
