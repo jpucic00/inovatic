@@ -52,7 +52,8 @@ function ReleaseNotesEmail({ release, appUrl }: ReleaseNotesProps) {
           <Text style={areaHeading}>{section.area}</Text>
           {section.changes.map((item, i) => (
             <Text key={i} style={bulletText}>
-              {`• ${item}`}
+              {'• '}
+              {withBold(item)}
             </Text>
           ))}
         </Section>
@@ -72,6 +73,13 @@ function ReleaseNotesEmail({ release, appUrl }: ReleaseNotesProps) {
       </Text>
     </EmailLayout>
   )
+}
+
+// A change line may mark a phrase `**like this**` — the one piece of emphasis a
+// note can ask for, used to make a feature's name stand out. Odd segments are
+// the bold ones; an unmatched `**` just leaves its tail bold.
+function withBold(text: string) {
+  return text.split('**').map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part))
 }
 
 const versionBox = {

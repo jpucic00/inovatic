@@ -87,6 +87,14 @@ describe('release notes email', () => {
     expect(html).not.toContain('Uz dijete koje kod nas')
   })
 
+  it('renders a **marked** phrase bold and drops the markers', async () => {
+    const html = await renderEmail({
+      sections: [{ area: 'Upiti', changes: ['**Lista čekanja**: upit se može staviti na listu.'] }],
+    })
+    expect(html).toContain('<strong>Lista čekanja</strong>')
+    expect(html).not.toContain('**')
+  })
+
   it('does not close with the association’s own contact card', async () => {
     const html = await renderEmail()
     expect(html).not.toContain('prijave.sibenik@udruga-inovatic.hr')
