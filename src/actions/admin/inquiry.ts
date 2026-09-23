@@ -361,6 +361,8 @@ export async function getInquiry(id: string) {
   })
 }
 
+const DECLINE_NOT_NEW_ERROR = 'Upit je već obrađen i ne može se odbiti.'
+
 export async function declineInquiry(
   id: string,
   reason: string,
@@ -378,19 +380,25 @@ export async function declineInquiry(
   try {
     // Declining settles the upit the same way creating the account does, so it
     // also takes it off the lista čekanja — in the same transaction, so a
-    // declined family never lingers in the queue.
-    await db.$transaction([
-      db.inquiryWaitlistGroup.deleteMany({ where: { inquiryId: parsed.data.id } }),
-      db.inquiry.update({
-        where: { id: parsed.data.id },
+    // declined family never lingers in the queue. Only a NEW upit may be
+    // declined, re-checked inside the write: a stale tab or a decline landing
+    // after a concurrent account creation would otherwise flip a placed child
+    // to DECLINED and throw away its queue place, which cannot be restored.
+    const declined = await db.$transaction(async (tx) => {
+      const updated = await tx.inquiry.updateMany({
+        where: { id: parsed.data.id, status: 'NEW' },
         data: {
           status: 'DECLINED',
           declineReason: parsed.data.reason,
           waitlistedAt: null,
           waitlistNote: null,
         },
-      }),
-    ])
+      })
+      if (updated.count === 0) return false
+      await tx.inquiryWaitlistGroup.deleteMany({ where: { inquiryId: parsed.data.id } })
+      return true
+    })
+    if (!declined) return { success: false, error: DECLINE_NOT_NEW_ERROR }
   } catch (err) {
     console.error('declineInquiry failed:', err)
     return { success: false, error: 'Greška pri odbijanju upita.' }

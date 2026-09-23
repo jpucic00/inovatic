@@ -16,6 +16,7 @@
  */
 import { zagrebDateKey } from './attendance-window'
 import { fromDateKey, parseCroatianWeekday } from './session-dates'
+import { schoolYearOfDateKey } from './school-year'
 
 export type StaffRole = 'LEAD' | 'ASSISTANT'
 
@@ -210,7 +211,7 @@ export interface TerminSection {
   dates: string[]
 }
 
-type AttendanceDates =
+type AttendanceDates = { schoolYear: string } & (
   | { kind: 'custom' | 'season'; expectedSessions: string[]; extraSessions: string[] }
   | {
       kind: 'standard'
@@ -222,20 +223,25 @@ type AttendanceDates =
       }[]
       otherDates: string[]
     }
+)
 
 /**
  * The termini a substitute can still be put on, grouped the way the Dolazak tab
  * groups them (probni sat, one block per module, then hand-added dates), so the
  * admin picks from the same dates teachers mark attendance on. Past termini are
  * dropped: covering a session that is over is a correction to the hours, not a
- * staffing decision.
+ * staffing decision. So is a date outside the group's own school year (a
+ * radionica stamped with next year but running in August), which
+ * `addSessionStaffChange` refuses — the picker offers only what the action takes.
  */
 export function upcomingTerminSections(
   attendance: AttendanceDates,
   todayKey: string,
 ): TerminSection[] {
   const upcoming = (dates: string[]) =>
-    [...new Set(dates)].filter((d) => d >= todayKey).sort((a, b) => a.localeCompare(b))
+    [...new Set(dates)]
+      .filter((d) => d >= todayKey && schoolYearOfDateKey(d) === attendance.schoolYear)
+      .sort((a, b) => a.localeCompare(b))
 
   const raw: TerminSection[] =
     attendance.kind === 'standard'

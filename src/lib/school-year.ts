@@ -1,7 +1,16 @@
-export function computeSchoolYear(now: Date = new Date()): string {
-  const year = now.getFullYear()
-  const month = now.getMonth() + 1
+// A school year starts on 1 September. The one cutoff behind both a moment
+// (`computeSchoolYear`) and a calendar date (`schoolYearOfDateKey`).
+function schoolYearFor(year: number, month: number): string {
   return month >= 9 ? `${year}/${year + 1}` : `${year - 1}/${year}`
+}
+
+export function computeSchoolYear(now: Date = new Date()): string {
+  return schoolYearFor(now.getFullYear(), now.getMonth() + 1)
+}
+
+/** The school year a `YYYY-MM-DD` date falls in. */
+export function schoolYearOfDateKey(dateKey: string): string {
+  return schoolYearFor(Number(dateKey.slice(0, 4)), Number(dateKey.slice(5, 7)))
 }
 
 export function getNextSchoolYear(current: string): string {

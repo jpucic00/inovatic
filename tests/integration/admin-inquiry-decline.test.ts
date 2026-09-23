@@ -106,7 +106,7 @@ describe('declineInquiry', () => {
   it('answers with the generic error when the write itself fails', async () => {
     await signInAdmin()
     const inquiry = await createInquiry({ city: 'SPLIT' })
-    vi.spyOn(db.inquiry, 'update').mockRejectedValue(new Error('connection reset'))
+    vi.spyOn(db, '$transaction').mockRejectedValue(new Error('connection reset'))
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const res = await declineInquiry(inquiry.id, 'Validan razlog odbijanja.')

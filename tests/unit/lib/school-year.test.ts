@@ -5,7 +5,22 @@ import {
   getPreviousSchoolYear,
   isArchivedYear,
   schoolYearNeedsPlanning,
+  schoolYearOfDateKey,
 } from '@/lib/school-year'
+
+describe('schoolYearOfDateKey', () => {
+  it('31 Aug belongs to the year that is ending', () => {
+    expect(schoolYearOfDateKey('2026-08-31')).toBe('2025/2026')
+  })
+
+  it('1 Sep starts the new year', () => {
+    expect(schoolYearOfDateKey('2026-09-01')).toBe('2026/2027')
+  })
+
+  it('January belongs to the year that started the previous September', () => {
+    expect(schoolYearOfDateKey('2027-01-15')).toBe('2026/2027')
+  })
+})
 
 describe('computeSchoolYear', () => {
   beforeEach(() => {

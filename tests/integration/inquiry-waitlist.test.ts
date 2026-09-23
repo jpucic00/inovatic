@@ -190,6 +190,32 @@ describe('setInquiryWaitlist / removeInquiryFromWaitlist', () => {
     expect(row.waitlistGroups).toHaveLength(0)
   })
 
+  // Only NEW may be declined, re-checked inside the write: a stale tab would
+  // otherwise flip a placed child to DECLINED and wipe the queue place, which
+  // is stamped only on the way on and cannot be restored.
+  it('refuses to decline an account-created or already-declined waitlisted upit and changes nothing', async () => {
+    const { course, other } = await radionica()
+    for (const status of ['ACCOUNT_CREATED', 'DECLINED'] as const) {
+      const inquiry = await upit(null, course.id, { status })
+      await db.inquiry.update({ where: { id: inquiry.id }, data: { declineReason: 'Prvi razlog.' } })
+      await setInquiryWaitlist({ id: inquiry.id, groupIds: [other.id], note: 'samo petak' })
+      const before = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } })
+
+      const res = await declineInquiry(inquiry.id, 'Drugi razlog odbijanja.')
+
+      expect(res).toEqual({ success: false, error: 'Upit je već obrađen i ne može se odbiti.' })
+      const row = await db.inquiry.findUniqueOrThrow({
+        where: { id: inquiry.id },
+        include: { waitlistGroups: true },
+      })
+      expect(row.status).toBe(status)
+      expect(row.declineReason).toBe('Prvi razlog.')
+      expect(row.waitlistedAt?.getTime()).toBe(before.waitlistedAt?.getTime())
+      expect(row.waitlistNote).toBe('samo petak')
+      expect(row.waitlistGroups.map((g) => g.scheduledGroupId)).toEqual([other.id])
+    }
+  })
+
   // The case the rule exists for: the family's seat was released onto the list,
   // another family booked it, and taking the first one off the list used to
   // re-take the same seat — 3 of 2.

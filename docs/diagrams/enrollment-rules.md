@@ -21,7 +21,6 @@ stateDiagram-v2
     NEW_PARTY --> PARTY_SCHEDULED: Admin books party date + time
     NEW_PARTY --> DECLINED: Admin declines
 
-    PARTY_SCHEDULED --> DECLINED: Admin changes mind
     DECLINED --> ACCOUNT_CREATED: Admin places a waitlisted child
 
     ACCOUNT_CREATED --> [*]
@@ -97,8 +96,7 @@ stateDiagram-v2
 | — | `NEW` | `submitInquiry` / `submitPartyInquiry` | Zod validation (`inquirySchema` rejects `scheduledGroupId` + `noSuitableTermin` together); COURSE: high-school grade / `noSuitableTermin` only on a COMPETITION target (`competitionOnlyAnswerError`); with group: `group.city === submitted city`, radionica termin not yet started; **without** group **and** without `noSuitableTermin`: `!isTerminRequired(programs, grade, courseId)` against `loadProgramsForCheck`; on an SLR target `paymentOption` is additionally mandatory (`'Odaberite način plaćanja.'`) | Inquiry created with `city`; confirmation email to the parent **and** a notification to the city's staff inbox (reply-to = parent, swallow-and-log after the row is committed); spot reserved if group selected (COURSE) |
 | `NEW` (or waitlisted `DECLINED`) | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `status !== ACCOUNT_CREATED`; `status !== DECLINED` **unless `waitlistedAt` is set** (pre-flight and again in the tx); `type === COURSE` | User + Enrollment + ModuleEnrollments; **no e-mail**; `studentId` + `assignedGroupId` set; lista čekanja entry cleared in the same transaction (`InquiryWaitlistGroup` rows deleted, `waitlistedAt`/`waitlistNote` → null) |
 | `NEW` | `PARTY_SCHEDULED` | `schedulePartyInquiry` | `type === PARTY` | `partyConfirmedDate` + `partyStartTime` set; appears on Kalendar |
-| `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000) | `declineReason` persisted; spot freed; a waitlisted upit is taken off the lista čekanja in the same transaction |
-| `PARTY_SCHEDULED` | `DECLINED` | `declineInquiry` | — (no status guard on decline) | `declineReason` persisted |
+| `NEW` | `DECLINED` | `declineInquiry` | Zod (reason min 3 trimmed, max 2000); `status === NEW`, re-checked inside the write — any other status (ACCOUNT_CREATED, DECLINED, PARTY_SCHEDULED) is refused and nothing changes | `declineReason` persisted; spot freed; a waitlisted upit is taken off the lista čekanja in the same transaction |
 | `DECLINED` | `ACCOUNT_CREATED` | `createStudentFromInquiry` | `waitlistedAt` set (a declined upit nobody waits on stays closed) | Same as `NEW` → `ACCOUNT_CREATED` |
 
 ### Non-status actions
@@ -712,6 +710,7 @@ sequenceDiagram
     alt Admin declines inquiry
         Admin->>Server: declineInquiry id reason
         Server->>Server: Validate reason min 3 trimmed max 2000
+        Server->>Server: Guard inside the write: status must be NEW, else refused with nothing changed
         Server->>Server: status DECLINED, declineReason persisted, spot freed, lista čekanja entry cleared (same transaction)
     end
 

@@ -7,6 +7,7 @@ import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertGroupInCity } from '@/lib/city-guard'
 import type { AdminActionResult } from '@/lib/action-types'
 import { archivedYearError } from '@/lib/school-year-guard'
+import { schoolYearOfDateKey } from '@/lib/school-year'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { fromDateKey, toDateKey } from '@/lib/session-dates'
 import { formatDateKey } from '@/lib/format'
@@ -195,10 +196,9 @@ function termErrorOutsideYear(
   schoolYear: string,
 ): string | null {
   if (dateKey < todayKey) return 'termin je već prošao.'
-  const year = Number(dateKey.slice(0, 4))
-  const month = Number(dateKey.slice(5, 7))
-  const dateYear = month >= 9 ? `${year}/${year + 1}` : `${year - 1}/${year}`
-  return dateYear === schoolYear ? null : 'termin nije u školskoj godini grupe.'
+  return schoolYearOfDateKey(dateKey) === schoolYear
+    ? null
+    : 'termin nije u školskoj godini grupe.'
 }
 
 function sameDayConflict(

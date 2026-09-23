@@ -160,6 +160,7 @@ describe('upcomingTerminSections', () => {
   it('groups a standard group by module like Dolazak and drops past termini', () => {
     const sections = upcomingTerminSections(
       {
+        schoolYear: '2026/2027',
         kind: 'standard',
         sections: [
           { moduleIndex: 0, moduleTitle: 'Probni sat', expectedSessions: ['2026-09-01'], adhocSessions: [] },
@@ -182,7 +183,7 @@ describe('upcomingTerminSections', () => {
   it('lists a radionica as one block', () => {
     expect(
       upcomingTerminSections(
-        { kind: 'custom', expectedSessions: ['2026-10-01', '2026-10-02'], extraSessions: [] },
+        { schoolYear: '2026/2027', kind: 'custom', expectedSessions: ['2026-10-01', '2026-10-02'], extraSessions: [] },
         '2026-09-29',
       ),
     ).toEqual([{ title: 'Termini', dates: ['2026-10-01', '2026-10-02'] }])
@@ -191,6 +192,7 @@ describe('upcomingTerminSections', () => {
   it('emits Ostali termini and lists a date named twice only once', () => {
     const sections = upcomingTerminSections(
       {
+        schoolYear: '2026/2027',
         kind: 'standard',
         sections: [
           {
@@ -210,10 +212,34 @@ describe('upcomingTerminSections', () => {
     ])
   })
 
+  it("drops a date outside the group's own school year, as the action refuses it", () => {
+    // A radionica stamped 2026/2027 whose run starts in August 2026.
+    expect(
+      upcomingTerminSections(
+        {
+          schoolYear: '2026/2027',
+          kind: 'custom',
+          expectedSessions: ['2026-08-28', '2026-08-31', '2026-09-01'],
+          extraSessions: [],
+        },
+        '2026-08-20',
+      ),
+    ).toEqual([{ title: 'Termini', dates: ['2026-09-01'] }])
+  })
+
+  it('drops a section left with no date in the school year', () => {
+    expect(
+      upcomingTerminSections(
+        { schoolYear: '2026/2027', kind: 'custom', expectedSessions: ['2026-08-31'], extraSessions: [] },
+        '2026-08-20',
+      ),
+    ).toEqual([])
+  })
+
   it('de-duplicates a radionica date listed as expected and extra', () => {
     expect(
       upcomingTerminSections(
-        { kind: 'custom', expectedSessions: ['2026-10-01'], extraSessions: ['2026-10-01', '2026-10-03'] },
+        { schoolYear: '2026/2027', kind: 'custom', expectedSessions: ['2026-10-01'], extraSessions: ['2026-10-01', '2026-10-03'] },
         '2026-09-29',
       ),
     ).toEqual([{ title: 'Termini', dates: ['2026-10-01', '2026-10-03'] }])

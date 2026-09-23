@@ -37,11 +37,42 @@ const { upsertHoliday } = await import('@/actions/admin/holidays')
 const { deleteGroup } = await import('@/actions/admin/group')
 const { deleteTeacher } = await import('@/actions/admin/teacher')
 
-const SY = '2026/2027'
-// A Monday — the factory's default group weekday — no other file uses.
-const MONDAY = '2027-03-15'
-const TUESDAY = '2027-03-16'
-const NEXT_MONDAY = '2027-03-22'
+// Derived from today, never fixed: a change must be today or later inside the
+// group's own school year, so a hardcoded date turns every case red the day it
+// passes. MONDAY is the factory's default group weekday, three weeks out, and
+// is pushed a week later when NEXT_MONDAY would cross into September.
+const MONDAY = futureMonday()
+const TUESDAY = addDays(MONDAY, 1)
+const NEXT_MONDAY = addDays(MONDAY, 7)
+const SY = schoolYearOf(MONDAY)
+// The first Monday of the following school year.
+const NEXT_YEAR_MONDAY = nextMondayFrom(`${SY.slice(5)}-09-01`)
+
+function addDays(dateKey: string, days: number): string {
+  const d = fromDateKey(dateKey)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function nextMondayFrom(dateKey: string): string {
+  return addDays(dateKey, (8 - fromDateKey(dateKey).getUTCDay()) % 7)
+}
+
+function schoolYearOf(dateKey: string): string {
+  const y = Number(dateKey.slice(0, 4))
+  return Number(dateKey.slice(5, 7)) >= 9 ? `${y}/${y + 1}` : `${y - 1}/${y}`
+}
+
+function futureMonday(): string {
+  const monday = nextMondayFrom(addDays(zagrebDateKey(new Date()), 21))
+  return schoolYearOf(monday) === schoolYearOf(addDays(monday, 7)) ? monday : addDays(monday, 7)
+}
+
+/** `dd.MM.yyyy.` — how the action names a refused date. */
+function hrDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-')
+  return `${d}.${m}.${y}.`
+}
 
 const fixtures = fixtureScope()
 
@@ -163,7 +194,7 @@ describe('adding a zamjena', () => {
     })
     expect(res).toEqual({
       success: false,
-      error: '16.03.2027.: Grupa se održava samo na dan: Ponedjeljak.',
+      error: `${hrDate(TUESDAY)}: Grupa se održava samo na dan: Ponedjeljak.`,
     })
     expect(await db.sessionStaffChange.count({ where: { scheduledGroupId: group.id } })).toBe(0)
   })
@@ -403,15 +434,15 @@ describe('the action holds the picker date bounds', () => {
     mockSession({ id: admin.id, role: 'ADMIN' })
     const res = await addSessionStaffChange({
       scheduledGroupId: group.id,
-      // A Monday in 2027/2028, a year after the group's.
-      sessionDates: [MONDAY, '2027-09-13'],
+      // A Monday in the school year after the group's.
+      sessionDates: [MONDAY, NEXT_YEAR_MONDAY],
       userId: substitute.id,
       role: 'LEAD',
       replacesUserId: lead.id,
     })
     expect(res).toEqual({
       success: false,
-      error: '13.09.2027.: termin nije u školskoj godini grupe.',
+      error: `${hrDate(NEXT_YEAR_MONDAY)}: termin nije u školskoj godini grupe.`,
     })
     expect(await db.sessionStaffChange.count({ where: { scheduledGroupId: group.id } })).toBe(0)
   })
@@ -420,7 +451,8 @@ describe('the action holds the picker date bounds', () => {
 describe('deleting a teacher', () => {
   it('drops their zamjene from today on and keeps the past ones as history', async () => {
     const { admin, lead, substitute, group } = await staffedGroup()
-    for (const days of [-7, 7]) {
+    // Yesterday and today straddle the cut: today's termin is still ahead.
+    for (const days of [-7, -1, 0, 7]) {
       await db.sessionStaffChange.create({
         data: {
           scheduledGroupId: group.id,
@@ -434,9 +466,13 @@ describe('deleting a teacher', () => {
     }
     mockSession({ id: admin.id, role: 'ADMIN' })
     expect(await deleteTeacher(substitute.id)).toEqual({ success: true })
-    const left = await db.sessionStaffChange.findMany({ where: { userId: substitute.id } })
+    const left = await db.sessionStaffChange.findMany({
+      where: { userId: substitute.id },
+      orderBy: { sessionDate: 'asc' },
+    })
     expect(left.map((c) => c.sessionDate.toISOString().slice(0, 10))).toEqual([
       zagrebDaysFromToday(-7),
+      zagrebDaysFromToday(-1),
     ])
   })
 })
@@ -531,6 +567,47 @@ describe('getGroupTerminSections (the zamjena picker, loaded on open)', () => {
     mockSession({ id: admin.id, role: 'ADMIN' })
     const sections = await getGroupTerminSections(group.id)
     expect(sections.flatMap((s) => s.dates)).toContain(NEXT_MONDAY)
+  })
+
+  it('offers exactly the dates the action accepts across a school-year boundary', async () => {
+    // A radionica stamped with SY whose run crosses 1 September into the next
+    // school year: the September days are termini on Dolazak, but not the group's year.
+    const endYear = SY.slice(5)
+    const admin = await createAdmin()
+    const lead = await createTeacher()
+    const substitute = await createTeacher()
+    const location = await fixtures.location({ city: 'SPLIT' })
+    const course = await fixtures.course({ kind: 'RADIONICA', city: 'SPLIT' })
+    const group = await fixtures.group({
+      locationId: location.id,
+      courseId: course.id,
+      city: 'SPLIT',
+      schoolYear: SY,
+      dateStart: `${endYear}-08-28`,
+      dateEnd: `${endYear}-09-03`,
+    })
+    await createTeacherAssignment(lead.id, group.id)
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const offered = (await getGroupTerminSections(group.id)).flatMap((s) => s.dates)
+    const inside = offered[0]
+    const outside = `${endYear}-09-01`
+    expect(inside).toBeDefined()
+    expect(offered.every((d) => d < outside)).toBe(true)
+
+    const change = (sessionDates: string[]) =>
+      addSessionStaffChange({
+        scheduledGroupId: group.id,
+        sessionDates,
+        userId: substitute.id,
+        role: 'LEAD',
+        replacesUserId: lead.id,
+      })
+    expect(await change([outside])).toEqual({
+      success: false,
+      error: `${hrDate(outside)}: termin nije u školskoj godini grupe.`,
+    })
+    expect(await change([inside])).toEqual({ success: true })
   })
 
   it('refuses a teacher', async () => {

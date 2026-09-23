@@ -450,8 +450,22 @@ function AddSubstituteDialog({
   // attendance read, which almost no visit to the group needs. Every opening
   // reloads, so a zamjena just added or a date just marked is reflected.
   const [termini, setTermini] = useState<TerminLoad>({ state: 'loading' })
+  const [replacesUserId, setReplacesUserId] = useState('')
+  const [userId, setUserId] = useState('')
+  const [role, setRole] = useState<StaffRole>('LEAD')
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+
   useEffect(() => {
-    if (!open) return
+    // Reset on close, whichever way it closes: the parent shuts the dialog
+    // itself after a successful save, so a reset inside onOpenChange alone
+    // carried the last opening's person and dates into the next one.
+    if (!open) {
+      setReplacesUserId('')
+      setUserId('')
+      setRole('LEAD')
+      setPicked(new Set())
+      return
+    }
     let cancelled = false
     setTermini({ state: 'loading' })
     getGroupTerminSections(groupId)
@@ -465,21 +479,6 @@ function AddSubstituteDialog({
       cancelled = true
     }
   }, [open, groupId])
-
-  const [replacesUserId, setReplacesUserId] = useState('')
-  const [userId, setUserId] = useState('')
-  const [role, setRole] = useState<StaffRole>('LEAD')
-  const [picked, setPicked] = useState<Set<string>>(new Set())
-
-  const change = (next: boolean) => {
-    if (!next) {
-      setReplacesUserId('')
-      setUserId('')
-      setRole('LEAD')
-      setPicked(new Set())
-    }
-    onOpenChange(next)
-  }
 
   // A date that already carries a change for either person cannot take another
   // one — the server refuses it too, this just says so before the click.
@@ -527,7 +526,7 @@ function AddSubstituteDialog({
   else if (selected.length > 1) submitLabel = `Dodaj za ${selected.length} termina`
 
   return (
-    <Dialog open={open} onOpenChange={change}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Dodaj zamjenu</DialogTitle>
@@ -639,7 +638,7 @@ function AddSubstituteDialog({
 
         <DialogFooter>
           <button
-            onClick={() => change(false)}
+            onClick={() => onOpenChange(false)}
             disabled={isPending}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
@@ -647,7 +646,7 @@ function AddSubstituteDialog({
           </button>
           <button
             onClick={() => onSubmit({ sessionDates: selected, userId, role, replacesUserId })}
-            disabled={isPending || !userId || selected.length === 0}
+            disabled={isPending || termini.state !== 'ready' || !userId || selected.length === 0}
             className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
           >
             {submitLabel}

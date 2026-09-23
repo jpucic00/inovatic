@@ -2061,6 +2061,50 @@ describe('sendEmailCampaign — admin copy', () => {
     expect(sendMock).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps the throttle pause between the last copy and the first parent', async () => {
+    const sender = await loginAdmin()
+    const colleague = await createAdmin({ city: 'SPLIT' })
+    const { group } = await makeSourceGroup()
+    await enrollStudent(group.id, { parentEmail: uniqEmail('copy-throttle') })
+    // The shared tier DB accumulates admins from every file; with a real
+    // throttle each one costs a pause, so only these two may receive a copy.
+    const leftovers = await db.user.findMany({
+      where: { role: 'ADMIN', city: 'SPLIT', deletedAt: null, id: { notIn: [sender.id, colleague.id] } },
+      select: { id: true },
+    })
+    const leftoverIds = leftovers.map((u) => u.id)
+    await db.user.updateMany({ where: { id: { in: leftoverIds } }, data: { deletedAt: new Date() } })
+
+    const at: { copy: number[]; parent: number[] } = { copy: [], parent: [] }
+    adminCopyMock.mockImplementation(async () => {
+      at.copy.push(performance.now())
+      return { data: { id: 'copy' }, error: null }
+    })
+    sendMock.mockImplementation(async () => {
+      at.parent.push(performance.now())
+      return { data: { id: 'sent' }, error: null }
+    })
+    process.env.EMAIL_SEND_THROTTLE_MS = '60'
+    try {
+      const res = await sendAndSettle({
+        kind: 'CUSTOM',
+        sourceSchoolYear: SOURCE_YEAR,
+        sourceGroupIds: [group.id],
+        ...CONTENT,
+      })
+      expect(res).toMatchObject({ success: true, sent: 1 })
+    } finally {
+      process.env.EMAIL_SEND_THROTTLE_MS = '0'
+      adminCopyMock.mockImplementation(async () => ({ data: { id: 'copy' }, error: null }))
+      await db.user.updateMany({ where: { id: { in: leftoverIds } }, data: { deletedAt: null } })
+    }
+
+    // Without the pause the last copy and the first parent share one Resend
+    // slot, and a refusal there lands on the parent as FAILED.
+    expect(at.copy).toHaveLength(2)
+    expect(at.parent[0] - Math.max(...at.copy)).toBeGreaterThanOrEqual(50)
+  })
+
   it('carries only the shared message on a per-child kind — never a report card', async () => {
     const admin = await loginAdmin()
     const { group } = await makeSourceGroup()

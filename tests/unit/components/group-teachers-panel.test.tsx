@@ -191,6 +191,54 @@ describe('GroupTeachersPanel — Dodaj zamjenu termini', () => {
   })
 })
 
+describe('GroupTeachersPanel — Dodaj zamjenu lifecycle', () => {
+  it('loads nothing until the dialog is opened', () => {
+    loadSections.mockResolvedValue(SECTIONS)
+    renderPanel()
+    expect(loadSections).not.toHaveBeenCalled()
+  })
+
+  it('reopens empty and reloaded after a successful save', async () => {
+    loadSections.mockResolvedValue(SECTIONS)
+    renderPanel()
+    let dialog = await openSubstituteDialog()
+    await within(dialog).findByText('Modul 1: Zabavni sustavi')
+
+    fireEvent.change(within(dialog).getByLabelText('Umjesto'), { target: { value: 'ivo' } })
+    fireEvent.change(within(dialog).getByLabelText('Tko dolazi'), { target: { value: 'marko' } })
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '13.10.2026.' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Dodaj zamjenu' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    dialog = await openSubstituteDialog()
+    await within(dialog).findByText('Modul 1: Zabavni sustavi')
+    expect(loadSections).toHaveBeenCalledTimes(2)
+    expect(within(dialog).getByLabelText('Tko dolazi')).toHaveValue('')
+    expect(within(dialog).getByRole('checkbox', { name: '13.10.2026.' })).not.toBeChecked()
+    expect(within(dialog).getByRole('button', { name: 'Dodaj zamjenu' })).toBeDisabled()
+  })
+
+  it('ignores a load that settles after the dialog was closed and reopened', async () => {
+    const first = deferred<TerminSection[]>()
+    const second = deferred<TerminSection[]>()
+    loadSections.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    renderPanel()
+
+    let dialog = await openSubstituteDialog()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Odustani' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    dialog = await openSubstituteDialog()
+
+    second.resolve([{ title: 'Modul 3: Svemir', dates: ['2026-12-01'] }])
+    await within(dialog).findByText('Modul 3: Svemir')
+    first.resolve(SECTIONS)
+    await Promise.resolve()
+
+    expect(within(dialog).queryByText('Modul 1: Zabavni sustavi')).toBeNull()
+    expect(within(dialog).getAllByRole('checkbox')).toHaveLength(1)
+  })
+})
+
 describe('GroupTeachersPanel — substitute rows', () => {
   it('lists no substitute when no change is passed in', () => {
     renderPanel([])
