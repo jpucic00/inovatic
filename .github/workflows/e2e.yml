@@ -1,0 +1,127 @@
+name: E2E
+
+# On-demand Playwright tier on a GitHub runner: fresh Postgres 16 + migrate +
+# full dev seed + `next dev` on :3000, then the same invocation as local
+# (`npx playwright test tests/phase1 tests/phase2 tests/phase3`, workers=1).
+# Dispatch it on any branch that contains this file:
+#   gh workflow run e2e.yml --ref <branch> [-f specs="tests/phase3/25-attendance.spec.ts"]
+# See docs/runbooks/e2e-github-actions.md for the full trigger/diagnose loop.
+
+on:
+  workflow_dispatch:
+    inputs:
+      specs:
+        description: 'Playwright targets (paths, optionally extra flags). Default: full phase1–3 suite.'
+        required: false
+        default: 'tests/phase1 tests/phase2 tests/phase3'
+
+permissions:
+  contents: read
+
+# A re-dispatch on the same branch supersedes the in-flight run — the common
+# case while diagnosing one failing spec.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      db:
+        # Mirrors docker-compose.yml so CI and local dev run the same Postgres.
+        image: postgres:16
+        env:
+          POSTGRES_DB: inovatic
+          POSTGRES_USER: inovatic
+          POSTGRES_PASSWORD: inovatic_dev_2024
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U inovatic -d inovatic"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://inovatic:inovatic_dev_2024@localhost:5432/inovatic
+      DIRECT_URL: postgresql://inovatic:inovatic_dev_2024@localhost:5432/inovatic
+      AUTH_SECRET: e2e-ci-only-not-a-production-secret
+      AUTH_URL: http://localhost:3000
+      # Session dates, attendance windows and dd.MM.yyyy. assertions are all
+      # Europe/Zagreb-anchored; the runner must not sit on UTC.
+      TZ: Europe/Zagreb
+      NEXT_TELEMETRY_DISABLED: '1'
+      # Belt and braces: the announcer already requires NODE_ENV=production and a
+      # RESEND_API_KEY (neither exists here), but a CI run must never mail anyone.
+      RELEASE_ANNOUNCE_DISABLED: '1'
+      # Optional repo secrets. When absent, tests/phase3/24-materials.spec.ts
+      # skips its Cloudinary Admin API assertion and everything else still runs.
+      CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # postinstall runs `prisma generate`.
+      - run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx prisma migrate deploy
+
+      # Full dev seed, then plan the current school year. The seed opens
+      # enrollment windows but creates NO ModuleSchedules — on a never-planned
+      # database every standard group is publicly invisible and the phase3
+      # bootstrap's create-student dialog renders no module checkboxes. The
+      # refresh script plans SPLIT for all standard programs (Uvod included, so
+      # the bootstrap's index-1 course pick works) and deliberately leaves
+      # SIBENIK unplanned — 40-sibenik-city-journey runs the planner itself.
+      - run: npm run db:seed
+
+      - run: npm run db:refresh-dev-dates -- --apply
+
+      - name: Start dev server
+        run: |
+          npm run dev > dev-server.log 2>&1 &
+          echo "waiting for http://localhost:3000 ..."
+          for i in $(seq 1 60); do
+            if curl -sf --max-time 60 -o /dev/null http://localhost:3000; then
+              echo "server is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "dev server never came up"
+          tail -50 dev-server.log
+          exit 1
+
+      - name: Run Playwright
+        env:
+          SPECS: ${{ inputs.specs || 'tests/phase1 tests/phase2 tests/phase3' }}
+        # Word-splitting of $SPECS is intentional — it carries multiple paths.
+        # The local config has no tracing; retain-on-failure gives every red test
+        # a downloadable trace without changing local runs.
+        run: npx playwright test --trace retain-on-failure $SPECS
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure-artifacts
+          path: |
+            test-results/
+            dev-server.log
+          if-no-files-found: ignore
+          retention-days: 7
