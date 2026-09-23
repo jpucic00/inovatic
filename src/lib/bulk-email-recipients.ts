@@ -71,7 +71,7 @@ export const SKIP_REASON_SHORT: Record<SkippedStudent['reason'], string> = {
 
 // Deliberately pragmatic: catches empty/garbage values without rejecting the
 // long tail of real-world addresses a strict RFC regex would.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_RE = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/
 
 /**
  * Normalize a stored parent email to a mailable addr-spec, or null when

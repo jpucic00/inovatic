@@ -81,7 +81,7 @@ export function rewriteProxyCss(body: string, basePath: string): string {
 /** Inject a `<base href="...">` tag after the opening `<head>` tag. */
 export function injectProxyBase(html: string, basePath: string): string {
   return html.replace(
-    /<head(\s[^>]*)?>/i,
+    /<head(\s[^<>]*)?>/i,
     (m) => `${m}<base href="${basePath}/">`,
   )
 }

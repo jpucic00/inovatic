@@ -62,7 +62,8 @@ export function parseGroupTabName(name: string): GroupSlot | null {
   // Numbers → Excel export splits multi-table sheets into "SUB 900-1030 - Tablica 1".
   // Only strip a spaced-dash suffix that does NOT start with a digit, so a tab
   // spelled "SUB 900 - 1030" keeps its time range.
-  const cleaned = name.replace(/\s+[-–]\s+(?!\d)\S.*$/, '').trim()
+  const suffix = /\s[-–]\s+(?!\d)\S/.exec(name)
+  const cleaned = (suffix ? name.slice(0, suffix.index) : name).trim()
   const [dayToken, ...rest] = cleaned.split(/[\s_]+/).filter(Boolean)
   if (!dayToken) return null
   const dayOfWeek = dayOfWeekFromLabel(dayToken)
@@ -174,7 +175,7 @@ export function parseContactCell(raw: string): ParsedContact {
 function cleanDisplayName(raw: string): string | null {
   const text = raw.trim().replaceAll(/(?:^["'])|(?:["']$)/g, '').replaceAll(/\s+/g, ' ').trim()
   if (!text) return null
-  const commaFlip = /^([^,]+),\s*(.+)$/.exec(text)
+  const commaFlip = /^([^,]+), ?(.+)$/.exec(text)
   const ordered = commaFlip ? `${commaFlip[2]} ${commaFlip[1]}` : text
   return titleCaseName(ordered) || null
 }
@@ -249,10 +250,23 @@ const CONTACT_HEADERS: Record<string, string> = {
  * (`Ime Prezime (12.03.2026.)` — when they joined or left). Without this the
  * pair becomes one impossible surname and the date lands inside another.
  */
+/** Drops every `(...)` span, leftmost first — `/\([^)]*\)/g` without its quadratic worst case. */
+function stripParenthesized(text: string): string {
+  let out = ''
+  let from = 0
+  for (let open = text.indexOf('('); open !== -1; open = text.indexOf('(', from)) {
+    const close = text.indexOf(')', open)
+    if (close === -1) break
+    out += text.slice(from, open)
+    from = close + 1
+  }
+  return out + text.slice(from)
+}
+
 export function parseStaffCell(raw: string): string[] {
   return raw
     .split(/[/;]/)
-    .map((part) => part.replaceAll(/\([^)]*\)/g, '').replaceAll(/\s+/g, ' ').trim())
+    .map((part) => stripParenthesized(part).replaceAll(/\s+/g, ' ').trim())
     .filter((part) => part.length > 0)
 }
 

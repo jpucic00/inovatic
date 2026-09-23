@@ -25,7 +25,7 @@ interface Props {
   }
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_RE = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/
 
 export function EditTeacherDialog({ teacher }: Readonly<Props>) {
   const router = useRouter()

@@ -161,7 +161,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
       toast.error('Ime, prezime i datum rođenja djeteta te e-mail roditelja su obavezni.')
       return
     }
-    if (!/^\S+@\S+\.\S+$/.test(parentEmail.trim())) {
+    if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(parentEmail.trim())) {
       toast.error('Unesite valjanu email adresu roditelja.')
       return
     }

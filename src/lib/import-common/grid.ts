@@ -90,7 +90,10 @@ export function isBlankRow(row: CellValue[]): boolean {
  * silently cost the whole `DATUM ROD.` column on the competition tabs.)
  */
 function captionKey(cell: CellValue): string {
-  return normalizeKey(cell).replace(/[.:]+$/, '').trim()
+  const key = normalizeKey(cell)
+  let end = key.length
+  while (end > 0 && (key[end - 1] === '.' || key[end - 1] === ':')) end--
+  return key.slice(0, end).trim()
 }
 
 /** Map normalized header captions → column index, scanning one or two rows

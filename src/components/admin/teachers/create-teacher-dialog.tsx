@@ -31,7 +31,7 @@ export function CreateTeacherDialog() {
   } | null>(null)
 
   const canSubmit =
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+    /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email) &&
     firstName.trim().length >= 2 &&
     lastName.trim().length >= 2
 

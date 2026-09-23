@@ -99,7 +99,7 @@ export type ParsedRecommendation =
 export function parseRecommendation(value: CellValue): ParsedRecommendation | null | 'unknown' {
   // Dashes vary between sheets (hyphen, en dash, em dash) and carry no meaning
   // in a preporuka — flatten them before matching.
-  const norm = normalizeKey(value).replaceAll(/[–—]/g, '-').replaceAll(/\s*-\s*/g, ' - ')
+  const norm = normalizeKey(value).replaceAll(/[–—]/g, '-').replaceAll(/ ?- ?/g, ' - ')
   if (!norm) return null
   // PRIPR?EMA: the real 2025/2026 archive spells it "PRIPEMA" (missing R) in
   // places; singular/plural NATJECANJE/NATJECANJA both appear too.
@@ -131,7 +131,7 @@ export function parsePaidValue(value: CellValue): boolean | 'unknown' {
 
 // ── Contact cells ────────────────────────────────────────────────────────────
 
-const PLAIN_EMAIL = /^\S+@\S+\.\S+$/
+const PLAIN_EMAIL = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/
 
 export function isPlainEmail(value: string): boolean {
   return PLAIN_EMAIL.test(value)

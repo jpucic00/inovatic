@@ -54,7 +54,7 @@ export function identityKey(id: {
 export function parseGroupName(name: string): GroupIdentity | null {
   // Numbers → Excel export names split-out worksheets "PON_SLR2_1830-20 - Tablica 1";
   // real tab names never contain a spaced dash, so stripping the suffix is safe.
-  const parts = name.replace(/\s+[-–]\s+.*$/, '').trim().split('_')
+  const parts = name.split(/\s[-–]\s/)[0].trim().split('_')
   if (parts.length < 2 || parts.length > 3) return null
   const dayOfWeek = dayOfWeekFromLabel(parts[0])
   const courseSlug = courseSlugFromLabel(parts[1])
