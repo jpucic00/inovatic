@@ -52,6 +52,28 @@ describe('effectiveStaffFor', () => {
     ])
   })
 
+  it('swaps two substitutes in for two regulars on the same date', () => {
+    const staff = effectiveStaffFor(
+      [IVO, ANA],
+      [
+        change({ replacesUserId: 'ivo', replacesName: 'Ivo Horvat' }),
+        change({
+          userId: 'petra',
+          name: 'Petra Perić',
+          role: 'ASSISTANT',
+          replacesUserId: 'ana',
+          replacesName: 'Ana Kovač',
+        }),
+      ],
+      DAY,
+    )
+    expect(staff.map((s) => [s.userId, s.role, s.replacesUserId])).toEqual([
+      ['marko', 'LEAD', 'ivo'],
+      ['petra', 'ASSISTANT', 'ana'],
+    ])
+    expect(staff.every((s) => s.isChange && !s.isRegular)).toBe(true)
+  })
+
   it('lists a regular with a different role for the day once, with that role', () => {
     const staff = effectiveStaffFor(
       [IVO, ANA],
@@ -95,6 +117,17 @@ describe('staffChangeAccessFrom', () => {
       '2026-10-13T00:00:00.000Z',
     )
   })
+
+  it('is the Zagreb calendar day in winter time too (CET, UTC+1)', () => {
+    // 23:30 UTC on 14 Dec is 00:30 on the 15th in Zagreb.
+    expect(staffChangeAccessFrom(new Date('2026-12-14T23:30:00Z')).toISOString()).toBe(
+      '2026-12-15T00:00:00.000Z',
+    )
+    // 22:30 UTC is still 23:30 on the 14th: an offset of +2 would wrongly roll it over.
+    expect(staffChangeAccessFrom(new Date('2026-12-14T22:30:00Z')).toISOString()).toBe(
+      '2026-12-14T00:00:00.000Z',
+    )
+  })
 })
 
 describe('staffChangeDateError', () => {
@@ -110,6 +143,10 @@ describe('staffChangeDateError', () => {
     const radionica = { dayOfWeek: null, dateStart: '2026-10-12', dateEnd: '2026-10-16' }
     expect(staffChangeDateError(radionica, '2026-10-14', new Set())).toBeNull()
     expect(staffChangeDateError(radionica, '2026-10-17', new Set())).toMatch(/završetka/)
+  })
+  it('refuses every date for a group with neither a weekday nor a date range', () => {
+    const blank = { dayOfWeek: null, dateStart: null, dateEnd: null }
+    expect(staffChangeDateError(blank, '2026-10-13', new Set())).toBe('Grupa nema zadan dan održavanja.')
   })
 })
 
@@ -149,5 +186,36 @@ describe('upcomingTerminSections', () => {
         '2026-09-29',
       ),
     ).toEqual([{ title: 'Termini', dates: ['2026-10-01', '2026-10-02'] }])
+  })
+
+  it('emits Ostali termini and lists a date named twice only once', () => {
+    const sections = upcomingTerminSections(
+      {
+        kind: 'standard',
+        sections: [
+          {
+            moduleIndex: 1,
+            moduleTitle: 'Zabavni sustavi',
+            expectedSessions: ['2026-10-06', '2026-10-13'],
+            adhocSessions: ['2026-10-13'],
+          },
+        ],
+        otherDates: ['2026-11-04', '2026-09-01', '2026-11-04'],
+      },
+      '2026-09-29',
+    )
+    expect(sections).toEqual([
+      { title: 'Modul 1: Zabavni sustavi', dates: ['2026-10-06', '2026-10-13'] },
+      { title: 'Ostali termini', dates: ['2026-11-04'] },
+    ])
+  })
+
+  it('de-duplicates a radionica date listed as expected and extra', () => {
+    expect(
+      upcomingTerminSections(
+        { kind: 'custom', expectedSessions: ['2026-10-01'], extraSessions: ['2026-10-01', '2026-10-03'] },
+        '2026-09-29',
+      ),
+    ).toEqual([{ title: 'Termini', dates: ['2026-10-01', '2026-10-03'] }])
   })
 })

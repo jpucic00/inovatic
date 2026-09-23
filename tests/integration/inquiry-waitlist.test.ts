@@ -6,7 +6,7 @@
  * holding a seat everywhere capacity is counted, a declined upit on the list
  * can still be turned into an account, and placing the child takes it off.
  */
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
@@ -47,16 +47,40 @@ const {
   getInquiries,
   getInquiryWaitlist,
   getGroupsForCourse,
+  getGroupsForCourseInSelectedYear,
+  getWaitlistGroupOptions,
+  getInquiryTabCounts,
 } = await import('@/actions/admin/inquiry')
 const { createStudentFromInquiry } = await import('@/actions/admin/student')
 const { getActivePrograms } = await import('@/actions/public/programs')
 
+/** Points the sidebar-year cookie at `year` (it must exist in the SchoolYear registry). */
+function selectYear(year: string) {
+  mockedCookies.mockResolvedValue({
+    get: (name: string) => (name === 'inovatic_school_year' ? { value: year, name } : undefined),
+  })
+}
+
+/**
+ * A school year no other test writes into, so a (city, year)-wide number — a
+ * tab count, a queue position — can be asserted exactly on a shared DB.
+ */
+async function isolatedYear(): Promise<string> {
+  const start = 3000 + Math.floor(Math.random() * 6000)
+  const label = `${start}/${start + 1}`
+  await db.schoolYear.upsert({ where: { label }, create: { label }, update: {} })
+  return label
+}
+
 beforeAll(async () => {
   delete process.env.RESEND_API_KEY
-  mockedCookies.mockResolvedValue({
-    get: (name: string) => (name === 'inovatic_school_year' ? { value: YEAR, name } : undefined),
-  })
+  selectYear(YEAR)
   await db.schoolYear.upsert({ where: { label: YEAR }, create: { label: YEAR }, update: {} })
+  await db.schoolYear.upsert({ where: { label: OTHER_YEAR }, create: { label: OTHER_YEAR }, update: {} })
+})
+
+afterEach(() => {
+  selectYear(YEAR)
 })
 
 /**
@@ -267,6 +291,65 @@ describe('a waitlisted NEW upit releases its seat', () => {
     expect(await publicSpots()).toBe(1)
     expect((await createStudentFromInquiry(second.id, group.id)).success).toBe(true)
   })
+
+  it('in getGroupsForCourseInSelectedYear, the add-enrollment and send-schedule picker', async () => {
+    const { course, group, other } = await radionica(1)
+    const holder = await upit(group.id, course.id)
+    const pickerSpots = async () =>
+      (await getGroupsForCourseInSelectedYear(course.id)).find((g) => g.id === group.id)?.availableSpots
+
+    expect(await pickerSpots()).toBe(0)
+    await setInquiryWaitlist({ id: holder.id, groupIds: [other.id], note: '' })
+    expect(await pickerSpots()).toBe(1)
+  })
+})
+
+describe('getWaitlistGroupOptions', () => {
+  it('offers the groups of the upit own school year, not the sidebar year', async () => {
+    const { course, group } = await radionica()
+    const range = { dateStart: relativeDateKey(30), dateEnd: relativeDateKey(32) }
+    const nextYearGroup = await createGroup({ courseId: course.id, schoolYear: OTHER_YEAR, ...range })
+    const inquiry = await upit(null, course.id, { schoolYear: OTHER_YEAR })
+
+    // The admin is looking at YEAR; the family signed up for OTHER_YEAR.
+    selectYear(YEAR)
+    const ids = (await getWaitlistGroupOptions(inquiry.id, course.id)).map((g) => g.id)
+    expect(ids).toEqual([nextYearGroup.id])
+    expect(ids).not.toContain(group.id)
+  })
+
+  it('gives the upit own reserved seat back in its group', async () => {
+    const { course, group } = await radionica(1)
+    const inquiry = await upit(group.id, course.id)
+
+    // Everyone else sees the one seat as taken by this very reservation.
+    expect(await spotsFor(course.id, group.id)).toBe(0)
+    const option = (await getWaitlistGroupOptions(inquiry.id, course.id)).find((g) => g.id === group.id)
+    expect(option).toMatchObject({ availableSpots: 1, isFull: false })
+  })
+})
+
+describe('getInquiryTabCounts', () => {
+  it('counts only the admin city and the sidebar year, waitlist within all', async () => {
+    const { course } = await radionica()
+    const year = await isolatedYear()
+    const listed = { waitlistedAt: new Date() }
+
+    await upit(null, course.id, { schoolYear: year })
+    await upit(null, course.id, { schoolYear: year, status: 'DECLINED' })
+    const waiting = await upit(null, course.id, { schoolYear: year })
+    await db.inquiry.update({ where: { id: waiting.id }, data: listed })
+    // Outside the scope: the other city, and the same city in another year.
+    const sib = await upit(null, course.id, { schoolYear: year, city: 'SIBENIK' })
+    await db.inquiry.update({ where: { id: sib.id }, data: listed })
+    const elsewhere = await upit(null, course.id, { schoolYear: YEAR })
+    await db.inquiry.update({ where: { id: elsewhere.id }, data: listed })
+
+    selectYear(year)
+    const counts = await getInquiryTabCounts()
+    expect(counts).toEqual({ all: 3, waitlist: 1 })
+    expect(counts.waitlist).toBeLessThanOrEqual(counts.all)
+  })
 })
 
 describe('createStudentFromInquiry and the waitlist', () => {
@@ -335,6 +418,60 @@ describe('getInquiries — Lista čekanja view', () => {
     // The default view still shows them all, newest first.
     const all = await getInquiries({ courseId: course.id, pageSize: 50 })
     expect(all.data.map((r) => r.id)).toEqual(expect.arrayContaining([a.id, b.id, notListed.id]))
+  })
+})
+
+describe('getInquiries — queue positions across pages', () => {
+  it('numbers a page-2 row by its place in the whole queue', async () => {
+    const { course } = await radionica()
+    const year = await isolatedYear()
+    const base = Date.now() - 60_000
+    const queued = []
+    for (let i = 0; i < 3; i++) {
+      const row = await upit(null, course.id, { schoolYear: year })
+      await db.inquiry.update({ where: { id: row.id }, data: { waitlistedAt: new Date(base + i * 1000) } })
+      queued.push(row)
+    }
+
+    selectYear(year)
+    const first = await getInquiries({ view: 'WAITLIST', page: 1, pageSize: 2 })
+    const second = await getInquiries({ view: 'WAITLIST', page: 2, pageSize: 2 })
+
+    expect(first.total).toBe(3)
+    expect(first.data.map((r) => [r.id, r.waitlist?.position])).toEqual([
+      [queued[0].id, 1],
+      [queued[1].id, 2],
+    ])
+    expect(second.data.map((r) => [r.id, r.waitlist?.position])).toEqual([[queued[2].id, 3]])
+  })
+})
+
+describe('placing one of two waiting families', () => {
+  it('clears only the placed family entry', async () => {
+    const { course, other } = await radionica()
+    const placed = await upit(null, course.id)
+    const stillWaiting = await upit(null, course.id)
+    await setInquiryWaitlist({ id: placed.id, groupIds: [other.id], note: '' })
+    await setInquiryWaitlist({ id: stillWaiting.id, groupIds: [other.id], note: 'petak' })
+    const before = await db.inquiry.findUniqueOrThrow({ where: { id: stillWaiting.id } })
+
+    expect((await createStudentFromInquiry(placed.id, other.id)).success).toBe(true)
+
+    const done = await db.inquiry.findUniqueOrThrow({
+      where: { id: placed.id },
+      include: { waitlistGroups: true },
+    })
+    expect(done.waitlistedAt).toBeNull()
+    expect(done.waitlistGroups).toHaveLength(0)
+
+    const waiting = await db.inquiry.findUniqueOrThrow({
+      where: { id: stillWaiting.id },
+      include: { waitlistGroups: true },
+    })
+    expect(waiting.status).toBe('NEW')
+    expect(waiting.waitlistedAt?.getTime()).toBe(before.waitlistedAt?.getTime())
+    expect(waiting.waitlistNote).toBe('petak')
+    expect(waiting.waitlistGroups.map((g) => g.scheduledGroupId)).toEqual([other.id])
   })
 })
 

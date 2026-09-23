@@ -150,4 +150,17 @@ describe('assignTeacherSchema', () => {
       assignTeacherSchema.safeParse({ teacherId: '', scheduledGroupId: 'g1' }).success,
     ).toBe(false)
   })
+
+  it('defaults the role to LEAD when none is given', () => {
+    expect(assignTeacherSchema.parse({ teacherId: 't1', scheduledGroupId: 'g1' }).role).toBe('LEAD')
+  })
+
+  it('keeps ASSISTANT and rejects an unknown role', () => {
+    expect(
+      assignTeacherSchema.parse({ teacherId: 't1', scheduledGroupId: 'g1', role: 'ASSISTANT' }).role,
+    ).toBe('ASSISTANT')
+    expect(
+      assignTeacherSchema.safeParse({ teacherId: 't1', scheduledGroupId: 'g1', role: 'MENTOR' }).success,
+    ).toBe(false)
+  })
 })

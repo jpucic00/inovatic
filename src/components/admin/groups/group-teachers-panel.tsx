@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, UserRoundPlus, Users, X } from 'lucide-react'
@@ -11,6 +11,7 @@ import {
 } from '@/actions/admin/teacher'
 import {
   addSessionStaffChange,
+  getGroupTerminSections,
   removeSessionStaffChange,
   setTeacherAssignmentRole,
   type GroupStaffChangeRow,
@@ -51,8 +52,6 @@ interface Props {
   people: Person[]
   /** Changes on termini that are not over yet (today or later, Zagreb). */
   changes: GroupStaffChangeRow[]
-  /** The group's upcoming termini, grouped like the Dolazak tab. */
-  terminSections: TerminSection[]
   editable: boolean
 }
 
@@ -76,7 +75,6 @@ export function GroupTeachersPanel({
   assignableTeachers,
   people,
   changes,
-  terminSections,
   editable,
 }: Readonly<Props>) {
   const router = useRouter()
@@ -273,12 +271,12 @@ export function GroupTeachersPanel({
       />
 
       <AddSubstituteDialog
+        groupId={groupId}
         open={substituteOpen}
         onOpenChange={setSubstituteOpen}
         regulars={regulars}
         people={people}
         changes={changes}
-        terminSections={terminSections}
         isPending={isPending}
         onSubmit={(input) =>
           startTransition(async () => {
@@ -424,25 +422,50 @@ type SubstituteInput = {
   replacesUserId: string
 }
 
+type TerminLoad =
+  | { state: 'loading' }
+  | { state: 'error' }
+  | { state: 'ready'; sections: TerminSection[] }
+
 function AddSubstituteDialog({
+  groupId,
   open,
   onOpenChange,
   regulars,
   people,
   changes,
-  terminSections,
   isPending,
   onSubmit,
 }: Readonly<{
+  groupId: string
   open: boolean
   onOpenChange: (open: boolean) => void
   regulars: Assignment[]
   people: Person[]
   changes: GroupStaffChangeRow[]
-  terminSections: TerminSection[]
   isPending: boolean
   onSubmit: (input: SubstituteInput) => void
 }>) {
+  // Loaded on open, not with the page: the dates come from the whole
+  // attendance read, which almost no visit to the group needs. Every opening
+  // reloads, so a zamjena just added or a date just marked is reflected.
+  const [termini, setTermini] = useState<TerminLoad>({ state: 'loading' })
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setTermini({ state: 'loading' })
+    getGroupTerminSections(groupId)
+      .then((sections) => {
+        if (!cancelled) setTermini({ state: 'ready', sections })
+      })
+      .catch(() => {
+        if (!cancelled) setTermini({ state: 'error' })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, groupId])
+
   const [replacesUserId, setReplacesUserId] = useState('')
   const [userId, setUserId] = useState('')
   const [role, setRole] = useState<StaffRole>('LEAD')
@@ -565,11 +588,20 @@ function AddSubstituteDialog({
 
           <fieldset>
             <legend className={LABEL}>Termini</legend>
-            {terminSections.length === 0 ? (
+            {termini.state === 'loading' && (
+              <output className="block text-sm text-gray-500">Učitavam termine...</output>
+            )}
+            {termini.state === 'error' && (
+              <p className="text-sm text-red-600" role="alert">
+                Termine nije moguće učitati. Zatvorite prozor i pokušajte ponovno.
+              </p>
+            )}
+            {termini.state === 'ready' && termini.sections.length === 0 && (
               <p className="text-sm text-gray-500 italic">Grupa nema nadolazećih termina.</p>
-            ) : (
+            )}
+            {termini.state === 'ready' && termini.sections.length > 0 && (
               <div className="max-h-72 overflow-y-auto rounded-lg border divide-y">
-                {terminSections.map((section) => {
+                {termini.sections.map((section) => {
                   const free = section.dates.filter((d) => !taken.has(d))
                   const allOn = free.length > 0 && free.every((d) => picked.has(d))
                   return (

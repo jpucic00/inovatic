@@ -62,13 +62,50 @@ export async function loginAsAdmin(page: Page) {
   await loginWithEmail(page, ADMIN_EMAIL, ADMIN_PASSWORD)
 }
 
+/**
+ * Get a signed-out /portal login form, even when the page still belongs to the
+ * previous user of a mid-test account switch.
+ *
+ * Clearing cookies alone is not enough. The Auth.js middleware re-signs the
+ * session cookie on EVERY matched response (rolling JWT expiry), so any request
+ * the old page still has in flight hands the old session back the moment its
+ * response lands — after the wipe. The gallery's `?tab=` `router.replace`, which
+ * fires after hydration and so after a spec's assertions on the SSR'd grid, is
+ * one such request. If it lands before the /portal request goes out, /portal
+ * sees the previous student and forwards them to /portal/grupa/<id>, and the
+ * form never renders.
+ *
+ * Leaving for about:blank first unloads that document, which cancels its
+ * pending requests before they can set anything, so the wipe that follows
+ * sticks. Checking the landing and retrying once stays as a backstop.
+ */
+export async function openLoginForm(page: Page): Promise<void> {
+  const identifier = page.locator('#identifier')
+  let landed = ''
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.goto('about:blank')
+    await page.context().clearCookies()
+    await page.goto(`${BASE}/portal`)
+    landed = page.url()
+    if (new URL(landed).pathname !== '/portal') continue
+    const shown = await identifier
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .then(() => true)
+      .catch(() => false)
+    if (shown) return
+    landed = page.url()
+  }
+  throw new Error(
+    `login form did not render at /portal after clearing cookies twice; page is at ${landed}` +
+      ' (a session cookie was probably re-set by a late response)',
+  )
+}
+
 export async function loginWithEmail(page: Page, email: string, password: string) {
   // Specs re-login mid-test to switch accounts. /portal bounces an existing
-  // staff session straight to its panel before the form can render, so drop
-  // any current session first — the old standalone /prijava login page
-  // tolerated a live session, /portal deliberately does not.
-  await page.context().clearCookies()
-  await page.goto(`${BASE}/portal`)
+  // session straight to its panel or group before the form can render, so the
+  // current session has to go first — see openLoginForm.
+  await openLoginForm(page)
   await page.locator('#identifier').fill(email)
   await page.locator('input[type="password"]').fill(password)
   // A dual-role admin (ADMIN with ≥1 TeacherAssignment) gets a panel-choice

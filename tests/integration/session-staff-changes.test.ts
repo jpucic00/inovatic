@@ -28,6 +28,7 @@ const {
   removeSessionStaffChange,
   setTeacherAssignmentRole,
   getGroupStaffChanges,
+  getGroupTerminSections,
 } = await import('@/actions/admin/session-staff')
 const { bulkMarkSession } = await import('@/actions/teacher/attendance')
 const { getMyAssignedGroups } = await import('@/actions/teacher/dashboard')
@@ -510,5 +511,38 @@ describe('a holiday only clears its own city', () => {
     mockSession({ id: sibenikAdmin.id, role: 'ADMIN', city: 'SIBENIK' })
     expect((await upsertHoliday({ schoolYear: SY, date: MONDAY })).success).toBe(true)
     expect(await db.sessionStaffChange.count({ where: { scheduledGroupId: group.id } })).toBe(1)
+  })
+})
+
+describe('getGroupTerminSections (the zamjena picker, loaded on open)', () => {
+  it('lists upcoming termini, including a date added by hand on Dolazak', async () => {
+    const { admin, group } = await staffedGroup()
+    const student = await createStudent()
+    const enrollment = await createEnrollment(student.id, group.id, { schoolYear: SY })
+    // A hand-added Dolazak date exists only as an attendance record.
+    await db.attendance.create({
+      data: {
+        enrollmentId: enrollment.id,
+        sessionDate: fromDateKey(NEXT_MONDAY),
+        present: true,
+        recordedById: admin.id,
+      },
+    })
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const sections = await getGroupTerminSections(group.id)
+    expect(sections.flatMap((s) => s.dates)).toContain(NEXT_MONDAY)
+  })
+
+  it('refuses a teacher', async () => {
+    const { lead, group } = await staffedGroup()
+    mockSession({ id: lead.id, role: 'TEACHER' })
+    await expect(getGroupTerminSections(group.id)).rejects.toThrow()
+  })
+
+  it('404s an admin of the other city', async () => {
+    const { group } = await staffedGroup('SPLIT')
+    const other = await createAdmin({ city: 'SIBENIK' })
+    mockSession({ id: other.id, role: 'ADMIN', city: 'SIBENIK' })
+    await expect(getGroupTerminSections(group.id)).rejects.toThrow(/NOT_FOUND|404/)
   })
 })

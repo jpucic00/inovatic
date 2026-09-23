@@ -2114,6 +2114,56 @@ describe('sendEmailCampaign — admin copy', () => {
     expect(copiesTo(admin.email)).toHaveLength(1)
   })
 
+  it('an invitation copy carries the target program termini and its signup link', async () => {
+    const admin = await loginAdmin()
+    const source = await makeSourceGroup()
+    await enrollStudent(source.group.id, { parentEmail: uniqEmail('copy-inv') })
+    const target = await makeTarget()
+
+    const res = await sendAndSettle({
+      kind: 'REENROLLMENT',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [source.group.id],
+      targetCourseId: target.course.id,
+      targetGroupIds: [target.group.id],
+      ...CONTENT,
+    })
+    expect(res).toMatchObject({ success: true, sent: 1 })
+
+    const copies = copiesTo(admin.email)
+    expect(copies).toHaveLength(1)
+    const props = copies[0].react.props
+    expect(String(props.signupUrl)).toMatch(new RegExp(`/prijava/${target.course.slug}$`))
+    expect(props.options).toEqual([expect.objectContaining({ groupName: target.group.name })])
+    // The copy reads exactly like the parents' invitation, minus nothing.
+    const parentProps = sendMock.mock.calls[0][0].react.props
+    expect(props.signupUrl).toBe(parentProps.signupUrl)
+    expect(props.options).toEqual(parentProps.options)
+  })
+
+  it('still sends each admin one copy when the cohort reaches no parent, and records no row for it', async () => {
+    const admin = await loginAdmin()
+    const colleague = await createAdmin({ city: 'SPLIT' })
+    // A group nobody is enrolled in: the cohort resolves to zero parents.
+    const { group } = await makeSourceGroup()
+
+    const res = await sendAndSettle({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      ...CONTENT,
+    })
+    expect(res).toMatchObject({ success: true, sent: 0, failed: [] })
+    if (!res.success) throw new Error('send failed')
+
+    expect(sendMock).not.toHaveBeenCalled()
+    expect(copiesTo(admin.email)).toHaveLength(1)
+    expect(copiesTo(colleague.email)).toHaveLength(1)
+    expect(await db.emailCampaignRecipient.count({ where: { campaignId: res.campaignId } })).toBe(0)
+    const campaign = await db.emailCampaign.findUniqueOrThrow({ where: { id: res.campaignId } })
+    expect(campaign).toMatchObject({ totalCount: 0, sentCount: 0, failedCount: 0 })
+  })
+
   it('a failed copy never stops the parents’ send', async () => {
     await loginAdmin()
     adminCopyMock.mockRejectedValueOnce(new Error('admin inbox down'))

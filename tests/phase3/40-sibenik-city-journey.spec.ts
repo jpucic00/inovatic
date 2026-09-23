@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
-import { loginWithEmail, BASE, addLinkMaterial, markSession, croatianDateRegex, expectNotFoundPage } from '../helpers/phase3'
+import { loginWithEmail, openLoginForm, BASE, addLinkMaterial, markSession, croatianDateRegex, expectNotFoundPage } from '../helpers/phase3'
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 import { fillInquiryStep1, selectPaymentOptionIfShown } from '../helpers/prijava'
 import { newRunId } from '../helpers/cleanup'
@@ -216,8 +216,7 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
   await test.step('post-login panel choice — dual-role admin picks the teacher panel', async () => {
     // Now that Slavica teaches a group, logging in must offer the panel choice
     // instead of auto-redirecting to /admin.
-    await page.context().clearCookies()
-    await page.goto(`${BASE}/portal`)
+    await openLoginForm(page)
     await page.locator('#identifier').fill(SLAVICA_EMAIL)
     await page.locator('input[type="password"]').fill(SLAVICA_PASSWORD)
     const teacherChoice = page.getByRole('button', { name: 'Nastavnički panel' })

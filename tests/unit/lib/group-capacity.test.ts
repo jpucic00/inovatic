@@ -1,6 +1,6 @@
 import type { ProgramKind } from '@prisma/client'
 import { describe, expect, it } from 'vitest'
-import { computeGroupCapacity } from '@/lib/group-capacity'
+import { computeGroupCapacity, RESERVING_INQUIRY_WHERE } from '@/lib/group-capacity'
 
 type GroupCapacityRow = Parameters<typeof computeGroupCapacity>[0]
 
@@ -285,5 +285,11 @@ describe('computeGroupCapacity — the full boundary', () => {
     expect(cap.enrolledCount).toBe(3)
     expect(cap.availableSpots).toBe(0)
     expect(cap.isFull).toBe(true)
+  })
+})
+
+describe('RESERVING_INQUIRY_WHERE', () => {
+  it('holds a seat only for a NEW upit that is not on the waitlist', () => {
+    expect(RESERVING_INQUIRY_WHERE).toEqual({ status: 'NEW', waitlistedAt: null })
   })
 })

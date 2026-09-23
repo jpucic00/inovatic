@@ -10,9 +10,7 @@ import { db } from '@/lib/db'
 import { ModuleEnrollmentPanel } from '@/components/admin/groups/module-enrollment-panel'
 import { GroupTeachersPanel } from '@/components/admin/groups/group-teachers-panel'
 import { getGroupStaffChanges } from '@/actions/admin/session-staff'
-import { getGroupAttendance } from '@/actions/teacher/attendance'
 import { zagrebDateKey } from '@/lib/attendance-window'
-import { upcomingTerminSections } from '@/lib/session-staff'
 import { GroupInfoPanel } from '@/components/admin/groups/group-info-panel'
 import { GroupGalleryPanel } from '@/components/admin/groups/group-gallery-panel'
 import { GroupMaterialsPanel } from '@/components/admin/groups/group-materials-panel'
@@ -31,7 +29,7 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   const { city } = await requireAdminCtx()
 
   const { id } = await params
-  const [group, allTeachers, courses, locations, staffChanges, attendance] = await Promise.all([
+  const [group, allTeachers, courses, locations, staffChanges] = await Promise.all([
     getGroupDetail(id),
     getAssignableTeachers(),
     db.course.findMany({
@@ -46,8 +44,6 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
       select: { id: true, name: true },
     }),
     getGroupStaffChanges(id),
-    // The substitute picker offers exactly the termini the Dolazak tab lists.
-    getGroupAttendance(id),
   ])
 
   if (!group) notFound()
@@ -67,7 +63,6 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   // in which they can open the group.
   const todayKey = zagrebDateKey(new Date())
   const upcomingChanges = staffChanges.filter((c) => c.sessionDate >= todayKey)
-  const terminSections = upcomingTerminSections(attendance, todayKey)
 
   // Signup window is inherited from the program for this group's school year.
   const window = group.course.enrollmentWindows[0] ?? null
@@ -135,7 +130,6 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
           assignableTeachers={assignableTeachers}
           people={allTeachers}
           changes={upcomingChanges}
-          terminSections={terminSections}
           editable={editable}
         />
       </div>

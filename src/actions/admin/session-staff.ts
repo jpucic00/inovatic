@@ -11,7 +11,13 @@ import { loadHolidayDateKeys } from '@/lib/holidays'
 import { fromDateKey, toDateKey } from '@/lib/session-dates'
 import { formatDateKey } from '@/lib/format'
 import { zagrebDateKey } from '@/lib/attendance-window'
-import { staffChangeDateError, type StaffChange } from '@/lib/session-staff'
+import {
+  staffChangeDateError,
+  upcomingTerminSections,
+  type StaffChange,
+  type TerminSection,
+} from '@/lib/session-staff'
+import { getGroupAttendance } from '@/actions/teacher/attendance'
 import {
   addSessionStaffChangeSchema,
   setAssignmentRoleSchema,
@@ -93,6 +99,18 @@ export async function getGroupStaffChanges(groupId: string): Promise<GroupStaffC
     replacesUserId: r.replacesUserId,
     replacesName: r.replaces ? `${r.replaces.firstName} ${r.replaces.lastName}` : null,
   }))
+}
+
+/**
+ * The termini the "Dodaj zamjenu" picker offers, loaded when the modal opens
+ * rather than on every view of the group page. Built from the same
+ * `getGroupAttendance` the Dolazak tab reads — hand-added dates live only as
+ * attendance records — so the picker can never offer a different set of dates.
+ */
+export async function getGroupTerminSections(groupId: string): Promise<TerminSection[]> {
+  const { city } = await requireAdminCtx()
+  await assertGroupInCity(groupId, city)
+  return upcomingTerminSections(await getGroupAttendance(groupId), zagrebDateKey(new Date()))
 }
 
 type ChangeValidation = {
