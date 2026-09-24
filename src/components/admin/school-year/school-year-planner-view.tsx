@@ -27,6 +27,7 @@ import {
   HolidayCalendar,
 } from '@/components/admin/school-year/holiday-calendar'
 import { WeekdayEndSummary } from '@/components/admin/school-year/weekday-end-summary'
+import { standardModuleWindows } from '@/lib/school-year-calendar'
 import type { HolidayRow } from '@/actions/admin/holidays'
 import { completeSchoolYearPlan } from '@/actions/admin/school-year-planner'
 
@@ -73,15 +74,6 @@ type Props = {
   partyEvents: PartyEvent[]
   /** True when any standard module already has a startDate or endDate for this year. */
   hasAnyModuleDate: boolean
-}
-
-function courseInputToWindows(
-  c: SchoolYearCourseInput,
-): { startDate: Date | null; endDate: Date | null }[] {
-  return c.modules.map((m) => ({
-    startDate: m.startDateKey ? fromDateKey(m.startDateKey) : null,
-    endDate: m.endDateKey ? fromDateKey(m.endDateKey) : null,
-  }))
 }
 
 export function SchoolYearPlannerView({
@@ -142,8 +134,9 @@ export function SchoolYearPlannerView({
         lastSessionDateByWeekday: preview.lastSessionDateByWeekday,
       }
     }
+    // The same inputs the printable PDF derives from (`loadSchoolYearCalendar`).
     return deriveSessionDatesFromWindows({
-      moduleWindows: effectiveStandardCourses.flatMap(courseInputToWindows),
+      moduleWindows: standardModuleWindows(effectiveStandardCourses),
       holidayDates: holidaySet,
     })
   }, [preview, effectiveStandardCourses, holidaySet])
@@ -190,7 +183,7 @@ export function SchoolYearPlannerView({
         courseId: c.courseId,
         courseTitle: c.courseTitle,
         level: c.level,
-        moduleWindows: courseInputToWindows(c),
+        moduleWindows: standardModuleWindows([c]),
       }))
     if (courses.length === 0) return null
     return computeWeekdaySummary({ courses, holidayDates: holidaySet })

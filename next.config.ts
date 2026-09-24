@@ -2,6 +2,16 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Renders PDFs with its own React reconciler — bundling it into the server
+  // layer would hand it the react-server build, which has no reconciler.
+  serverExternalPackages: ['@react-pdf/renderer'],
+  // The raspored PDF reads its fonts and logo from disk at runtime; a path
+  // built with `path.join` is invisible to the standalone trace, so without
+  // these the production image renders without them (or not at all).
+  outputFileTracingIncludes: {
+    '/api/admin/school-year-calendar': ['./src/assets/fonts/**/*', './public/images/logo_dark.png'],
+    '/admin/email': ['./src/assets/fonts/**/*', './public/images/logo_dark.png'],
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'res.cloudinary.com' },

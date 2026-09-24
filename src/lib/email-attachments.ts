@@ -39,6 +39,37 @@ export async function sweepStaleDraftAttachments(now: Date = new Date()): Promis
   return count
 }
 
+/**
+ * One attachment row with its bytes. A draft (`campaignId: null`) from the
+ * composer's upload, or a file the server generated for a campaign it is
+ * creating — pass that campaign's transaction so the file and the campaign
+ * commit together.
+ */
+export async function storeAttachment(
+  client: Pick<Prisma.TransactionClient, 'emailAttachment'>,
+  input: {
+    city: City
+    campaignId: string | null
+    filename: string
+    mimeType: string
+    data: Buffer
+  },
+): Promise<{ id: string; filename: string; bytes: number; mimeType: string }> {
+  return client.emailAttachment.create({
+    data: {
+      city: input.city,
+      campaignId: input.campaignId,
+      filename: input.filename,
+      mimeType: input.mimeType,
+      bytes: input.data.length,
+      // A copy: Prisma's Bytes wants a plain ArrayBuffer-backed array, and a
+      // rendered PDF's Buffer may sit on a shared pool.
+      content: { create: { data: new Uint8Array(input.data) } },
+    },
+    select: { id: true, filename: true, bytes: true, mimeType: true },
+  })
+}
+
 type DraftAttachmentsResult =
   | { ok: true; attachments: AttachmentSummary[] }
   | { ok: false; error: string }

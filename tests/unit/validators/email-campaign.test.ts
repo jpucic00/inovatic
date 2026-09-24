@@ -240,3 +240,48 @@ describe('SCHEDULE campaign', () => {
     ).toBe(true)
   })
 })
+
+describe('SCHOOL_CALENDAR campaign', () => {
+  it('accepts a group selection with per-address exclusions — a row is one inbox', () => {
+    const parsed = sendEmailCampaignSchema.safeParse({
+      kind: 'SCHOOL_CALENDAR',
+      ...baseFilters,
+      ...content,
+      excludedParentEmails: ['obitelj@example.hr'],
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it('rejects a preporuka selection and individually picked children', () => {
+    const byRecommendation = sendEmailCampaignSchema.safeParse({
+      kind: 'SCHOOL_CALENDAR',
+      sourceSchoolYear: '2025/2026',
+      recommendations: ['COMPETITION_PROGRAM'],
+      ...content,
+    })
+    expect(byRecommendation.success).toBe(false)
+    if (!byRecommendation.success) {
+      expect(byRecommendation.error.issues[0]?.message).toBe(
+        'Raspored školske godine šalje se odabirom grupa.',
+      )
+    }
+    const byStudents = sendEmailCampaignSchema.safeParse({
+      kind: 'SCHOOL_CALENDAR',
+      sourceSchoolYear: '2025/2026',
+      sourceStudentIds: ['s1'],
+      ...content,
+    })
+    expect(byStudents.success).toBe(false)
+  })
+
+  it('previews with the year that decides which PDF is attached', () => {
+    expect(previewEmailSchema.safeParse({ kind: 'SCHOOL_CALENDAR', ...content }).success).toBe(false)
+    expect(
+      previewEmailSchema.safeParse({
+        kind: 'SCHOOL_CALENDAR',
+        sourceSchoolYear: '2025/2026',
+        ...content,
+      }).success,
+    ).toBe(true)
+  })
+})

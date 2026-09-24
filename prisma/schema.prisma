@@ -163,6 +163,14 @@ enum EmailCampaignKind {
   /// kids come" wants one answer. Repeatable — no sentKey — so it can be
   /// re-sent after a child is moved to another group.
   SCHEDULE
+  /// The printable "Raspored radionica" for the source school year, attached as
+  /// a PDF. One mail per parent INBOX with siblings merged, like CUSTOM — the
+  /// file is the city's whole-year calendar and names no child. The PDF is
+  /// rendered ONCE at campaign creation and stored as the campaign's own
+  /// EmailAttachment, so a resumed send and the admin copy carry the identical
+  /// file. Standard groups only: radionice and the competitive program do not
+  /// follow the 28-termin year. Repeatable — no sentKey.
+  SCHOOL_CALENDAR
 }
 
 enum EmailRecipientStatus {

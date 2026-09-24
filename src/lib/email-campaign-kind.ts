@@ -45,6 +45,13 @@ export const EMAIL_CAMPAIGN_KINDS: Record<
     description:
       'Podsjetnik u koje je grupe dijete upisano — program, dan, vrijeme i lokacija. Jedan e-mail po roditelju: dvoje djece na istoj adresi dolazi u jednoj poruci.',
   },
+  SCHOOL_CALENDAR: {
+    label: 'Raspored školske godine',
+    badgeLabel: 'Raspored godine',
+    badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
+    description:
+      'Raspored radionica za cijelu školsku godinu kao PDF privitak — zeleni dani su termini, plavi praznici. Samo standardni programi; jedan e-mail po roditelju.',
+  },
 }
 
 /** Ordered for the composer's kind toggle. */
@@ -54,4 +61,5 @@ export const EMAIL_CAMPAIGN_KIND_ORDER: readonly EmailCampaignKind[] = [
   'EVALUATION',
   'CREDENTIALS',
   'SCHEDULE',
+  'SCHOOL_CALENDAR',
 ]

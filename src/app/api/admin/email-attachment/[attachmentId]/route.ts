@@ -1,21 +1,9 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { attachmentContentDisposition } from '@/lib/content-disposition'
 
 export const runtime = 'nodejs'
-
-/**
- * RFC 6266 header carrying both an ASCII fallback and the exact UTF-8 name —
- * Croatian filenames ("Ugovor – Šibenik.pdf") would otherwise arrive mangled.
- */
-function contentDisposition(filename: string): string {
-  const ascii = filename
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\x20-\x7e]/g, '_')
-    .replace(/["\\]/g, '_')
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`
-}
 
 /**
  * An /admin/email attachment, for the campaign history. Admin-only and scoped
@@ -45,7 +33,7 @@ export async function GET(
   return new NextResponse(Buffer.from(data), {
     headers: {
       'Content-Type': attachment.mimeType,
-      'Content-Disposition': contentDisposition(attachment.filename),
+      'Content-Disposition': attachmentContentDisposition(attachment.filename),
       'Content-Length': String(data.byteLength),
       'Cache-Control': 'private, no-store',
     },

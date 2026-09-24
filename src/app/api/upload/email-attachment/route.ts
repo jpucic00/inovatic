@@ -8,7 +8,7 @@ import {
   formatMegabytes,
   isAllowedAttachmentType,
 } from '@/lib/email-attachment-rules'
-import { sweepStaleDraftAttachments } from '@/lib/email-attachments'
+import { storeAttachment, sweepStaleDraftAttachments } from '@/lib/email-attachments'
 
 export const runtime = 'nodejs'
 
@@ -95,15 +95,12 @@ export async function POST(req: Request) {
     console.error('sweepStaleDraftAttachments failed:', err)
   })
 
-  const row = await db.emailAttachment.create({
-    data: {
-      city,
-      filename: cleanAttachmentFilename(file.name),
-      mimeType,
-      bytes: bytes.length,
-      content: { create: { data: bytes } },
-    },
-    select: { id: true, filename: true, bytes: true, mimeType: true },
+  const row = await storeAttachment(db, {
+    city,
+    campaignId: null,
+    filename: cleanAttachmentFilename(file.name),
+    mimeType,
+    data: bytes,
   })
 
   return NextResponse.json(row)

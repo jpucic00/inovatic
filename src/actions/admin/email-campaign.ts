@@ -64,14 +64,24 @@ import {
   type SendEmailCampaignInput,
 } from '@/lib/validators/admin/email-campaign'
 import type { GroupOption } from '../../../emails/schedule-options'
-import type { EmailAttachmentFile } from '@/lib/email-attachment-rules'
+import {
+  attachmentSetError,
+  type AttachmentSummary,
+  type EmailAttachmentFile,
+} from '@/lib/email-attachment-rules'
 import {
   AttachmentLinkError,
   linkDraftAttachments,
   loadCampaignAttachmentFiles,
   loadCampaignAttachmentSummaries,
   loadDraftAttachments,
+  storeAttachment,
 } from '@/lib/email-attachments'
+import { schoolYearCalendarFilename } from '@/lib/school-year-calendar'
+import {
+  SchoolYearCalendarUnavailableError,
+  renderSchoolYearCalendarPdf,
+} from '@/lib/pdf/school-year-calendar-pdf'
 
 const INVALID_DATA = 'Nevaljani podaci.'
 const SCHOOL_YEAR_RE = /^\d{4}\/\d{4}$/
@@ -120,6 +130,18 @@ const GROUP_NOT_RADIONICA = { course: NOT_RADIONICA } as const
  */
 function kindExcludesRadionice(kind: string): boolean {
   return kind === 'REENROLLMENT' || kind === 'EVALUATION'
+}
+
+/**
+ * Narrower still: the school-year calendar is the 28-termin timetable of the
+ * STANDARD programs, which neither a radionica nor the competitive program
+ * follows — mailing it to those families would announce dates they do not have.
+ */
+const GROUP_STANDARD_ONLY = { course: { kind: 'STANDARD' } } as const
+
+function groupKindFilter(kind: EmailCampaignKind) {
+  if (kind === 'SCHOOL_CALENDAR') return GROUP_STANDARD_ONLY
+  return kindExcludesRadionice(kind) ? GROUP_NOT_RADIONICA : {}
 }
 
 /**
@@ -177,13 +199,21 @@ export async function getEmailStudentOptions(sourceYear: string) {
  * `excludeRadionice` mirrors the campaign kind — a business rule, not a security
  * boundary; the send re-enforces it in resolveCohort.
  */
-export async function getEmailGroupTree(sourceYear: string, excludeRadionice: boolean) {
+export async function getEmailGroupTree(
+  sourceYear: string,
+  excludeRadionice: boolean,
+  standardOnly = false,
+) {
   const { city } = await requireAdminCtx()
   if (!SCHOOL_YEAR_RE.test(sourceYear)) return []
 
+  let programFilter = {}
+  if (standardOnly) programFilter = { kind: 'STANDARD' as const }
+  else if (excludeRadionice) programFilter = NOT_RADIONICA
+
   const courses = await db.course.findMany({
     where: {
-      ...(excludeRadionice ? NOT_RADIONICA : {}),
+      ...programFilter,
       scheduledGroups: { some: { schoolYear: sourceYear, city } },
     },
     select: {
@@ -301,6 +331,11 @@ async function resolveCohort(
     // Groups only — the validator rejects the other two modes for this kind.
     return resolveScheduleCohort(city, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
   }
+  if (kind === 'SCHOOL_CALENDAR') {
+    // Groups only, standard groups only (validateSourceGroups); one row per
+    // inbox exactly like CUSTOM — the attached file names no child.
+    return resolveGroupCohort(city, kind, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
+  }
   if (filters.recommendations?.length) {
     return resolveRecommendationCohort(city, kind, filters.sourceSchoolYear, [
       ...new Set(filters.recommendations),
@@ -327,7 +362,7 @@ async function validateSourceGroups(
       id: { in: ids },
       city,
       schoolYear: sourceSchoolYear,
-      ...(kindExcludesRadionice(kind) ? GROUP_NOT_RADIONICA : {}),
+      ...groupKindFilter(kind),
     },
     select: { id: true },
   })
@@ -924,6 +959,51 @@ type PreviewEmailHtmlResult =
   | { success: true; html: string }
   | { success: false; error: string }
 
+type CalendarAttachment =
+  | { ok: true; file: { filename: string; mimeType: string; data: Buffer } }
+  | { ok: false; error: string }
+
+/**
+ * The SCHOOL_CALENDAR campaign's PDF — the admin's city, the campaign's year,
+ * the same document the Kalendar's download button serves. Rendered at campaign
+ * creation and stored, never re-rendered by a resume: a holiday added between
+ * two runs must not hand half the parents a different calendar.
+ */
+async function renderCalendarAttachment(
+  city: City,
+  schoolYear: string,
+): Promise<CalendarAttachment> {
+  try {
+    const data = await renderSchoolYearCalendarPdf({ city, schoolYear })
+    return {
+      ok: true,
+      file: {
+        filename: schoolYearCalendarFilename(city, schoolYear),
+        mimeType: 'application/pdf',
+        data,
+      },
+    }
+  } catch (err) {
+    if (err instanceof SchoolYearCalendarUnavailableError) return { ok: false, error: err.message }
+    throw err
+  }
+}
+
+/** The generated PDF counts toward the same limits as the admin's own files. */
+function withCalendar(
+  drafts: AttachmentSummary[],
+  calendar: CalendarAttachment | null,
+): { ok: true; attachments: AttachmentSummary[] } | { ok: false; error: string } {
+  if (!calendar) return { ok: true, attachments: drafts }
+  if (!calendar.ok) return calendar
+  const attachments = [
+    ...drafts,
+    { filename: calendar.file.filename, bytes: calendar.file.data.length },
+  ]
+  const error = attachmentSetError(attachments)
+  return error ? { ok: false, error } : { ok: true, attachments }
+}
+
 /**
  * Stand-in card for the step-1 layout preview. Invented rather than borrowed
  * from a real child: the preview is about the template, and picking a real card
@@ -1052,6 +1132,16 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
     const drafts = await loadDraftAttachments(parsed.data.attachmentIds ?? [], city)
     if (!drafts.ok) return { success: false, error: drafts.error }
 
+    // Rendered here too, so an unplanned year is refused at the preview and the
+    // "Prilozi" list names the real file with its real size.
+    const files = withCalendar(
+      drafts.attachments,
+      parsed.data.kind === 'SCHOOL_CALENDAR'
+        ? await renderCalendarAttachment(city, parsed.data.sourceSchoolYear)
+        : null,
+    )
+    if (!files.ok) return { success: false, error: files.error }
+
     const html = await renderBulkMessageHtml({
       subject: previewSubject,
       bodyText: body.bodyText,
@@ -1061,7 +1151,7 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
       cards,
       credentials,
       schedules,
-      attachments: drafts.attachments,
+      attachments: files.attachments,
     })
     return { success: true, html }
   } catch (err) {
@@ -1243,6 +1333,15 @@ export async function sendEmailCampaign(
     const drafts = await loadDraftAttachments(attachmentIds, city)
     if (!drafts.ok) return { success: false, error: drafts.error }
 
+    // Generated ONCE, here, and stored with the campaign below — see
+    // renderCalendarAttachment. An unplanned year refuses the whole campaign.
+    const calendar =
+      data.kind === 'SCHOOL_CALENDAR'
+        ? await renderCalendarAttachment(city, data.sourceSchoolYear)
+        : null
+    const files = withCalendar(drafts.attachments, calendar)
+    if (!files.ok) return { success: false, error: files.error }
+
     const targetYear = await getSelectedSchoolYear()
 
     const prep = await prepareReenrollment(city, targetYear, data)
@@ -1306,6 +1405,9 @@ export async function sendEmailCampaign(
       // another campaign since the check above throws here, and the campaign is
       // never created — it cannot go out without the file the admin attached.
       await linkDraftAttachments(tx, attachmentIds, city, created.id)
+      if (calendar?.ok) {
+        await storeAttachment(tx, { city, campaignId: created.id, ...calendar.file })
+      }
 
       // Persist the children nobody could be mailed for, so the detail view can
       // name them instead of showing an anonymous "skipped: 3".

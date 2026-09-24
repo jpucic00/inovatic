@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { PartyPopper } from 'lucide-react'
+import { FileDown, PartyPopper } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { db } from '@/lib/db'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
@@ -10,21 +11,22 @@ import { listHolidays } from '@/actions/admin/holidays'
 import { getScheduledParties } from '@/actions/admin/inquiry'
 import { toDateKey } from '@/lib/session-dates'
 import { formatDateKey } from '@/lib/format'
-import type { PartyEvent } from '@/lib/school-year-planner'
+import { deriveSessionDatesFromWindows, type PartyEvent } from '@/lib/school-year-planner'
+import { incompleteWeekdays, standardModuleWindows } from '@/lib/school-year-calendar'
 import { HolidayImportDialog } from '@/components/admin/school-year/holiday-import-dialog'
 import { TrialWeekEditor } from '@/components/admin/school-year/trial-week-editor'
 import { getTrialWeek } from '@/actions/admin/trial-week'
 import {
   SchoolYearPlannerView,
-  type SchoolYearCourseInput,
   type SchoolYearRadionicaGroupInput,
 } from '@/components/admin/school-year/school-year-planner-view'
+import {
+  coursePlanSelect,
+  loadStandardCoursePlans,
+  toCoursePlanInput,
+} from '@/lib/school-year-calendar-data'
 
 export const metadata: Metadata = { title: 'Admin – Školska godina' }
-
-function formatCourseLabel(course: { title: string; level: string | null }): string {
-  return course.level ? course.level.replace('_', ' ') : course.title
-}
 
 export default async function SchoolYearPage() {
   const { city } = await requireAdminCtx()
@@ -37,54 +39,17 @@ export default async function SchoolYearPage() {
   // labels (radionice groups whose [dateStart, dateEnd] range covers the day).
   // Standard ScheduledGroups are NOT a calendar input — they only matter for
   // attendance and the per-group teacher panel.
-  const [holidays, standardCoursesRaw, customCoursesRaw, radionicaGroupsRaw, scheduledPartiesRaw] = await Promise.all([
+  const [holidays, standardCourses, customCoursesRaw, radionicaGroupsRaw, scheduledPartiesRaw] = await Promise.all([
     listHolidays(schoolYear),
-    db.course.findMany({
-      // STANDARD only: the competitive program has no dated modules to draw.
-      where: { kind: 'STANDARD' },
-      select: {
-        id: true,
-        title: true,
-        level: true,
-        modules: {
-          select: {
-            id: true,
-            sortOrder: true,
-            title: true,
-            schedules: {
-              // Calendar shows the caller's city's planner rows only.
-              where: { schoolYear, city },
-              select: { startDate: true, endDate: true },
-            },
-          },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-      orderBy: [{ level: 'asc' }, { title: 'asc' }],
-    }),
+    // Shared with the printable PDF so the two can never draw different termini.
+    loadStandardCoursePlans(city, schoolYear),
     db.course.findMany({
       where: {
         kind: 'RADIONICA',
         OR: [{ city: null }, { city }],
         modules: { some: { schedules: { some: { schoolYear, city } } } },
       },
-      select: {
-        id: true,
-        title: true,
-        level: true,
-        modules: {
-          select: {
-            id: true,
-            sortOrder: true,
-            title: true,
-            schedules: {
-              where: { schoolYear, city },
-              select: { startDate: true, endDate: true },
-            },
-          },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
+      select: coursePlanSelect(schoolYear, city),
       orderBy: { title: 'asc' },
     }),
     db.scheduledGroup.findMany({
@@ -106,29 +71,7 @@ export default async function SchoolYearPage() {
     getScheduledParties(schoolYear),
   ])
 
-  function toCourseInput(
-    course: (typeof standardCoursesRaw)[number],
-  ): SchoolYearCourseInput {
-    return {
-      courseId: course.id,
-      courseTitle: course.title,
-      courseLabel: formatCourseLabel(course),
-      level: course.level,
-      modules: course.modules.map((m) => {
-        const sched = m.schedules[0]
-        return {
-          id: m.id,
-          sortOrder: m.sortOrder,
-          title: m.title,
-          startDateKey: sched?.startDate ? toDateKey(sched.startDate) : null,
-          endDateKey: sched?.endDate ? toDateKey(sched.endDate) : null,
-        }
-      }),
-    }
-  }
-
-  const standardCourses = standardCoursesRaw.map(toCourseInput)
-  const customCourses = customCoursesRaw.map(toCourseInput)
+  const customCourses = customCoursesRaw.map(toCoursePlanInput)
   const radionicaGroups: SchoolYearRadionicaGroupInput[] = radionicaGroupsRaw.map((g) => ({
     groupId: g.id,
     dateStart: g.dateStart,
@@ -153,6 +96,15 @@ export default async function SchoolYearPage() {
   )
 
   const holidayDateKeys = holidays.map((h) => h.date)
+  // Same derivation the PDF route runs, so the button is offered exactly when
+  // the download would succeed.
+  const calendarReady =
+    incompleteWeekdays(
+      deriveSessionDatesFromWindows({
+        moduleWindows: standardModuleWindows(standardCourses),
+        holidayDates: new Set(holidayDateKeys),
+      }),
+    ).length === 0
   const holidayCount = holidays.length
 
   return (
@@ -160,7 +112,29 @@ export default async function SchoolYearPage() {
       <header className="space-y-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="text-2xl font-bold text-gray-900">Školska godina {schoolYear}</h1>
-          {!archived && <HolidayImportDialog schoolYear={schoolYear} archived={archived} />}
+          <div className="flex flex-wrap items-center gap-2">
+            {calendarReady ? (
+              // A plain <a>: the route answers with a file, not a page.
+              <Button asChild variant="outline" className="gap-2">
+                <a href={`/api/admin/school-year-calendar?year=${encodeURIComponent(schoolYear)}`}>
+                  <FileDown className="h-4 w-4" aria-hidden />
+                  Preuzmi raspored (PDF)
+                </a>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                disabled
+                title="Raspored se može preuzeti kad svi dani u tjednu imaju 28 radionica."
+              >
+                <FileDown className="h-4 w-4" aria-hidden />
+                Preuzmi raspored (PDF)
+              </Button>
+            )}
+            {!archived && <HolidayImportDialog schoolYear={schoolYear} archived={archived} />}
+          </div>
         </div>
         <p className="text-sm text-gray-600">
           Označite dane praznika kako bi automatski bili izuzeti iz evidencije dolaska. Kalendar

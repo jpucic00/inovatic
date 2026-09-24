@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Eye, Send } from 'lucide-react'
+import { Eye, FileDown, Send } from 'lucide-react'
 import { croatianPlural, formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
 import type { RecommendationOption } from '@/lib/assessment-rubric'
@@ -19,6 +19,7 @@ import {
   EMAIL_CAMPAIGN_KINDS,
   EMAIL_CAMPAIGN_KIND_ORDER,
 } from '@/lib/email-campaign-kind'
+import { formatSchoolYearDotted } from '@/lib/school-year-calendar'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import {
@@ -124,7 +125,13 @@ function SendProgressPanel({ result }: Readonly<{ result: StartedSend }>) {
   )
 }
 
-type Kind = 'CUSTOM' | 'REENROLLMENT' | 'EVALUATION' | 'CREDENTIALS' | 'SCHEDULE'
+type Kind =
+  | 'CUSTOM'
+  | 'REENROLLMENT'
+  | 'EVALUATION'
+  | 'CREDENTIALS'
+  | 'SCHEDULE'
+  | 'SCHOOL_CALENDAR'
 /** STUDENTS is CREDENTIALS-only — see the validator's requireExactlyOneSelection. */
 type SelectionMode = 'GROUPS' | 'RECOMMENDATION' | 'STUDENTS'
 type GroupTree = Awaited<ReturnType<typeof getEmailGroupTree>>
@@ -172,6 +179,12 @@ const DEFAULT_SCHEDULE_BODY = [
   'Poštovani,',
   'U nastavku se nalaze termini grupa u koje je Vaše dijete upisano u ovoj školskoj godini.',
   'Sačuvajte ovu poruku, a za sva pitanja slobodno nam odgovorite.',
+].join('\n')
+
+const DEFAULT_SCHOOL_CALENDAR_BODY = [
+  'Poštovani,',
+  'u privitku se nalazi raspored radionica za ovu školsku godinu. Radionice se održavaju u danima označenim zelenom bojom, a u danima označenim plavom (praznici i školski odmori) nema nastave.',
+  'Sačuvajte raspored, a za sva pitanja slobodno nam odgovorite na ovu poruku.',
 ].join('\n')
 
 const SELECT_CLASS =
@@ -257,7 +270,12 @@ export function EmailWizard({
     // None of the per-child kinds can use a preporuka cohort (the server
     // rejects it too): a preporuka names children, not the card, the account
     // or the groups being sent. All start on groups.
-    if (next === 'EVALUATION' || next === 'CREDENTIALS' || next === 'SCHEDULE') {
+    if (
+      next === 'EVALUATION' ||
+      next === 'CREDENTIALS' ||
+      next === 'SCHEDULE' ||
+      next === 'SCHOOL_CALENDAR'
+    ) {
       setSelectionMode('GROUPS')
     }
     // Individual children are a CREDENTIALS-only cohort (the validator refuses
@@ -284,6 +302,10 @@ export function EmailWizard({
       setSubject('Termini vaših grupa – Inovatic')
       setBodyBlocks(plainTextToBlocks(DEFAULT_SCHEDULE_BODY))
       setSourceYear(selectedYear)
+    } else if (next === 'SCHOOL_CALENDAR') {
+      setSubject(`Raspored radionica za školsku godinu ${formatSchoolYearDotted(selectedYear)}`)
+      setBodyBlocks(plainTextToBlocks(DEFAULT_SCHOOL_CALENDAR_BODY))
+      setSourceYear(selectedYear)
     } else {
       setSubject('')
       setBodyBlocks([])
@@ -293,19 +315,22 @@ export function EmailWizard({
 
   // Reload the group tree when the source year or kind changes (the initial
   // CUSTOM + selected-year tree comes preloaded from the server).
-  const treeKeyRef = useRef(`${selectedYear}:false`)
+  const treeKeyRef = useRef(`${selectedYear}:false:false`)
   useEffect(() => {
     // Radionice are never graded and are not a re-enrolment cohort either — but
     // a workshop child does get a portal account, so CREDENTIALS must see them.
     // Mirrors `kindExcludesRadionice` on the server; the send re-validates.
     const excludeRadionice = kind === 'REENROLLMENT' || kind === 'EVALUATION'
-    const key = `${sourceYear}:${excludeRadionice}`
+    // The calendar is the standard programs' timetable — no radionice, no
+    // competitive groups. Mirrors `groupKindFilter` on the server.
+    const standardOnly = kind === 'SCHOOL_CALENDAR'
+    const key = `${sourceYear}:${excludeRadionice}:${standardOnly}`
     if (treeKeyRef.current === key) return
     treeKeyRef.current = key
     let cancelled = false
     setLoadingTree(true)
     setTree([])
-    getEmailGroupTree(sourceYear, excludeRadionice)
+    getEmailGroupTree(sourceYear, excludeRadionice, standardOnly)
       .then((next) => {
         if (!cancelled) setTree(next)
       })
@@ -628,6 +653,9 @@ export function EmailWizard({
       input = { kind: 'CREDENTIALS' as const, ...content }
     } else if (kind === 'SCHEDULE') {
       input = { kind: 'SCHEDULE' as const, ...content }
+    } else if (kind === 'SCHOOL_CALENDAR') {
+      // The year decides which PDF is attached, so the preview renders it too.
+      input = { kind: 'SCHOOL_CALENDAR' as const, ...content, sourceSchoolYear: sourceYear }
     } else {
       input = { kind: 'CUSTOM' as const, ...content }
     }
@@ -682,6 +710,12 @@ export function EmailWizard({
       } else if (kind === 'SCHEDULE') {
         // Rows are inboxes again (siblings merged), so exclusion is by address.
         input = { kind: 'SCHEDULE' as const, ...base, excludedParentEmails: [...excluded] }
+      } else if (kind === 'SCHOOL_CALENDAR') {
+        input = {
+          kind: 'SCHOOL_CALENDAR' as const,
+          ...base,
+          excludedParentEmails: [...excluded],
+        }
       } else {
         input = { kind: 'CUSTOM' as const, ...base, excludedParentEmails: [...excluded] }
       }
@@ -764,6 +798,24 @@ export function EmailWizard({
                 <strong>svih</strong> svojih grupa u odabranoj školskoj godini. Poruka se
                 može slati više puta — npr. nakon što dijete prebacite u drugu grupu.
               </p>
+            )}
+            {kind === 'SCHOOL_CALENDAR' && (
+              <div className="mt-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 space-y-1.5">
+                <p>
+                  Uz poruku automatski ide PDF raspored radionica za školsku godinu{' '}
+                  <strong>{sourceYear}</strong> — isti kao u Kalendaru. Izrađuje se jednom, pri
+                  pokretanju slanja, i ubraja se u ograničenje privitaka. Školsku godinu mijenjate
+                  u koraku Primatelji.
+                </p>
+                {/* A plain <a>: the route answers with a file. */}
+                <a
+                  href={`/api/admin/school-year-calendar?year=${encodeURIComponent(sourceYear)}`}
+                  className="inline-flex items-center gap-1.5 font-medium text-sky-800 underline hover:text-sky-900"
+                >
+                  <FileDown className="h-3.5 w-3.5" aria-hidden />
+                  Preuzmi PDF ({sourceYear})
+                </a>
+              </div>
             )}
           </section>
 
@@ -872,6 +924,7 @@ export function EmailWizard({
                   '; ispod teksta automatski slijedi kartica djeteta, a njegovo se ime dodaje u predmet poruke'}
                 {kind === 'SCHEDULE' &&
                   '; ispod teksta automatski slijede grupe svakog djeteta, a imena djece dodaju se u predmet poruke'}
+                {kind === 'SCHOOL_CALENDAR' && '; raspored školske godine ide kao PDF privitak'}
                 .{' '}
                 <span className={bodyText.length > EMAIL_BODY_MAX_LENGTH ? 'text-red-600' : 'text-gray-400'}>
                   {bodyText.length}/{EMAIL_BODY_MAX_LENGTH}
@@ -926,6 +979,9 @@ export function EmailWizard({
                 if (kind === 'SCHEDULE') {
                   return 'Jedan red = jedan roditelj sa svom svojom djecom iz odabranih grupa. Radionice su uključene.'
                 }
+                if (kind === 'SCHOOL_CALENDAR') {
+                  return 'Roditelji polaznika standardnih programa iz odabranih grupa — jedan e-mail po roditelju. Radionice i natjecateljski program ne prate ovaj raspored.'
+                }
                 return 'Roditelji polaznika odabranih grupa iz odabrane školske godine.'
               })()}
             </p>
@@ -954,7 +1010,7 @@ export function EmailWizard({
                 same holds for a schedule mail, which lists the groups a child is
                 IN. Credentials swap the preporuka mode for naming children
                 outright: a preporuka says nothing about which ACCOUNT is sent. */}
-            {kind !== 'EVALUATION' && kind !== 'SCHEDULE' && (
+            {kind !== 'EVALUATION' && kind !== 'SCHEDULE' && kind !== 'SCHOOL_CALENDAR' && (
               <div className="mt-4">
                 <span className="block text-sm font-medium text-gray-700 mb-1.5">
                   Način odabira
@@ -1370,12 +1426,16 @@ export function EmailWizard({
               </>
             )}
 
-            {attachments.length > 0 && (
+            {(attachments.length > 0 || kind === 'SCHOOL_CALENDAR') && (
               <p className="mt-4 text-xs text-gray-600">
                 <span className="font-medium text-gray-700">
-                  Privici ({attachments.length}):
+                  Privici ({attachments.length + (kind === 'SCHOOL_CALENDAR' ? 1 : 0)}):
                 </span>{' '}
-                {attachments.map((a) => a.filename).join(', ')} — idu svakom primatelju.
+                {[
+                  ...(kind === 'SCHOOL_CALENDAR' ? [`Raspored radionica ${sourceYear} (PDF)`] : []),
+                  ...attachments.map((a) => a.filename),
+                ].join(', ')}{' '}
+                — idu svakom primatelju.
               </p>
             )}
 

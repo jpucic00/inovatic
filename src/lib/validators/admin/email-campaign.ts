@@ -94,6 +94,14 @@ function requireExactlyOneSelection(
       message: 'Termini se šalju odabirom grupa.',
     })
   }
+  // The calendar is the standard programme's timetable; the groups decide who
+  // receives it, and a preporuka cohort would reach children of other programs.
+  if (value.kind === 'SCHOOL_CALENDAR' && hasRecommendations) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Raspored školske godine šalje se odabirom grupa.',
+    })
+  }
   // The individual-children mode exists for CREDENTIALS only. Every other
   // resolver keys its content off a group or a report card and has nothing to
   // build from a bare student id.
@@ -237,6 +245,21 @@ const scheduleContent = {
   attachmentIds: attachmentIdsField,
 }
 
+/**
+ * The school-year calendar. Its content is one PDF for the whole city, rendered
+ * at campaign creation for `sourceSchoolYear` — which is why the year rides the
+ * content here: the step-1 preview has no cohort yet, but it must still render
+ * (and size) the very file the send would attach.
+ */
+const schoolCalendarContent = {
+  kind: z.literal('SCHOOL_CALENDAR'),
+  subject: subjectField,
+  bodyText: bodyTextField,
+  bodyBlocks: bodyBlocksField,
+  attachmentIds: attachmentIdsField,
+  sourceSchoolYear: schoolYearField,
+}
+
 const reenrollmentContent = {
   kind: z.literal('REENROLLMENT'),
   subject: subjectField,
@@ -279,6 +302,12 @@ export const sendEmailCampaignSchema = z
       ...selectionFields,
       excludedParentEmails: excludedParentEmailsField,
     }),
+    // One inbox per row (the file names no child), so excluded by address.
+    z.object({
+      ...schoolCalendarContent,
+      ...selectionFields,
+      excludedParentEmails: excludedParentEmailsField,
+    }),
   ])
   .superRefine(requireExactlyOneSelection)
   .superRefine(validateBody)
@@ -287,7 +316,14 @@ export const sendEmailCampaignSchema = z
 // kind compute its "već poslano" skip-set alongside the cohort.
 export const previewRecipientsSchema = z
   .object({
-    kind: z.enum(['CUSTOM', 'REENROLLMENT', 'EVALUATION', 'CREDENTIALS', 'SCHEDULE']),
+    kind: z.enum([
+      'CUSTOM',
+      'REENROLLMENT',
+      'EVALUATION',
+      'CREDENTIALS',
+      'SCHEDULE',
+      'SCHOOL_CALENDAR',
+    ]),
     ...selectionFields,
     targetCourseId: z.string().min(1).optional(),
   })
@@ -301,6 +337,7 @@ export const previewEmailSchema = z
     z.object(evaluationContent),
     z.object(credentialsContent),
     z.object(scheduleContent),
+    z.object(schoolCalendarContent),
   ])
   .superRefine(validateBody)
 
