@@ -575,7 +575,7 @@ Split and Šibenik run as fully separated tenants inside one app. "City" is the 
 - A **COMPETITION enrollment is billed monthly** through its `EnrollmentMonth` rows (a month is owed once `periodStart <= now`), not via `fullYearPaidAt` / `ModuleEnrollment.paidAt` — though `fullYearPaidAt` still works as the pay-upfront override.
 - An `Enrollment` row means "this student is in this group for this school year". To cancel a radionica enrollment, delete the row. `fullYearPaidAt` is the admin "whole school year paid" mark.
 - A `ModuleEnrollment` row means "this student is taking this module instance". To remove a student from a module, delete the row. Cascading to later modules is **not** automatic — each module row must be deleted individually. `paidAt` is the admin per-module paid mark.
-- A module is "done" when `ModuleSchedule.endDate < now`, either because the date naturally passed or because a teacher manually set `endDate = now` via `closeModuleSchedule`.
+- A module is "done" when `ModuleSchedule.endDate < now`. Standard-program windows are never edited by hand: they are derived from module 1's start plus the city's holidays and re-derived on every holiday change (`rederiveModuleWindows`, `src/lib/module-plan-sync.ts`).
 
 ## Module Template vs Year Instance
 

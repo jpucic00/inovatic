@@ -15,8 +15,8 @@ import type { AdminActionResult } from '@/lib/action-types'
 
 /**
  * Set how long a COMPETITION program runs this school year, in this admin's
- * city. Mirrors `upsertModuleSchedule`: same archived-year guard, same
- * city-from-context rule, same "empty date clears it" semantics.
+ * city. Archived years are refused, the city comes from the admin context, and
+ * an empty date clears it.
  *
  * Also re-syncs monthly charges for every enrollment on the program's groups in
  * this city and year — see {@link syncSeasonMonths}. Without that a season

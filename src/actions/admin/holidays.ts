@@ -20,6 +20,7 @@ import {
   type UpsertHolidayRangeInput,
 } from '@/lib/validators/admin/holiday'
 import type { AdminActionResult } from '@/lib/action-types'
+import { rederiveModuleWindows } from '@/lib/module-plan-sync'
 import {
   fetchCroatianHolidays,
   HolidayApiError,
@@ -212,6 +213,7 @@ export async function upsertHolidayRange(
           update: { name },
         })
       }
+      await rederiveModuleWindows(tx, { city, schoolYear: data.schoolYear })
     })
   } catch (err) {
     if (err instanceof AttendanceConfirmationRequired) {
@@ -226,6 +228,7 @@ export async function upsertHolidayRange(
   }
 
   revalidatePath('/admin/skolska-godina')
+  revalidatePath('/admin/programi', 'layout')
   revalidatePath('/nastavnik', 'layout')
   return { success: true, requiresConfirmation: false }
 }
@@ -251,12 +254,15 @@ export async function removeHolidayRange(
   if (archived) return archived
 
   try {
-    await db.schoolYearHoliday.deleteMany({
-      where: {
-        schoolYear: data.schoolYear,
-        city,
-        date: { gte: fromDateKey(data.startDate), lte: fromDateKey(data.endDate) },
-      },
+    await db.$transaction(async (tx) => {
+      await tx.schoolYearHoliday.deleteMany({
+        where: {
+          schoolYear: data.schoolYear,
+          city,
+          date: { gte: fromDateKey(data.startDate), lte: fromDateKey(data.endDate) },
+        },
+      })
+      await rederiveModuleWindows(tx, { city, schoolYear: data.schoolYear })
     })
   } catch (err) {
     console.error('removeHolidayRange failed:', err)
@@ -264,6 +270,7 @@ export async function removeHolidayRange(
   }
 
   revalidatePath('/admin/skolska-godina')
+  revalidatePath('/admin/programi', 'layout')
   revalidatePath('/nastavnik', 'layout')
   return { success: true }
 }
@@ -289,13 +296,17 @@ export async function removeHoliday(input: RemoveHolidayInput): Promise<AdminAct
   if (archived) return archived
 
   try {
-    await db.schoolYearHoliday.delete({ where: { id: parsed.data.id } })
+    await db.$transaction(async (tx) => {
+      await tx.schoolYearHoliday.delete({ where: { id: parsed.data.id } })
+      await rederiveModuleWindows(tx, { city, schoolYear: row.schoolYear })
+    })
   } catch (err) {
     console.error('removeHoliday failed:', err)
     return { success: false, error: 'Greška pri brisanju praznika.' }
   }
 
   revalidatePath('/admin/skolska-godina')
+  revalidatePath('/admin/programi', 'layout')
   revalidatePath('/nastavnik', 'layout')
   return { success: true }
 }
@@ -482,6 +493,7 @@ export async function bulkImportHolidays(
           update: { name },
         })
       }
+      await rederiveModuleWindows(tx, { city, schoolYear: data.schoolYear })
     })
   } catch (err) {
     if (err instanceof AttendanceConfirmationRequired) {
@@ -497,6 +509,7 @@ export async function bulkImportHolidays(
   }
 
   revalidatePath('/admin/skolska-godina')
+  revalidatePath('/admin/programi', 'layout')
   revalidatePath('/nastavnik', 'layout')
   return { success: true, requiresConfirmation: false, importedCount: dateToName.size }
 }

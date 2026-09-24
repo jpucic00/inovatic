@@ -43,56 +43,6 @@ export async function deleteModuleEnrollment(id: string): Promise<AdminActionRes
   return { success: true }
 }
 
-export async function closeModuleSchedule(
-  moduleScheduleId: string,
-): Promise<AdminActionResult> {
-  const { city } = await requireAdminCtx()
-
-  if (!moduleScheduleId) return { success: false, error: 'Modul nije pronađen.' }
-
-  try {
-    const schedule = await db.moduleSchedule.findUnique({
-      where: { id: moduleScheduleId },
-      select: {
-        schoolYear: true,
-        city: true,
-        module: {
-          select: {
-            course: {
-              select: {
-                scheduledGroups: { select: { id: true }, where: { city } },
-              },
-            },
-          },
-        },
-      },
-    })
-    // Schedules are per-city rows: closing by id only ever ends the caller's
-    // city's module. Cross-city ids read as nonexistent.
-    if (schedule?.city !== city) {
-      return { success: false, error: 'Modul nije pronađen.' }
-    }
-
-    const blocked = archivedYearError(schedule.schoolYear)
-    if (blocked) return blocked
-
-    await db.moduleSchedule.update({
-      where: { id: moduleScheduleId },
-      data: { endDate: new Date() },
-    })
-
-    for (const g of schedule.module.course.scheduledGroups) {
-      revalidatePath(`/admin/grupe/${g.id}`)
-    }
-    revalidatePath('/admin/programi', 'layout')
-  } catch (err) {
-    console.error('closeModuleSchedule failed:', err)
-    return { success: false, error: 'Greška pri zatvaranju modula.' }
-  }
-
-  return { success: true }
-}
-
 export async function addModuleEnrollment(
   enrollmentId: string,
   moduleScheduleId: string,

@@ -2,6 +2,8 @@ import { test, expect, type Page } from '@playwright/test'
 import { clickUntilVisible } from '../helpers/hydration'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
+import { db } from '@/lib/db'
+import { computeSchoolYear } from '@/lib/school-year'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PHASE 2 STEP 8 — Module Enrollment + School-Year Historization
@@ -18,8 +20,9 @@ import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 //  - Create N test students and enroll them
 //
 // The tests for module-date manipulation shift the SLR 1 module schedule
-// dates via the /admin/programi inline edit UI. They restore original dates
-// in afterAll to avoid leaving the database in a weird state for other runs.
+// dates directly in the DB — the Programi table is read-only, since module
+// dates are derived from the school-year plan and holidays. They restore the
+// original dates in afterAll to avoid leaving the database in a weird state.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const BASE = 'http://localhost:3000'
@@ -212,61 +215,47 @@ async function createStudentAndEnroll(
   await expect(dialog).toBeHidden({ timeout: 10000 })
 }
 
-/**
- * Edits the date fields for a given module row (identified by index 0-based)
- * in the SLR 1 ModuleDatesTable. Saves and waits for the success toast.
- */
-async function shiftModuleDates(
-  page: Page,
-  modIndex: number,
-  startDate: string,
-  endDate: string,
-) {
-  await gotoSlrProgramDetail(page)
-  const table = slrTable(page)
-  await expect(table).toBeVisible()
-
-  const row = table.locator('tbody tr').nth(modIndex)
-  // Click the pencil edit button
-  await row.getByRole('button', { name: 'Uredi datume' }).click()
-  // Two date inputs appear inline
-  const dateInputs = row.locator('input[type="date"]')
-  await dateInputs.nth(0).fill(startDate)
-  await dateInputs.nth(1).fill(endDate)
-  await row.getByRole('button', { name: 'Spremi' }).click()
-  await expect(page.getByText('Datumi modula ažurirani.')).toBeVisible({ timeout: 5000 })
+/** SLR 1's modules in sortOrder, with the caller city's schedule for the current year. */
+async function slrModules() {
+  const course = await db.course.findFirstOrThrow({
+    where: { kind: 'STANDARD', title: { contains: COURSE_SEARCH } },
+    select: { id: true },
+  })
+  return db.courseModule.findMany({
+    where: { courseId: course.id },
+    orderBy: { sortOrder: 'asc' },
+    select: {
+      id: true,
+      schedules: {
+        where: { schoolYear: computeSchoolYear(), city: 'SPLIT' },
+        select: { startDate: true, endDate: true },
+      },
+    },
+  })
 }
 
 /**
- * Captures the currently-displayed start/end dates for all module rows in
- * SLR 1's ModuleDatesTable, so we can restore them later. Parses the
- * rendered "dd.mm.yyyy." strings back to "yyyy-mm-dd".
+ * Sets the dates of one SLR 1 module (0-based index). Written straight to the
+ * DB: the Programi table only displays dates, it no longer edits them.
  */
-async function snapshotModuleDates(page: Page): Promise<{ startDate: string; endDate: string }[]> {
-  await gotoSlrProgramDetail(page)
-  const table = slrTable(page)
-  await expect(table).toBeVisible()
-
-  const rows = table.locator('tbody tr')
-  const count = await rows.count()
-  const result: { startDate: string; endDate: string }[] = []
-  for (let i = 0; i < count; i++) {
-    const row = rows.nth(i)
-    const startCell = await row.locator('td').nth(1).innerText()
-    const endCell = await row.locator('td').nth(2).innerText()
-    result.push({ startDate: parseHrDate(startCell), endDate: parseHrDate(endCell) })
-  }
-  return result
+async function shiftModuleDates(modIndex: number, startDate: string, endDate: string) {
+  const mod = (await slrModules())[modIndex]
+  const schoolYear = computeSchoolYear()
+  const dates = { startDate: new Date(`${startDate}T00:00:00.000Z`), endDate: new Date(`${endDate}T00:00:00.000Z`) }
+  await db.moduleSchedule.upsert({
+    where: { moduleId_schoolYear_city: { moduleId: mod.id, schoolYear, city: 'SPLIT' } },
+    create: { moduleId: mod.id, schoolYear, city: 'SPLIT', ...dates },
+    update: dates,
+  })
 }
 
-function parseHrDate(s: string): string {
-  // "15.04.2026." → "2026-04-15"  |  "–" → ""
-  const m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/)
-  if (!m) return ''
-  const dd = m[1].padStart(2, '0')
-  const mm = m[2].padStart(2, '0')
-  const yyyy = m[3]
-  return `${yyyy}-${mm}-${dd}`
+/** SLR 1's current module dates, so afterAll can restore them. */
+async function snapshotModuleDates(): Promise<{ startDate: string; endDate: string }[]> {
+  const key = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : '')
+  return (await slrModules()).map((m) => ({
+    startDate: key(m.schedules[0]?.startDate),
+    endDate: key(m.schedules[0]?.endDate),
+  }))
 }
 
 // ─── Test suite ──────────────────────────────────────────────────────────────
@@ -281,14 +270,14 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
     await loginAsAdmin(page)
 
     // Snapshot original SLR 1 module dates (so we can restore them in afterAll)
-    originalDates = await snapshotModuleDates(page)
+    originalDates = await snapshotModuleDates()
 
     // Shift the four SLR 1 modules into deterministic states (M1=Završen,
     // M2=Aktivan, M3=M4=Nadolazi) so the remove-student-from-module and
     // button-visibility tests below have a known active-module context.
     // Date-state derivation is unit-tested at tests/unit/lib/active-module.test.ts.
     for (let i = 0; i < SHIFT_DATES.length; i++) {
-      await shiftModuleDates(page, i, SHIFT_DATES[i].startDate, SHIFT_DATES[i].endDate)
+      await shiftModuleDates(i, SHIFT_DATES[i].startDate, SHIFT_DATES[i].endDate)
     }
 
     // Create a dedicated group + 9 students with all modules selected
@@ -300,27 +289,20 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
     await page.close()
   })
 
-  test.afterAll(async ({ browser }) => {
+  test.afterAll(async () => {
     // The group + students this spec created: they are named after the run, so
     // they would otherwise pile up in the same weekday lane forever.
     await cleanupRunFixtures(RUN_ID)
 
-    // Restore SLR 1 module dates so we don't leave the DB in a shifted state
-    if (originalDates.length === 0) return
-    test.setTimeout(120000)
-    const page = await browser.newPage()
+    // Restore SLR 1 module dates so we don't leave the DB in a shifted state.
+    // Best-effort: swallow errors.
     try {
-      await loginAsAdmin(page)
       for (let i = 0; i < originalDates.length; i++) {
         const d = originalDates[i]
-        if (d.startDate && d.endDate) {
-          await shiftModuleDates(page, i, d.startDate, d.endDate)
-        }
+        if (d.startDate && d.endDate) await shiftModuleDates(i, d.startDate, d.endDate)
       }
     } catch {
       // Restoration is best-effort; swallow errors
-    } finally {
-      await page.close()
     }
   })
 
@@ -430,27 +412,24 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       await expect(page.getByText(/2 slobodnih/).first()).toBeVisible()
     })
 
-    test('E10 — "Završi" button visible only on the Aktivan module row (programi page)', async ({
+    test('E10 — the Programi module table is read-only and points at the Kalendar', async ({
       page,
     }) => {
-      // The "Završi modul" bulk action moved from the group detail
-      // ModuleEnrollmentPanel to the ModuleDatesTable, now on the per-program
-      // detail page, and was renamed to just "Završi". It only shows on rows
-      // whose status is Aktivan.
+      // Module dates are derived from the school-year plan and holidays, so
+      // the table offers no edit and no "Završi" — only the status chips.
       await loginAsAdmin(page)
       await gotoSlrProgramDetail(page)
       const table = slrTable(page)
       await expect(table).toBeVisible()
 
       const rows = table.locator('tbody tr')
-      // M1 (Završen) — no "Završi" button on the row
-      await expect(rows.nth(0).getByRole('button', { name: 'Završi' })).toHaveCount(0)
-      // M2 (Aktivan) — button present
-      await expect(rows.nth(1).getByRole('button', { name: 'Završi' })).toBeVisible()
-      // M3 (Nadolazi) — no button
-      await expect(rows.nth(2).getByRole('button', { name: 'Završi' })).toHaveCount(0)
-      // M4 (Nadolazi) — no button
-      await expect(rows.nth(3).getByRole('button', { name: 'Završi' })).toHaveCount(0)
+      await expect(rows.nth(0)).toContainText('Završen')
+      await expect(rows.nth(1)).toContainText('Aktivan')
+      await expect(table.getByRole('button')).toHaveCount(0)
+      await expect(table.getByRole('link', { name: 'Kalendar' })).toHaveAttribute(
+        'href',
+        '/admin/skolska-godina',
+      )
     })
 
     test('E11 — "Sljedeći" button available on active tab promotes to next module', async ({

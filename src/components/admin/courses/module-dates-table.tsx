@@ -1,13 +1,5 @@
-'use client'
-
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
-import { Check, X, Pencil, Users, CheckCircle, Calendar } from 'lucide-react'
-import { upsertModuleSchedule } from '@/actions/admin/module'
-import { closeModuleSchedule } from '@/actions/admin/module-enrollment'
-import { DateInput } from '@/components/ui/date-input'
-import { formatDate, toDateInputValue } from '@/lib/format'
+import { Users, Calendar } from 'lucide-react'
+import { formatDate } from '@/lib/format'
 import Link from 'next/link'
 
 type Module = {
@@ -33,8 +25,6 @@ type CourseInfo = {
 interface ModuleDatesTableProps {
   course: CourseInfo
   modules: Module[]
-  selectedYear: string
-  editable: boolean
   /** Hide the course title/level header block (when the page already shows it). */
   hideHeader?: boolean
 }
@@ -47,54 +37,8 @@ function getModuleStatus(mod: Module): { label: string; className: string } {
   return { label: 'Aktivan', className: 'text-green-700 bg-green-50' }
 }
 
-function ModuleRow({
-  mod,
-  selectedYear,
-  editable,
-}: Readonly<{ mod: Module; selectedYear: string; editable: boolean }>) {
-  const [editing, setEditing] = useState(false)
-  const [startDate, setStartDate] = useState(toDateInputValue(mod.startDate))
-  const [endDate, setEndDate] = useState(toDateInputValue(mod.endDate))
-  const [isPending, startTransition] = useTransition()
-  const router = useRouter()
+function ModuleRow({ mod }: Readonly<{ mod: Module }>) {
   const status = getModuleStatus(mod)
-
-  const handleSave = () => {
-    startTransition(async () => {
-      const result = await upsertModuleSchedule({
-        moduleId: mod.id,
-        schoolYear: selectedYear,
-        startDate: startDate || null,
-        endDate: endDate || null,
-      })
-      if (result.success) {
-        toast.success('Datumi modula ažurirani.')
-        setEditing(false)
-        router.refresh()
-      } else {
-        toast.error(result.error ?? 'Greška.')
-      }
-    })
-  }
-
-  const handleCloseModule = () => {
-    if (!mod.scheduleId) return
-    startTransition(async () => {
-      const result = await closeModuleSchedule(mod.scheduleId!)
-      if (result.success) {
-        toast.success(`Modul "${mod.title}" završen.`)
-        router.refresh()
-      } else {
-        toast.error(result.error ?? 'Greška.')
-      }
-    })
-  }
-
-  const handleCancel = () => {
-    setStartDate(toDateInputValue(mod.startDate))
-    setEndDate(toDateInputValue(mod.endDate))
-    setEditing(false)
-  }
 
   return (
     <tr className="border-b border-gray-100 last:border-0">
@@ -102,33 +46,17 @@ function ModuleRow({
         <span className="text-sm text-gray-800">{mod.title}</span>
       </td>
       <td className="py-2.5 pr-4">
-        {editing ? (
-          <DateInput
-            value={startDate}
-            onChange={setStartDate}
-            className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
-        ) : (
-          <span className="text-sm text-gray-600">{formatDate(mod.startDate) || '–'}</span>
-        )}
+        <span className="text-sm text-gray-600">{formatDate(mod.startDate) || '–'}</span>
       </td>
       <td className="py-2.5 pr-4">
-        {editing ? (
-          <DateInput
-            value={endDate}
-            onChange={setEndDate}
-            className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
-        ) : (
-          <span className="text-sm text-gray-600">{formatDate(mod.endDate) || '–'}</span>
-        )}
+        <span className="text-sm text-gray-600">{formatDate(mod.endDate) || '–'}</span>
       </td>
       <td className="py-2.5 pr-4">
         <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${status.className}`}>
           {status.label}
         </span>
       </td>
-      <td className="py-2.5 pr-4">
+      <td className="py-2.5">
         {mod.scheduleId ? (
           <Link
             href={`/admin/ucenici?scheduleId=${mod.scheduleId}`}
@@ -141,51 +69,6 @@ function ModuleRow({
           <span className="text-xs text-gray-400">–</span>
         )}
       </td>
-      <td className="py-2.5 text-right">
-        {editable && (
-          editing ? (
-            <div className="flex items-center justify-end gap-1">
-              <button
-                onClick={handleSave}
-                disabled={isPending}
-                className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                title="Spremi"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={isPending}
-                className="p-1.5 text-gray-400 hover:bg-gray-100 rounded transition-colors"
-                title="Odustani"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-end gap-1">
-              {mod.scheduleId && status.label === 'Aktivan' && (
-                <button
-                  onClick={handleCloseModule}
-                  disabled={isPending}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50"
-                  title="Završi modul za sve grupe (postavi krajnji datum na danas)"
-                >
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  Završi
-                </button>
-              )}
-              <button
-                onClick={() => setEditing(true)}
-                className="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded transition-colors"
-                title={mod.scheduleId ? 'Uredi datume' : 'Postavi datume'}
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )
-        )}
-      </td>
     </tr>
   )
 }
@@ -193,8 +76,6 @@ function ModuleRow({
 export function ModuleDatesTable({
   course,
   modules,
-  selectedYear,
-  editable,
   hideHeader,
 }: Readonly<ModuleDatesTableProps>) {
   if (modules.length === 0) return null
@@ -238,17 +119,24 @@ export function ModuleDatesTable({
             <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 pr-4">Početak</th>
             <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 pr-4">Završetak</th>
             <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 pr-4">Status</th>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 pr-4">Polaznici</th>
-            <th className="pb-2 w-16"></th>
+            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2">Polaznici</th>
           </tr>
         </thead>
         <tbody>
           {modules.map((mod) => (
-            <ModuleRow key={mod.id} mod={mod} selectedYear={selectedYear} editable={editable} />
+            <ModuleRow key={mod.id} mod={mod} />
           ))}
         </tbody>
       </table>
       </div>
+      <p className="text-xs text-gray-500 mt-3">
+        Datumi se računaju iz početka školske godine i praznika i mijenjaju se sami kad se
+        praznici promijene. Uređuju se na stranici{' '}
+        <Link href="/admin/skolska-godina" className="text-cyan-700 hover:underline">
+          Kalendar
+        </Link>
+        .
+      </p>
     </div>
   )
 }

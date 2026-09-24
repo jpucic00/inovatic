@@ -365,8 +365,8 @@ function accumulateArcMarkers(
  *
  * Note: when a module is missing its dates, the arc stops there (race-ahead
  * cursor has nowhere to land) so later-module markers are suppressed too.
- * In practice the planner sets all 4 dates atomically, so partial-date input
- * only happens during ad-hoc admin edits.
+ * In practice the planner and the holiday re-derivation write all 4 dates
+ * together, so partial-date input only comes from legacy or imported rows.
  */
 export function computeModuleMarkers(input: {
   courses: ReadonlyArray<ModuleMarkerInputCourse>

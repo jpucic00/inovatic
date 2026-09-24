@@ -11,6 +11,7 @@ import {
   computeSchoolYearPlan,
   MODULE_COUNT,
 } from '@/lib/school-year-planner'
+import { writeModuleWindows } from '@/lib/module-plan-sync'
 import {
   completeSchoolYearPlanSchema,
   type CompleteSchoolYearPlanInput,
@@ -34,13 +35,14 @@ import type { AdminActionResult } from '@/lib/action-types'
  * Guards (each refuses with a Croatian message, no rows mutated):
  *   - non-ADMIN → throws via requireAdmin
  *   - archived school year → archivedYearError short-circuit
- *   - any standard module already has a date for the year → admin should use
- *     /admin/programi instead; planner is one-shot
+ *   - any standard module already has a date for the year → planner is
+ *     one-shot; later changes come only through holidays
  *   - any standard course doesn't have exactly MODULE_COUNT modules → planner
  *     hardcodes 4 modules × 7 sessions = 28; refuse rather than silently skip
  *
  * All upserts ride a single $transaction so a partial failure can't leave
- * the year half-planned.
+ * the year half-planned. From then on the windows are re-derived by
+ * `rederiveModuleWindows` on every holiday change — nobody edits them by hand.
  */
 export async function completeSchoolYearPlan(
   input: CompleteSchoolYearPlanInput,
@@ -73,7 +75,7 @@ export async function completeSchoolYearPlan(
   if (existingDated > 0) {
     return {
       success: false,
-      error: 'Datumi modula već postoje — uredite ih preko stranice programa.',
+      error: 'Datumi modula već postoje — računaju se iz početka godine i praznika.',
     }
   }
 
@@ -120,35 +122,17 @@ export async function completeSchoolYearPlan(
     holidayDates,
   })
 
-  // Position in the per-course sorted module list — not the raw sortOrder
-  // (seed convention is 1..4, but older / future data may be 0..3). Position
-  // is the single source of truth for "Nth module of the year".
-  const upserts: Array<ReturnType<typeof db.moduleSchedule.upsert>> = []
-  for (const [, mods] of byCourse) {
-    mods.forEach((m, position) => {
-      const window = plan.modules[position]
-      if (!window) return
-      upserts.push(
-        db.moduleSchedule.upsert({
-          where: { moduleId_schoolYear_city: { moduleId: m.id, schoolYear, city } },
-          create: {
-            moduleId: m.id,
-            schoolYear,
-            city,
-            startDate: window.startDate,
-            endDate: window.endDate,
-          },
-          update: {
-            startDate: window.startDate,
-            endDate: window.endDate,
-          },
-        }),
-      )
-    })
-  }
-
   try {
-    await db.$transaction(upserts)
+    await db.$transaction(async (tx) => {
+      for (const [, mods] of byCourse) {
+        await writeModuleWindows(tx, {
+          city,
+          schoolYear,
+          moduleIds: mods.map((m) => m.id),
+          windows: plan.modules,
+        })
+      }
+    })
   } catch (err) {
     console.error('completeSchoolYearPlan failed:', err)
     return { success: false, error: 'Greška pri spremanju plana školske godine.' }

@@ -37,10 +37,7 @@ vi.mock('next/navigation', async () => {
 const { upsertHolidayRange, removeHoliday, removeHolidayRange, listHolidays } =
   await import('@/actions/admin/holidays')
 const { completeSchoolYearPlan } = await import('@/actions/admin/school-year-planner')
-const { closeModuleSchedule, addModuleEnrollment } = await import(
-  '@/actions/admin/module-enrollment'
-)
-const { upsertModuleSchedule } = await import('@/actions/admin/module')
+const { addModuleEnrollment } = await import('@/actions/admin/module-enrollment')
 const { upsertEnrollmentWindow } = await import('@/actions/admin/enrollment-window')
 
 const SY = '2026/2027'
@@ -205,29 +202,6 @@ describe('completeSchoolYearPlan — per-city one-shot', () => {
 })
 
 describe('module schedules and windows — per-city rows', () => {
-  it('closeModuleSchedule reads a cross-city schedule as nonexistent and closes only its own', async () => {
-    const course = await createCourse()
-    const mod = await createModule(course.id)
-    const endDate = new Date('2027-03-15T00:00:00.000Z')
-    const splitSched = await createModuleSchedule(mod.id, {
-      schoolYear: SY, city: 'SPLIT', startDate: new Date('2026-09-01T00:00:00.000Z'), endDate,
-    })
-    const sibenikSched = await createModuleSchedule(mod.id, {
-      schoolYear: SY, city: 'SIBENIK', startDate: new Date('2026-11-02T00:00:00.000Z'), endDate,
-    })
-    await sibenikAdminSession()
-
-    const cross = await closeModuleSchedule(splitSched.id)
-    expect(cross).toEqual({ success: false, error: 'Modul nije pronađen.' })
-    const splitAfter = await db.moduleSchedule.findUnique({ where: { id: splitSched.id } })
-    expect(splitAfter?.endDate?.toISOString()).toBe(endDate.toISOString())
-
-    const own = await closeModuleSchedule(sibenikSched.id)
-    expect(own).toEqual({ success: true })
-    const sibenikAfter = await db.moduleSchedule.findUnique({ where: { id: sibenikSched.id } })
-    expect(sibenikAfter?.endDate?.toISOString()).not.toBe(endDate.toISOString())
-  })
-
   it('addModuleEnrollment rejects a schedule from the other city', async () => {
     const course = await createCourse()
     const mod = await createModule(course.id)
@@ -247,30 +221,37 @@ describe('module schedules and windows — per-city rows', () => {
     expect(own).toEqual({ success: true })
   })
 
-  it('upsertModuleSchedule writes the caller city row and leaves the other city untouched', async () => {
-    const course = await createCourse()
-    const mod = await createModule(course.id)
-    const splitStart = new Date('2026-09-01T00:00:00.000Z')
-    const splitSched = await createModuleSchedule(mod.id, {
-      schoolYear: SY, city: 'SPLIT', startDate: splitStart,
+  it('a Šibenik holiday re-derives only Šibenik module windows, never Split', async () => {
+    const course = await createCourse({ kind: 'STANDARD' })
+    for (let i = 0; i < 4; i++) {
+      await createModule(course.id, { sortOrder: i, title: `Modul ${i + 1}` })
+    }
+    await splitAdminSession()
+    expect(await completeSchoolYearPlan({ schoolYear: SY, startDate: '2026-09-01' })).toEqual({
+      success: true,
     })
     await sibenikAdminSession()
-
-    const res = await upsertModuleSchedule({
-      moduleId: mod.id,
-      schoolYear: SY,
-      startDate: '2026-11-02',
-      endDate: '2026-12-20',
+    expect(await completeSchoolYearPlan({ schoolYear: SY, startDate: '2026-09-01' })).toEqual({
+      success: true,
     })
-    expect(res).toEqual({ success: true })
+    const windows = (city: 'SPLIT' | 'SIBENIK') =>
+      db.moduleSchedule
+        .findMany({ where: { schoolYear: SY, city }, orderBy: { startDate: 'asc' } })
+        .then((rows) => rows.map((r) => [r.startDate?.toISOString(), r.endDate?.toISOString()]))
+    const splitBefore = await windows('SPLIT')
+    const sibenikBefore = await windows('SIBENIK')
 
-    const rows = await db.moduleSchedule.findMany({ where: { moduleId: mod.id, schoolYear: SY } })
-    expect(rows).toHaveLength(2)
-    const splitAfter = rows.find((r) => r.city === 'SPLIT')
-    const sibenikAfter = rows.find((r) => r.city === 'SIBENIK')
-    expect(splitAfter?.id).toBe(splitSched.id)
-    expect(splitAfter?.startDate?.toISOString()).toBe(splitStart.toISOString())
-    expect(sibenikAfter?.startDate?.toISOString()).toBe('2026-11-02T00:00:00.000Z')
+    // Monday 12 Oct falls inside module 1, whose end is anchored on Mondays.
+    const res = await upsertHolidayRange({
+      schoolYear: SY,
+      startDate: '2026-10-12',
+      endDate: '2026-10-12',
+      name: 'Dan grada',
+    })
+    expect(res.success).toBe(true)
+
+    expect(await windows('SPLIT')).toEqual(splitBefore)
+    expect(await windows('SIBENIK')).not.toEqual(sibenikBefore)
   })
 
   it('upsertEnrollmentWindow opens the caller city window without clobbering the other city', async () => {

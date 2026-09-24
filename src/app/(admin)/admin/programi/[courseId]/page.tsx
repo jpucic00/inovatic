@@ -189,8 +189,6 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
           </h2>
           <ModuleDatesTable
             hideHeader
-            selectedYear={selectedYear}
-            editable={editable}
             course={{
               id: course.id,
               title: course.title,

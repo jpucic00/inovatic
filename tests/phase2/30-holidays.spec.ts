@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { loginAsAdmin as sharedLoginAsAdmin } from '../helpers/phase3'
 import { db } from '@/lib/db'
+import { rederiveModuleWindows } from '@/lib/module-plan-sync'
 
 import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -138,6 +139,13 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await db.schoolYearHoliday.deleteMany({ where: { schoolYear: SY } })
+  // The holidays this spec added re-derived the year's module windows; with
+  // them gone, derive them back so later specs see the plan without them.
+  await db.$transaction(async (tx) => {
+    for (const city of ['SPLIT', 'SIBENIK'] as const) {
+      await rederiveModuleWindows(tx, { city, schoolYear: SY })
+    }
+  })
   await db.attendance.deleteMany({ where: { enrollmentId: seeded.enrollmentId } })
   await db.enrollment.deleteMany({ where: { id: seeded.enrollmentId } })
   await db.user.deleteMany({ where: { id: seeded.studentId } })

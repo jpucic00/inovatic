@@ -183,7 +183,6 @@ flowchart LR
         F2[deleteInquiry]
         F3[deleteEnrollment - hard delete row]
         F4[deleteModuleEnrollment - hard delete row]
-        F5["closeModuleSchedule - endDate set to now, next module takes over"]
         F6["setInquiryWaitlist on a NEW upit - waitlisting releases the seat<br/>removal is refused while NEW, so it never comes back from the list"]
     end
 
@@ -197,7 +196,6 @@ flowchart LR
     style F2 fill:#d1fae5
     style F3 fill:#d1fae5
     style F4 fill:#d1fae5
-    style F5 fill:#d1fae5
     style F6 fill:#d1fae5
 ```
 
@@ -557,7 +555,7 @@ flowchart TD
 
 > A window counts as open only when **both** `enrollmentStart` and `enrollmentEnd` are set and `now` falls inside the range. No `CourseEnrollmentWindow` row for a `(course, year, city)` — or one outside the range — hides every group of that program/year in that city; a Split window never exposes Šibenik groups or vice versa. There is no "always open" shortcut.
 >
-> The standard-course second gate is the per-group race-ahead arc (`getGroupModuleArc` → next-enrolling module), not a raw `ModuleSchedule.startDate > now` check. Closing the running module early (`closeModuleSchedule` sets `endDate = today`) reshapes the arc so a later module becomes the next-enrolling one. The radionica second gate is the start-day cutoff (`isRadionicaOpenForSignup` in `toActiveGroup`) — a workshop with both date bounds blank has no start to compare against and stays bookable. Competition groups have no second gate: they run a whole season.
+> The standard-course second gate is the per-group race-ahead arc (`getGroupModuleArc` → next-enrolling module), not a raw `ModuleSchedule.startDate > now` check. The radionica second gate is the start-day cutoff (`isRadionicaOpenForSignup` in `toActiveGroup`) — a workshop with both date bounds blank has no start to compare against and stays bookable. Competition groups have no second gate: they run a whole season.
 >
 > **The feed split is only the course filter**: `getActivePrograms(city)` calls the shared `loadPrograms` with `kind: { not: 'COMPETITION' }`; `getSignupProgram(city, slug)` calls it with `{ slug }` (competition included), and `getSignupProgramById` with `{ id }` for the per-program link's live availability poll. Window, capacity, holiday and cutoff logic are identical across all three, so the feeds can never drift.
 >
@@ -724,11 +722,6 @@ sequenceDiagram
     alt Admin removes a module from an enrolled student
         Admin->>Server: deleteModuleEnrollment moduleEnrollmentId
         Server->>Server: Hard delete single row — later modules untouched
-    end
-
-    alt Admin closes a running module early
-        Admin->>Server: closeModuleSchedule moduleScheduleId
-        Server->>Server: Set ModuleSchedule.endDate = now — group advances to next module
     end
 
     alt Admin removes a whole enrollment
