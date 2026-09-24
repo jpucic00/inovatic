@@ -31,7 +31,10 @@ import {
   type SessionStatus,
   type TeacherDraft,
 } from '@/lib/attendance-draft'
-import { assignAdhocDateToSection } from '@/lib/attendance-sections'
+import {
+  assignAdhocDateToSection,
+  pickDefaultSessionDate,
+} from '@/lib/attendance-sections'
 import {
   sessionTeacherRows,
   STAFF_ROLE_LABELS,
@@ -1031,18 +1034,6 @@ export function AttendanceMarker(props: Readonly<GroupAttendance>) {
 
 type FlatProps = Extract<GroupAttendance, { kind: 'custom' | 'season' }>
 
-function pickFlatDefault(expected: string[], extras: string[]): string {
-  const today = toDateKey(todayUtc())
-  const all = [...new Set([...expected, ...extras])].sort((a, b) =>
-    a.localeCompare(b),
-  )
-  if (all.length === 0) return today
-  if (all.includes(today)) return today
-  const past = all.filter((d) => d <= today)
-  if (past.length > 0) return past.at(-1)!
-  return all[0]
-}
-
 function FlatAttendanceMarker({
   groupId,
   kind,
@@ -1078,7 +1069,7 @@ function FlatAttendanceMarker({
   }, [serverKnown, adhocDates])
 
   const [selected, setSelected] = useState<string>(() =>
-    pickFlatDefault(expectedSessions, extraSessions),
+    pickDefaultSessionDate(serverKnown, toDateKey(todayUtc())),
   )
   const adhocInput = useAdhocInput(allDates, addAdhocDate, setSelected)
 
@@ -1086,7 +1077,9 @@ function FlatAttendanceMarker({
   // the list no longer offers — fall back to the branch default instead.
   const handleRemoveAdhoc = (key: string) => {
     removeAdhocDate(key)
-    if (selected === key) setSelected(pickFlatDefault(expectedSessions, extraSessions))
+    if (selected === key) {
+      setSelected(pickDefaultSessionDate(serverKnown, toDateKey(todayUtc())))
+    }
   }
 
   if (roster.length === 0) return <EmptyRoster />

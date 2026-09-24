@@ -11,12 +11,11 @@ import {
   toDateKey,
 } from '@/lib/session-dates'
 import { isCompetition, isRadionica } from '@/lib/program-kind'
+import { getGroupModuleArc } from '@/lib/group-module-arc'
 import {
-  getActiveModuleForGroup,
-  getGroupModuleArc,
-  type GroupModuleArcEntry,
-} from '@/lib/group-module-arc'
-import { assignAdhocDateToSection } from '@/lib/attendance-sections'
+  assignAdhocDateToSection,
+  pickDefaultSessionDate,
+} from '@/lib/attendance-sections'
 import {
   teacherMarkingError,
   teacherMarkingWindow,
@@ -432,7 +431,13 @@ function buildStandardAttendance(
     kind: 'standard',
     sections,
     otherDates,
-    defaultSelectedDate: pickDefaultSelectedDate(arc, sections),
+    defaultSelectedDate: pickDefaultSessionDate(
+      [
+        ...sections.flatMap((s) => [...s.expectedSessions, ...s.adhocSessions]),
+        ...otherDates,
+      ],
+      toDateKey(todayUtc()),
+    ),
   }
 }
 
@@ -541,48 +546,6 @@ export async function getGroupAttendance(
     records,
     trialDate,
   )
-}
-
-/**
- * Resolve the default date from the arc's active-module state, or null when the
- * arc is empty / no module phase applies (caller then falls back to sections).
- */
-function pickDateFromArcState(
-  arc: GroupModuleArcEntry[],
-  today: string,
-): string | null {
-  if (arc.length === 0) return null
-  const state = getActiveModuleForGroup(arc, todayUtc())
-  const inProgress = state.inProgressModule
-  if (inProgress) {
-    const dates = inProgress.sessionDates.map(toDateKey)
-    if (dates.includes(today)) return today
-    const past = dates.filter((d) => d <= today)
-    if (past.length > 0) return past.at(-1)!
-    return dates[0]
-  }
-  if (state.lastCompletedModule) {
-    const dates = state.lastCompletedModule.sessionDates.map(toDateKey)
-    const past = dates.filter((d) => d <= today)
-    return past.at(-1) ?? dates.at(-1) ?? today
-  }
-  if (state.nextEnrollingModule) {
-    return toDateKey(state.nextEnrollingModule.firstSession)
-  }
-  return null
-}
-
-function pickDefaultSelectedDate(
-  arc: GroupModuleArcEntry[],
-  sections: AttendanceModuleSection[],
-): string {
-  const today = toDateKey(todayUtc())
-  const fromArc = pickDateFromArcState(arc, today)
-  if (fromArc !== null) return fromArc
-  for (const s of sections) {
-    if (s.expectedSessions.length > 0) return s.expectedSessions[0]
-  }
-  return today
 }
 
 /**

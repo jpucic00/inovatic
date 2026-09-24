@@ -435,4 +435,39 @@ describe('getGroupAttendance — standard-branch section assembly', () => {
     // behind us is the one a teacher is most likely still filling in.
     expect(result.defaultSelectedDate).toBe(toKey(dayOffset(-7)))
   })
+
+  // The reported bug: through the probni tjedan the tab opened module 1's first
+  // session, because the default came from the module arc and the trial is not
+  // part of it. Its own year keeps the TrialWeek row away from every other test.
+  it('opens the probni sat during the probni tjedan, not module 1', async () => {
+    const year = '2033/2034'
+    const teacher = await createTeacher()
+    const course = await createCourse({ kind: 'STANDARD' })
+    const m1 = await createModule(course.id, { title: 'Modul 1', sortOrder: 0 })
+    // Trial two days ago; module 1 starts on the same weekday next week.
+    await createModuleSchedule(m1.id, {
+      schoolYear: year,
+      startDate: dayOffset(5),
+      endDate: dayOffset(47),
+    })
+    const group = await createGroup({
+      courseId: course.id,
+      schoolYear: year,
+      city: 'SPLIT',
+      dayOfWeek: WEEKDAYS[dayOffset(-2).getUTCDay()],
+    })
+    await createTeacherAssignment(teacher.id, group.id)
+    await db.trialWeek.upsert({
+      where: { schoolYear_city: { schoolYear: year, city: 'SPLIT' } },
+      create: { schoolYear: year, city: 'SPLIT', startDate: dayOffset(-3), endDate: dayOffset(2) },
+      update: { startDate: dayOffset(-3), endDate: dayOffset(2) },
+    })
+
+    mockSession({ id: teacher.id, role: 'TEACHER' })
+    const result = await getGroupAttendance(group.id)
+    if (result.kind !== 'standard') throw new Error('expected the standard branch')
+
+    expect(result.sections[0].moduleTitle).toBe('Probni sat')
+    expect(result.defaultSelectedDate).toBe(toKey(dayOffset(-2)))
+  })
 })

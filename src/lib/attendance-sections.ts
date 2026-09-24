@@ -24,3 +24,29 @@ export function assignAdhocDateToSection(
   }
   return null
 }
+
+/**
+ * The session the Dolazak tab opens on: it follows the calendar. Today's
+ * session if there is one, else the most recent one already held (a teacher
+ * usually marks after class), else the next one coming up.
+ *
+ * `dates` must hold every session the tab lists — the probni sat included.
+ * Deriving this from the module arc alone opened module 1 all through the
+ * probni tjedan, because the trial is not part of the arc.
+ */
+export function pickDefaultSessionDate(
+  dates: ReadonlyArray<string>,
+  today: string,
+): string {
+  let latestPast: string | null = null
+  let earliestUpcoming: string | null = null
+  for (const d of dates) {
+    if (d === today) return today
+    if (d < today) {
+      if (latestPast === null || d > latestPast) latestPast = d
+    } else if (earliestUpcoming === null || d < earliestUpcoming) {
+      earliestUpcoming = d
+    }
+  }
+  return latestPast ?? earliestUpcoming ?? today
+}

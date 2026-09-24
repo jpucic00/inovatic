@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { assignAdhocDateToSection } from '@/lib/attendance-sections'
+import {
+  assignAdhocDateToSection,
+  pickDefaultSessionDate,
+} from '@/lib/attendance-sections'
 
 const SECTIONS = [
   { firstSession: '2026-09-08', lastSession: '2026-10-20' }, // M1
@@ -62,5 +65,32 @@ describe('assignAdhocDateToSection', () => {
       { firstSession: '2026-10-15', lastSession: '2026-11-30' },
     ]
     expect(assignAdhocDateToSection('2026-10-20', overlapping)).toBe(0)
+  })
+})
+
+describe('pickDefaultSessionDate', () => {
+  // Probni sat on Wed 23.9., module 1 from Wed 30.9.
+  const DATES = ['2026-09-30', '2026-10-07', '2026-09-23', '2026-10-14']
+
+  it('opens the probni sat during the probni tjedan, not module 1', () => {
+    expect(pickDefaultSessionDate(DATES, '2026-09-21')).toBe('2026-09-23')
+    expect(pickDefaultSessionDate(DATES, '2026-09-24')).toBe('2026-09-23')
+  })
+
+  it("opens today's session on a session day", () => {
+    expect(pickDefaultSessionDate(DATES, '2026-10-07')).toBe('2026-10-07')
+  })
+
+  it('opens the most recent held session between sessions', () => {
+    expect(pickDefaultSessionDate(DATES, '2026-10-09')).toBe('2026-10-07')
+    expect(pickDefaultSessionDate(DATES, '2026-12-01')).toBe('2026-10-14')
+  })
+
+  it('opens the first upcoming session before anything was held', () => {
+    expect(pickDefaultSessionDate(DATES, '2026-09-01')).toBe('2026-09-23')
+  })
+
+  it('falls back to today when the group has no sessions', () => {
+    expect(pickDefaultSessionDate([], '2026-09-24')).toBe('2026-09-24')
   })
 })
