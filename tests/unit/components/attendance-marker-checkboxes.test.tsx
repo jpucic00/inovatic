@@ -205,3 +205,23 @@ describe('AttendanceMarker — saving nothing', () => {
     await waitFor(() => expect(bulkMarkSession).toHaveBeenCalledTimes(1))
   })
 })
+
+describe('AttendanceMarker — date list chip', () => {
+  const chip = (title: string) => screen.getByTitle(title)
+
+  // It used to read "2/2" here — two rows recorded — while only Ana came.
+  it('counts the children present on a saved date, not the rows recorded', () => {
+    render(<AttendanceMarker {...props([record(ANA.enrollmentId, true), record(LUKA.enrollmentId, false)])} />)
+    expect(chip('Prisutno 1 od 2').textContent).toBe('1/2')
+  })
+
+  it('flags a child without a row rather than counting them absent', () => {
+    render(<AttendanceMarker {...props([record(ANA.enrollmentId, true)])} />)
+    expect(chip('Prisutno 1 od 2 · 1 bez zapisa').textContent).toBe('1/2, 1 bez zapisa')
+  })
+
+  it('shows an em dash for a date nothing was saved for', () => {
+    render(<AttendanceMarker {...props()} />)
+    expect(screen.getAllByTitle('Nije evidentirano')).toHaveLength(SESSIONS.length)
+  })
+})

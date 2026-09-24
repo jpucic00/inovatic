@@ -4,6 +4,7 @@ import {
   initAttendanceDraft,
   initTeacherDraft,
   isSessionDirty,
+  sessionChip,
   sessionStatus,
   summarizeSession,
   type DraftRecord,
@@ -254,5 +255,44 @@ describe('sessionStatus', () => {
     })
     expect(s.tone).toBe('dirty')
     expect(s.text).toBe('Nespremljene izmjene — 2 od 2 označeno')
+  })
+})
+
+describe('sessionChip', () => {
+  const at = '2026-05-12T16:42:00.000Z'
+
+  it('is an em dash when nothing is recorded, never 0/N', () => {
+    expect(sessionChip({ recorded: 0, present: 0, savedAt: null }, 12)).toMatchObject({
+      tone: 'none',
+      text: '—',
+      title: 'Nije evidentirano',
+    })
+  })
+
+  // The reported bug: a saved session where 3 of 12 came read "12/12".
+  it('counts present children, not recorded rows', () => {
+    expect(sessionChip({ recorded: 12, present: 3, savedAt: at }, 12)).toEqual({
+      tone: 'complete',
+      text: '3/12',
+      title: 'Prisutno 3 od 12',
+      missing: 0,
+    })
+  })
+
+  it('shows 0/N for a saved session nobody attended', () => {
+    expect(sessionChip({ recorded: 8, present: 0, savedAt: at }, 8)).toMatchObject({
+      tone: 'complete',
+      text: '0/8',
+    })
+  })
+
+  // A child enrolled after the save has no row: flagged, not counted absent.
+  it('flags roster members without a row instead of counting them absent', () => {
+    expect(sessionChip({ recorded: 11, present: 11, savedAt: at }, 12)).toEqual({
+      tone: 'partial',
+      text: '11/12',
+      title: 'Prisutno 11 od 12 · 1 bez zapisa',
+      missing: 1,
+    })
   })
 })

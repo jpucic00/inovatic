@@ -201,3 +201,36 @@ export function sessionStatus(args: {
   }
   return { tone: 'idle', text: 'Nije evidentirano — označite prisutne polaznike' }
 }
+
+export type SessionChipTone = 'none' | 'partial' | 'complete'
+
+export interface SessionChip {
+  tone: SessionChipTone
+  text: string
+  title: string
+  /** Roster members with no row for the session — flagged, never counted absent. */
+  missing: number
+}
+
+/**
+ * The chip beside each date in the session list. It states ATTENDANCE —
+ * present out of the roster — because that is how every teacher read it; the
+ * old `recorded/total` made a saved 3-of-12 session read `12/12` and a
+ * complete one with a late enrollee read "one absent". Completeness is the
+ * tone instead: a roster member without a row (enrolled after the save) turns
+ * the chip amber and is named in the title, never folded into the absentees.
+ * Nothing recorded stays an em dash — `0/12` now genuinely means nobody came.
+ */
+export function sessionChip(summary: SessionSummary, total: number): SessionChip {
+  if (summary.recorded === 0) {
+    return { tone: 'none', text: '—', title: 'Nije evidentirano', missing: total }
+  }
+  const missing = Math.max(0, total - summary.recorded)
+  const base = `Prisutno ${summary.present} od ${total}`
+  return {
+    tone: missing > 0 ? 'partial' : 'complete',
+    text: `${summary.present}/${total}`,
+    title: missing > 0 ? `${base} · ${missing} bez zapisa` : base,
+    missing,
+  }
+}

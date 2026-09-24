@@ -25,9 +25,12 @@ import {
   initAttendanceDraft,
   initTeacherDraft,
   isSessionDirty,
+  sessionChip,
   sessionStatus,
   summarizeSession,
   type AttendanceDraft,
+  type SessionChip,
+  type SessionChipTone,
   type SessionStatus,
   type TeacherDraft,
 } from '@/lib/attendance-draft'
@@ -80,16 +83,11 @@ function sessionLabel(key: string): string {
   return formatDate(fromDateKey(key))
 }
 
-/** How many of the roster already have a row for the date — not how many came. */
-function recordedCount(
+function chipFor(
   roster: AttendanceRosterRow[],
   byEnrollment: Map<string, AttendanceRecord> | undefined,
-): number {
-  if (!byEnrollment) return 0
-  return roster.reduce(
-    (n, r) => (byEnrollment.has(r.enrollmentId) ? n + 1 : n),
-    0,
-  )
+): SessionChip {
+  return sessionChip(summarizeSession(roster, byEnrollment), roster.length)
 }
 
 function makeDraftHandlers(setDraft: Dispatch<SetStateAction<AttendanceDraft>>): {
@@ -786,11 +784,16 @@ function SessionPanel({
 
 // ─── Date list ──────────────────────────────────────────────────────────────
 
+const CHIP_TONE_CLASS: Record<SessionChipTone, string> = {
+  none: 'bg-gray-100 text-gray-500',
+  partial: 'bg-amber-100 text-amber-800',
+  complete: 'bg-emerald-100 text-emerald-700',
+}
+
 interface DateButtonProps {
   dateKey: string
   isActive: boolean
-  recorded: number
-  total: number
+  chip: SessionChip
   onPick: (key: string) => void
   /**
    * Present only on a hand-added date with no saved rows yet — the × that
@@ -803,15 +806,11 @@ interface DateButtonProps {
 function DateButton({
   dateKey,
   isActive,
-  recorded,
-  total,
+  chip,
   onPick,
   onRemove,
 }: Readonly<DateButtonProps>) {
   const isFuture = dateKey > toDateKey(todayUtc())
-  let chipClass = 'bg-gray-100 text-gray-500'
-  if (total > 0 && recorded === total) chipClass = 'bg-emerald-100 text-emerald-700'
-  else if (recorded > 0) chipClass = 'bg-amber-100 text-amber-700'
   // A sibling, never a child: a remove button nested inside the pick button
   // would be interactive-inside-interactive — the same invalid-HTML trap the
   // roster checkboxes design around.
@@ -833,16 +832,22 @@ function DateButton({
           <span className="block text-[11px] text-gray-400">nadolazeći</span>
         ) : null}
       </span>
-      {/* "0/8" read as "nobody came" rather than "not recorded" — the em dash
-          is the only value here that cannot be misread as attendance. */}
+      {/* Present out of the roster; the tone says whether every child has a
+          row. An unsaved date is an em dash, never "0/N". */}
       <span
         className={cn(
-          'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium',
-          chipClass,
+          'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+          CHIP_TONE_CLASS[chip.tone],
         )}
-        title={recorded === 0 ? 'Nije evidentirano' : 'Evidentirano zapisa'}
+        title={chip.title}
       >
-        {recorded === 0 ? '—' : `${recorded}/${total}`}
+        {chip.text}
+        {chip.tone === 'partial' ? (
+          <>
+            <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
+            <span className="sr-only">, {chip.missing} bez zapisa</span>
+          </>
+        ) : null}
       </span>
     </button>
   )
@@ -1101,17 +1106,16 @@ function FlatAttendanceMarker({
         ) : (
           <ul className="max-h-[28rem] space-y-1 overflow-y-auto pr-1">
             {allDates.map((key) => {
-              const recorded = recordedCount(roster, recordIndex.get(key))
+              const chip = chipFor(roster, recordIndex.get(key))
               return (
                 <li key={key}>
                   <DateButton
                     dateKey={key}
                     isActive={key === selected}
-                    recorded={recorded}
-                    total={roster.length}
+                    chip={chip}
                     onPick={setSelected}
                     onRemove={
-                      adhocDates.includes(key) && recorded === 0
+                      adhocDates.includes(key) && chip.tone === 'none'
                         ? () => handleRemoveAdhoc(key)
                         : undefined
                     }
@@ -1308,7 +1312,7 @@ function StandardAttendanceMarker({
                   ) : (
                     <ul className="space-y-1">
                       {datesForSection.map((key) => {
-                        const recorded = recordedCount(
+                        const chip = chipFor(
                           sectionRoster,
                           recordIndex.get(key),
                         )
@@ -1317,11 +1321,10 @@ function StandardAttendanceMarker({
                             <DateButton
                               dateKey={key}
                               isActive={key === selected}
-                              recorded={recorded}
-                              total={sectionRoster.length}
+                              chip={chip}
                               onPick={setSelected}
                               onRemove={
-                                adhocDates.includes(key) && recorded === 0
+                                adhocDates.includes(key) && chip.tone === 'none'
                                   ? () => handleRemoveAdhoc(key)
                                   : undefined
                               }
@@ -1347,17 +1350,16 @@ function StandardAttendanceMarker({
               <div className="border-t border-gray-100 p-2">
                 <ul className="space-y-1">
                   {otherDatesAll.map((key) => {
-                    const recorded = recordedCount(roster, recordIndex.get(key))
+                    const chip = chipFor(roster, recordIndex.get(key))
                     return (
                       <li key={key}>
                         <DateButton
                           dateKey={key}
                           isActive={key === selected}
-                          recorded={recorded}
-                          total={roster.length}
+                          chip={chip}
                           onPick={setSelected}
                           onRemove={
-                            adhocDates.includes(key) && recorded === 0
+                            adhocDates.includes(key) && chip.tone === 'none'
                               ? () => handleRemoveAdhoc(key)
                               : undefined
                           }
