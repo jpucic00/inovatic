@@ -6,6 +6,7 @@ import type { ReleaseNote } from '@/lib/releases'
 import type { CredentialsCard } from '@/lib/credentials-email-recipients'
 import type { ScheduleCard } from '@/lib/schedule-email-recipients'
 import type { EmailRichBlock } from '@/lib/email-rich-text'
+import type { AttachmentSummary, EmailAttachmentFile } from '@/lib/email-attachment-rules'
 import type { GroupTermin } from '@/lib/group-termin'
 import { ASSOCIATION_EMAIL, cityInboxEmail, sendTransactionalEmail } from './client'
 import type { InquiryNextStep } from '@/lib/inquiry-next-step'
@@ -392,9 +393,21 @@ type BulkMessageParams = {
    * it is passed per call; unlike them it holds every child of the inbox.
    */
   schedules?: ScheduleCard[]
+  /**
+   * The campaign's files — the same for every recipient, since attachments are
+   * campaign-level only. Attached to the mail and listed under "Prilozi" in its
+   * body, so a parent whose client hides attachments still knows to look.
+   */
+  attachments?: EmailAttachmentFile[]
 }
 
-function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>) {
+/** What rendering needs: the attachment NAMES, never the bytes — which is what
+ * lets the preview and the history page show the list without loading files. */
+type BulkMessageContent = Omit<BulkMessageParams, 'to' | 'city' | 'attachments'> & {
+  attachments?: AttachmentSummary[]
+}
+
+function buildBulkMessageElement(params: BulkMessageContent) {
   return createElement(BulkMessageEmail, {
     subject: params.subject,
     bodyText: params.bodyText,
@@ -403,6 +416,7 @@ function buildBulkMessageElement(params: Omit<BulkMessageParams, 'to' | 'city'>)
     cards: params.cards,
     credentials: params.credentials,
     schedules: params.schedules,
+    attachments: params.attachments?.map((a) => ({ filename: a.filename, bytes: a.bytes })),
     signupUrl: params.signupPath ? `${publicBaseUrl()}${params.signupPath}` : undefined,
   })
 }
@@ -419,6 +433,7 @@ export function sendBulkMessageEmail(params: BulkMessageParams): Promise<boolean
     city,
     subject: params.subject,
     react: buildBulkMessageElement(rest),
+    attachments: params.attachments,
   })
 }
 
@@ -426,7 +441,7 @@ export function sendBulkMessageEmail(params: BulkMessageParams): Promise<boolean
  * The composer's preview iframe renders through the same element builder as
  * the send path, so what the admin previews is exactly what parents receive.
  */
-export function renderBulkMessageHtml(params: Omit<BulkMessageParams, 'to' | 'city'>): Promise<string> {
+export function renderBulkMessageHtml(params: BulkMessageContent): Promise<string> {
   return render(buildBulkMessageElement(params))
 }
 

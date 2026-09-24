@@ -33,6 +33,7 @@ import {
   type SendEmailCampaignResult,
 } from '@/actions/admin/email-campaign'
 import { EmailPreviewDialog } from './email-preview-dialog'
+import { EmailAttachmentPicker, type DraftAttachment } from './email-attachment-picker'
 
 /**
  * Client-only and lazily loaded — BlockNote is a large bundle and touches
@@ -206,6 +207,10 @@ export function EmailWizard({
    * a parent reads rather than on the JSON encoding it.
    */
   const bodyText = useMemo(() => flattenRichText(bodyBlocks), [bodyBlocks])
+  /** Kept across a change of kind — every kind can carry the same files. */
+  const [attachments, setAttachments] = useState<DraftAttachment[]>([])
+  const [uploadingAttachments, setUploadingAttachments] = useState(false)
+  const attachmentIds = useMemo(() => attachments.map((a) => a.id), [attachments])
   const [targetCourseId, setTargetCourseId] = useState('')
   const [targetGroups, setTargetGroups] = useState<TargetGroup[]>([])
   const [targetGroupIds, setTargetGroupIds] = useState<string[]>([])
@@ -565,6 +570,7 @@ export function EmailWizard({
       subject,
       bodyText,
       bodyBlocks,
+      attachmentIds,
       sourceSchoolYear: sourceYear,
       sourceGroupIds,
       assessmentId: rowKey,
@@ -587,6 +593,7 @@ export function EmailWizard({
   // this replaced hard-stopped typing at the limit, and without the gate the
   // wizard would let an over-long message through to a server rejection.
   const contentValid =
+    !uploadingAttachments &&
     subject.trim().length >= 3 &&
     bodyText.trim().length >= 10 &&
     bodyText.length <= EMAIL_BODY_MAX_LENGTH &&
@@ -606,24 +613,23 @@ export function EmailWizard({
     setPreviewHtml(null)
     setPreviewOpen(true)
     setRowPreviewKey(null)
+    const content = { subject, bodyText, bodyBlocks, attachmentIds }
     let input
     if (kind === 'REENROLLMENT') {
       input = {
         kind: 'REENROLLMENT' as const,
-        subject,
-        bodyText,
-        bodyBlocks,
+        ...content,
         targetCourseId,
         targetGroupIds,
       }
     } else if (kind === 'EVALUATION') {
-      input = { kind: 'EVALUATION' as const, subject, bodyText, bodyBlocks }
+      input = { kind: 'EVALUATION' as const, ...content }
     } else if (kind === 'CREDENTIALS') {
-      input = { kind: 'CREDENTIALS' as const, subject, bodyText, bodyBlocks }
+      input = { kind: 'CREDENTIALS' as const, ...content }
     } else if (kind === 'SCHEDULE') {
-      input = { kind: 'SCHEDULE' as const, subject, bodyText, bodyBlocks }
+      input = { kind: 'SCHEDULE' as const, ...content }
     } else {
-      input = { kind: 'CUSTOM' as const, subject, bodyText, bodyBlocks }
+      input = { kind: 'CUSTOM' as const, ...content }
     }
     previewEmailHtml(input)
       .then((res) => {
@@ -655,6 +661,7 @@ export function EmailWizard({
         subject,
         bodyText,
         bodyBlocks,
+        attachmentIds,
       }
       let input
       if (kind === 'REENROLLMENT') {
@@ -871,8 +878,18 @@ export function EmailWizard({
                 </span>
               </p>
             </fieldset>
+            <EmailAttachmentPicker
+              attachments={attachments}
+              onChange={setAttachments}
+              onUploadingChange={setUploadingAttachments}
+            />
             <div className="flex items-center justify-between pt-1">
-              <button type="button" onClick={handlePreview} className={SECONDARY_BUTTON}>
+              <button
+                type="button"
+                onClick={handlePreview}
+                disabled={uploadingAttachments}
+                className={SECONDARY_BUTTON}
+              >
                 <span className="inline-flex items-center gap-2">
                   <Eye className="w-4 h-4" />
                   Pregled e-maila
@@ -1351,6 +1368,15 @@ export function EmailWizard({
                   </details>
                 )}
               </>
+            )}
+
+            {attachments.length > 0 && (
+              <p className="mt-4 text-xs text-gray-600">
+                <span className="font-medium text-gray-700">
+                  Privici ({attachments.length}):
+                </span>{' '}
+                {attachments.map((a) => a.filename).join(', ')} — idu svakom primatelju.
+              </p>
             )}
 
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">

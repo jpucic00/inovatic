@@ -9,6 +9,7 @@ import type { EmailRichBlock } from '../src/lib/email-rich-text'
 import type { EvaluationCard } from '../src/lib/evaluation-email-cards'
 import type { CredentialsCard } from '../src/lib/credentials-email-recipients'
 import type { ScheduleCard } from '../src/lib/schedule-email-recipients'
+import type { AttachmentSummary } from '../src/lib/email-attachment-rules'
 
 interface BulkMessageProps {
   /** Admin-authored plain text; newline-separated paragraphs. Sent exactly as
@@ -50,6 +51,13 @@ interface BulkMessageProps {
    * several: siblings on one address are mailed together, by design.
    */
   schedules?: ScheduleCard[]
+  /**
+   * The campaign's attached files, listed under "Prilozi". Names and sizes only
+   * — the files themselves ride on the message, not in the markup. Some clients
+   * tuck attachments away below a long mail, and a contract the parent never
+   * noticed is a contract that never comes back signed.
+   */
+  attachments?: AttachmentSummary[]
   /** Admin-authored subject — reused as the inbox preview line. */
   subject: string
 }
@@ -68,6 +76,7 @@ function BulkMessageEmail({
   cards,
   credentials,
   schedules,
+  attachments,
   subject,
 }: BulkMessageProps) {
   const paragraphs = bodyText
@@ -140,6 +149,18 @@ function BulkMessageEmail({
           ))}
         </>
       )}
+      {attachments && attachments.length > 0 && (
+        <Section style={attachmentBox}>
+          <Text style={attachmentHeading}>
+            <strong>{`Prilozi (${attachments.length})`}</strong>
+          </Text>
+          {attachments.map((file, i) => (
+            <Text key={i} style={attachmentLine}>
+              {`📎 ${file.filename} · ${formatAttachmentSize(file.bytes)}`}
+            </Text>
+          ))}
+        </Section>
+      )}
       {signupUrl && (
         <Section style={{ textAlign: 'center', margin: '24px 0' }}>
           <Link href={signupUrl} style={button}>
@@ -152,6 +173,33 @@ function BulkMessageEmail({
           already lists both cities' contacts. */}
     </EmailLayout>
   )
+}
+
+function formatAttachmentSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`
+}
+
+const attachmentBox = {
+  backgroundColor: '#f9fafb',
+  border: '1px solid #e5e7eb',
+  borderRadius: '8px',
+  padding: '12px 16px',
+  margin: '16px 0 8px',
+}
+
+const attachmentHeading = {
+  color: '#374151',
+  fontSize: '14px',
+  lineHeight: '1.5',
+  margin: '0 0 4px',
+}
+
+const attachmentLine = {
+  color: '#374151',
+  fontSize: '14px',
+  lineHeight: '1.5',
+  margin: '0',
 }
 
 const optionBox = {
@@ -252,6 +300,10 @@ BulkMessageEmail.PreviewProps = {
     },
   ],
   signupUrl: 'https://udruga-inovatic.hr/prijava',
+  attachments: [
+    { filename: 'Ugovor o pohađanju 2026-2027.pdf', bytes: 184_320 },
+    { filename: 'Cjenik.docx', bytes: 1_572_864 },
+  ],
   schedules: [
     {
       childName: 'Ana Anić',

@@ -31,8 +31,13 @@ describe('mimeMatchesBytes — accepts correct magic bytes', () => {
     ['application/pdf', PDF_MAGIC],
     ['application/msword', OLE2_MAGIC],
     ['application/vnd.ms-powerpoint', OLE2_MAGIC],
+    ['application/vnd.ms-excel', OLE2_MAGIC],
     [
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ZIP_MAGIC,
+    ],
+    [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       ZIP_MAGIC,
     ],
     [
@@ -116,5 +121,14 @@ describe('mimeMatchesBytes — edge cases', () => {
     exactly12[1] = 0xd8
     exactly12[2] = 0xff
     expect(mimeMatchesBytes('image/jpeg', exactly12)).toBe(true)
+  })
+})
+
+describe('mimeMatchesBytes — Excel (e-mail attachments)', () => {
+  it('rejects a PDF declared as a spreadsheet', () => {
+    expect(mimeMatchesBytes('application/vnd.ms-excel', PDF_MAGIC)).toBe(false)
+    expect(
+      mimeMatchesBytes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', PDF_MAGIC),
+    ).toBe(false)
   })
 })

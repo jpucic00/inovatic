@@ -70,6 +70,9 @@ export async function sendTransactionalEmail(params: {
   /** Overrides the city inbox — used by inbound notifications so staff
    * reply straight to the person who submitted the form. */
   replyTo?: string
+  /** Files to attach — /admin/email campaigns only. Omitted from the payload
+   * entirely when empty, so every other mail's request is unchanged. */
+  attachments?: readonly { filename: string; contentType: string; content: Buffer }[]
 }): Promise<boolean> {
   if (!process.env.RESEND_API_KEY) return false
   const inbox = cityInboxEmail(params.city)
@@ -79,6 +82,18 @@ export async function sendTransactionalEmail(params: {
     to: params.to,
     subject: params.subject,
     react: params.react,
+    // Base64, not the Buffer itself: the SDK JSON-serialises the payload, and a
+    // Buffer would go over the wire as an array of numbers, several times the
+    // size of the file.
+    ...(params.attachments?.length
+      ? {
+          attachments: params.attachments.map((a) => ({
+            filename: a.filename,
+            contentType: a.contentType,
+            content: a.content.toString('base64'),
+          })),
+        }
+      : {}),
   })
   if (result?.error) {
     throw new Error(`Resend: ${result.error.name} — ${result.error.message}`)

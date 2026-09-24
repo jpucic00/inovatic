@@ -35,6 +35,12 @@ vi.mock('@/actions/admin/email-campaign', () => ({
   sendEmailCampaign: sendEmailCampaignMock,
 }))
 vi.mock('@/actions/admin/inquiry', () => ({ getGroupsForCourse: vi.fn() }))
+const { deleteDraftEmailAttachmentMock } = vi.hoisted(() => ({
+  deleteDraftEmailAttachmentMock: vi.fn(async () => ({ success: true })),
+}))
+vi.mock('@/actions/admin/email-attachment', () => ({
+  deleteDraftEmailAttachment: deleteDraftEmailAttachmentMock,
+}))
 /**
  * The body editor is BlockNote behind a `next/dynamic` boundary — a
  * contenteditable surface that jsdom cannot drive and that this suite is not
@@ -266,5 +272,109 @@ describe('EmailWizard — client payload contracts', () => {
     expect(input.excludedAssessmentIds).toEqual(['assess-ana'])
     // The sibling's mail must survive: no address-level exclusion may exist.
     expect(input.excludedParentEmails).toBeUndefined()
+  })
+})
+
+describe('EmailWizard — attachments travel as draft ids', () => {
+  const TEXT = 'Dovoljno dugačak tekst poruke za formu.'
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  function pickFiles(files: File[]) {
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files } })
+  }
+
+  function uploadResponds(id: string, filename: string) {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id, filename, bytes: 2048, mimeType: 'application/pdf' }),
+    })
+  }
+
+  async function writeMessage() {
+    fireEvent.change(screen.getByLabelText(/Predmet/), { target: { value: 'Testni predmet' } })
+    fireEvent.change(await screen.findByRole('textbox', { name: /Tekst poruke/ }), {
+      target: { value: TEXT },
+    })
+  }
+
+  it('uploads a picked file and sends its id with the campaign', async () => {
+    previewEmailRecipientsMock.mockResolvedValue({
+      success: true,
+      recipients: [recipient('mama@test.hr', 'mama@test.hr', 'Ana Anić')],
+      skipped: [],
+      alreadySent: [],
+    })
+    uploadResponds('att-1', 'Ugovor.pdf')
+    render(<EmailWizard {...BASE_PROPS} />)
+    await writeMessage()
+
+    pickFiles([new File(['%PDF-1.4'], 'Ugovor.pdf', { type: 'application/pdf' })])
+    await screen.findByText('Ugovor.pdf')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/upload/email-attachment',
+      expect.objectContaining({ method: 'POST' }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Dalje: primatelji/ }))
+    await screen.findByText('Odaberi sve grupe')
+    fireEvent.click(screen.getByRole('checkbox', { name: /Odaberi sve grupe/ }))
+    await screen.findByText(/Ana Anić/)
+    // Named again before the send, so nobody mails a contract by surprise.
+    expect(screen.getByText(/idu svakom primatelju/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Pošalji \(1\)/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Potvrdi slanje \(1\)/ }))
+
+    await waitFor(() => expect(sendEmailCampaignMock).toHaveBeenCalledTimes(1))
+    expect(sendEmailCampaignMock.mock.calls[0][0]).toMatchObject({ attachmentIds: ['att-1'] })
+  })
+
+  it('previews with the uploaded ids, so the mail shows its Prilozi list', async () => {
+    uploadResponds('att-3', 'Ugovor.pdf')
+    render(<EmailWizard {...BASE_PROPS} />)
+    await writeMessage()
+    pickFiles([new File(['%PDF-1.4'], 'Ugovor.pdf', { type: 'application/pdf' })])
+    await screen.findByText('Ugovor.pdf')
+
+    fireEvent.click(screen.getByRole('button', { name: /Pregled e-maila/ }))
+    await waitFor(() =>
+      expect(previewEmailHtmlMock).toHaveBeenCalledWith(
+        expect.objectContaining({ attachmentIds: ['att-3'] }),
+      ),
+    )
+  })
+
+  it('removing a file deletes the draft and drops it from the preview', async () => {
+    uploadResponds('att-2', 'Cjenik.pdf')
+    render(<EmailWizard {...BASE_PROPS} />)
+    await writeMessage()
+    pickFiles([new File(['%PDF-1.4'], 'Cjenik.pdf', { type: 'application/pdf' })])
+    await screen.findByText('Cjenik.pdf')
+
+    fireEvent.click(screen.getByRole('button', { name: /Ukloni privitak Cjenik.pdf/ }))
+    expect(deleteDraftEmailAttachmentMock).toHaveBeenCalledWith('att-2')
+    expect(screen.queryByText('Cjenik.pdf')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /Pregled e-maila/ }))
+    await waitFor(() =>
+      expect(previewEmailHtmlMock).toHaveBeenCalledWith(
+        expect.objectContaining({ attachmentIds: [] }),
+      ),
+    )
+  })
+
+  it('refuses an oversized file before uploading it', async () => {
+    render(<EmailWizard {...BASE_PROPS} />)
+    await writeMessage()
+    const big = new File(['x'], 'veliki.pdf', { type: 'application/pdf' })
+    Object.defineProperty(big, 'size', { value: 11 * 1024 * 1024 })
+    pickFiles([big])
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.queryByText('veliki.pdf')).toBeNull()
   })
 })

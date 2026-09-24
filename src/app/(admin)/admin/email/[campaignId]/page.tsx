@@ -44,6 +44,7 @@ export default async function CampaignDetailPage({
         kind={campaign.kind}
         subject={campaign.subject}
         bodyText={campaign.bodyText}
+        attachments={campaign.attachments}
       />
 
       <CampaignRecipients campaign={campaign} />

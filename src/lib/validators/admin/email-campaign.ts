@@ -5,6 +5,7 @@ import {
   EMAIL_BODY_MIN_LENGTH,
   resolveEmailBody,
 } from '@/lib/email-rich-text'
+import { MAX_ATTACHMENTS } from '@/lib/email-attachment-rules'
 
 const schoolYearField = z
   .string()
@@ -147,6 +148,17 @@ function validateBody(
   }
 }
 
+/**
+ * Draft attachments from the composer — ids only; the bytes went up through
+ * `/api/upload/email-attachment`, since a server action's request body is
+ * capped at 1 MB. The server re-checks city, draft state and the size limits
+ * (`loadDraftAttachments`), so this only bounds the payload.
+ */
+const attachmentIdsField = z
+  .array(z.string().min(1).max(50))
+  .max(MAX_ATTACHMENTS, `Najviše ${MAX_ATTACHMENTS} privitaka po poruci.`)
+  .optional()
+
 // Unchecked rows from the recipient curation list. The server re-resolves the
 // cohort from the filters and only SUBTRACTS these — a tampered client can
 // shrink the audience, never grow it.
@@ -171,6 +183,7 @@ const customContent = {
   subject: subjectField,
   bodyText: bodyTextField,
   bodyBlocks: bodyBlocksField,
+  attachmentIds: attachmentIdsField,
 }
 
 /**
@@ -184,6 +197,7 @@ const evaluationContent = {
   subject: subjectField,
   bodyText: bodyTextField,
   bodyBlocks: bodyBlocksField,
+  attachmentIds: attachmentIdsField,
 }
 
 /**
@@ -207,6 +221,7 @@ const credentialsContent = {
   subject: subjectField,
   bodyText: bodyTextField,
   bodyBlocks: bodyBlocksField,
+  attachmentIds: attachmentIdsField,
 }
 
 /**
@@ -219,6 +234,7 @@ const scheduleContent = {
   subject: subjectField,
   bodyText: bodyTextField,
   bodyBlocks: bodyBlocksField,
+  attachmentIds: attachmentIdsField,
 }
 
 const reenrollmentContent = {
@@ -226,6 +242,7 @@ const reenrollmentContent = {
   subject: subjectField,
   bodyText: bodyTextField,
   bodyBlocks: bodyBlocksField,
+  attachmentIds: attachmentIdsField,
   targetCourseId: z.string().min(1, 'Odaberite program.'),
   targetGroupIds: z
     .array(z.string().min(1))

@@ -64,6 +64,14 @@ import {
   type SendEmailCampaignInput,
 } from '@/lib/validators/admin/email-campaign'
 import type { GroupOption } from '../../../emails/schedule-options'
+import type { EmailAttachmentFile } from '@/lib/email-attachment-rules'
+import {
+  AttachmentLinkError,
+  linkDraftAttachments,
+  loadCampaignAttachmentFiles,
+  loadCampaignAttachmentSummaries,
+  loadDraftAttachments,
+} from '@/lib/email-attachments'
 
 const INVALID_DATA = 'Nevaljani podaci.'
 const SCHOOL_YEAR_RE = /^\d{4}\/\d{4}$/
@@ -895,11 +903,15 @@ export async function previewEvaluationEmailForRecipient(
     const body = resolveEmailBody(parsed.data)
     if (!body.ok) return { success: false, error: body.error }
 
+    const drafts = await loadDraftAttachments(parsed.data.attachmentIds ?? [], city)
+    if (!drafts.ok) return { success: false, error: drafts.error }
+
     const html = await renderBulkMessageHtml({
       subject: `${parsed.data.subject} – ${built.childName}`,
       bodyText: body.bodyText,
       bodyBlocks: body.bodyBlocks,
       cards: built.cards,
+      attachments: drafts.attachments,
     })
     return { success: true, html }
   } catch (err) {
@@ -1035,6 +1047,11 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
     const body = resolveEmailBody(parsed.data)
     if (!body.ok) return { success: false, error: body.error }
 
+    // Also the composer's early warning that a draft has expired: the preview
+    // refuses exactly what the send would.
+    const drafts = await loadDraftAttachments(parsed.data.attachmentIds ?? [], city)
+    if (!drafts.ok) return { success: false, error: drafts.error }
+
     const html = await renderBulkMessageHtml({
       subject: previewSubject,
       bodyText: body.bodyText,
@@ -1044,6 +1061,7 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
       cards,
       credentials,
       schedules,
+      attachments: drafts.attachments,
     })
     return { success: true, html }
   } catch (err) {
@@ -1219,6 +1237,12 @@ export async function sendEmailCampaign(
     const body = resolveEmailBody(data)
     if (!body.ok) return { success: false, error: body.error }
 
+    // Checked here for a clear refusal before any cohort work; the transaction
+    // re-checks by linking, which is the check that actually holds under a race.
+    const attachmentIds = data.attachmentIds ?? []
+    const drafts = await loadDraftAttachments(attachmentIds, city)
+    if (!drafts.ok) return { success: false, error: drafts.error }
+
     const targetYear = await getSelectedSchoolYear()
 
     const prep = await prepareReenrollment(city, targetYear, data)
@@ -1277,6 +1301,11 @@ export async function sendEmailCampaign(
           totalCount: toSend.length,
         },
       })
+
+      // Same transaction as the campaign row: a draft swept or claimed by
+      // another campaign since the check above throws here, and the campaign is
+      // never created — it cannot go out without the file the admin attached.
+      await linkDraftAttachments(tx, attachmentIds, city, created.id)
 
       // Persist the children nobody could be mailed for, so the detail view can
       // name them instead of showing an anonymous "skipped: 3".
@@ -1355,6 +1384,7 @@ export async function sendEmailCampaign(
       skipped: cohort.skipped,
     }
   } catch (err) {
+    if (err instanceof AttachmentLinkError) return { success: false, error: err.message }
     console.error('sendEmailCampaign failed:', err)
     return { success: false, error: 'Greška pri slanju e-maila.' }
   }
@@ -1369,10 +1399,22 @@ export async function sendEmailCampaign(
  * job outliving its test file writes into the next one's data.
  */
 async function startSendJob(
-  job: SendJob,
+  input: Omit<SendJob, 'attachments'>,
   { withAdminCopy = false }: { withAdminCopy?: boolean } = {},
 ): Promise<void> {
   const run = async () => {
+    // Loaded ONCE, before anyone is mailed — the admin copy included. If the
+    // files cannot be read, nobody is claimed: every row stays PENDING and
+    // "Nastavi slanje" retries the lot, instead of each parent failing in turn
+    // or, worse, receiving the mail without its contract.
+    let attachments: EmailAttachmentFile[]
+    try {
+      attachments = await loadCampaignAttachmentFiles(input.campaignId)
+    } catch (err) {
+      console.error(`startSendJob: attachments for ${input.campaignId} unreadable:`, err)
+      return
+    }
+    const job: SendJob = { ...input, attachments }
     if (withAdminCopy) await sendAdminCopies(job)
     await runSendJob(job)
   }
@@ -1418,6 +1460,9 @@ async function sendAdminCopies(job: SendJob): Promise<void> {
           city: job.city,
           options: job.options,
           signupPath: job.signupPath,
+          // Shared content like the message itself — the copy is what the
+          // office keeps of what parents received.
+          attachments: job.attachments,
         })
       } catch (err) {
         console.error(`sendAdminCopies: copy to ${admin.email} failed:`, err)
@@ -1467,6 +1512,12 @@ type SendJob = {
    * helps build is still constructed inside the loop.
    */
   sourceSchoolYear: string
+  /**
+   * The campaign's files. Safe here because attachments are campaign-level by
+   * owner decision: every recipient gets the same ones, so this is the
+   * campaign's own content like `bodyText`, not one family's.
+   */
+  attachments: EmailAttachmentFile[]
 }
 
 /** Everything `toEvaluationCard` and the ownership guard read off a card row. */
@@ -1809,6 +1860,7 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
       cards,
       credentials,
       schedules,
+      attachments: job.attachments,
     })
     // "This parent holds a password that currently works." Stamped only after a
     // non-throwing send, and cleared again by resetStudentPassword — so it never
@@ -2022,6 +2074,8 @@ export async function getCampaignDetail(campaignId: string) {
   })
   if (!campaign) notFound()
 
+  const attachments = await loadCampaignAttachmentSummaries(campaignId)
+
   const recipients = await db.emailCampaignRecipient.findMany({
     where: { campaignId },
     // Problems first — the whole point of this page is finding who was missed.
@@ -2039,6 +2093,7 @@ export async function getCampaignDetail(campaignId: string) {
   return {
     ...campaign,
     finished: campaign.finishedAt !== null,
+    attachments,
     recipients: recipients.map((r) => ({
       ...r,
       sentAt: r.sentAt.toISOString(),
@@ -2111,6 +2166,7 @@ export async function getCampaignEmailHtml(campaignId: string): Promise<PreviewE
       bodyBlocks: parseRichBlocks(campaign.bodyBlocks),
       options,
       signupPath,
+      attachments: await loadCampaignAttachmentSummaries(campaignId),
     })
     return { success: true, html }
   } catch (err) {
@@ -2143,6 +2199,7 @@ export async function getRecipientEmailHtml(recipientId: string): Promise<Previe
       studentIds: true,
       campaign: {
         select: {
+          id: true,
           kind: true,
           subject: true,
           bodyText: true,
@@ -2157,6 +2214,7 @@ export async function getRecipientEmailHtml(recipientId: string): Promise<Previe
   try {
     const { campaign } = recipient
     const bodyBlocks = parseRichBlocks(campaign.bodyBlocks)
+    const attachments = await loadCampaignAttachmentSummaries(campaign.id)
     if (campaign.kind === 'EVALUATION') {
       const built = await buildCardsForRecipient(recipient, city)
       if (!built.ok) return { success: false, error: built.reason }
@@ -2166,6 +2224,7 @@ export async function getRecipientEmailHtml(recipientId: string): Promise<Previe
         bodyText: campaign.bodyText,
         bodyBlocks,
         cards: built.cards,
+        attachments,
       })
       return { success: true, html }
     }
@@ -2177,6 +2236,7 @@ export async function getRecipientEmailHtml(recipientId: string): Promise<Previe
         bodyText: campaign.bodyText,
         bodyBlocks,
         schedules: built.schedules,
+        attachments,
       })
       return { success: true, html }
     }

@@ -981,7 +981,8 @@ model EmailCampaign {
   targetCourse Course? @relation("EmailCampaignTarget", fields: [targetCourseId], references: [id], onDelete: SetNull)
   sentBy       User    @relation("EmailCampaignSender", fields: [sentById], references: [id])
 
-  recipients EmailCampaignRecipient[]
+  recipients  EmailCampaignRecipient[]
+  attachments EmailAttachment[]
 
   @@index([city, createdAt])
   @@index([city, kind, targetCourseId, targetSchoolYear])
@@ -1032,6 +1033,51 @@ model EmailCampaignRecipient {
 
   @@unique([sentKey, parentEmail])
   @@index([campaignId])
+}
+
+/// A file attached to an /admin/email campaign. Campaign-level by owner
+/// decision (2026-09-24): every recipient of a campaign, and the admin copy,
+/// gets exactly the same files — there are no per-parent or per-child
+/// documents, so nothing here can carry one family's content to another.
+///
+/// Uploaded BEFORE the campaign exists (the composer attaches while the admin
+/// is still writing), so a row starts as a draft with `campaignId` null and is
+/// linked by `sendEmailCampaign` inside the transaction that creates the
+/// campaign. A draft is deleted by the composer's ×, or swept by the next
+/// upload once it is older than a day; a linked row is never swept and lives as
+/// long as its campaign, because "Nastavi slanje" has to attach the same files
+/// and the history has to show what went out.
+///
+/// The bytes live in {@link EmailAttachmentContent}, NOT here: Prisma selects
+/// every scalar unless told otherwise, so a `Bytes` column on this model would
+/// ride along on every `include: { attachments: true }`.
+model EmailAttachment {
+  id         String   @id @default(cuid())
+  /// The uploading admin's city — the only tenant a draft has before it is
+  /// linked, and what keeps one city from sending (or reading) the other's file.
+  city       City
+  campaignId String?
+  /// As uploaded, shown to the parent as the attachment name.
+  filename   String
+  mimeType   String
+  bytes      Int
+  createdAt  DateTime @default(now())
+
+  campaign EmailCampaign?          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  content  EmailAttachmentContent?
+
+  // Serves both the per-campaign load (campaignId = x, ordered by createdAt)
+  // and the draft sweep (campaignId IS NULL AND createdAt < cutoff).
+  @@index([campaignId, createdAt])
+}
+
+/// The file itself, 1:1 with {@link EmailAttachment}. Read by exactly two
+/// places — the send job and the admin download — and by nothing that lists.
+model EmailAttachmentContent {
+  attachmentId String @id
+  data         Bytes
+
+  attachment EmailAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
 }
 
 /// One row per app version whose release e-mail has ALREADY gone out to the

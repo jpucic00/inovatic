@@ -151,6 +151,39 @@ describe('email senders', () => {
     })
   })
 
+  // Base64, not the Buffer: the SDK JSON-serialises the payload, and a Buffer
+  // would go over the wire as an array of numbers.
+  it('attaches campaign files as base64 and lists them in the body', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    const content = Buffer.from('%PDF-1.4 ugovor')
+    await sendBulkMessageEmail({
+      to: 'roditelj@example.hr',
+      subject: 'Ugovor – Inovatic',
+      bodyText: 'U privitku je ugovor.',
+      city: 'SPLIT',
+      attachments: [
+        { filename: 'Ugovor.pdf', bytes: content.length, contentType: 'application/pdf', content },
+      ],
+    })
+    const payload = send.mock.calls[0][0]
+    expect(payload.attachments).toEqual([
+      { filename: 'Ugovor.pdf', contentType: 'application/pdf', content: content.toString('base64') },
+    ])
+    expect(payload.react.props.attachments).toEqual([{ filename: 'Ugovor.pdf', bytes: content.length }])
+  })
+
+  it('leaves the attachments key out entirely when there are none', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendBulkMessageEmail({
+      to: 'roditelj@example.hr',
+      subject: 'Obavijest – Inovatic',
+      bodyText: 'Kratka obavijest.',
+      city: 'SPLIT',
+      attachments: [],
+    })
+    expect(send.mock.calls[0][0]).not.toHaveProperty('attachments')
+  })
+
   it('bulk-message no-ops without a key like every other sender', async () => {
     vi.stubEnv('RESEND_API_KEY', '')
     const sent = await sendBulkMessageEmail({

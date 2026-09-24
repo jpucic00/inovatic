@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Eye } from 'lucide-react'
+import { Download, Eye } from 'lucide-react'
 import { getCampaignEmailHtml } from '@/actions/admin/email-campaign'
+import { formatBytes } from '@/lib/material-display'
 import { EmailPreviewDialog } from './email-preview-dialog'
 
 /**
@@ -17,7 +18,15 @@ export function CampaignContent({
   kind,
   subject,
   bodyText,
-}: Readonly<{ campaignId: string; kind: string; subject: string; bodyText: string }>) {
+  attachments,
+}: Readonly<{
+  campaignId: string
+  kind: string
+  subject: string
+  bodyText: string
+  /** The files every recipient received — the record of what went out. */
+  attachments: { id: string; filename: string; bytes: number }[]
+}>) {
   const [open, setOpen] = useState(false)
   const [html, setHtml] = useState<string | null>(null)
 
@@ -66,6 +75,29 @@ export function CampaignContent({
       <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700 border-t border-gray-100 pt-3">
         {bodyText}
       </p>
+
+      {attachments.length > 0 && (
+        <div className="mt-3 border-t border-gray-100 pt-3">
+          <h3 className="text-xs font-medium text-gray-700">
+            Privici ({attachments.length}) — poslani svakom primatelju
+          </h3>
+          <ul className="mt-1.5 space-y-1">
+            {attachments.map((a) => (
+              <li key={a.id}>
+                {/* A plain <a>, not <Link>: the route answers with a file. */}
+                <a
+                  href={`/api/admin/email-attachment/${a.id}`}
+                  className="inline-flex items-center gap-1.5 text-sm text-cyan-700 hover:underline"
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                  {a.filename}
+                  <span className="text-xs text-gray-500">· {formatBytes(a.bytes)}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {isEvaluation && (
         <p className="mt-3 text-xs text-gray-500">

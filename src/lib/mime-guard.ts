@@ -16,9 +16,11 @@ export function mimeMatchesBytes(declared: string, buf: Buffer): boolean {
       return buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46 // %PDF
     case 'application/msword':
     case 'application/vnd.ms-powerpoint':
+    case 'application/vnd.ms-excel':
       return buf[0] === 0xd0 && buf[1] === 0xcf && buf[2] === 0x11 && buf[3] === 0xe0 // OLE2
     case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
     case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+    case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
       return buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04 // ZIP (PK)
     case 'video/mp4':
     case 'video/quicktime': {
