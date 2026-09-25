@@ -11,7 +11,7 @@ import {
   computeSchoolYearPlan,
   MODULE_COUNT,
 } from '@/lib/school-year-planner'
-import { writeModuleWindows } from '@/lib/module-plan-sync'
+import { lockSchoolYearPlan, writeModuleWindows } from '@/lib/module-plan-sync'
 import {
   completeSchoolYearPlanSchema,
   type CompleteSchoolYearPlanInput,
@@ -40,8 +40,9 @@ import type { AdminActionResult } from '@/lib/action-types'
  *   - any standard course doesn't have exactly MODULE_COUNT modules → planner
  *     hardcodes 4 modules × 7 sessions = 28; refuse rather than silently skip
  *
- * All upserts ride a single $transaction so a partial failure can't leave
- * the year half-planned. From then on the windows are re-derived by
+ * The guards, the holiday read and the upserts ride a single $transaction
+ * under the (city, year) plan lock, so a partial failure can't leave the year
+ * half-planned and a concurrent holiday edit can't slip between read and write. From then on the windows are re-derived by
  * `rederiveModuleWindows` on every holiday change — nobody edits them by hand.
  */
 export async function completeSchoolYearPlan(
@@ -56,74 +57,79 @@ export async function completeSchoolYearPlan(
   const archived = archivedYearError(schoolYear)
   if (archived) return archived
 
-  // Re-derive holidays server-side. Never trust the client. Active weekdays
-  // are NOT a planner input — the calendar always plans for all 6 weekdays
-  // (Pon–Sub) regardless of which weekdays currently have ScheduledGroups.
-  const holidayDates = await loadHolidayDateKeys(schoolYear, city)
-
-  // Race-safe re-check: planner is only meant to seed an empty year — for the
-  // caller's city. Each city plans the shared curriculum independently, so
-  // Split having dates must not block Šibenik's first planner run.
-  const existingDated = await db.moduleSchedule.count({
-    where: {
-      schoolYear,
-      city,
-      module: { course: { kind: 'STANDARD' } },
-      OR: [{ startDate: { not: null } }, { endDate: { not: null } }],
-    },
-  })
-  if (existingDated > 0) {
-    return {
-      success: false,
-      error: 'Datumi modula već postoje — računaju se iz početka godine i praznika.',
-    }
-  }
-
-  // Apply to every standard program — admin's intent is "all standard programs
-  // share the same plan". ScheduledGroup existence is irrelevant: admin may
-  // plan before any groups are created.
-  const standardModules = await db.courseModule.findMany({
-    where: { course: { kind: 'STANDARD' } },
-    select: {
-      id: true,
-      sortOrder: true,
-      courseId: true,
-      course: { select: { title: true } },
-    },
-    orderBy: [{ courseId: 'asc' }, { sortOrder: 'asc' }],
-  })
-
-  // Sanity: every targeted standard course must have exactly MODULE_COUNT
-  // modules.
-  const byCourse = new Map<string, typeof standardModules>()
-  for (const m of standardModules) {
-    const arr = byCourse.get(m.courseId) ?? []
-    arr.push(m)
-    byCourse.set(m.courseId, arr)
-  }
-  for (const [, mods] of byCourse) {
-    if (mods.length !== MODULE_COUNT) {
-      return {
-        success: false,
-        error: `Standardni program "${mods[0]?.course.title ?? mods[0]?.courseId}" nema točno ${MODULE_COUNT} modula.`,
-      }
-    }
-  }
-  if (byCourse.size === 0) {
-    return {
-      success: false,
-      error: 'Nema standardnih programa s grupama ove godine.',
-    }
-  }
-
-  const plan = computeSchoolYearPlan({
-    startDate: fromDateKey(startDate),
-    activeWeekdays: ACTIVE_WEEKDAYS,
-    holidayDates,
-  })
-
+  let refusal: AdminActionResult | null
   try {
-    await db.$transaction(async (tx) => {
+    refusal = await db.$transaction(async (tx) => {
+      // Same lock a holiday edit takes, so a holiday added while this runs is
+      // either already visible below or waits and re-derives over our rows.
+      await lockSchoolYearPlan(tx, { city, schoolYear })
+
+      // Race-safe re-check: planner is only meant to seed an empty year — for the
+      // caller's city. Each city plans the shared curriculum independently, so
+      // Split having dates must not block Šibenik's first planner run.
+      const existingDated = await tx.moduleSchedule.count({
+        where: {
+          schoolYear,
+          city,
+          module: { course: { kind: 'STANDARD' } },
+          OR: [{ startDate: { not: null } }, { endDate: { not: null } }],
+        },
+      })
+      if (existingDated > 0) {
+        return {
+          success: false,
+          error: 'Datumi modula već postoje — računaju se iz početka godine i praznika.',
+        }
+      }
+
+      // Apply to every standard program — admin's intent is "all standard programs
+      // share the same plan". ScheduledGroup existence is irrelevant: admin may
+      // plan before any groups are created.
+      const standardModules = await tx.courseModule.findMany({
+        where: { course: { kind: 'STANDARD' } },
+        select: {
+          id: true,
+          sortOrder: true,
+          courseId: true,
+          course: { select: { title: true } },
+        },
+        orderBy: [{ courseId: 'asc' }, { sortOrder: 'asc' }],
+      })
+
+      // Sanity: every targeted standard course must have exactly MODULE_COUNT
+      // modules.
+      const byCourse = new Map<string, typeof standardModules>()
+      for (const m of standardModules) {
+        const arr = byCourse.get(m.courseId) ?? []
+        arr.push(m)
+        byCourse.set(m.courseId, arr)
+      }
+      for (const [, mods] of byCourse) {
+        if (mods.length !== MODULE_COUNT) {
+          return {
+            success: false,
+            error: `Standardni program "${mods[0]?.course.title ?? mods[0]?.courseId}" nema točno ${MODULE_COUNT} modula.`,
+          }
+        }
+      }
+      if (byCourse.size === 0) {
+        return {
+          success: false,
+          error: 'Nema standardnih programa s grupama ove godine.',
+        }
+      }
+
+      // Re-derive holidays server-side, under the lock. Never trust the client.
+      // Active weekdays are NOT a planner input — the calendar always plans for
+      // all 6 weekdays (Pon–Sub) regardless of which weekdays currently have
+      // ScheduledGroups.
+      const holidayDates = await loadHolidayDateKeys(schoolYear, city, tx)
+      const plan = computeSchoolYearPlan({
+        startDate: fromDateKey(startDate),
+        activeWeekdays: ACTIVE_WEEKDAYS,
+        holidayDates,
+      })
+
       for (const [, mods] of byCourse) {
         await writeModuleWindows(tx, {
           city,
@@ -132,11 +138,13 @@ export async function completeSchoolYearPlan(
           windows: plan.modules,
         })
       }
+      return null
     })
   } catch (err) {
     console.error('completeSchoolYearPlan failed:', err)
     return { success: false, error: 'Greška pri spremanju plana školske godine.' }
   }
+  if (refusal) return refusal
 
   revalidatePath('/admin/skolska-godina')
   revalidatePath('/admin/programi')

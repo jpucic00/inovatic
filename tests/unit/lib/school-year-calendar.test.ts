@@ -152,6 +152,31 @@ describe('buildSchoolYearCalendar — the 2025/2026 Word calendar', () => {
     expect(buildSchoolYearCalendar({ ...empty, holidays: [] })).toEqual({ months: [], weekCount: 0 })
     expect(incompleteWeekdays(empty)).toEqual([...ACTIVE_WEEKDAYS])
   })
+
+  it('names exactly the weekday a stale window leaves one termin short (the 27/28 case)', () => {
+    const { sessions } = example2025()
+    expect(incompleteWeekdays(sessions)).toEqual([])
+    // A Saturday holiday against windows that were NOT re-derived for it.
+    // Saturday's ZADNJA (23.5.) is where the last window ends, so it is the
+    // one weekday with no spare week left inside the stored windows.
+    const holidayDates = new Set([...HOLIDAYS_2025.map((h) => h.dateKey), '2026-04-25'])
+    const plan = computeSchoolYearPlan({
+      startDate: fromDateKey('2025-10-06'),
+      activeWeekdays: ACTIVE_WEEKDAYS,
+      holidayDates: new Set(HOLIDAYS_2025.map((h) => h.dateKey)),
+    })
+    const course = {
+      modules: plan.modules.map((m) => ({
+        startDateKey: toDateKey(m.startDate),
+        endDateKey: toDateKey(m.endDate),
+      })),
+    }
+    const stale = deriveSessionDatesFromWindows({
+      moduleWindows: standardModuleWindows([course]),
+      holidayDates,
+    })
+    expect(incompleteWeekdays(stale)).toEqual(['Subota'])
+  })
 })
 
 describe('schoolYearCalendarFilename', () => {

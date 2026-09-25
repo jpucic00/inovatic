@@ -102,6 +102,23 @@ async function sessionCounts(
   return summary.flatMap((w) => w.courses.map((c) => c.computedSessions))
 }
 
+/** Backends of this database currently waiting on a lock (advisory or row). */
+async function waitingLockCount(): Promise<number> {
+  const [row] = await db.$queryRaw<{ n: number }[]>`
+    SELECT count(*)::int AS n
+    FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+    WHERE NOT l.granted AND a.datname = current_database()`
+  return row.n
+}
+
+async function waitFor(check: () => Promise<boolean>, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error('waitFor: timed out')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
+
 describe('holiday mutations re-derive module windows', () => {
   it('adding a holiday keeps every weekday on 28 — the stale windows would have read 27', async () => {
     await seedStandardCourses(2)
@@ -136,6 +153,37 @@ describe('holiday mutations re-derive module windows', () => {
         before.windows[i].startDate!.getTime(),
       )
     }
+  })
+
+  it('leaves a standard course that is not exactly 4 modules untouched, and still moves the rest', async () => {
+    await seedStandardCourses(1)
+    await planAs('SPLIT')
+    // Added after planning with windows of its own (the planner would refuse
+    // a 3-module course, so it can only arrive like this).
+    const odd = await createCourse({ kind: 'STANDARD' })
+    const oddWindows = [
+      ['2026-09-07', '2026-11-02'],
+      ['2026-11-09', '2027-01-25'],
+      ['2027-02-01', '2027-04-26'],
+    ]
+    for (const [i, [start, end]] of oddWindows.entries()) {
+      const m = await createModule(odd.id, { sortOrder: i, title: `Modul ${i + 1}` })
+      await createModuleSchedule(m.id, {
+        schoolYear: SY,
+        city: 'SPLIT',
+        startDate: new Date(`${start}T00:00:00Z`),
+        endDate: new Date(`${end}T00:00:00Z`),
+      })
+    }
+    const before = await storedWindows('SPLIT')
+
+    await upsertHoliday({ schoolYear: SY, date: MONDAY_IN_MODULE_1, name: 'Test' })
+
+    const after = await storedWindows('SPLIT')
+    const oddAfter = after.find((r) => r.courseId === odd.id)!
+    expect(asKeys([oddAfter])).toEqual([oddWindows])
+    const planned = (rows: typeof after) => asKeys(rows.filter((r) => r.courseId !== odd.id))
+    expect(planned(after)).not.toEqual(planned(before))
   })
 
   it('deleting the holiday moves the windows back', async () => {
@@ -178,6 +226,47 @@ describe('holiday mutations re-derive module windows', () => {
     })
     expect(res).toMatchObject({ success: true, requiresConfirmation: false })
     expect(asKeys(await storedWindows('SPLIT'))).not.toEqual(original)
+    expect(new Set(await sessionCounts('SPLIT'))).toEqual(new Set([28]))
+  })
+
+  it('two concurrent holiday edits of one (city, year) both land in the windows', async () => {
+    await seedStandardCourses(1)
+    await planAs('SPLIT')
+
+    // T1 adds one Monday and re-derives, then stays open. Without the plan lock
+    // T2 reads the holidays before T1 commits (seeing only its own), queues
+    // behind T1's window rows and overwrites them with a plan missing T1's day.
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let derived!: () => void
+    const firstDerived = new Promise<void>((resolve) => {
+      derived = resolve
+    })
+    const first = db.$transaction(
+      async (tx) => {
+        await tx.schoolYearHoliday.create({
+          data: { schoolYear: SY, city: 'SPLIT', date: new Date(`${MONDAY_IN_MODULE_1}T00:00:00Z`) },
+        })
+        await rederiveModuleWindows(tx, { city: 'SPLIT', schoolYear: SY })
+        derived()
+        await gate
+      },
+      { timeout: 20_000 },
+    )
+    // Only start T2 once T1 holds the lock and its window rows, and only let
+    // T1 commit once T2 is parked on a lock — otherwise nothing overlaps.
+    await firstDerived
+    const second = upsertHoliday({ schoolYear: SY, date: '2026-10-19', name: 'Drugi' })
+    await waitFor(async () => (await waitingLockCount()) > 0)
+    release()
+    await first
+    expect(await second).toEqual({ success: true, requiresConfirmation: false })
+
+    const concurrent = asKeys(await storedWindows('SPLIT'))
+    await db.$transaction((tx) => rederiveModuleWindows(tx, { city: 'SPLIT', schoolYear: SY }))
+    expect(concurrent).toEqual(asKeys(await storedWindows('SPLIT')))
     expect(new Set(await sessionCounts('SPLIT'))).toEqual(new Set([28]))
   })
 

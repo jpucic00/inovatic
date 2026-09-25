@@ -23,8 +23,23 @@ type ModuleWindow = { startDate: Date; endDate: Date }
 
 type PlanTx = Pick<
   Prisma.TransactionClient,
-  'course' | 'moduleSchedule' | 'schoolYearHoliday'
+  'course' | 'moduleSchedule' | 'schoolYearHoliday' | '$executeRaw'
 >
+
+/**
+ * Serialise every plan write of one (city, school year) until the transaction
+ * ends. Under READ COMMITTED two holiday edits would otherwise each re-derive
+ * without seeing the other's holiday, and the later commit would overwrite the
+ * windows with a plan that is missing one of them. Holidays must be read AFTER
+ * this returns. One helper, so the lock key cannot drift between callers.
+ */
+export async function lockSchoolYearPlan(
+  tx: Pick<Prisma.TransactionClient, '$executeRaw'>,
+  input: { city: City; schoolYear: string },
+): Promise<void> {
+  const key = `plan:${input.city}:${input.schoolYear}`
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`
+}
 
 /**
  * Upsert one course's module windows by POSITION in its sortOrder-sorted module
@@ -87,6 +102,7 @@ export async function rederiveModuleWindows(
   const { city, schoolYear } = input
   if (isArchivedYear(schoolYear)) return
 
+  await lockSchoolYearPlan(tx, input)
   const [courses, holidayRows] = await Promise.all([
     tx.course.findMany({
       where: { kind: 'STANDARD' },

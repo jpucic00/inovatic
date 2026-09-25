@@ -45,6 +45,7 @@ export async function GET(req: Request) {
         schoolYearCalendarFilename(city, schoolYear),
       ),
       'Content-Length': String(pdf.byteLength),
+      'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'private, no-store',
     },
   })

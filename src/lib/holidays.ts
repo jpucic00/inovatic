@@ -1,4 +1,4 @@
-import type { City } from '@prisma/client'
+import type { City, Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
 import { toDateKey } from '@/lib/session-dates'
 
@@ -12,13 +12,15 @@ import { toDateKey } from '@/lib/session-dates'
  * the admin session — never from client input.
  *
  * Lives outside `session-dates.ts` so the date-math helpers stay Prisma-free
- * and unit-testable without a DB mock.
+ * and unit-testable without a DB mock. Pass `client` to read inside a
+ * transaction (the planner reads them under the plan lock).
  */
 export async function loadHolidayDateKeys(
   schoolYear: string,
   city: City,
+  client: Pick<Prisma.TransactionClient, 'schoolYearHoliday'> = db,
 ): Promise<Set<string>> {
-  const rows = await db.schoolYearHoliday.findMany({
+  const rows = await client.schoolYearHoliday.findMany({
     where: { schoolYear, city },
     select: { date: true },
   })

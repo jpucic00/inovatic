@@ -122,16 +122,24 @@ export default async function SchoolYearPage() {
                 </a>
               </Button>
             ) : (
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2"
-                disabled
-                title="Raspored se može preuzeti kad svi dani u tjednu imaju 28 radionica."
-              >
-                <FileDown className="h-4 w-4" aria-hidden />
-                Preuzmi raspored (PDF)
-              </Button>
+              // The reason is visible text, not a `title`: a tooltip never
+              // shows on touch and a disabled button cannot be focused to
+              // reveal one.
+              <div className="flex max-w-xs flex-col gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                  disabled
+                  aria-describedby="calendar-pdf-unavailable"
+                >
+                  <FileDown className="h-4 w-4" aria-hidden />
+                  Preuzmi raspored (PDF)
+                </Button>
+                <p id="calendar-pdf-unavailable" className="text-xs text-gray-500">
+                  Raspored se može preuzeti kad svi dani u tjednu imaju 28 radionica.
+                </p>
+              </div>
             )}
             {!archived && <HolidayImportDialog schoolYear={schoolYear} archived={archived} />}
           </div>

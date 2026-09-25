@@ -97,9 +97,13 @@ function mondayIndex(date: Date): number {
   return (date.getUTCDay() + 6) % 7
 }
 
-export function buildSchoolYearCalendar(
-  input: WeekdaySessions & { holidays: ReadonlyArray<HolidayInput> },
-): SchoolYearCalendar {
+type CellContext = {
+  sessions: ReadonlySet<string>
+  markers: ReadonlyMap<string, 'FIRST' | 'LAST'>
+  holidayNames: ReadonlyMap<string, string>
+}
+
+function collectSessions(input: WeekdaySessions): Omit<CellContext, 'holidayNames'> {
   const sessions = new Set<string>()
   const markers = new Map<string, 'FIRST' | 'LAST'>()
   for (const w of ACTIVE_WEEKDAYS) {
@@ -109,68 +113,78 @@ export function buildSchoolYearCalendar(
     const last = input.lastSessionDateByWeekday[w]
     if (last) markers.set(last, 'LAST')
   }
+  return { sessions, markers }
+}
+
+function cellFor(date: Date, ctx: CellContext): CalendarCell {
+  const dateKey = toDateKey(date)
+  const label = dayLabel(dateKey)
+  if (ctx.holidayNames.has(dateKey)) {
+    const name = ctx.holidayNames.get(dateKey)
+    // A lone holiday is worth naming (a parent wonders why that Thursday is
+    // off); a break is self-explanatory, and naming each of its days would
+    // just repeat one word down a column. Sundays never have a termin.
+    const single =
+      !ctx.holidayNames.has(toDateKey(addDays(date, -1))) &&
+      !ctx.holidayNames.has(toDateKey(addDays(date, 1)))
+    return {
+      dateKey,
+      label,
+      state: 'HOLIDAY',
+      ...(single && name && mondayIndex(date) < 6 ? { holidayName: name } : {}),
+    }
+  }
+  if (ctx.sessions.has(dateKey)) {
+    const marker = ctx.markers.get(dateKey)
+    return { dateKey, label, state: 'SESSION', ...(marker ? { marker } : {}) }
+  }
+  return { dateKey, label, state: 'NONE' }
+}
+
+/** Monday-first weeks covering one month; days of the neighbouring months are blank. */
+function monthWeeks(year: number, month: number, ctx: CellContext): CalendarCell[][] {
+  const monthStart = new Date(Date.UTC(year, month, 1))
+  const nextMonthStart = new Date(Date.UTC(year, month + 1, 1))
+  const weeks: CalendarCell[][] = []
+  let weekStart = addDays(monthStart, -mondayIndex(monthStart))
+  while (weekStart.getTime() < nextMonthStart.getTime()) {
+    const week: CalendarCell[] = []
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(weekStart, i)
+      week.push(
+        day.getUTCMonth() === month ? cellFor(day, ctx) : { dateKey: null, label: '', state: 'NONE' },
+      )
+    }
+    weeks.push(week)
+    weekStart = addDays(weekStart, 7)
+  }
+  return weeks
+}
+
+export function buildSchoolYearCalendar(
+  input: WeekdaySessions & { holidays: ReadonlyArray<HolidayInput> },
+): SchoolYearCalendar {
+  const { sessions, markers } = collectSessions(input)
   if (sessions.size === 0) return { months: [], weekCount: 0 }
 
-  const holidayNames = new Map(input.holidays.map((h) => [h.dateKey, h.name?.trim() ?? '']))
+  const ctx: CellContext = {
+    sessions,
+    markers,
+    holidayNames: new Map(input.holidays.map((h) => [h.dateKey, h.name?.trim() ?? ''])),
+  }
   const sorted = [...sessions].sort((a, b) => a.localeCompare(b))
   const first = fromDateKey(sorted[0])
   const last = fromDateKey(sorted.at(-1) ?? sorted[0])
 
-  function cellFor(date: Date): CalendarCell {
-    const dateKey = toDateKey(date)
-    const label = dayLabel(dateKey)
-    if (holidayNames.has(dateKey)) {
-      const name = holidayNames.get(dateKey)
-      // A lone holiday is worth naming (a parent wonders why that Thursday is
-      // off); a break is self-explanatory, and naming each of its days would
-      // just repeat one word down a column. Sundays never have a termin.
-      const single =
-        !holidayNames.has(toDateKey(addDays(date, -1))) &&
-        !holidayNames.has(toDateKey(addDays(date, 1)))
-      return {
-        dateKey,
-        label,
-        state: 'HOLIDAY',
-        ...(single && name && mondayIndex(date) < 6 ? { holidayName: name } : {}),
-      }
-    }
-    if (sessions.has(dateKey)) {
-      const marker = markers.get(dateKey)
-      return { dateKey, label, state: 'SESSION', ...(marker ? { marker } : {}) }
-    }
-    return { dateKey, label, state: 'NONE' }
-  }
-
   const months: CalendarMonth[] = []
   let weekCount = 0
-  let year = first.getUTCFullYear()
-  let month = first.getUTCMonth()
   const endMonth = last.getUTCFullYear() * 12 + last.getUTCMonth()
-  while (year * 12 + month <= endMonth) {
-    const monthStart = new Date(Date.UTC(year, month, 1))
-    const nextMonthStart = new Date(Date.UTC(year, month + 1, 1))
-    const weeks: CalendarCell[][] = []
-    let weekStart = addDays(monthStart, -mondayIndex(monthStart))
-    while (weekStart.getTime() < nextMonthStart.getTime()) {
-      const week: CalendarCell[] = []
-      for (let i = 0; i < 7; i++) {
-        const day = addDays(weekStart, i)
-        week.push(
-          day.getUTCMonth() === month
-            ? cellFor(day)
-            : { dateKey: null, label: '', state: 'NONE' },
-        )
-      }
-      weeks.push(week)
-      weekStart = addDays(weekStart, 7)
-    }
+  for (let m = first.getUTCFullYear() * 12 + first.getUTCMonth(); m <= endMonth; m++) {
+    const year = Math.floor(m / 12)
+    const month = m % 12
+    const weeks = monthWeeks(year, month, ctx)
     months.push({ label: MONTH_NAMES[month], weeks })
     weekCount += weeks.length
-    month += 1
-    if (month === 12) {
-      month = 0
-      year += 1
-    }
   }
   return { months, weekCount }
 }
