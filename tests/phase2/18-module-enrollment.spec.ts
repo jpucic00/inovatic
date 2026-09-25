@@ -319,7 +319,7 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       // The global school-year switcher in the sidebar defaults to the current year.
       const switcher = page.getByLabel('Odaberi školsku godinu')
       await expect(switcher).toBeVisible()
-      await expect(switcher).toContainText('2025/2026')
+      await expect(switcher).toContainText(computeSchoolYear())
     })
 
     test('ModuleDatesTable renders SLR 1 with Modul/Početak/Završetak/Status/Polaznici columns', async ({
@@ -456,7 +456,8 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       await page.goto(`${BASE}/admin/programi`)
 
       const switcher = page.getByLabel('Odaberi školsku godinu')
-      const nextYearLabel = '2026/2027'
+      const startYear = Number(computeSchoolYear().split('/')[0])
+      const nextYearLabel = `${startYear + 1}/${startYear + 2}`
 
       // Register the next year only if it does not already exist. When a
       // previous run left it registered, select it from the dropdown instead —
@@ -467,19 +468,27 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
 
       if (alreadyExists) {
         await nextOption.click()
-      } else {
-        await page.keyboard.press('Escape')
-        await page.getByLabel('Nova školska godina').click()
-        await page
-          .getByRole('button', { name: new RegExp(`Kreiraj ${nextYearLabel}`) })
-          .click()
-        await expect(
-          page.getByText(`Školska godina ${nextYearLabel} kreirana.`),
-        ).toBeVisible({ timeout: 10000 })
+        await expect(switcher).toContainText(nextYearLabel)
+        return
       }
 
-      // Both paths end with the switcher on the newly selected/created year.
-      await expect(switcher).toContainText(nextYearLabel)
+      // The dialog offers the year after the LATEST registered one, which is
+      // not always the calendar's next year (specs 31/32 register 2030/2031).
+      // Read what it offers, and remove it again so runs do not stack years.
+      await page.keyboard.press('Escape')
+      await page.getByLabel('Nova školska godina').click()
+      const createBtn = page.getByRole('button', { name: /^Kreiraj \d{4}\/\d{4}$/ })
+      const created = ((await createBtn.textContent()) ?? '').replace('Kreiraj ', '').trim()
+      await createBtn.click()
+      try {
+        await expect(page.getByText(`Školska godina ${created} kreirana.`)).toBeVisible({
+          timeout: 10000,
+        })
+        // The create path auto-switches to the new year.
+        await expect(switcher).toContainText(created)
+      } finally {
+        await db.schoolYear.deleteMany({ where: { label: created } })
+      }
     })
 
     test('switching the school year updates the programs view', async ({ page }) => {
@@ -489,15 +498,18 @@ test.describe.serial('Phase 2 Step 8 — Module Enrollment + Historization', () 
       const switcher = page.getByLabel('Odaberi školsku godinu')
 
       // Switch to the next year if it is registered, then back to the current year.
+      const current = computeSchoolYear()
+      const startYear = Number(current.split('/')[0])
+      const next = `${startYear + 1}/${startYear + 2}`
       await switcher.click()
-      const nextOption = page.getByRole('option', { name: /2026\/2027/ })
+      const nextOption = page.getByRole('option', { name: next })
       if (await nextOption.isVisible().catch(() => false)) {
         await nextOption.click()
-        await expect(switcher).toContainText('2026/2027')
+        await expect(switcher).toContainText(next)
         await switcher.click()
       }
-      await page.getByRole('option', { name: '2025/2026' }).click()
-      await expect(switcher).toContainText('2025/2026')
+      await page.getByRole('option', { name: current }).click()
+      await expect(switcher).toContainText(current)
 
       // SLR 1 table renders one row per module (4) for the selected year.
       await gotoSlrProgramDetail(page)

@@ -13,6 +13,8 @@ import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 //      "zapis dolaska" before destructive save; on confirm, attendance is
 //      cascaded out and the cell turns blue
 //   3. WeekdayEndSummary reflects the dropped Monday (3/28 in amber)
+// Holidays are added as the Split admin only; teardown removes exactly those
+// and leaves every holiday that existed before the run (either city) alone.
 // Requires: dev server on localhost:3000, seeded admin user (jpucic00@…).
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -40,10 +42,25 @@ function currentSchoolYear(): string {
 const SY = currentSchoolYear()
 
 // Inside the current school year's calendar window (Sept N → Aug N+1) so
-// the seeded cells actually exist on the page. Today (per CI/dev clock) is
-// in 2025/2026 → use Jan 2026 Mondays.
-const MOD_START = new Date(Date.UTC(2026, 0, 5)) // Mon 2026-01-05
-const MOD_END = new Date(Date.UTC(2026, 0, 26)) // Mon 2026-01-26 (4 Mondays)
+// the seeded cells actually exist on the page — derived from SY, never
+// hardcoded: a literal year rots on every 1 September.
+const END_YEAR = Number(SY.split('/')[1])
+
+/** First Monday of `month` (0-based) in the school year's second calendar year. */
+function firstMonday(month: number): Date {
+  const d = new Date(Date.UTC(END_YEAR, month, 1))
+  d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7))
+  return d
+}
+
+function keyAfter(date: Date, days: number): string {
+  return new Date(date.getTime() + days * 86_400_000).toISOString().slice(0, 10)
+}
+
+const MOD_START = firstMonday(0)
+const MOD_END = new Date(MOD_START.getTime() + 21 * 86_400_000) // 4 Mondays
+const FEB_MONDAY = firstMonday(1)
+const MAR_MONDAY = firstMonday(2)
 
 let seeded: {
   courseId: string
@@ -56,8 +73,17 @@ let seeded: {
   emptyCellKey: string // YYYY-MM-DD
 }
 
+// Split holidays of SY that existed before this run — the teardown's allow-list.
+const preexistingHolidayIds = new Set<string>()
+
 test.beforeAll(async () => {
   await db.schoolYear.upsert({ where: { label: SY }, create: { label: SY }, update: {} })
+
+  const existing = await db.schoolYearHoliday.findMany({
+    where: { schoolYear: SY, city: 'SPLIT' },
+    select: { id: true },
+  })
+  for (const h of existing) preexistingHolidayIds.add(h.id)
 
   const location = await db.location.create({
     data: { city: 'SPLIT', name: `Holiday Lokacija ${RUN_ID}`, address: `Test ulica ${RUN_ID}` },
@@ -113,9 +139,9 @@ test.beforeAll(async () => {
     data: { userId: student.id, scheduledGroupId: group.id, schoolYear: SY },
   })
 
-  // Attendance on the SECOND Monday (Jan 12 2026) — that's the date we'll
+  // Attendance on the SECOND Monday of January — that's the date we'll
   // mark as a holiday and expect the warn-before-delete dialog.
-  const attendanceDate = new Date(Date.UTC(2026, 0, 12))
+  const attendanceDate = new Date(MOD_START.getTime() + 7 * 86_400_000)
   await db.attendance.create({
     data: {
       enrollmentId: enrollment.id,
@@ -132,19 +158,22 @@ test.beforeAll(async () => {
     studentId: student.id,
     enrollmentId: enrollment.id,
     attendanceDate,
-    cellWithAttendanceKey: '2026-01-12',
-    emptyCellKey: '2026-01-19', // third Monday — no attendance
+    cellWithAttendanceKey: keyAfter(MOD_START, 7),
+    emptyCellKey: keyAfter(MOD_START, 14), // third Monday — no attendance
   }
 })
 
 test.afterAll(async () => {
-  await db.schoolYearHoliday.deleteMany({ where: { schoolYear: SY } })
+  // Delete only the holidays this run added: it must never delete one it did
+  // not create. A year-wide delete (both cities) wiped a dev DB's real holidays.
+  // Šibenik is never touched here, so only Split is cleaned and re-derived.
+  await db.schoolYearHoliday.deleteMany({
+    where: { schoolYear: SY, city: 'SPLIT', id: { notIn: [...preexistingHolidayIds] } },
+  })
   // The holidays this spec added re-derived the year's module windows; with
   // them gone, derive them back so later specs see the plan without them.
   await db.$transaction(async (tx) => {
-    for (const city of ['SPLIT', 'SIBENIK'] as const) {
-      await rederiveModuleWindows(tx, { city, schoolYear: SY })
-    }
+    await rederiveModuleWindows(tx, { city: 'SPLIT', schoolYear: SY })
   })
   await db.attendance.deleteMany({ where: { enrollmentId: seeded.enrollmentId } })
   await db.enrollment.deleteMany({ where: { id: seeded.enrollmentId } })
@@ -224,10 +253,10 @@ test.describe('/admin/skolska-godina — holiday management', () => {
     await loginAsAdmin(page)
     await page.goto(`${BASE}/admin/skolska-godina`)
 
-    // Start on Mon 2026-02-02, end on Fri 2026-02-06 — five fresh, untouched cells.
-    const startKey = '2026-02-02'
-    const endKey = '2026-02-06'
-    const rangeKeys = ['2026-02-02', '2026-02-03', '2026-02-04', '2026-02-05', '2026-02-06']
+    // February's first Monday through Friday — five fresh, untouched cells.
+    const rangeKeys = [0, 1, 2, 3, 4].map((d) => keyAfter(FEB_MONDAY, d))
+    const startKey = rangeKeys[0]
+    const endKey = rangeKeys[4]
 
     // 1. Click start cell → stages range start, shows hint banner.
     await page
@@ -261,7 +290,9 @@ test.describe('/admin/skolska-godina — holiday management', () => {
       )
     }
     // The day immediately before the range should NOT have been flipped.
-    await expect(page.locator(`button[data-date="2026-02-01"][data-in-month="true"]`)).toHaveAttribute(
+    await expect(
+      page.locator(`button[data-date="${keyAfter(FEB_MONDAY, -1)}"][data-in-month="true"]`),
+    ).toHaveAttribute(
       'data-holiday',
       'false',
     )
@@ -274,12 +305,13 @@ test.describe('/admin/skolska-godina — holiday management', () => {
     await loginAsAdmin(page)
     await page.goto(`${BASE}/admin/skolska-godina`)
 
-    // Stage a contiguous 5-day block via the range picker. Use March 2026
+    // Stage a contiguous 5-day block via the range picker. Use March
     // dates so we don't collide with earlier tests' state.
-    const rangeStart = '2026-03-02'
-    const rangeEnd = '2026-03-06'
-    const midDay = '2026-03-04'
-    const outsideDay = '2026-03-09'
+    const blockKeys = [0, 1, 2, 3, 4].map((d) => keyAfter(MAR_MONDAY, d))
+    const rangeStart = blockKeys[0]
+    const rangeEnd = blockKeys[4]
+    const midDay = blockKeys[2]
+    const outsideDay = keyAfter(MAR_MONDAY, 7)
 
     await page.locator(`button[data-date="${rangeStart}"][data-in-month="true"]`).click()
     await page.locator(`button[data-date="${rangeEnd}"][data-in-month="true"]`).click()
@@ -330,7 +362,7 @@ test.describe('/admin/skolska-godina — holiday management', () => {
     await removeBlockBtn.click()
     await expect(page.getByRole('dialog')).toBeHidden()
 
-    for (const key of ['2026-03-02', '2026-03-03', '2026-03-04', '2026-03-05', '2026-03-06']) {
+    for (const key of blockKeys) {
       await expect(
         page.locator(`button[data-date="${key}"][data-in-month="true"]`),
       ).toHaveAttribute('data-holiday', 'false')
