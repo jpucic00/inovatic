@@ -1,5 +1,15 @@
 import type { NextConfig } from 'next'
 
+// pdfkit (under @react-pdf) always loads its Helvetica metrics on document
+// init via `createRequire('#standard-fonts/…')`, and its AFM/ICC data by URL —
+// both invisible to the trace, so without these the image 500s on every render.
+const PDF_RUNTIME_FILES = [
+  './src/assets/fonts/**/*',
+  './public/images/logo_dark.png',
+  './node_modules/pdfkit/js/standard-fonts/**/*',
+  './node_modules/pdfkit/js/data/**/*',
+]
+
 const nextConfig: NextConfig = {
   output: 'standalone',
   // Renders PDFs with its own React reconciler — bundling it into the server
@@ -9,8 +19,8 @@ const nextConfig: NextConfig = {
   // built with `path.join` is invisible to the standalone trace, so without
   // these the production image renders without them (or not at all).
   outputFileTracingIncludes: {
-    '/api/admin/school-year-calendar': ['./src/assets/fonts/**/*', './public/images/logo_dark.png'],
-    '/admin/email': ['./src/assets/fonts/**/*', './public/images/logo_dark.png'],
+    '/api/admin/school-year-calendar': PDF_RUNTIME_FILES,
+    '/admin/email': PDF_RUNTIME_FILES,
   },
   images: {
     remotePatterns: [
