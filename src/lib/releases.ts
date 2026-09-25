@@ -124,6 +124,26 @@ export interface ReleaseNote {
  */
 export const RELEASES: readonly ReleaseNote[] = [
   {
+    version: '1.6.0',
+    date: '2026-09-25',
+    title: 'Nova verzija aplikacije.',
+    sections: [
+      {
+        area: 'Kalendar',
+        changes: [
+          'Gumb Preuzmi raspored (PDF) daje raspored radionica za školsku godinu: termine, praznike te prvi i zadnji termin po danu.',
+        ],
+      },
+      {
+        area: 'E-mail',
+        changes: [
+          'Privici: svaka poruka može nositi do 5 datoteka (PDF, Word, Excel, slike), iste za sve primatelje.',
+          'Nova vrsta poruke „Raspored školske godine” šalje taj PDF roditeljima standardnih grupa.',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-09-23',
     title: 'Nova verzija aplikacije.',
