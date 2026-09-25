@@ -15,7 +15,7 @@
  *    must not be what decides the match
  */
 import { describe, expect, it } from 'vitest'
-import { findFamilyDiscounts } from '@/lib/family-discount'
+import { findFamilyDiscounts } from '@/lib/family-discount-data'
 import { computeSchoolYear, getPreviousSchoolYear } from '@/lib/school-year'
 import {
   createCourse,

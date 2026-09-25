@@ -12,7 +12,7 @@ import {
 } from '@/actions/admin/student-assessment'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { getRecommendationOptions } from '@/lib/student-detail'
-import { findFamilyDiscounts } from '@/lib/family-discount'
+import { findFamilyDiscounts } from '@/lib/family-discount-data'
 import { buildGradebookTabs } from '@/lib/student-assessment-view'
 import { StudentDetailView } from '@/components/shared/student-detail-view'
 
