@@ -35,6 +35,33 @@ describe('normalizeParentEmail', () => {
   })
 })
 
+// The regex was rewritten for linear time (d9a1c42). A regression here does
+// not throw — it silently turns a family into a SKIPPED row on every campaign.
+describe('normalizeParentEmail — accepted address shapes', () => {
+  it.each([
+    'x@os-split.skole.hr',
+    'a+tag@gmail.com',
+    'ana.maria.anic@t-com.hr',
+    'a_b@c.co.uk',
+  ])('keeps %s', (addr) => {
+    expect(normalizeParentEmail(addr)).toBe(addr)
+  })
+
+  it.each(['a@b..hr', 'a@.b.hr', 'a@b.hr.', 'a b@c.hr', 'a@b@c.hr', '@b.hr', 'a@'])(
+    'refuses %s',
+    (addr) => {
+      expect(normalizeParentEmail(addr)).toBeNull()
+    },
+  )
+
+  it('stays linear on adversarial input', () => {
+    const evil = 'a@' + 'b.'.repeat(25_000) + '@'
+    const started = performance.now()
+    expect(normalizeParentEmail(evil)).toBeNull()
+    expect(performance.now() - started).toBeLessThan(100)
+  })
+})
+
 describe('buildEmailRecipients', () => {
   it('merges siblings sharing one parent email into a single recipient', () => {
     const { recipients, skipped } = buildEmailRecipients([

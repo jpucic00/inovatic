@@ -44,8 +44,17 @@ vi.mock('resend', () => ({
   },
 }))
 
+// Passthrough by default. One test replaces the pre-check once to reach the
+// in-transaction link guard, which the pre-check otherwise always pre-empts.
+vi.mock('@/lib/email-attachments', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/email-attachments')>()
+  return { ...actual, loadDraftAttachments: vi.fn(actual.loadDraftAttachments) }
+})
+
 import { cookies } from 'next/headers'
+import { loadDraftAttachments } from '@/lib/email-attachments'
 const mockedCookies = cookies as unknown as Mock
+const loadDraftAttachmentsMock = loadDraftAttachments as unknown as Mock
 
 const SOURCE_YEAR = computeSchoolYear()
 
@@ -186,6 +195,30 @@ describe('POST /api/upload/email-attachment', () => {
     expect((await upload(new File([PDF_BYTES], 'a.pdf', { type: 'application/pdf' }))).status).toBe(401)
   })
 
+  it('413s from the declared length before reading the body — after the auth check', async () => {
+    const oversized = () => {
+      const form = new FormData()
+      form.append('file', new File([PDF_BYTES], 'a.pdf', { type: 'application/pdf' }))
+      // A small, perfectly valid body under a length no single file fits in:
+      // only a check on the header, not on the parsed file, can refuse it.
+      return new Request('http://localhost/api/upload/email-attachment', {
+        method: 'POST',
+        body: form,
+        headers: { 'content-length': String(MAX_ATTACHMENT_BYTES + 1024 * 1024) },
+      })
+    }
+
+    mockSession(null)
+    expect((await uploadPOST(oversized())).status, 'a guest learns nothing about sizes').toBe(401)
+
+    await loginAdmin()
+    const before = await db.emailAttachment.count()
+    const res = await uploadPOST(oversized())
+    expect(res.status).toBe(413)
+    expect(await res.json()).toEqual({ error: expect.stringMatching(/prevelika/) })
+    expect(await db.emailAttachment.count()).toBe(before)
+  })
+
   it('refuses a disallowed type, a disguised file and an oversized one', async () => {
     await loginAdmin()
     const exe = await upload(new File([Buffer.from('MZ-not-a-document-at-all')], 'x.exe', { type: 'application/x-msdownload' }))
@@ -240,15 +273,29 @@ describe('sendEmailCampaign — attachments', () => {
     const group = await makeCohort([a, b])
     const pdfId = await uploadPdf('Ugovor.pdf')
 
-    const res = await sendEmailCampaign({
-      kind: 'CUSTOM',
-      sourceSchoolYear: SOURCE_YEAR,
-      sourceGroupIds: [group.id],
-      attachmentIds: [pdfId],
-      ...CONTENT,
-    })
-    if (!res.success) throw new Error(res.error)
-    await settle(res.campaignId)
+    // Encoded once per job, not once per mail — two parents plus the admin copy
+    // must still cost a single Base64 pass over the file.
+    const toStringSpy = vi.spyOn(Buffer.prototype, 'toString')
+    let res: Awaited<ReturnType<typeof sendEmailCampaign>>
+    let pdfEncodes: number
+    try {
+      res = await sendEmailCampaign({
+        kind: 'CUSTOM',
+        sourceSchoolYear: SOURCE_YEAR,
+        sourceGroupIds: [group.id],
+        attachmentIds: [pdfId],
+        ...CONTENT,
+      })
+      if (!res.success) throw new Error(res.error)
+      await settle(res.campaignId)
+      pdfEncodes = toStringSpy.mock.calls.filter(
+        ([encoding], i) =>
+          encoding === 'base64' && (toStringSpy.mock.contexts[i] as Buffer).equals(PDF_BYTES),
+      ).length
+    } finally {
+      toStringSpy.mockRestore()
+    }
+    expect(pdfEncodes).toBe(1)
 
     expect(sendMock).toHaveBeenCalledTimes(2)
     const expected = [
@@ -333,6 +380,49 @@ describe('sendEmailCampaign — attachments', () => {
     })
     expect(second).toMatchObject({ success: false })
     expect(sendMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('rolls the whole campaign back when a draft is claimed after the pre-check (the race)', async () => {
+    const admin = await loginAdmin()
+    const parent = uniqEmail('att-race')
+    const group = await makeCohort([parent])
+
+    // Another campaign has already claimed the file by the time this one's
+    // transaction runs; the pre-check saw it while it was still a draft.
+    const pdfId = await uploadPdf()
+    const other = await db.emailCampaign.create({
+      data: {
+        city: 'SPLIT',
+        kind: 'CUSTOM',
+        subject: 'Druga kampanja',
+        bodyText: 'x',
+        sourceSchoolYear: SOURCE_YEAR,
+        sourceGroupIds: [],
+        sentById: admin.id,
+      },
+    })
+    await db.emailAttachment.update({ where: { id: pdfId }, data: { campaignId: other.id } })
+    loadDraftAttachmentsMock.mockResolvedValueOnce({
+      ok: true,
+      attachments: [{ filename: 'Ugovor 2026.pdf', bytes: PDF_BYTES.length }],
+    })
+    const before = await db.emailCampaign.count()
+
+    const res = await sendEmailCampaign({
+      kind: 'CUSTOM',
+      sourceSchoolYear: SOURCE_YEAR,
+      sourceGroupIds: [group.id],
+      attachmentIds: [pdfId],
+      ...CONTENT,
+    })
+
+    expect(res).toMatchObject({ success: false, error: expect.stringMatching(/Privitak/) })
+    expect(await db.emailCampaign.count(), 'no campaign row survives the rollback').toBe(before)
+    expect(await db.emailCampaignRecipient.count({ where: { parentEmail: parent } })).toBe(0)
+    expect(sendMock).not.toHaveBeenCalled()
+    expect(adminCopyMock).not.toHaveBeenCalled()
+    const row = await db.emailAttachment.findUniqueOrThrow({ where: { id: pdfId } })
+    expect(row.campaignId, 'the other campaign keeps its file').toBe(other.id)
   })
 
   it('refuses a set over the total size limit', async () => {

@@ -5,8 +5,13 @@
 export function attachmentContentDisposition(filename: string): string {
   const ascii = filename
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\x20-\x7e]/g, '_')
-    .replace(/["\\]/g, '_')
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`
+    .replaceAll(/[\u0300-\u036f]/g, '')
+    .replaceAll(/[^\x20-\x7e]/g, '_')
+    .replaceAll(/["\\]/g, '_')
+  // encodeURIComponent leaves ' ( ) * unescaped, which RFC 5987 does not allow.
+  const encoded = encodeURIComponent(filename).replaceAll(
+    /['()*]/g,
+    (c) => `%${(c.codePointAt(0) ?? 0).toString(16).toUpperCase()}`,
+  )
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`
 }

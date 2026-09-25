@@ -42,24 +42,33 @@ async function uploadOne(file: File): Promise<DraftAttachment> {
  *
  * The same limits the server enforces are checked here first, so an admin is
  * told before uploading rather than after composing everything else.
+ *
+ * `reservedFile` holds one slot for a file the server adds itself (the
+ * SCHOOL_CALENDAR PDF counts toward the same set). Its size is not known until
+ * the send renders it, so only the slot is counted here; the server still has
+ * the last word on the total.
  */
 export function EmailAttachmentPicker({
   attachments,
   onChange,
   onUploadingChange,
+  reservedFile,
 }: Readonly<{
   attachments: DraftAttachment[]
   onChange: (next: DraftAttachment[]) => void
   onUploadingChange: (uploading: boolean) => void
+  reservedFile?: { note: string }
 }>) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState<string[]>([])
   const total = attachments.reduce((sum, a) => sum + a.bytes, 0)
+  const reserved = reservedFile ? [{ bytes: 0 }] : []
 
   const handleFiles = async (list: FileList | null) => {
     if (!list || list.length === 0) return
     const picked = Array.from(list)
     const error = attachmentSetError([
+      ...reserved,
       ...attachments,
       ...picked.map((f) => ({ bytes: f.size })),
     ])
@@ -94,7 +103,7 @@ export function EmailAttachmentPicker({
     deleteDraftEmailAttachment(id).catch(() => {})
   }
 
-  const full = attachments.length >= MAX_ATTACHMENTS
+  const full = attachments.length + reserved.length >= MAX_ATTACHMENTS
 
   return (
     <fieldset className="m-0 min-w-0 border-0 p-0">
@@ -128,10 +137,10 @@ export function EmailAttachmentPicker({
       )}
 
       {uploading.length > 0 && (
-        <p className="mb-2 inline-flex items-center gap-2 text-xs text-gray-500" role="status">
+        <output className="mb-2 inline-flex items-center gap-2 text-xs text-gray-500">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
           Učitavam: {uploading.join(', ')}
-        </p>
+        </output>
       )}
 
       <div className="flex flex-wrap items-center gap-3">
@@ -165,6 +174,7 @@ export function EmailAttachmentPicker({
       </div>
       <p className="mt-1.5 text-xs text-gray-500">
         Svi primatelji dobivaju iste privitke.
+        {reservedFile && ` ${reservedFile.note}`}
       </p>
     </fieldset>
   )

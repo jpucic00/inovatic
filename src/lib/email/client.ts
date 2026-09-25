@@ -71,8 +71,9 @@ export async function sendTransactionalEmail(params: {
    * reply straight to the person who submitted the form. */
   replyTo?: string
   /** Files to attach — /admin/email campaigns only. Omitted from the payload
-   * entirely when empty, so every other mail's request is unchanged. */
-  attachments?: readonly { filename: string; contentType: string; content: Buffer }[]
+   * entirely when empty, so every other mail's request is unchanged. Content
+   * arrives already Base64, encoded once per send job by the caller. */
+  attachments?: readonly { filename: string; contentType: string; contentBase64: string }[]
 }): Promise<boolean> {
   if (!process.env.RESEND_API_KEY) return false
   const inbox = cityInboxEmail(params.city)
@@ -82,15 +83,15 @@ export async function sendTransactionalEmail(params: {
     to: params.to,
     subject: params.subject,
     react: params.react,
-    // Base64, not the Buffer itself: the SDK JSON-serialises the payload, and a
-    // Buffer would go over the wire as an array of numbers, several times the
-    // size of the file.
+    // Base64, not a Buffer: the SDK JSON-serialises the payload, and a Buffer
+    // would go over the wire as an array of numbers, several times the size of
+    // the file.
     ...(params.attachments?.length
       ? {
           attachments: params.attachments.map((a) => ({
             filename: a.filename,
             contentType: a.contentType,
-            content: a.content.toString('base64'),
+            content: a.contentBase64,
           })),
         }
       : {}),

@@ -18,6 +18,13 @@ export const runtime = 'nodejs'
  * extension. A real declared type is never overridden, and the magic-byte check
  * below decides either way.
  */
+/**
+ * Headroom over one file for the multipart envelope (boundaries, part headers,
+ * the filename). Generous on purpose: this only turns away bodies that cannot
+ * hold an acceptable file, the per-file check below stays the real limit.
+ */
+const MULTIPART_OVERHEAD_BYTES = 64 * 1024
+
 const EXTENSION_TYPES: Readonly<Record<string, string>> = {
   pdf: 'application/pdf',
   doc: 'application/msword',
@@ -51,6 +58,17 @@ export async function POST(req: Request) {
   const city = session?.user?.city
   if (session?.user?.role !== 'ADMIN' || !city) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Refuse an oversized body from its declared length, before `formData()`
+  // buffers all of it. The header can be absent (chunked), so the per-file
+  // size check after parsing still has to hold on its own.
+  const declared = Number(req.headers.get('content-length'))
+  if (declared > MAX_ATTACHMENT_BYTES + MULTIPART_OVERHEAD_BYTES) {
+    return NextResponse.json(
+      { error: `Datoteka je prevelika (najviše ${formatMegabytes(MAX_ATTACHMENT_BYTES)}).` },
+      { status: 413 },
+    )
   }
 
   let formData: FormData

@@ -181,6 +181,11 @@ const DEFAULT_SCHEDULE_BODY = [
   'Sačuvajte ovu poruku, a za sva pitanja slobodno nam odgovorite.',
 ].join('\n')
 
+// Names the year, so it has to follow the year the PDF is rendered for.
+function schoolCalendarSubject(year: string): string {
+  return `Raspored radionica za školsku godinu ${formatSchoolYearDotted(year)}`
+}
+
 const DEFAULT_SCHOOL_CALENDAR_BODY = [
   'Poštovani,',
   'u privitku se nalazi raspored radionica za ovu školsku godinu. Radionice se održavaju u danima označenim zelenom bojom, a u danima označenim plavom (praznici i školski odmori) nema nastave.',
@@ -303,7 +308,7 @@ export function EmailWizard({
       setBodyBlocks(plainTextToBlocks(DEFAULT_SCHEDULE_BODY))
       setSourceYear(selectedYear)
     } else if (next === 'SCHOOL_CALENDAR') {
-      setSubject(`Raspored radionica za školsku godinu ${formatSchoolYearDotted(selectedYear)}`)
+      setSubject(schoolCalendarSubject(selectedYear))
       setBodyBlocks(plainTextToBlocks(DEFAULT_SCHOOL_CALENDAR_BODY))
       setSourceYear(selectedYear)
     } else {
@@ -420,6 +425,10 @@ export function EmailWizard({
   ])
 
   const handleSourceYearChange = (year: string) => {
+    // The prefilled subject names the year; an admin-edited one is left alone.
+    if (kind === 'SCHOOL_CALENDAR' && subject === schoolCalendarSubject(sourceYear)) {
+      setSubject(schoolCalendarSubject(year))
+    }
     setSourceYear(year)
     setSourceGroupIds([])
     setSourceStudentIds([])
@@ -724,6 +733,8 @@ export function EmailWizard({
         setConfirming(false)
         if (res.success) {
           setSendResult(res)
+          // Linked to the campaign now — no longer drafts this wizard may reuse.
+          setAttachments([])
           // The send continues on the server, so the admin may close the tab.
           toast.success(`Slanje pokrenuto — ${res.total} primatelja.`)
           router.refresh()
@@ -935,6 +946,11 @@ export function EmailWizard({
               attachments={attachments}
               onChange={setAttachments}
               onUploadingChange={setUploadingAttachments}
+              reservedFile={
+                kind === 'SCHOOL_CALENDAR'
+                  ? { note: 'Jedno mjesto zauzima PDF rasporeda školske godine.' }
+                  : undefined
+              }
             />
             <div className="flex items-center justify-between pt-1">
               <button
@@ -1432,8 +1448,9 @@ export function EmailWizard({
                   Privici ({attachments.length + (kind === 'SCHOOL_CALENDAR' ? 1 : 0)}):
                 </span>{' '}
                 {[
-                  ...(kind === 'SCHOOL_CALENDAR' ? [`Raspored radionica ${sourceYear} (PDF)`] : []),
                   ...attachments.map((a) => a.filename),
+                  // Last, as in the mail: it is stored after the uploaded drafts.
+                  ...(kind === 'SCHOOL_CALENDAR' ? [`Raspored radionica ${sourceYear} (PDF)`] : []),
                 ].join(', ')}{' '}
                 — idu svakom primatelju.
               </p>

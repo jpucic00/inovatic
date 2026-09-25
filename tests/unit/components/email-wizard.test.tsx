@@ -377,4 +377,63 @@ describe('EmailWizard — attachments travel as draft ids', () => {
     expect(fetchMock).not.toHaveBeenCalled()
     expect(screen.queryByText('veliki.pdf')).toBeNull()
   })
+
+  it('SCHOOL_CALENDAR reserves one slot for the generated PDF; other kinds do not', () => {
+    render(<EmailWizard {...BASE_PROPS} />)
+    expect(screen.queryByText(/Jedno mjesto zauzima PDF rasporeda/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Raspored školske godine/ }))
+    expect(screen.getByText(/Jedno mjesto zauzima PDF rasporeda/)).toBeTruthy()
+  })
+})
+
+describe('EmailWizard — SCHOOL_CALENDAR subject follows the PDF year', () => {
+  async function pickCalendarAndGoToStep2() {
+    fireEvent.click(screen.getByRole('button', { name: /Raspored školske godine/ }))
+    expect(screen.getByLabelText(/Predmet/)).toHaveValue(
+      'Raspored radionica za školsku godinu 2025./2026.',
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Dalje: primatelji/ }))
+    await screen.findByText('Odaberi sve grupe')
+  }
+
+  async function sendToAllGroups() {
+    previewEmailRecipientsMock.mockResolvedValue({
+      success: true,
+      recipients: [recipient('mama@test.hr', 'mama@test.hr', 'Ana Anić')],
+      skipped: [],
+      alreadySent: [],
+    })
+    // A year change reloads the group tree, so the checkbox comes back async.
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Odaberi sve grupe/ }))
+    await screen.findByText(/Ana Anić/)
+    fireEvent.click(screen.getByRole('button', { name: /Pošalji \(1\)/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Potvrdi slanje \(1\)/ }))
+    await waitFor(() => expect(sendEmailCampaignMock).toHaveBeenCalledTimes(1))
+    return sendEmailCampaignMock.mock.calls[0][0]
+  }
+
+  it('changing the year in step 2 renames the prefilled subject to the year the PDF is for', async () => {
+    render(<EmailWizard {...BASE_PROPS} />)
+    await pickCalendarAndGoToStep2()
+
+    fireEvent.change(screen.getByLabelText('Školska godina'), { target: { value: '2024/2025' } })
+    const input = await sendToAllGroups()
+
+    expect(input.kind).toBe('SCHOOL_CALENDAR')
+    expect(input.sourceSchoolYear).toBe('2024/2025')
+    expect(input.subject).toBe('Raspored radionica za školsku godinu 2024./2025.')
+  })
+
+  it('leaves a subject the admin wrote alone', async () => {
+    render(<EmailWizard {...BASE_PROPS} />)
+    fireEvent.click(screen.getByRole('button', { name: /Raspored školske godine/ }))
+    fireEvent.change(screen.getByLabelText(/Predmet/), { target: { value: 'Naš raspored' } })
+    fireEvent.click(screen.getByRole('button', { name: /Dalje: primatelji/ }))
+    await screen.findByText('Odaberi sve grupe')
+
+    fireEvent.change(screen.getByLabelText('Školska godina'), { target: { value: '2024/2025' } })
+    const input = await sendToAllGroups()
+
+    expect(input.subject).toBe('Naš raspored')
+  })
 })

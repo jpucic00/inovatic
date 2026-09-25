@@ -168,7 +168,7 @@ export async function loadCampaignAttachmentFiles(
       filename: row.filename,
       bytes: row.bytes,
       contentType: row.mimeType,
-      content: Buffer.from(row.content.data),
+      contentBase64: Buffer.from(row.content.data).toString('base64'),
     }
   })
 }

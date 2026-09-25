@@ -55,10 +55,14 @@ export type AttachmentSummary = {
   bytes: number
 }
 
-/** A file ready to hand to Resend — the summary plus the bytes. */
+/**
+ * A file ready to hand to Resend — the summary plus the bytes, already Base64.
+ * Encoded once when a send job loads its files, not once per recipient: a
+ * 15 MB set would otherwise allocate ~20 MB of fresh string for every parent.
+ */
 export type EmailAttachmentFile = AttachmentSummary & {
   contentType: string
-  content: Buffer
+  contentBase64: string
 }
 
 /**
@@ -91,7 +95,7 @@ export function formatMegabytes(bytes: number): string {
 export function cleanAttachmentFilename(raw: string): string {
   const base = raw.split(/[/\\]/).pop() ?? ''
   // eslint-disable-next-line no-control-regex
-  const cleaned = base.replace(/[\u0000-\u001f\u007f]/g, '').trim()
+  const cleaned = base.replaceAll(/[\u0000-\u001f\u007f]/g, '').trim()
   if (!cleaned) return 'privitak'
   if (cleaned.length <= 150) return cleaned
   const dot = cleaned.lastIndexOf('.')

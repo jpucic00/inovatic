@@ -1505,10 +1505,10 @@ async function startSendJob(
   { withAdminCopy = false }: { withAdminCopy?: boolean } = {},
 ): Promise<void> {
   const run = async () => {
-    // Loaded ONCE, before anyone is mailed — the admin copy included. If the
-    // files cannot be read, nobody is claimed: every row stays PENDING and
-    // "Nastavi slanje" retries the lot, instead of each parent failing in turn
-    // or, worse, receiving the mail without its contract.
+    // Loaded (and Base64-encoded) ONCE, before anyone is mailed — the admin
+    // copy included. If the files cannot be read, nobody is claimed: every row
+    // stays PENDING and "Nastavi slanje" retries the lot, instead of each
+    // parent failing in turn or, worse, receiving the mail without its contract.
     let attachments: EmailAttachmentFile[]
     try {
       attachments = await loadCampaignAttachmentFiles(input.campaignId)

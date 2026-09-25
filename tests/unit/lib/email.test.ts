@@ -162,7 +162,12 @@ describe('email senders', () => {
       bodyText: 'U privitku je ugovor.',
       city: 'SPLIT',
       attachments: [
-        { filename: 'Ugovor.pdf', bytes: content.length, contentType: 'application/pdf', content },
+        {
+          filename: 'Ugovor.pdf',
+          bytes: content.length,
+          contentType: 'application/pdf',
+          contentBase64: content.toString('base64'),
+        },
       ],
     })
     const payload = send.mock.calls[0][0]
