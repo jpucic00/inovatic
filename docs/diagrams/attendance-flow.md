@@ -127,7 +127,7 @@ flowchart TD
     style STF fill:#e0f2fe
 ```
 
-> The return type is a union on `kind`: the two flat branches share one shape — `{ kind: 'custom' | 'season', expectedSessions[], extraSessions[] }` (`'custom'` = radionica, `'season'` = competition) — while standard returns `{ kind: 'standard', sections[], otherDates[], defaultSelectedDate }`. On the client, `AttendanceMarker` routes `kind === 'standard'` to `StandardAttendanceMarker` and both flat kinds to one `FlatAttendanceMarker`, whose default date comes from `pickFlatDefault` (today if expected, else nearest past, else first). The header line is `scheduleHint(dateRange = kind === 'custom', …)` — a radionica reads as its date range, while a competition group reads as its weekday, exactly like a standard group.
+> The return type is a union on `kind`: the two flat branches share one shape — `{ kind: 'custom' | 'season', expectedSessions[], extraSessions[] }` (`'custom'` = radionica, `'season'` = competition) — while standard returns `{ kind: 'standard', sections[], otherDates[], defaultSelectedDate }`. On the client, `AttendanceMarker` routes `kind === 'standard'` to `StandardAttendanceMarker` and both flat kinds to one `FlatAttendanceMarker`, which picks its default date client-side with the same `pickDefaultSessionDate` (see *Default Session Selection* below). The header line is `scheduleHint(dateRange = kind === 'custom', …)` — a radionica reads as its date range, while a competition group reads as its weekday, exactly like a standard group.
 
 ## Extra / ad-hoc sessions
 
@@ -210,7 +210,7 @@ An empty checkbox means two different things either side of a save — "not aske
 | draft differs from records | *Nespremljene izmjene — N od M označeno* |
 | records exist, draft matches | *Evidentirano · N od M prisutno · spremljeno HH:mm* |
 
-`dirty` wins over `saved` (reading back the old timestamp on edited work would be a lie), it is **computed against the records rather than tracked as a touched-flag** — ticking a box and unticking it again must leave the session clean — and notes compare **trimmed**, because `note.trim() || null` is what the save writes. Save is disabled only when nothing changed **and the saved rows cover everyone on the session**: `hasUnrecordedEntries` keeps it live when a student enrolled — or a teacher was assigned — *after* the session was saved, since their missing row rests at the draft baseline and can never present as an edit (2026-09-01). In the date list the chip shows `—` rather than `0/8` when nothing is recorded: `0/8` counts records but reads as "nobody came"; `8/8` still means "fully recorded", the question that list answers. The rules are pure functions in `src/lib/attendance-draft.ts` (`initAttendanceDraft`, `initTeacherDraft`, `isSessionDirty`, `summarizeSession`, `sessionStatus`, `hasUnrecordedEntries`), kept out of the component so the standard and flat branches cannot answer them differently.
+`dirty` wins over `saved` (reading back the old timestamp on edited work would be a lie), it is **computed against the records rather than tracked as a touched-flag** — ticking a box and unticking it again must leave the session clean — and notes compare **trimmed**, because `note.trim() || null` is what the save writes. Save is disabled only when nothing changed **and the saved rows cover everyone on the session**: `hasUnrecordedEntries` keeps it live when a student enrolled — or a teacher was assigned — *after* the session was saved, since their missing row rests at the draft baseline and can never present as an edit (2026-09-01). In the date list the chip (`sessionChip`, 2026-09-25) states **attendance — PRESENT out of the roster** (`3/12`), and completeness is its colour: nothing recorded → `—` (grey); every roster member has a row → green; someone on the roster has no row (enrolled after the save) → amber, with "N bez zapisa" in the title — **never counted as absent**. So `0/8` genuinely means nobody came; the old `recorded/total` chip made a saved 3-of-12 session read `12/12`. The rules are pure functions in `src/lib/attendance-draft.ts` (`initAttendanceDraft`, `initTeacherDraft`, `isSessionDirty`, `summarizeSession`, `sessionStatus`, `hasUnrecordedEntries`, `sessionChip`), kept out of the component so the standard and flat branches cannot answer them differently.
 
 **Hand-added dates ("Dodaj datum ručno") are a client-side draft too.** Nothing exists server-side until evidencija is saved for the date, so it lives in per-group `sessionStorage` (`src/lib/adhoc-date-memory.ts`): it survives tab switches and reloads within one browser tab, is pruned automatically once the server lists the date itself, is removable with the × on its row (a sibling button, offered only while the date has no saved rows — 2026-09-01), and dies with the tab as the backstop. The structural replacement for all of this is the planned `ClassSession` model (Flux `6q66ke4`).
 
@@ -295,36 +295,36 @@ flowchart LR
     C -->|Yes| DEL["deleteMany Attendance (via enrollment.scheduledGroup)<br/>deleteMany TeacherAttendance (via scheduledGroup)"]
     DEL --> SSC
     SSC --> SAVE["Upsert SchoolYearHoliday rows"]
+    SAVE --> RD["rederiveModuleWindows(tx, city + schoolYear)<br/>standard ModuleSchedule windows follow the new holiday set"]
 
     style DEL fill:#fee2e2
     style SSC fill:#fef3c7
     style SAVE fill:#d1fae5
+    style RD fill:#e0f2fe
 ```
 
 > Source: `src/actions/admin/holidays.ts` (`upsertHolidayRange` and `bulkImportHolidays` share the same scoped helpers, `deleteAffectedAttendance` and `deleteStaffChangesOn`). The city filter is load-bearing — this delete is irreversible, and a Šibenik closure must never destroy Split rows. Deleting the teacher rows too is what stops a cancelled class from still being billed.
+>
+> **Module windows follow in the same transaction.** Every holiday mutation — `upsertHolidayRange` (and `upsertHoliday` through it), `bulkImportHolidays`, `removeHoliday`, `removeHolidayRange` — ends with `rederiveModuleWindows(tx, { city, schoolYear })` (`src/lib/module-plan-sync.ts`), which recomputes every standard program's four `ModuleSchedule` windows from its module-1 start and the holidays as they now stand. An archived year is refused by the actions and skipped again by the sync; a year never planned (no module-1 start) is left alone.
 
-## Default Session Selection (standard groups)
+## Default Session Selection
 
-`pickDefaultSelectedDate` picks the most relevant date from the arc state — standard branch only; the flat branches (radionica and competition) return no `defaultSelectedDate`, and `FlatAttendanceMarker` picks its own client-side via `pickFlatDefault`.
+`pickDefaultSessionDate(dates, today)` (`src/lib/attendance-sections.ts`) decides which date the Dolazak tab opens on — it follows the calendar, for every program kind.
 
 ```mermaid
 flowchart TD
-    A["AttendanceMarker opens — pickDefaultSelectedDate(arc)"] --> B["state = getActiveModuleForGroup(arc, today)"]
-    B --> C{inProgressModule?}
-    C -->|Yes| C1{today in its sessions?}
-    C1 -->|Yes| PICK1[Select today]
-    C1 -->|No| C2[Select nearest past session in module, else its first]
-    C -->|No| D{lastCompletedModule?}
-    D -->|Yes| D1[Select its nearest past session, else its last]
-    D -->|No| E{nextEnrollingModule?}
-    E -->|Yes| E1[Select its first session]
-    E -->|No| F["Fallback: first section with any expected date, else today"]
+    A["pickDefaultSessionDate(dates, today)"] --> B{"today is one of the listed dates?"}
+    B -->|Yes| PICK1[Select today]
+    B -->|No| C{"any listed date before today?"}
+    C -->|Yes| C1["Select the LATEST past date — a teacher usually marks after class"]
+    C -->|No| D{"any listed date after today?"}
+    D -->|Yes| D1[Select the EARLIEST upcoming date]
+    D -->|No| F[Fallback: today]
 
     style PICK1 fill:#d1fae5
-    style C2 fill:#e0f2fe
-    style D1 fill:#e0f2fe
-    style E1 fill:#fef3c7
+    style C1 fill:#e0f2fe
+    style D1 fill:#fef3c7
     style F fill:#fee2e2
 ```
 
-> Source: `pickDefaultSelectedDate()` in `src/actions/teacher/attendance.ts`. Driven entirely by the race-ahead arc (`getActiveModuleForGroup`), so the default date sits inside the module the group is actually on right now.
+> **Standard branch — server-side.** `buildStandardAttendance` (`src/actions/teacher/attendance.ts`) returns `defaultSelectedDate` computed over **every date the tab lists**: each section's `expectedSessions` and `adhocSessions` — the Probni sat section included — plus `otherDates`. Deriving it from the module arc alone opened module 1 all through the probni tjedan, because the trial is not part of the arc. **Flat branches — client-side.** The radionica and competition shapes carry no `defaultSelectedDate`; `FlatAttendanceMarker` (`src/components/teacher/attendance-marker.tsx`) calls the same function over `expectedSessions + extraSessions`, and again when the hand-added date under the open panel is removed.

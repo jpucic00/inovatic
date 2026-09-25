@@ -68,8 +68,8 @@ erDiagram
         string moduleId FK
         string schoolYear "e.g. 2025/2026"
         City city "per-city planner rows for the shared curriculum"
-        datetime startDate "nullable - @db.Date"
-        datetime endDate "nullable - @db.Date; set to today to close early"
+        datetime startDate "nullable - @db.Date; module 1 = the kickoff written by Dovrsi plan"
+        datetime endDate "nullable - @db.Date; DERIVED from the kickoff + city holidays, never hand-edited"
     }
 
     SchoolYear {
@@ -267,7 +267,7 @@ erDiagram
     EmailCampaign {
         string id PK
         City city "tenant - the sending admin's city"
-        EmailCampaignKind kind "CUSTOM - REENROLLMENT - EVALUATION - CREDENTIALS"
+        EmailCampaignKind kind "CUSTOM - REENROLLMENT - EVALUATION - CREDENTIALS - SCHEDULE - SCHOOL_CALENDAR"
         string sourceSchoolYear "cohort source year"
         string sourceGroupIds "String[] - audit-only snapshot, no FK; empty in preporuka mode"
         string sourceRecommendations "String[] - preporuka labels; empty in group mode"
@@ -293,9 +293,25 @@ erDiagram
         EmailRecipientStatus status "PENDING - SENT - FAILED - ALREADY_SENT - SKIPPED"
         string childNames "String[] - snapshot at send time"
         string assessmentIds "String[] - EVALUATION only: the exact card(s) this row mails, re-verified via assertCardsBelongTo before each send; empty otherwise"
+        string studentIds "String[] - CREDENTIALS: the one child account; SCHEDULE: every child on the address; re-verified via assertCredentialsBelongTo / assertScheduleBelongsTo; empty otherwise"
         string failureReason "nullable - why FAILED, or why SKIPPED had no address"
         string sentKey "nullable - invitation idempotency key, set only on SENT"
         datetime sentAt
+    }
+
+    EmailAttachment {
+        string id PK
+        City city "the uploading admin's city - the only tenant a draft has before it is linked"
+        string campaignId FK "nullable - null = draft; linked inside the campaign-creating tx - Cascade"
+        string filename "as uploaded, shown to the parent"
+        string mimeType
+        int bytes
+        datetime createdAt "default now - an unlinked draft older than 24 h is swept by the next upload"
+    }
+
+    EmailAttachmentContent {
+        string attachmentId PK "PK + FK to EmailAttachment - Cascade"
+        bytes data "the file - a separate table so no listing query ever loads it"
     }
 
     ReleaseAnnouncement {
@@ -423,7 +439,9 @@ erDiagram
 
     User          ||--o{ EmailCampaign : "sentBy"
     Course        ||--o{ EmailCampaign : "targetCourse - SetNull"
-    EmailCampaign ||--o{ EmailCampaignRecipient : "one row per inbox - per child for EVALUATION"
+    EmailCampaign ||--o{ EmailCampaignRecipient : "one row per inbox - per child for EVALUATION and CREDENTIALS"
+    EmailCampaign |o--o{ EmailAttachment : "campaign files - null campaignId = draft - Cascade"
+    EmailAttachment ||--o| EmailAttachmentContent : "bytes - Cascade"
 
     Article ||--o{ ArticleImage : "inline images"
     Article ||--o{ ArticleTag : "tagged with"
@@ -446,7 +464,7 @@ erDiagram
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
 | MaterialScope | `MODULE`, `COURSE`, `GROUP` |
 | PaymentOption | `PO_MODULU`, `CIJELA_GODINA` — how a family settles an SLR program. **STANDARD only**, gated by `offersPaymentOption` (which is `hasDatedModules`): a radionica settles by the akontacija + ostatak its confirmation e-mail spells out, and COMPETITION is billed monthly through `EnrollmentMonth`, so neither has a choice to record. **Null means "nije odabrano" and is never backfilled.** Decoupled from the paid marks on purpose — this is intent, `fullYearPaidAt` / `ModuleEnrollment.paidAt` are what happened, and choosing `CIJELA_GODINA` must never tick a paid mark |
-| EmailCampaignKind | `CUSTOM`, `REENROLLMENT`, `EVALUATION`, `CREDENTIALS` — REENROLLMENT sends are idempotent per `(city, targetCourseId, targetSchoolYear)`; CUSTOM is deliberately repeatable; EVALUATION mails report cards with one recipient row per **child** (not per inbox) and never sets `sentKey`, so a corrected card stays re-sendable. **CREDENTIALS** is one row per child ACCOUNT (a child in two selected groups is still one mail) and, since 2026-08-17, the ONLY way a student login leaves the building — neither inquiry acceptance nor manual creation mails anything. Radionica groups are deliberately NOT excluded from it: a workshop child gets a real portal account too |
+| EmailCampaignKind | `CUSTOM`, `REENROLLMENT`, `EVALUATION`, `CREDENTIALS`, `SCHEDULE`, `SCHOOL_CALENDAR` — REENROLLMENT sends are idempotent per `(city, targetCourseId, targetSchoolYear)`; CUSTOM is deliberately repeatable; EVALUATION mails report cards with one recipient row per **child** (not per inbox) and never sets `sentKey`, so a corrected card stays re-sendable. **CREDENTIALS** is one row per child ACCOUNT (a child in two selected groups is still one mail) and, since 2026-08-17, the ONLY way a student login leaves the building — neither inquiry acceptance nor manual creation mails anything. Radionica groups are deliberately NOT excluded from it: a workshop child gets a real portal account too. **SCHEDULE** ("Slanje rasporeda") is one mail per parent **inbox** with siblings merged — the row's `studentIds` holds every child on the address, each listed with all their groups in the source year — repeatable, no `sentKey`. **SCHOOL_CALENDAR** mails the city's "Raspored radionica" PDF for the source year, rendered **once** at campaign creation and stored as the campaign's own `EmailAttachment` (so a resume and the `[Kopija]` carry identical bytes); one mail per inbox, **standard groups only**, repeatable, no `sentKey` |
 | EmailRecipientStatus | `PENDING`, `SENT`, `FAILED`, `ALREADY_SENT`, `SKIPPED` — every intended recipient is written as `PENDING` upfront, so the detail view lists the whole cohort immediately and a resumed send knows exactly who is still owed a mail |
 
 > There are no `EnrollmentStatus` / `ModuleEnrollmentStatus` enums. Presence of a row means the student is in the group/module; deletion is the only way out.
@@ -483,8 +501,9 @@ erDiagram
 | User → SchoolYearHoliday | `createdBy` relation (nullable) — admin who added the holiday. |
 | SchoolYear | Standalone registry of valid year labels (`YYYY/YYYY`). The `schoolYear` string columns on `ScheduledGroup`, `ModuleSchedule`, `Enrollment`, `Inquiry`, `Course` (radionice) and `CourseEnrollmentWindow` reference `SchoolYear.label` by string with **no** Prisma FK relation; only `SchoolYearHoliday.schoolYear` is a true FK. |
 | User → TeacherAttendance ← ScheduledGroup | Teaching hours, keyed `(userId, scheduledGroupId, sessionDate)` — deliberately **not** keyed on `TeacherAssignment`, so unassigning a teacher or a stand-in covering one session never rewrites who worked which hour. Sole source of **hours** for the admin payout report (`src/lib/teacher-work-report.ts`), which prices them at the teacher's current `User.hourlyRateCents` over the last `REPORT_MONTH_COUNT` (12) months — a null rate makes every `amountCents` null rather than 0, and changing the rate re-prices every month in the window, including ones already paid. Cascades from `User`, but **RESTRICT** from `ScheduledGroup`: these rows are payout evidence, so `deleteGroup`/`deleteCourse` block on them explicitly and the FK is the backstop. `recordedBy` is a separate non-cascading `User` relation — authorship, not entitlement. |
-| EmailCampaign → EmailCampaignRecipient | One row per parent inbox per send — except EVALUATION, where a row is one **child** (two siblings on one address get two rows, each mailing exactly one card via the row's `assessmentIds`, re-verified by `assertCardsBelongTo` immediately before each send). Rows cascade (`onDelete: Cascade`) and are written as `PENDING` **before** any mail goes out. A `SENT` row carries `sentKey`, and the `(sentKey, parentEmail)` unique index is what actually prevents a double invitation — two overlapping sends can't both win the insert. Cleared to null on `FAILED` so a retry may re-invite. The four `*Count` columns are display counters; recipient rows are ground truth. |
+| EmailCampaign → EmailCampaignRecipient | One row per parent inbox per send — except EVALUATION, where a row is one **child** (two siblings on one address get two rows, each mailing exactly one card via the row's `assessmentIds`, re-verified by `assertCardsBelongTo` immediately before each send), and CREDENTIALS, where a row is one child **account** (`studentIds`, re-verified by `assertCredentialsBelongTo`). Rows cascade (`onDelete: Cascade`) and are written as `PENDING` **before** any mail goes out. A `SENT` row carries `sentKey`, and the `(sentKey, parentEmail)` unique index is what actually prevents a double invitation — two overlapping sends can't both win the insert. Cleared to null on `FAILED` so a retry may re-invite. The four `*Count` columns are display counters; recipient rows are ground truth. |
 | Course → EmailCampaign | `targetCourse` for REENROLLMENT invitations, `onDelete: SetNull` — deleting a program keeps the send history readable. |
+| EmailCampaign → EmailAttachment → EmailAttachmentContent | Campaign-level files (any kind; at most 5, 10 MB each, 15 MB together) — every recipient and the `[Kopija]` get the identical set, never per-child documents. An upload (`POST /api/upload/email-attachment`) writes a **draft** (`campaignId` null, stamped with the admin's city); `linkDraftAttachments` (`src/lib/email-attachments.ts`) claims the drafts inside the campaign-creating transaction, and a draft already swept or claimed rolls the whole campaign back. Unlinked drafts older than 24 h are deleted by `sweepStaleDraftAttachments`, which every upload runs (no cron). SCHOOL_CALENDAR's PDF is written straight into the campaign by `storeAttachment` in the same transaction. Both FKs Cascade: a sent file lives as long as its campaign. The bytes sit in `EmailAttachmentContent`, read only by the send job and the admin download. |
 
 ## Unique Constraints
 
@@ -540,6 +559,7 @@ erDiagram
 | InquiryWaitlistGroup | `scheduledGroupId` |
 | EmailCampaign | `(city, createdAt)`, `(city, kind, targetCourseId, targetSchoolYear)`, `sentById`, `targetCourseId` |
 | EmailCampaignRecipient | `campaignId` |
+| EmailAttachment | `(campaignId, createdAt)` — serves both the per-campaign load and the draft sweep (`campaignId IS NULL AND createdAt < cutoff`) |
 
 > The trailing single-column entries on `TeacherAttendance` and `EmailCampaign` are FK-support indexes. Postgres does not create them automatically, and each of those FKs is `RESTRICT` or `SET NULL` — without the index every `User`/`Course` delete seq-scans the referencing table.
 
@@ -547,9 +567,9 @@ erDiagram
 
 Split and Šibenik run as fully separated tenants inside one app. "City" is the tenant; `Location` stays the venue *within* a city (Trokut inkubator is a `Location` with `city = SIBENIK`).
 
-**Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `CourseSeason` (each city runs the shared competition program's season on its own dates), `CourseGradeRule` (each city offers the shared standard program to its own razredi), `TrialWeek` (each city picks its own probni-sat week), `SchoolYearHoliday`, `EmailCampaign` (the sending admin's city — the tenant boundary for both recipient resolution and the `/admin/email` history list), and `Course` (nullable — `null` = shared standard SLR program and the competition program, set = per-city radionica).
+**Models carrying a `city` column:** `User`, `Location`, `ScheduledGroup` (denormalized from its venue, enforced by the composite FK), `Inquiry`, `Article`, `CourseEnrollmentWindow`, `ModuleSchedule`, `CourseSeason` (each city runs the shared competition program's season on its own dates), `CourseGradeRule` (each city offers the shared standard program to its own razredi), `TrialWeek` (each city picks its own probni-sat week), `SchoolYearHoliday`, `EmailCampaign` (the sending admin's city — the tenant boundary for both recipient resolution and the `/admin/email` history list), `EmailAttachment` (the uploading admin's city — a draft has no campaign yet, so this is what keeps one city from sending or reading the other's file), and `Course` (nullable — `null` = shared standard SLR program and the competition program, set = per-city radionica).
 
-**Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`EnrollmentMonth`/`Attendance`/`TeacherAttendance`/`GalleryImage`/`TeacherAssignment`/`SessionStaffChange`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `InquiryWaitlistGroup` through its inquiry (and its group, which must be in the same city), `ArticleImage`/`ArticleTag` through their article, `EmailCampaignRecipient` through its campaign.
+**Everything else derives its city transitively** — `Enrollment`/`ModuleEnrollment`/`EnrollmentMonth`/`Attendance`/`TeacherAttendance`/`GalleryImage`/`TeacherAssignment`/`SessionStaffChange`/`StudentComment`/`StudentAssessment`/`MaterialGroupHide` through their group, `InquiryWaitlistGroup` through its inquiry (and its group, which must be in the same city), `ArticleImage`/`ArticleTag` through their article, `EmailCampaignRecipient` through its campaign, `EmailAttachmentContent` through its attachment.
 
 `ReleaseAnnouncement` is the one model with **no city at all, not even transitively**.
 
@@ -583,7 +603,7 @@ Every standard SLR course is split into four modules (M1–M4). The same four ti
 
 ### `ModuleSchedule.startDate / endDate` are course-wide reference, NOT per-group
 
-`ModuleSchedule.startDate` is the school-year kickoff for the whole course. `ModuleSchedule.endDate` is the **slowest-weekday's 7th session** — written by the planner so all weekdays are guaranteed at least 7 sessions inside the window.
+Module 1's `startDate` is the school-year kickoff for the whole course. Each `endDate` is the **slowest-weekday's 7th session**, so all weekdays are guaranteed at least 7 sessions inside the window, and module N+1 starts the day after module N ends. The windows are **derived, never hand-edited**: two inputs — the kickoff and the city's holidays — go through `computeSchoolYearPlan`. `completeSchoolYearPlan` ("Dovrši plan") writes them first via `writeModuleWindows`, and `rederiveModuleWindows` (`src/lib/module-plan-sync.ts`) re-derives every standard program's windows (per course, from its own module-1 start) in the **same transaction** as every holiday add or remove. An archived year, or a course without a module-1 start or with other than four modules, is left alone.
 
 But each `ScheduledGroup` runs on its own `dayOfWeek`, and `SchoolYearHoliday` rows don't fall evenly across weekdays. So the *real* first/last session for a Wed group is different from the same module's first/last for a Mon group. The "which module is this group on" question therefore can't be answered from `ModuleSchedule.startDate/endDate` alone.
 

@@ -66,7 +66,7 @@ flowchart LR
     A --> DB["GalleryImage.url = watermarked DELIVERY url<br/>GalleryImage.publicId = bare asset id"]
     DB --> T["Grid: cloudinaryThumbUrl(url, 400, 400) inserts<br/>c_fill,g_auto,400x400 IN FRONT of the overlay"]
     DB --> L["Lightbox download: { url: img.url } → the watermarked file"]
-    DB --> D["deleteGalleryImage → destroyCloudinaryAssetsByPublicId([publicId])"]
+    DB --> D["removeGalleryImage → delete row, then<br/>destroyCloudinaryAssetsByPublicId([publicId]) fire-and-forget"]
 
     style W fill:#fef3c7
     style D fill:#d1fae5
@@ -77,7 +77,7 @@ flowchart LR
 >
 > **Order in the chain is load-bearing.** Cloudinary applies chained components left to right, so the thumbnail resize must sit in FRONT of the overlay: the logo is then drawn on the finished 400×400 crop at a constant 28% of it, instead of being shrunk and cropped along with the photo. `cloudinaryThumbUrl` therefore bails only on an existing **sizing** transformation, and `isSizingTransform` excludes any `l_…` component even though the watermark carries `w_0.28` — inside an overlay that `w_` sizes the layer, not the photo. Since 2026-09-02 `withWatermark` honours the same rule from the other side (it splices behind any transform already present), so the two helpers commute.
 >
-> **Deletion is unaffected here, unlike articles.** `GalleryImage` stores `publicId` as its own column and `deleteGalleryImage` destroys by that id, so no gallery cleanup ever parses a URL. Article bodies hold URLs only — which is why the same feature forced `publicIdFromUrl` to skip leading transformation segments and `autosaveArticle` to diff removals on resolved public ids (`removedAssetUrls`) rather than on raw strings.
+> **Deletion is unaffected here, unlike articles.** `GalleryImage` stores `publicId` as its own column and `removeGalleryImage` (`src/actions/gallery/crud.ts`) destroys by that id, so no gallery cleanup ever parses a URL. The destroy is **not awaited**: the row is deleted first and a failed Cloudinary call is only logged, so a remote hiccup never fails the delete the admin asked for. Article bodies hold URLs only — which is why the same feature forced `publicIdFromUrl` to skip leading transformation segments and `autosaveArticle` to diff removals on resolved public ids (`removedAssetUrls`) rather than on raw strings.
 
 ## Reader gate
 
