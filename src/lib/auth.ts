@@ -88,6 +88,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
           role: user.role,
           city: user.city,
           studentId,
+          sessionVersion: user.sessionVersion,
         }
       },
     }),
@@ -103,6 +104,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         token.city = (user as { city: City }).city
         const studentId = (user as { studentId?: string | null }).studentId
         if (studentId) token.studentId = studentId
+        token.sessionVersion = (user as { sessionVersion?: number }).sessionVersion ?? 0
         token.checkedAt = Date.now()
         return token
       }

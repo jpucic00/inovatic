@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Logo } from '@/components/shared/logo'
 import { LoginForm } from '@/components/auth/login-form'
+import { cityInboxEmail } from '@/lib/email/client'
 
 /**
  * The full-page sign-in screen. Rendered by `/portal` for visitors without a
@@ -20,6 +21,21 @@ export function LoginScreen() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <LoginForm />
         </div>
+
+        {/* No self-service reset, by design: a public "forgot password" form is
+            one more thing for the bots already hammering this page to abuse.
+            Staff send a new link from the profile instead. */}
+        <p className="mt-4 text-center text-xs text-gray-500">
+          Zaboravili ste lozinku ili još nemate pristup? Javite nam se na{' '}
+          <a href={`mailto:${cityInboxEmail('SPLIT')}`} className="text-cyan-600 hover:underline">
+            {cityInboxEmail('SPLIT')}
+          </a>{' '}
+          (Split) ili{' '}
+          <a href={`mailto:${cityInboxEmail('SIBENIK')}`} className="text-cyan-600 hover:underline">
+            {cityInboxEmail('SIBENIK')}
+          </a>{' '}
+          (Šibenik) i poslat ćemo vam poveznicu za novu lozinku.
+        </p>
 
         <div className="mt-4 text-center">
           <Link href="/" className="text-sm text-gray-400 hover:text-gray-600">

@@ -57,14 +57,11 @@ test.describe('Admin — Teachers', () => {
     await page.locator('#teacher-phone').fill(TEACHER.phone)
     await page.getByRole('button', { name: /Kreiraj nastavnika/ }).click()
 
-    // Success state renders credentials. Exact matches avoid strict-mode
-    // violations: "Pristupni podaci" also appears inside a longer
-    // DialogDescription sentence, and the email shows up twice (inside a
-    // <strong> on its own, and as part of "E-mail: {email}").
-    // The server action sends the credentials email via Resend, which can
-    // take a few seconds on a cold dev server — bump past the 5s default.
-    await expect(page.getByText('Pristupni podaci', { exact: true })).toBeVisible({ timeout: 15000 })
-    await expect(page.getByText(TEACHER.email, { exact: true }).first()).toBeVisible()
+    // Success state. No password is shown any more — the teacher is mailed a
+    // setup link. The action sends it through Resend, which can take a few
+    // seconds on a cold dev server — bump past the 5s default.
+    await expect(page.getByText('Nastavnik kreiran', { exact: true })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText('Lozinka:', { exact: false })).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Zatvori' }).click()
 

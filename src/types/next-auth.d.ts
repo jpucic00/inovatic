@@ -21,6 +21,7 @@ declare module 'next-auth' {
     role: UserRole
     city: City
     studentId?: string | null
+    sessionVersion?: number
   }
 }
 
@@ -33,5 +34,6 @@ declare module 'next-auth/jwt' {
     city?: City
     checkedAt?: number
     studentId?: string
+    sessionVersion?: number
   }
 }

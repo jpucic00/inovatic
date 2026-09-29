@@ -3,7 +3,7 @@ import { render } from '@react-email/components'
 import type { City } from '@prisma/client'
 import type { EvaluationCard } from '@/lib/evaluation-email-cards'
 import type { ReleaseNote } from '@/lib/releases'
-import type { CredentialsCard } from '@/lib/credentials-email-recipients'
+import type { PasswordLinkCard } from '@/lib/credentials-email-recipients'
 import type { ScheduleCard } from '@/lib/schedule-email-recipients'
 import type { EmailRichBlock } from '@/lib/email-rich-text'
 import type { AttachmentSummary, EmailAttachmentFile } from '@/lib/email-attachment-rules'
@@ -20,8 +20,7 @@ import PartyInquiryConfirmationEmail from '../../../emails/party-inquiry-confirm
 import StemEducationInquiryEmail from '../../../emails/stem-education-inquiry'
 import StemEducationConfirmationEmail from '../../../emails/stem-education-confirmation'
 import ScheduleOptionsEmail, { type GroupOption } from '../../../emails/schedule-options'
-import AccountCredentialsEmail from '../../../emails/account-credentials'
-import TeacherCredentialsEmail from '../../../emails/teacher-credentials'
+import PasswordLinkEmail from '../../../emails/password-link'
 import BulkMessageEmail from '../../../emails/bulk-message'
 import ReleaseNotesEmail from '../../../emails/release-notes'
 
@@ -266,85 +265,44 @@ export function sendScheduleOptionsEmail(params: {
 }
 
 /**
- * Student account credentials + enrollment details → the student's parent.
- *
- * **Currently has NO caller, and that is deliberate (2026-08-18).** Until
- * 2026-08-17 this fired automatically from `createStudentFromInquiry` and
- * `createStudentManually`; that automatic send was removed on purpose, and
- * credentials now leave only through a CREDENTIALS e-mail campaign, which
- * re-verifies ownership per child with `assertCredentialsBelongTo` before every
- * send. The sender is kept because the owner may want a single-child send back
- * (e.g. off `resetStudentPassword`), not because anything uses it.
- *
- * Two consequences worth knowing before you touch it:
- * - `knip` stays green only because `tests/unit/lib/email.test.ts` and
- *   `tests/unit/components/emails-venue-address.test.tsx` reference it. Dead
- *   production code kept alive by its own tests will not be reported.
- * - If you are here to "restore the credentials e-mail", do not simply call
- *   this. It owns its own subject and hard-requires a single group, and it has
- *   none of the campaign's per-child ownership check — wiring it back into an
- *   account-creation path would reintroduce exactly the automatic send that was
- *   removed, without the guard that replaced it.
+ * Where a password link points. The token rides in the URL FRAGMENT: browsers
+ * never send the part after `#` to a server, so it cannot land in the hosting
+ * provider's request logs, in a Referer header or in analytics — only the page
+ * itself reads it and posts it back.
  */
-export function sendStudentCredentialsEmail(params: {
-  to: string
-  /** The city the child was enrolled in. */
-  city: City
-  parentName: string
-  childName: string
-  username: string
-  password: string
-  groupName: string
-  schedule: string
-  locationName: string
-  locationAddress: string
-}): Promise<boolean> {
-  return sendTransactionalEmail({
-    to: params.to,
-    city: params.city,
-    subject: `Pristupni podaci za ${params.childName} – Inovatic`,
-    react: createElement(AccountCredentialsEmail, {
-      parentName: params.parentName,
-      childName: params.childName,
-      username: params.username,
-      password: params.password,
-      groupName: params.groupName,
-      schedule: params.schedule,
-      locationName: params.locationName,
-      locationAddress: params.locationAddress,
-    }),
-  })
+export function passwordLinkUrl(token: string): string {
+  return `${publicBaseUrl()}/postavi-lozinku#${token}`
 }
 
-const TEACHER_SUBJECTS = {
-  new: 'Pristupni podaci – Inovatic',
-  reset: 'Nova lozinka – Inovatic',
-} as const
-
 /**
- * Teacher account credentials → the teacher. `variant: 'new'` on account
- * creation, `'reset'` on password reset (same template, different subject).
+ * A one-time "choose your password" link → the account's own inbox: a parent
+ * (listing the children the login opens) or a staff member. Sent from a
+ * profile button, from `createTeacher`, and by the deploy-time staff rollout;
+ * the setup-link campaign renders the same block through the bulk template.
  */
-export function sendTeacherCredentialsEmail(params: {
+export function sendPasswordLinkEmail(params: {
   to: string
-  /** The teacher's own city — staff answer their own office, not the other one. */
+  /** Sends from this city's inbox — the office the family or teacher deals with. */
   city: City
-  firstName: string
-  lastName: string
-  password: string
-  variant: keyof typeof TEACHER_SUBJECTS
+  purpose: 'SETUP' | 'RESET'
+  audience: 'PARENT' | 'STAFF'
+  token: string
+  validFor: string
+  children: readonly string[]
 }): Promise<boolean> {
-  const baseUrl = publicBaseUrl()
   return sendTransactionalEmail({
     to: params.to,
     city: params.city,
-    subject: TEACHER_SUBJECTS[params.variant],
-    react: createElement(TeacherCredentialsEmail, {
-      firstName: params.firstName,
-      lastName: params.lastName,
-      email: params.to,
-      password: params.password,
-      loginUrl: `${baseUrl}/portal`,
+    subject: params.purpose === 'SETUP' ? 'Postavite lozinku – Inovatic' : 'Nova lozinka – Inovatic',
+    react: createElement(PasswordLinkEmail, {
+      purpose: params.purpose,
+      audience: params.audience,
+      card: {
+        email: params.to,
+        children: params.children.map((name) => ({ name, groups: [] })),
+        url: passwordLinkUrl(params.token),
+        validFor: params.validFor,
+      },
     }),
   })
 }
@@ -382,14 +340,14 @@ type BulkMessageParams = {
    */
   cards?: EvaluationCard[]
   /**
-   * The child's portal login — CREDENTIALS campaigns only, and always exactly
-   * one child, the one named in `subject`. Same per-call rule as `cards`: it is
+   * The parent login's one-time link — CREDENTIALS campaigns only, minted for
+   * this recipient inside the send loop. Same per-call rule as `cards`: it is
    * per-recipient content, so it never lives on the campaign.
    */
-  credentials?: CredentialsCard
+  passwordLink?: PasswordLinkCard
   /**
    * One card per child on this address with that child's groups — SCHEDULE
-   * campaigns only. Per-recipient content like `cards` and `credentials`, so
+   * campaigns only. Per-recipient content like `cards` and `passwordLink`, so
    * it is passed per call; unlike them it holds every child of the inbox.
    */
   schedules?: ScheduleCard[]
@@ -414,7 +372,7 @@ function buildBulkMessageElement(params: BulkMessageContent) {
     bodyBlocks: params.bodyBlocks,
     options: params.options,
     cards: params.cards,
-    credentials: params.credentials,
+    passwordLink: params.passwordLink,
     schedules: params.schedules,
     attachments: params.attachments?.map((a) => ({ filename: a.filename, bytes: a.bytes })),
     signupUrl: params.signupPath ? `${publicBaseUrl()}${params.signupPath}` : undefined,

@@ -17,9 +17,10 @@ export type EmailRecipientChild = {
   groupLabel?: string
   /** EVALUATION only: false when some skill in the group's rubric is still ungraded. */
   complete?: boolean
-  /** CREDENTIALS only: the account has no usable password and one will be minted. */
-  needsPassword?: boolean
-  /** CREDENTIALS only: a previous campaign already mailed working details. */
+  /** CREDENTIALS only: the parent has already chosen their own password. The
+   *  row is still sent — the mail says to ignore it if access works. */
+  passwordSet?: boolean
+  /** CREDENTIALS only: a password link was mailed to this account before. */
   alreadySent?: boolean
 }
 
@@ -33,8 +34,8 @@ export type EmailRecipient = {
    */
   assessmentIds: string[]
   /**
-   * CREDENTIALS only: the child account this row is mailed — always exactly one.
-   * Empty for every other kind.
+   * CREDENTIALS: the selected children of the ONE parent account this row is
+   * mailed to (1..n). SCHEDULE: every child on the address. Empty for the rest.
    */
   studentIds: string[]
   /**
@@ -42,8 +43,8 @@ export type EmailRecipient = {
    * parent inbox for CUSTOM/REENROLLMENT (one row per inbox), the individual
    * report card for EVALUATION (one row per card, so siblings on one address
    * are two independent rows and unchecking one cannot drop the other), and the
-   * child ACCOUNT for CREDENTIALS (one row per account — not per enrollment, so
-   * a child in two selected groups is a single mail listing both).
+   * parent ACCOUNT's e-mail for CREDENTIALS (one row per login, listing every
+   * selected child it opens).
    */
   rowKey: string
 }
@@ -51,8 +52,11 @@ export type EmailRecipient = {
 export type SkippedStudent = {
   studentId: string
   studentName: string
-  /** `NOT_GRADED`: EVALUATION only — the child has no filled-in report card. */
-  reason: 'MISSING_EMAIL' | 'INVALID_EMAIL' | 'NOT_GRADED'
+  /**
+   * `NOT_GRADED`: EVALUATION only — the child has no filled-in report card.
+   * `NO_PARENT_ACCOUNT`: CREDENTIALS only — no login opens this child yet.
+   */
+  reason: 'MISSING_EMAIL' | 'INVALID_EMAIL' | 'NOT_GRADED' | 'NO_PARENT_ACCOUNT'
 }
 
 /** Why a child was skipped, in the words the admin reads. */
@@ -60,6 +64,7 @@ export const SKIP_REASON_TEXT: Record<SkippedStudent['reason'], string> = {
   MISSING_EMAIL: 'Roditelj nema upisanu e-mail adresu.',
   INVALID_EMAIL: 'E-mail adresa roditelja nije ispravna.',
   NOT_GRADED: 'Dijete nema ispunjenu evaluaciju.',
+  NO_PARENT_ACCOUNT: 'Dijete nema roditeljski račun — upišite ispravan e-mail roditelja na profilu.',
 }
 
 /** The same three, condensed for the composer's skipped list. */
@@ -67,6 +72,7 @@ export const SKIP_REASON_SHORT: Record<SkippedStudent['reason'], string> = {
   MISSING_EMAIL: 'nema e-mail',
   INVALID_EMAIL: 'neispravan e-mail',
   NOT_GRADED: 'nema evaluaciju',
+  NO_PARENT_ACCOUNT: 'nema roditeljski račun',
 }
 
 // Deliberately pragmatic: catches empty/garbage values without rejecting the
@@ -219,36 +225,33 @@ export type CredentialsCandidate = {
   studentId: string
   firstName: string
   lastName: string
-  parentEmail: string | null
   /** Every current group of this child, joined for the composer's row. */
   groupLabel: string
-  /** True when the account has no usable password yet and one will be minted. */
-  needsPassword: boolean
-  /** True when a CREDENTIALS campaign has already mailed working details. */
-  alreadySent: boolean
+  /** The one login that opens this child; null = none yet (no usable e-mail). */
+  account: {
+    id: string
+    email: string
+    /** The owner has chosen their own password. */
+    passwordSet: boolean
+    /** A password link was mailed to this account before. */
+    alreadySent: boolean
+  } | null
 }
 
 /**
- * One recipient row per child ACCOUNT — same non-merging rule as
- * {@link buildEvaluationRecipients}, for a stronger reason.
+ * One recipient row per PARENT ACCOUNT, listing every selected child it opens.
  *
- * Two siblings on one address have two different usernames and two different
- * passwords, so a merged mail would be a single message carrying two people's
- * login secrets. The merge key (`parentEmail`) is not a family identifier — a
- * mistyped, shared or institutional address is indistinguishable from real
- * siblings at the data level — and where a leaked report card is embarrassing, a
- * leaked login is account takeover of a minor's portal account.
- *
- * The unit is the ACCOUNT, not the enrollment: a password is an account fact, so
- * a child in two selected groups is still exactly one mail, listing both groups.
- * That is the one place this differs from the evaluation builder, where a child
- * in two groups legitimately has two separate documents to send.
+ * Merging siblings is safe here in a way it never was for the old credentials
+ * mail: the mail carries no child's secret, only a link to choose the ONE
+ * password of a login that already sees all of these children. The account —
+ * not a matching e-mail string — is the unit, so two families that happen to
+ * share a mistyped address are two accounts only if they are two accounts.
  */
 export function buildCredentialsRecipients(candidates: CredentialsCandidate[]): {
   recipients: EmailRecipient[]
   skipped: SkippedStudent[]
 } {
-  const recipients: EmailRecipient[] = []
+  const byAccount = new Map<string, EmailRecipient>()
   const skipped: SkippedStudent[] = []
   const seenStudents = new Set<string>()
 
@@ -257,34 +260,35 @@ export function buildCredentialsRecipients(candidates: CredentialsCandidate[]): 
     seenStudents.add(candidate.studentId)
 
     const studentName = `${candidate.firstName} ${candidate.lastName}`.trim()
-    const email = normalizeParentEmail(candidate.parentEmail)
-    if (!email) {
-      skipped.push({
-        studentId: candidate.studentId,
-        studentName,
-        reason: candidate.parentEmail?.trim() ? 'INVALID_EMAIL' : 'MISSING_EMAIL',
-      })
+    const account = candidate.account
+    const email = account ? normalizeParentEmail(account.email) : null
+    if (!account || !email) {
+      skipped.push({ studentId: candidate.studentId, studentName, reason: 'NO_PARENT_ACCOUNT' })
       continue
     }
 
-    recipients.push({
+    const row = byAccount.get(account.id) ?? {
       parentEmail: email,
-      children: [
-        {
-          name: studentName,
-          recommendation: null,
-          groupLabel: candidate.groupLabel,
-          needsPassword: candidate.needsPassword,
-          alreadySent: candidate.alreadySent,
-        },
-      ],
+      children: [],
       assessmentIds: [],
-      studentIds: [candidate.studentId],
-      // The account, not the inbox and not the enrollment — see `rowKey`.
-      rowKey: candidate.studentId,
+      studentIds: [],
+      // The login's address — which is also the exclusion key, so the composer
+      // unchecks a whole family login at once.
+      rowKey: email,
+    }
+    row.children.push({
+      name: studentName,
+      recommendation: null,
+      groupLabel: candidate.groupLabel,
+      passwordSet: account.passwordSet,
+      alreadySent: account.alreadySent,
     })
+    row.studentIds.push(candidate.studentId)
+    byAccount.set(account.id, row)
   }
 
+  const recipients = [...byAccount.values()]
+  for (const r of recipients) r.children.sort((a, b) => a.name.localeCompare(b.name, 'hr'))
   recipients.sort((a, b) => a.children[0].name.localeCompare(b.children[0].name, 'hr'))
   return { recipients, skipped }
 }

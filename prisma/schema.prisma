@@ -222,15 +222,22 @@ model User {
   // wrong number. Admin-only — the payout action is the sole reader, and no
   // teacher- or student-facing query may select it.
   hourlyRateCents Int?
-  /// When this child's parent was last mailed working login details by a
-  /// CREDENTIALS campaign. Means "the parent holds a password that currently
-  /// works", so it is CLEARED by `resetStudentPassword` and by the mint-on-reuse
-  /// path in `findOrCreateStudent` — a rotated password makes any previous mail
-  /// wrong. Deliberately NOT backfilled from history: stamping it from account
-  /// creation would mark every send that FAILED as sent (exactly the families
-  /// that still need reaching) and mis-date every returning child, presenting a
-  /// guess as an audit trail. Null therefore means "not sent by this system".
+  /// When a password link was last mailed to THIS account — a parent, a
+  /// teacher or an admin (since 2026-09-29 a child never receives one; its
+  /// parent account does). Set by every send of a link: the profile button, the
+  /// setup-link campaign and the staff rollout at deploy. Not proof the link was
+  /// used — `passwordSetAt` is. Deliberately NOT backfilled: null means "no link
+  /// sent by this system".
   credentialsSentAt DateTime?
+  /// When the account's OWNER last chose its password — through a link or the
+  /// staff change-password page. Null = still on a password somebody else set
+  /// (a default an admin handed out) or none at all. Not backfilled: nobody can
+  /// know who picked a password that existed before this column did.
+  passwordSetAt DateTime?
+  /// Bumped on every password set; stamped into the JWT at login. A token with
+  /// an older value is ended by `revalidateTokenClaims` within ~60s, which is
+  /// what logs every other device out after a password change.
+  sessionVersion Int @default(0)
   gdprConsentAt DateTime?
   /// STUDENT only: the one account that sees this child in the portal — a
   /// PARENT, or a staff account whose e-mail the parent used. Strictly one; a
@@ -243,6 +250,8 @@ model User {
 
   parentAccount        User?               @relation("ParentChildren", fields: [parentAccountId], references: [id], onDelete: SetNull)
   children             User[]              @relation("ParentChildren")
+  passwordTokens       PasswordToken[]     @relation("PasswordTokenUser")
+  issuedPasswordTokens PasswordToken[]     @relation("PasswordTokenCreator")
   teacherAssignments   TeacherAssignment[]
   enrollments          Enrollment[]
   articles             Article[]
@@ -1100,6 +1109,38 @@ model EmailAttachmentContent {
   data         Bytes
 
   attachment EmailAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+}
+
+enum PasswordTokenPurpose {
+  /// First password: a new account, the setup-link campaign, the staff rollout.
+  SETUP
+  /// A staff member sent it from a profile because someone lost access.
+  RESET
+}
+
+/// A one-time link to choose a password. Only the SHA-256 of the token is
+/// stored: the plaintext exists in memory while the mail is built and in the
+/// recipient's inbox, nowhere else. A token is spent by `usedAt`, dies at
+/// `expiresAt`, and is expired on the spot when a newer link is issued for the
+/// same account — only the latest link ever works. Rows are kept (pruned after
+/// 30 days) because they are what the per-account send limit counts. There is no public way to
+/// create one: staff actions, campaigns and the deploy rollout are the only
+/// callers of `issuePasswordToken`.
+model PasswordToken {
+  id          String               @id @default(cuid())
+  userId      String
+  tokenHash   String               @unique
+  purpose     PasswordTokenPurpose
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime             @default(now())
+  /// The staff member who sent it; null for the system (campaign rollout).
+  createdById String?
+
+  user      User  @relation("PasswordTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("PasswordTokenCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
 }
 
 /// One row per app version whose release e-mail has ALREADY gone out to the

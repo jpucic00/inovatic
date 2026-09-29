@@ -83,7 +83,7 @@ function requireExactlyOneSelection(
   if (value.kind === 'CREDENTIALS' && hasRecommendations) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Pristupni podaci šalju se odabirom grupa ili pojedinačne djece.',
+      message: 'Poveznica za lozinku šalje se odabirom grupa ili pojedinačne djece.',
     })
   }
   // A schedule mail lists the groups a child is IN — a preporuka says which
@@ -209,20 +209,10 @@ const evaluationContent = {
 }
 
 /**
- * CREDENTIALS' exclusion key. Like EVALUATION it cannot be the parent's e-mail —
- * a credentials row is one child, so two siblings share an address. The STUDENT
- * is the identifier that names exactly one row (not the enrollment: a child in
- * two selected groups is still a single account, hence a single mail).
- */
-const excludedStudentIdsField = z
-  .array(z.string().min(1).max(50))
-  .max(1000, 'Previše isključenih primatelja.')
-  .optional()
-
-/**
- * The credentials send carries no target program and no CTA — the content is the
- * child's own username/password plus their current groups, resolved per
- * recipient at send time.
+ * The setup-link send carries no target program and no CTA — the content is the
+ * parent login's one-time link plus the selected children and their groups,
+ * resolved per recipient at send time. A row is one parent LOGIN, whose address
+ * is its identity, so it is excluded by address.
  */
 const credentialsContent = {
   kind: z.literal('CREDENTIALS'),
@@ -293,7 +283,7 @@ export const sendEmailCampaignSchema = z
     z.object({
       ...credentialsContent,
       ...selectionFields,
-      excludedStudentIds: excludedStudentIdsField,
+      excludedParentEmails: excludedParentEmailsField,
     }),
     // A SCHEDULE row is one inbox (siblings merged), so like CUSTOM it is
     // excluded by address.

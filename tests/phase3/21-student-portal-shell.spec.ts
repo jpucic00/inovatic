@@ -57,9 +57,9 @@ const MULTI_STUDENT: StudentData = {
   parentPhone: '0911111113',
 }
 
-let zeroCredentials: { username: string; password: string; loginEmail: string } | null = null
-let singleCredentials: { username: string; password: string; loginEmail: string; groupId: string; courseTitle: string } | null = null
-let multiCredentials: { username: string; password: string; loginEmail: string; groupAId: string; groupBId: string } | null = null
+let zeroCredentials: { password: string; loginEmail: string } | null = null
+let singleCredentials: { password: string; loginEmail: string; groupId: string; courseTitle: string } | null = null
+let multiCredentials: { password: string; loginEmail: string; groupAId: string; groupBId: string } | null = null
 
 test.describe.configure({ mode: 'serial' })
 
@@ -71,19 +71,15 @@ test.describe('Phase 3 Step 10 — Student Portal Shell', () => {
 
     // Zero-enrollment student
     const zeroCreds = await createStudentNoEnrollment(page, ZERO_STUDENT)
-    zeroCredentials = {
-      ...zeroCreds,
-      loginEmail: `${zeroCreds.username}@student.inovatic.local`,
-    }
+    zeroCredentials = { password: zeroCreds.password, loginEmail: zeroCreds.loginEmail }
 
     // Single-enrollment student
     const [groupA, groupB] = collectGroupIds(page, 2)
     const courseTitle = await getGroupCourseTitle(page, groupA)
     const singleCreds = await createStudentInGroup(page, groupA, SINGLE_STUDENT)
     singleCredentials = {
-      username: singleCreds.username,
       password: singleCreds.password,
-      loginEmail: `${singleCreds.username}@student.inovatic.local`,
+      loginEmail: singleCreds.loginEmail,
       groupId: groupA,
       courseTitle,
     }
@@ -92,9 +88,8 @@ test.describe('Phase 3 Step 10 — Student Portal Shell', () => {
     const multiCreds = await createStudentInGroup(page, groupA, MULTI_STUDENT)
     await addEnrollmentToStudent(page, multiCreds.studentId, groupB)
     multiCredentials = {
-      username: multiCreds.username,
       password: multiCreds.password,
-      loginEmail: `${multiCreds.username}@student.inovatic.local`,
+      loginEmail: multiCreds.loginEmail,
       groupAId: groupA,
       groupBId: groupB,
     }
@@ -137,7 +132,7 @@ test.describe('Phase 3 Step 10 — Student Portal Shell', () => {
     await page.locator('input[type="password"]').fill(zeroCredentials.password)
     await clickUntilVisible(
       page.locator('button[type="submit"]'),
-      page.getByText(/više nije dio nijednog programa/),
+      page.getByText(/nije upisano u program/),
     )
 
     // No session was minted: the login form is still the thing on screen.
@@ -158,13 +153,14 @@ test.describe('Phase 3 Step 10 — Student Portal Shell', () => {
       page.getByRole('heading', { name: `${SINGLE_STUDENT.firstName} ${SINGLE_STUDENT.lastName}` }),
     ).toBeVisible()
 
-    await expect(page.getByText('Korisničko ime', { exact: true })).toBeVisible()
-    await expect(page.getByText(singleCredentials.username, { exact: true })).toBeVisible()
+    // A child has no login of its own any more — no username on the profile.
+    await expect(page.getByText('Korisničko ime', { exact: true })).toHaveCount(0)
     await expect(page.getByText(SINGLE_STUDENT.childSchool)).toBeVisible()
 
     await expect(page.getByText('Roditelj / skrbnik')).toBeVisible()
     await expect(page.getByText(SINGLE_STUDENT.parentName)).toBeVisible()
-    await expect(page.getByText(SINGLE_STUDENT.parentEmail)).toBeVisible()
+    // The fixture's address carries a unique +tag (one login per test child).
+    await expect(page.getByText(singleCredentials.loginEmail)).toBeVisible()
     await expect(page.getByText(SINGLE_STUDENT.parentPhone)).toBeVisible()
 
     await expect(page.getByRole('button', { name: /Uredi|Spremi/ })).toHaveCount(0)

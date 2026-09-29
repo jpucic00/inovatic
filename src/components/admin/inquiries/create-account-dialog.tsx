@@ -193,12 +193,12 @@ export function CreateAccountDialog({
         return
       }
       if (res.success) {
-        // Nothing is mailed here any more — say so plainly, or the admin will
-        // assume the parent has the login and never run the campaign.
+        // Nothing is mailed here — say so plainly, or the admin will assume the
+        // parent already has portal access.
         toast.success(
           res.isExisting
-            ? 'Dijete upisano u novu grupu (postojeći račun). Pristupni podaci nisu poslani roditelju.'
-            : 'Račun kreiran i dijete upisano. Pristupni podaci nisu poslani roditelju — pošaljite ih preko E-mail → Pristupni podaci ili ih pročitajte na profilu učenika.',
+            ? 'Dijete upisano u novu grupu (postojeći račun). Roditelju nije poslana poveznica za lozinku.'
+            : 'Račun kreiran i dijete upisano. Roditelju nije poslana poveznica za lozinku — pošaljite je s profila učenika ili preko E-mail → Postavljanje lozinke.',
         )
         setOpen(false)
         router.refresh()

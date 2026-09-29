@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { UserPlus, Copy, ExternalLink, CheckCircle2 } from 'lucide-react'
+import { UserPlus, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { createTeacher } from '@/actions/admin/teacher'
 import { toast } from 'sonner'
 
@@ -26,7 +26,6 @@ export function CreateTeacherDialog() {
   const [isPending, startTransition] = useTransition()
   const [result, setResult] = useState<{
     teacherId: string
-    password: string
     emailSent: boolean
   } | null>(null)
 
@@ -65,13 +64,6 @@ export function CreateTeacherDialog() {
     })
   }
 
-  const copyCredentials = () => {
-    if (!result) return
-    const text = `E-mail: ${email}\nLozinka: ${result.password}`
-    navigator.clipboard.writeText(text)
-    toast.success('Podaci kopirani.')
-  }
-
   return (
     <Dialog
       open={open}
@@ -93,10 +85,10 @@ export function CreateTeacherDialog() {
           </DialogTitle>
           <DialogDescription>
             {(() => {
-              if (!result) return 'Kreiranjem računa generira se privremena lozinka koja se šalje na e-mail.'
+              if (!result) return 'Nastavnik na e-mail dobiva poveznicu i sam postavlja lozinku.'
               return result.emailSent
-                ? 'Pristupni podaci poslani su na unesenu e-mail adresu.'
-                : 'Račun je kreiran. E-mail nije poslan — podijelite pristupne podatke ručno.'
+                ? 'Poveznica za postavljanje lozinke poslana je na unesenu e-mail adresu.'
+                : 'Račun je kreiran, ali e-mail nije poslan — pošaljite poveznicu ponovno s profila nastavnika.'
             })()}
           </DialogDescription>
         </DialogHeader>
@@ -107,31 +99,10 @@ export function CreateTeacherDialog() {
               <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <p className="text-sm text-emerald-800">
-                  E-mail s pristupnim podacima poslan je na <strong>{email}</strong>.
+                  Poveznica za lozinku poslana je na <strong>{email}</strong>. Prijava je e-mailom.
                 </p>
               </div>
             )}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="text-sm font-medium text-green-800 mb-2">
-                Pristupni podaci
-              </p>
-              <div className="font-mono text-sm text-gray-800 space-y-1">
-                <p>
-                  <span className="text-gray-500">E-mail:</span> {email}
-                </p>
-                <p>
-                  <span className="text-gray-500">Lozinka:</span>{' '}
-                  {result.password}
-                </p>
-              </div>
-              <button
-                onClick={copyCredentials}
-                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200 transition-colors"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                Kopiraj podatke
-              </button>
-            </div>
             <div className="flex justify-end gap-2">
               <Link
                 href={`/admin/nastavnici/${result.teacherId}`}

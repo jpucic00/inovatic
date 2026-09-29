@@ -11,7 +11,8 @@ import { getTeacherWorkReport } from '@/actions/admin/teacher-work'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { computeSchoolYear } from '@/lib/school-year'
 import { EditTeacherDialog } from '@/components/admin/teachers/edit-teacher-dialog'
-import { ResetPasswordButton } from '@/components/admin/teachers/reset-password-button'
+import { SendPasswordLinkButton } from '@/components/shared/send-password-link-button'
+import { PasswordStatus } from '@/components/shared/password-status'
 import { DeleteTeacherDialog } from '@/components/admin/teachers/delete-teacher-dialog'
 import { TeacherAssignmentPanel } from '@/components/admin/teachers/teacher-assignment-panel'
 import { TeacherWorkReportCard } from '@/components/admin/teachers/teacher-work-report-card'
@@ -129,12 +130,14 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
         </dl>
       </div>
 
-      {/* Credentials */}
-      {!isAdminAccount && (
-        <div className="bg-white rounded-xl border p-6 mb-6">
-          <div className="flex items-center justify-between mb-2">
+      {/* Credentials — shown for a teaching admin too: whether staff still sit
+          on a password somebody handed them is exactly what this card answers. */}
+      <div className="bg-white rounded-xl border p-6 mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h2 className="text-sm font-semibold text-gray-700">Pristupni podaci</h2>
-            <ResetPasswordButton teacherId={teacher.id} teacherEmail={teacher.email} />
+            <SendPasswordLinkButton
+              target={{ kind: 'staff', userId: teacher.id, email: teacher.email }}
+            />
           </div>
           <dl>
             <DetailRow
@@ -147,23 +150,16 @@ export default async function TeacherDetailPage({ params }: Readonly<PageProps>)
               }
             />
             <DetailRow
-              label="Trenutna lozinka"
+              label="Vlastita lozinka"
               value={
-                teacher.plainPassword ? (
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono">{teacher.plainPassword}</span>
-                    <CopyButton value={teacher.plainPassword} label="lozinku" />
-                  </div>
-                ) : (
-                  <span className="text-gray-400 italic">
-                    Nije dostupna (nastavnik ju je promijenio)
-                  </span>
-                )
+                <PasswordStatus
+                  passwordSetAt={teacher.passwordSetAt}
+                  linkSentAt={teacher.credentialsSentAt}
+                />
               }
             />
           </dl>
-        </div>
-      )}
+      </div>
 
       {/* Assignments */}
       <div className="bg-white rounded-xl border p-6 mb-6">

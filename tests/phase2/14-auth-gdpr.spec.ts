@@ -26,7 +26,7 @@ test.describe('Login Page', () => {
     await page.locator('#identifier').fill('wrong@example.com')
     await page.locator('input[type="password"]').fill('wrongpassword')
     await page.locator('button[type="submit"]').click()
-    await expect(page.locator('text=Pogrešno korisničko ime ili lozinka')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('text=Pogrešan e-mail ili lozinka')).toBeVisible({ timeout: 10000 })
   })
 
   test('uses shared Logo component', async ({ page }) => {

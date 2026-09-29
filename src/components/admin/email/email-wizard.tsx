@@ -171,8 +171,8 @@ const DEFAULT_EVALUATION_BODY = [
 
 const DEFAULT_CREDENTIALS_BODY = [
   'Poštovani,',
-  'U nastavku se nalaze pristupni podaci Vašeg djeteta za polaznički portal. Ondje su dostupni materijali s radionica, fotografije i evaluacija.',
-  'Podatke čuvajte — vrijede za tekuću školsku godinu. Za sva pitanja slobodno nam odgovorite na ovu poruku.',
+  'u portalu udruge Inovatic vidite materijale s radionica, fotografije i evaluaciju svog djeteta. Prijavljujete se svojim e-mailom, a lozinku postavljate sami — preko poveznice u nastavku.',
+  'Ako već imate pristup portalu, ovu poruku možete zanemariti ili je iskoristiti da promijenite lozinku. Za sva pitanja slobodno nam odgovorite na ovu poruku.',
 ].join('\n')
 
 const DEFAULT_SCHEDULE_BODY = [
@@ -299,7 +299,7 @@ export function EmailWizard({
       setSourceYear(selectedYear)
     } else if (next === 'CREDENTIALS') {
       // No child name here either — the send appends it per recipient.
-      setSubject('Pristupni podaci za polaznički portal – Inovatic')
+      setSubject('Pristup portalu – postavite lozinku')
       setBodyBlocks(plainTextToBlocks(DEFAULT_CREDENTIALS_BODY))
       setSourceYear(selectedYear)
     } else if (next === 'SCHEDULE') {
@@ -713,9 +713,8 @@ export function EmailWizard({
         // Excluded rows are report cards here, not inboxes — see toggleRecipient.
         input = { kind: 'EVALUATION' as const, ...base, excludedAssessmentIds: [...excluded] }
       } else if (kind === 'CREDENTIALS') {
-        // Excluded rows are child accounts here, not inboxes — a sibling on the
-        // same address must survive unchecking their brother or sister.
-        input = { kind: 'CREDENTIALS' as const, ...base, excludedStudentIds: [...excluded] }
+        // A row is one parent login, whose address is its identity.
+        input = { kind: 'CREDENTIALS' as const, ...base, excludedParentEmails: [...excluded] }
       } else if (kind === 'SCHEDULE') {
         // Rows are inboxes again (siblings merged), so exclusion is by address.
         input = { kind: 'SCHEDULE' as const, ...base, excludedParentEmails: [...excluded] }
@@ -990,7 +989,7 @@ export function EmailWizard({
                   return 'Jedan red = jedno dijete i njegova kartica. Radionice se ne ocjenjuju pa nisu na popisu.'
                 }
                 if (kind === 'CREDENTIALS') {
-                  return 'Jedan red = jedno dijete i njegov račun. Dvoje djece na istoj adresi dobiva dvije poruke.'
+                  return 'Jedan red = jedan roditeljski račun sa svom odabranom djecom na njemu. Poruka ide svima — tko već ima pristup, može je zanemariti.'
                 }
                 if (kind === 'SCHEDULE') {
                   return 'Jedan red = jedan roditelj sa svom svojom djecom iz odabranih grupa. Radionice su uključene.'
@@ -1134,9 +1133,9 @@ export function EmailWizard({
                               {s.name}
                               {/* Both badges answer questions the admin would
                                   otherwise have to open each profile for. */}
-                              {s.needsPassword && (
-                                <span className="ml-2 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
-                                  nova lozinka
+                              {s.passwordSet && (
+                                <span className="ml-2 rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[11px] text-emerald-700">
+                                  lozinka postavljena
                                 </span>
                               )}
                               {s.alreadySent && (
@@ -1144,9 +1143,9 @@ export function EmailWizard({
                                   već poslano
                                 </span>
                               )}
-                              {!s.hasEmail && (
+                              {!s.hasAccount && (
                                 <span className="ml-2 rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700">
-                                  nema e-mail
+                                  nema roditeljski račun
                                 </span>
                               )}
                             </span>

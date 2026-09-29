@@ -99,7 +99,7 @@ test.describe('Phase 3 — Gallery', () => {
     const s = await seedStudentInGroup(groupId, STUDENT)
     seeded = {
       teacher: { email: TEACHER.email, password: t.password, teacherId: t.teacherId },
-      student: { email: `${s.username}@student.inovatic.local`, password: s.password },
+      student: { email: s.loginEmail, password: s.password },
       groupId,
     }
   })

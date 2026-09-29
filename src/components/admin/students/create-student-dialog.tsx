@@ -205,8 +205,8 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
         // assume the parent has the login and never run the campaign.
         toast.success(
           res.isExisting
-            ? 'Postojeći učenik pronađen i ažuriran. Pristupni podaci nisu poslani roditelju.'
-            : 'Račun učenika kreiran. Pristupni podaci nisu poslani roditelju — pošaljite ih preko E-mail → Pristupni podaci ili ih pročitajte na profilu učenika.',
+            ? 'Postojeći učenik pronađen i ažuriran. Roditelju nije poslana poveznica za lozinku.'
+            : 'Račun učenika kreiran. Roditelju nije poslana poveznica za lozinku — pošaljite je s profila učenika ili preko E-mail → Postavljanje lozinke.',
         )
         setOpen(false)
         router.refresh()

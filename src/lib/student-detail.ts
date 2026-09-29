@@ -120,8 +120,6 @@ const userBaseSelect = {
   email: true,
   firstName: true,
   lastName: true,
-  username: true,
-  plainPassword: true,
   phone: true,
   dateOfBirth: true,
   role: true,
@@ -139,6 +137,8 @@ const userBaseSelect = {
   parentAccount: {
     select: {
       email: true,
+      passwordSetAt: true,
+      credentialsSentAt: true,
       _count: { select: { children: { where: { role: 'STUDENT' as const, deletedAt: null } } } },
     },
   },

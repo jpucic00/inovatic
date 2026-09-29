@@ -10,6 +10,12 @@ import {
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
+// The link mail "arrives" so the send path completes; nothing leaves the test.
+vi.mock('@/lib/email', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/email')>('@/lib/email')
+  return { ...actual, sendPasswordLinkEmail: vi.fn(() => Promise.resolve(true)) }
+})
+
 // The city guards 404 via notFound() and the admin guards bounce via
 // redirect() — both from next/navigation, both throw in a real request.
 // Mirror that here (same shape as api/access-control.test.ts).
@@ -38,17 +44,16 @@ const {
   getAssignableGroupsForTeacher,
   createTeacher: createTeacherAction,
   updateTeacher,
-  resetTeacherPassword,
   deleteTeacher,
   assignTeacherToGroup,
   unassignTeacherFromGroup,
 } = await import('@/actions/admin/teacher')
+const { sendStaffPasswordLink } = await import('@/actions/password-link')
 
 const SY = '2026/2027'
 
 beforeAll(async () => {
-  // createTeacher/resetTeacherPassword send credentials emails when
-  // RESEND_API_KEY is set; the test environment shouldn't talk to Resend.
+  // Belt and braces: the mock above already keeps the link mail in-process.
   delete process.env.RESEND_API_KEY
   await db.schoolYear.upsert({ where: { label: SY }, create: { label: SY }, update: {} })
 })
@@ -133,20 +138,17 @@ describe('getAssignableTeachers — same-city TEACHER + ADMIN', () => {
 })
 
 describe('mutations by id — cross-city 404s, same-city works', () => {
-  it('resetTeacherPassword: cross-city throws NEXT_NOT_FOUND, same-city succeeds', async () => {
+  it('sendStaffPasswordLink: cross-city throws NEXT_NOT_FOUND and mints nothing, same-city sends', async () => {
     const sibTeacher = await createTeacher({ city: 'SIBENIK' })
     const splitTeacher = await createTeacher({ city: 'SPLIT' })
     await sibenikAdminSession()
 
-    await expect(resetTeacherPassword(splitTeacher.id)).rejects.toThrow('NEXT_NOT_FOUND')
-    const splitRow = await db.user.findUnique({
-      where: { id: splitTeacher.id },
-      select: { passwordHash: true },
-    })
-    expect(splitRow?.passwordHash).toBe(splitTeacher.passwordHash)
+    await expect(sendStaffPasswordLink(splitTeacher.id)).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(await db.passwordToken.count({ where: { userId: splitTeacher.id } })).toBe(0)
 
-    const res = await resetTeacherPassword(sibTeacher.id)
+    const res = await sendStaffPasswordLink(sibTeacher.id)
     expect(res.success).toBe(true)
+    expect(await db.passwordToken.count({ where: { userId: sibTeacher.id } })).toBe(1)
   })
 
   it('updateTeacher: cross-city throws NEXT_NOT_FOUND, same-city succeeds', async () => {

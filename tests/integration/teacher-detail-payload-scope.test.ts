@@ -32,13 +32,11 @@ afterAll(async () => {
 })
 
 describe('getTeacher — RSC payload scope', () => {
-  it('never ships passwordHash, and keeps plainPassword for a TEACHER', async () => {
+  it('never ships passwordHash or any password — only whether one was chosen', async () => {
     const admin = await createAdmin()
     const teacher = await createTeacher()
-    await db.user.update({
-      where: { id: teacher.id },
-      data: { plainPassword: 'nastavnik-lozinka' },
-    })
+    const setAt = new Date('2026-09-29T10:00:00Z')
+    await db.user.update({ where: { id: teacher.id }, data: { passwordSetAt: setAt } })
     mockSession({ id: admin.id, role: 'ADMIN' })
 
     const row = await getTeacher(teacher.id)
@@ -46,8 +44,9 @@ describe('getTeacher — RSC payload scope', () => {
     if (!row) return
 
     expect(row).not.toHaveProperty('passwordHash')
+    expect(row).not.toHaveProperty('plainPassword')
     // Load-bearing: the credentials block renders this.
-    expect(row.plainPassword).toBe('nastavnik-lozinka')
+    expect(row.passwordSetAt).toEqual(setAt)
     // Everything the page renders is still there.
     expect(row.email).toBe(teacher.email)
     expect(row.firstName).toBe(teacher.firstName)
@@ -79,33 +78,12 @@ describe('getTeacher — RSC payload scope', () => {
       'firstName',
       'id',
       'lastName',
+      'passwordSetAt',
+      'credentialsSentAt',
       'phone',
-      'plainPassword',
       'role',
       'teacherAssignments',
     ].sort())
-  })
-
-  it('omits plainPassword for a teaching ADMIN, matching the hidden credentials block', async () => {
-    const viewer = await createAdmin()
-    const teachingAdmin = await createAdmin()
-    await db.user.update({
-      where: { id: teachingAdmin.id },
-      data: { plainPassword: 'admin-lozinka' },
-    })
-    // An ADMIN only appears in this section if she actually teaches.
-    const group = await fx.group({ schoolYear: '2026/2027' })
-    await createTeacherAttendance(teachingAdmin.id, group.id)
-
-    mockSession({ id: viewer.id, role: 'ADMIN' })
-
-    const row = await getTeacher(teachingAdmin.id)
-    expect(row).not.toBeNull()
-    if (!row) return
-
-    expect(row).not.toHaveProperty('passwordHash')
-    expect(row.plainPassword).toBeNull()
-    expect(row.role).toBe('ADMIN')
   })
 
   it('keeps the assignment shape the detail panel renders', async () => {

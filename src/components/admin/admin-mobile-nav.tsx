@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, CalendarDays, TriangleAlert, Presentation, Send } from 'lucide-react'
+import { Menu, X, LogOut, LayoutDashboard, Inbox, Users2, BookOpen, MapPin, Users, GraduationCap, Newspaper, CalendarDays, TriangleAlert, Presentation, Send, KeyRound } from 'lucide-react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/shared/logo'
@@ -157,6 +157,13 @@ function UserFooter({ userName }: Readonly<{ userName: string }>) {
         <p className="text-xs text-gray-500 truncate">{userName}</p>
         <p className="text-xs text-gray-600">Administrator</p>
       </div>
+      <Link
+        href="/admin/lozinka"
+        className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+      >
+        <KeyRound className="w-4 h-4" />
+        Lozinka
+      </Link>
       <form action={logoutAction}>
         <button
           type="submit"

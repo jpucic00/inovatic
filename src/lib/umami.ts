@@ -10,9 +10,11 @@
  * tag survives client-side navigation into /portal → /admin etc., so the
  * data-before-send guard drops these even while the tracker stays loaded.
  * /portal covers the sign-in screen too; /prijava is the public signup form
- * and must stay tracked.
+ * and must stay tracked. /postavi-lozinku carries its token in the URL
+ * fragment, which Umami never reads — excluded anyway, since nothing about a
+ * password page is a visit worth counting.
  */
-export const UMAMI_INTERNAL_PATH_PATTERN = '^/(?:admin|nastavnik|portal|api)(?:/|$)'
+export const UMAMI_INTERNAL_PATH_PATTERN = '^/(?:admin|nastavnik|portal|api|postavi-lozinku)(?:/|$)'
 
 type UmamiEventData = Record<string, string | number | boolean>
 

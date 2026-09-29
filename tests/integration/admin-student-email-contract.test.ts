@@ -77,9 +77,9 @@ describe('createStudentFromInquiry — mails nothing', () => {
       const user = await db.user.findUnique({ where: { id: res.studentId } })
       expect(user).not.toBeNull()
       expect(user?.role).toBe('STUDENT')
-      // The password is minted and stored — readable on the profile — it is
-      // just never mailed from here.
-      expect(user?.plainPassword).toBeTruthy()
+      // No password exists for a child at all (2026-09-29) — nothing readable
+      // is stored, and the family gets its link separately.
+      expect(user?.plainPassword).toBeNull()
       const enrollments = await db.enrollment.count({
         where: { userId: res.studentId, scheduledGroupId: group.id },
       })
@@ -116,7 +116,7 @@ describe('createStudentManually — mails nothing', () => {
     if (res.success) {
       const user = await db.user.findUnique({ where: { id: res.studentId } })
       expect(user).not.toBeNull()
-      expect(user?.plainPassword).toBeTruthy()
+      expect(user?.plainPassword).toBeNull()
       const enrollments = await db.enrollment.count({
         where: { userId: res.studentId, scheduledGroupId: group.id },
       })

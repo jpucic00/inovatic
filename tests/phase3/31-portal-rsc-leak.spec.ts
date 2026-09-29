@@ -152,7 +152,7 @@ test.describe('Phase 3 — Portal RSC payload leak guard', () => {
 
     seeded = {
       studentLogin: {
-        email: `${s.username}@student.inovatic.local`,
+        email: s.loginEmail,
         password: s.password,
       },
       groupId,

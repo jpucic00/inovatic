@@ -32,9 +32,11 @@ import {
   type EvaluationCard,
 } from '@/lib/evaluation-email-cards'
 import {
-  assertCredentialsBelongTo,
-  type CredentialsCard,
+  assertPasswordLinkBelongsTo,
+  type CredentialsGroup,
+  type PasswordLinkCard,
 } from '@/lib/credentials-email-recipients'
+import { isLinkableRole, issuePasswordToken, PASSWORD_LINK_VALID_FOR } from '@/lib/password-token'
 import {
   assertScheduleBelongsTo,
   buildScheduleRecipients,
@@ -43,11 +45,9 @@ import {
 import { GROUP_TERMIN_SELECT, toGroupTermin } from '@/lib/group-termin'
 import { formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
-import { generateSimplePassword, hashPassword } from '@/lib/password'
-// Credentials ride the campaign template (`credentials` on sendBulkMessageEmail),
-// not the standalone `sendStudentCredentialsEmail` — that one owns its own
-// subject and hard-requires a single group, neither of which fits a campaign.
-import { renderBulkMessageHtml, sendBulkMessageEmail } from '@/lib/email'
+// The setup link rides the campaign template (`passwordLink` on
+// sendBulkMessageEmail) so the admin's own message frames it.
+import { passwordLinkUrl, renderBulkMessageHtml, sendBulkMessageEmail } from '@/lib/email'
 import {
   parseRichBlocks,
   resolveEmailBody,
@@ -146,9 +146,9 @@ function groupKindFilter(kind: EmailCampaignKind) {
 
 /**
  * Feed for the CREDENTIALS "pojedinačna djeca" picker: every student enrolled in
- * `sourceYear` in the admin's city, with their groups and their credentials
- * state, so the admin can see at a glance who still needs a password minted and
- * who has already been sent working details.
+ * `sourceYear` in the admin's city, with their groups and their parent login's
+ * state, so the admin can see at a glance which family has already chosen a
+ * password and which was sent a link before.
  *
  * City-scoped like every other feed here. The send re-resolves and re-validates
  * whatever comes back, so this is a convenience list, not a trust boundary.
@@ -168,9 +168,9 @@ export async function getEmailStudentOptions(sourceYear: string) {
       id: true,
       firstName: true,
       lastName: true,
-      parentEmail: true,
-      plainPassword: true,
-      credentialsSentAt: true,
+      parentAccount: {
+        select: { deletedAt: true, passwordSetAt: true, credentialsSentAt: true },
+      },
       enrollments: {
         where: { schoolYear: sourceYear },
         select: { scheduledGroup: { select: { name: true, course: { select: { title: true } } } } },
@@ -187,9 +187,10 @@ export async function getEmailStudentOptions(sourceYear: string) {
         [e.scheduledGroup.name, e.scheduledGroup.course.title].filter(Boolean).join(' · '),
       )
       .join(' | '),
-    hasEmail: normalizeParentEmail(s.parentEmail) !== null,
-    needsPassword: !s.plainPassword,
-    alreadySent: s.credentialsSentAt !== null,
+    // "Has a login a link can go to" — no parent account means nothing to mail.
+    hasAccount: s.parentAccount !== null && s.parentAccount.deletedAt === null,
+    passwordSet: s.parentAccount?.passwordSetAt != null,
+    alreadySent: s.parentAccount?.credentialsSentAt != null,
   }))
 }
 
@@ -457,12 +458,9 @@ async function resolveEvaluationCohort(
 }
 
 /**
- * Credentials mode: one recipient per child ACCOUNT, from either selected groups
- * or explicitly named children.
- *
- * The unit is the account, so a child in two selected groups produces one row
- * listing both groups — unlike EVALUATION, where two groups mean two documents
- * and therefore two mails.
+ * Credentials mode: one recipient per PARENT ACCOUNT, from either selected
+ * groups or explicitly named children — every selected child that login opens
+ * is listed in one mail, and a child in two selected groups is listed once.
  *
  * Both selection modes validate the same way every other cohort does: a smuggled
  * or cross-city id invalidates the whole request rather than being silently
@@ -512,10 +510,16 @@ async function resolveCredentialsCohort(
       id: true,
       firstName: true,
       lastName: true,
-      parentEmail: true,
-      plainPassword: true,
-      username: true,
-      credentialsSentAt: true,
+      parentAccount: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          deletedAt: true,
+          passwordSetAt: true,
+          credentialsSentAt: true,
+        },
+      },
       enrollments: {
         where: { schoolYear: sourceSchoolYear },
         select: {
@@ -534,17 +538,22 @@ async function resolveCredentialsCohort(
         studentId: s.id,
         firstName: s.firstName,
         lastName: s.lastName,
-        parentEmail: s.parentEmail,
         groupLabel: s.enrollments
           .map((e) =>
             [e.scheduledGroup.name, e.scheduledGroup.course.title].filter(Boolean).join(' · '),
           )
           .join(' | '),
-        // A null plainPassword means the account has an unusable hash (the Excel
-        // importer's doing) — nobody can log in with it, so minting a fresh one
-        // at campaign creation destroys nothing.
-        needsPassword: !s.plainPassword || !s.username,
-        alreadySent: s.credentialsSentAt !== null,
+        // A deleted or non-parent login is no login a link may go to — the
+        // child is listed as skipped, the same as one with no account at all.
+        account:
+          s.parentAccount && !s.parentAccount.deletedAt && isLinkableRole(s.parentAccount.role)
+            ? {
+                id: s.parentAccount.id,
+                email: s.parentAccount.email,
+                passwordSet: s.parentAccount.passwordSetAt !== null,
+                alreadySent: s.parentAccount.credentialsSentAt !== null,
+              }
+            : null,
       })),
     ),
   }
@@ -1034,21 +1043,26 @@ const SAMPLE_EVALUATION_CARD: EvaluationCard = {
 /**
  * Stand-in login for the step-1 layout preview. Invented for the same reason as
  * the sample card above, plus a sharper one: the preview is about the template,
- * and rendering a real child's working password into a preview iframe would put
- * a live credential on screen for no benefit.
+ * and a real link in a preview iframe would be a working way into a family's
+ * portal sitting on an admin's screen for no benefit. The link goes nowhere.
  */
-const SAMPLE_CREDENTIALS_CARD: CredentialsCard = {
-  childName: 'Ana Anić (primjer)',
-  username: 'ana_anic',
-  password: 'a1b2c3',
-  groups: [
+const SAMPLE_PASSWORD_LINK_CARD: PasswordLinkCard = {
+  email: 'roditelj@primjer.hr',
+  children: [
     {
-      label: 'SLR 2 – utorkom · Svijet LEGO robotike 2',
-      schedule: 'Utorak, 17:00–18:30',
-      locationName: 'Velebitska 32',
-      locationAddress: 'Velebitska 32, Split',
+      name: 'Ana Anić (primjer)',
+      groups: [
+        {
+          label: 'SLR 2 – utorkom · Svijet LEGO robotike 2',
+          schedule: 'Utorak, 17:00–18:30',
+          locationName: 'Velebitska 32',
+          locationAddress: 'Velebitska 32, Split',
+        },
+      ],
     },
   ],
+  url: '#primjer',
+  validFor: PASSWORD_LINK_VALID_FOR.SETUP,
 }
 
 /**
@@ -1096,8 +1110,8 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
     let signupPath: string | undefined
     const cards =
       parsed.data.kind === 'EVALUATION' ? [SAMPLE_EVALUATION_CARD] : undefined
-    const credentials =
-      parsed.data.kind === 'CREDENTIALS' ? SAMPLE_CREDENTIALS_CARD : undefined
+    const passwordLink =
+      parsed.data.kind === 'CREDENTIALS' ? SAMPLE_PASSWORD_LINK_CARD : undefined
     const schedules = parsed.data.kind === 'SCHEDULE' ? SAMPLE_SCHEDULE_CARDS : undefined
     if (parsed.data.kind === 'REENROLLMENT') {
       const targetYear = await getSelectedSchoolYear()
@@ -1119,7 +1133,7 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
     if (parsed.data.kind === 'EVALUATION') {
       previewSubject = `${parsed.data.subject} – ${SAMPLE_EVALUATION_CARD.childName}`
     } else if (parsed.data.kind === 'CREDENTIALS') {
-      previewSubject = `${parsed.data.subject} – ${SAMPLE_CREDENTIALS_CARD.childName}`
+      previewSubject = `${parsed.data.subject} – ${SAMPLE_PASSWORD_LINK_CARD.children.map((c) => c.name).join(', ')}`
     } else if (parsed.data.kind === 'SCHEDULE') {
       previewSubject = `${parsed.data.subject} – ${SAMPLE_SCHEDULE_CARDS.map((c) => c.childName).join(', ')}`
     }
@@ -1149,7 +1163,7 @@ export async function previewEmailHtml(input: PreviewEmailInput): Promise<Previe
       options,
       signupPath,
       cards,
-      credentials,
+      passwordLink,
       schedules,
       attachments: files.attachments,
     })
@@ -1231,81 +1245,19 @@ function partitionRecipients(
 /**
  * The unchecked rows, keyed the way this kind's `rowKey` is keyed.
  *
- * Per-child kinds cannot exclude by address: two siblings share one, so
+ * A per-child kind cannot exclude by address: two siblings share one, so
  * unchecking a child would silently drop their sibling too. EVALUATION keys on
- * the report card (two groups = two documents = two rows) and CREDENTIALS on the
- * student (one account, however many groups).
+ * the report card (two groups = two documents = two rows). CREDENTIALS rows are
+ * a parent LOGIN, whose address is its identity, so it excludes by address like
+ * the per-inbox kinds.
  */
 function buildExcludedSet(data: SendEmailCampaignInput): Set<string> {
   if (data.kind === 'EVALUATION') return new Set(data.excludedAssessmentIds ?? [])
-  if (data.kind === 'CREDENTIALS') return new Set(data.excludedStudentIds ?? [])
   return new Set(
     (data.excludedParentEmails ?? [])
       .map((e) => normalizeParentEmail(e))
       .filter((e): e is string => e !== null),
   )
-}
-
-/** One minted credential, hashed before the transaction opens. */
-type MintedPassword = { id: string; password: string; passwordHash: string }
-
-/**
- * Hash a new password for every credentialed child that has none — OUTSIDE any
- * transaction.
- *
- * bcrypt at cost 12 costs ~200 ms per call and `bcryptjs` is pure JS, so doing
- * this inside the campaign transaction put a CPU-bound loop under Prisma's
- * 5 s interactive-transaction budget: about two dozen children exhausted it and
- * the whole campaign rolled back with a generic error — no rows, no passwords,
- * nothing sent, and identical on retry. Historically-imported accounts all have
- * `plainPassword: null`, so a cohort of exactly those children is both the
- * campaign's primary audience and the case that blew the budget. Hashing here
- * and writing inside keeps the transaction to plain updates.
- */
-async function mintPasswordsFor(recipients: EmailRecipient[]): Promise<MintedPassword[]> {
-  const studentIds = recipients.flatMap((r) => r.studentIds)
-  if (studentIds.length === 0) return []
-
-  const needing = await db.user.findMany({
-    where: { id: { in: studentIds }, role: 'STUDENT', plainPassword: null },
-    select: { id: true },
-  })
-
-  return Promise.all(
-    needing.map(async (student) => {
-      const password = generateSimplePassword(6)
-      return { id: student.id, password, passwordHash: await hashPassword(password) }
-    }),
-  )
-}
-
-/**
- * Store the minted passwords, inside the campaign-creation transaction.
- *
- * That placement is the whole point: minting inside the send loop would mean a
- * resumed run rotates a password a second time, invalidating the one the first
- * run already mailed — the parent would hold a password that no longer works and
- * nothing would say so.
- *
- * The `plainPassword: null` condition is repeated here, on the write, so it
- * still holds against the read done before the transaction opened: a concurrent
- * campaign (or a `resetStudentPassword`) that gave the child a password in
- * between must win, rather than being overwritten by a hash computed earlier.
- * Only accounts with no usable password are ever touched — a null
- * `plainPassword` means an unusable hash, so nobody can log in with it today and
- * replacing it destroys nothing, while a parent handed their password in person
- * must never find it silently rotated.
- */
-async function persistMintedPasswords(
-  tx: Prisma.TransactionClient,
-  minted: MintedPassword[],
-): Promise<void> {
-  for (const m of minted) {
-    await tx.user.updateMany({
-      where: { id: m.id, role: 'STUDENT', plainPassword: null },
-      data: { passwordHash: m.passwordHash, plainPassword: m.password },
-    })
-  }
 }
 
 export async function sendEmailCampaign(
@@ -1362,11 +1314,6 @@ export async function sendEmailCampaign(
     const sourceRecommendations = data.recommendations?.length
       ? await labelRecommendations(data.recommendations, city)
       : []
-
-    // Hashed BEFORE the transaction opens — see `mintPasswordsFor`. Only the
-    // writes belong inside; bcrypt does not.
-    const mintedPasswords =
-      data.kind === 'CREDENTIALS' ? await mintPasswordsFor(toSend) : []
 
     // One transaction: the campaign row and its intended-recipient rows commit
     // together, so a crash here can't leave a campaign whose counters promise a
@@ -1441,16 +1388,6 @@ export async function sendEmailCampaign(
           studentIds: r.studentIds,
         })),
       })
-
-      // Mint the missing passwords HERE, in the same transaction that claims the
-      // cohort — never inside the send loop, where a resumed run would rotate a
-      // second time and invalidate the password the first mail already
-      // delivered. Only accounts with no usable password are touched: a null
-      // `plainPassword` means an unusable hash (the Excel importer's doing), so
-      // nobody can log in with it and nothing is destroyed.
-      if (data.kind === 'CREDENTIALS') {
-        await persistMintedPasswords(tx, mintedPasswords)
-      }
 
       return created
     })
@@ -1609,9 +1546,9 @@ type SendJob = {
   signupPath: string | undefined
   sentKey: string | null
   /**
-   * Which year's groups a CREDENTIALS mail lists. A plain scalar, and safe to
-   * live here: it is the same for every recipient. The per-child content it
-   * helps build is still constructed inside the loop.
+   * Which year's groups a CREDENTIALS (or SCHEDULE) mail lists. A plain scalar,
+   * and safe to live here: it is the same for every recipient. The per-child
+   * content it helps build is still constructed inside the loop.
    */
   sourceSchoolYear: string
   /**
@@ -1688,57 +1625,65 @@ async function markRecipientFailed(
     .catch(() => {})
 }
 
-/** Everything the credentials card and its ownership guard read off a student. */
-const CREDENTIALS_SELECT = {
+/** Everything the setup-link guard and the card read off a selected child. */
+const PASSWORD_LINK_SELECT = {
   id: true,
   firstName: true,
   lastName: true,
-  parentEmail: true,
   city: true,
-  username: true,
-  plainPassword: true,
   deletedAt: true,
+  parentAccount: { select: { id: true, email: true, role: true, deletedAt: true } },
 } as const
 
-type BuiltCredentials =
-  | { ok: true; card: CredentialsCard; childName: string; studentId: string }
+/**
+ * Proven, but WITHOUT the link: the token is minted only after the row is
+ * claimed (see `sendToRecipient`), because minting deletes the account's
+ * earlier links — a run that loses the claim must not kill the link the
+ * winning run just mailed.
+ */
+type BuiltPasswordLink =
+  | {
+      ok: true
+      accountId: string
+      childNames: string[]
+      children: PasswordLinkCard['children']
+    }
   | { ok: false; reason: string }
 
 /**
- * Load the login one recipient row is owed, and prove it may go to that address
- * before returning it.
+ * Load the children one recipient row covers, and prove they still share the
+ * ONE login whose address the row names (`assertPasswordLinkBelongsTo`).
  *
- * The sibling of `buildCardsForRecipient`, and the same discipline: the row's
- * `studentIds` were written when the cohort was resolved, so this re-derives
- * ownership from the student's CURRENT `parentEmail` and refuses on any
- * disagreement (`assertCredentialsBelongTo`). Called once per recipient from
- * inside the send loop — never hoisted, so a password cannot outlive its
- * iteration.
+ * The sibling of `buildCardsForRecipient` and `buildSchedulesForRecipient`, and
+ * the same discipline: the row was written when the cohort was resolved, so
+ * ownership is re-derived from the children's CURRENT parent account and the
+ * whole row fails closed on any disagreement — a child moved to the other
+ * parent since then is exactly the case this exists for. Called once per
+ * recipient from inside the send loop — never hoisted.
  *
- * The group list is loaded separately from the ownership row: it is display
- * content, and an empty list is fine (a child credentialed before enrollment
- * still gets a working login).
+ * Groups are display content and read fresh; an empty list is fine.
  */
-async function buildCredentialsForRecipient(
+async function buildPasswordLinkForRecipient(
   recipient: { parentEmail: string; studentIds: string[] },
   city: City,
   sourceSchoolYear: string,
-): Promise<BuiltCredentials> {
+): Promise<BuiltPasswordLink> {
   const rows = await db.user.findMany({
     where: { id: { in: recipient.studentIds }, role: 'STUDENT' },
-    select: CREDENTIALS_SELECT,
+    select: PASSWORD_LINK_SELECT,
+    orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
   })
 
-  const verdict = assertCredentialsBelongTo(
+  const verdict = assertPasswordLinkBelongsTo(
     { parentEmail: recipient.parentEmail, city, studentIds: recipient.studentIds },
     rows,
   )
   if (!verdict.ok) return { ok: false, reason: verdict.reason }
 
-  const student = rows[0]
   const enrollments = await db.enrollment.findMany({
-    where: { userId: student.id, schoolYear: sourceSchoolYear },
+    where: { userId: { in: recipient.studentIds }, schoolYear: sourceSchoolYear },
     select: {
+      userId: true,
       scheduledGroup: {
         select: {
           name: true,
@@ -1752,33 +1697,36 @@ async function buildCredentialsForRecipient(
         },
       },
     },
+    orderBy: { createdAt: 'asc' },
   })
+  const groupsByStudent = new Map<string, CredentialsGroup[]>()
+  for (const { userId, scheduledGroup: g } of enrollments) {
+    const list = groupsByStudent.get(userId) ?? []
+    list.push({
+      label: [g.name, g.course.title].filter(Boolean).join(' · '),
+      schedule: formatGroupSchedule({
+        dateRange: isRadionica(g.course.kind),
+        dayOfWeek: g.dayOfWeek,
+        dateStart: g.dateStart,
+        dateEnd: g.dateEnd,
+        startTime: g.startTime,
+        endTime: g.endTime,
+      }),
+      locationName: g.location.name,
+      locationAddress: g.location.address,
+    })
+    groupsByStudent.set(userId, list)
+  }
 
-  const childName = `${student.firstName} ${student.lastName}`.trim()
+  const children = rows.map((child) => ({
+    name: `${child.firstName} ${child.lastName}`.trim(),
+    groups: groupsByStudent.get(child.id) ?? [],
+  }))
   return {
     ok: true,
-    studentId: student.id,
-    childName,
-    card: {
-      childName,
-      // The guard above already refused a null username/password, so these are
-      // non-null here.
-      username: student.username ?? '',
-      password: student.plainPassword ?? '',
-      groups: enrollments.map(({ scheduledGroup: g }) => ({
-        label: [g.name, g.course.title].filter(Boolean).join(' · '),
-        schedule: formatGroupSchedule({
-          dateRange: isRadionica(g.course.kind),
-          dayOfWeek: g.dayOfWeek,
-          dateStart: g.dateStart,
-          dateEnd: g.dateEnd,
-          startTime: g.startTime,
-          endTime: g.endTime,
-        }),
-        locationName: g.location.name,
-        locationAddress: g.location.address,
-      })),
-    },
+    accountId: verdict.accountId,
+    childNames: children.map((c) => c.name),
+    children,
   }
 }
 
@@ -1800,7 +1748,7 @@ type BuiltSchedules =
  * Load the children one recipient row covers, prove every one of them still
  * belongs to that address (`assertScheduleBelongsTo`), and build their cards.
  *
- * Same discipline as `buildCardsForRecipient` and `buildCredentialsForRecipient`:
+ * Same discipline as `buildCardsForRecipient` and `buildPasswordLinkForRecipient`:
  * the row's `studentIds` were written when the cohort was resolved, so ownership
  * is re-derived from the students' CURRENT `parentEmail`, and the whole row
  * fails closed on any disagreement. Called once per recipient from inside the
@@ -1901,9 +1849,9 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
   // recipient and must not be able to survive into the next iteration. See
   // SendJob.
   let cards: EvaluationCard[] | undefined
-  let credentials: CredentialsCard | undefined
+  let passwordLink: PasswordLinkCard | undefined
+  let proven: Extract<BuiltPasswordLink, { ok: true }> | undefined
   let schedules: ScheduleCard[] | undefined
-  let credentialedStudentId: string | undefined
   let subject = job.subject
   if (job.kind === 'EVALUATION') {
     const built = await buildCardsForRecipient(recipient, job.city)
@@ -1918,20 +1866,19 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
     // makes a misdirected card obvious to the person best placed to notice.
     subject = `${job.subject} – ${built.childName}`
   } else if (job.kind === 'CREDENTIALS') {
-    const built = await buildCredentialsForRecipient(
+    const built = await buildPasswordLinkForRecipient(
       recipient,
       job.city,
       job.sourceSchoolYear,
     )
     if (!built.ok) {
-      // Fail closed, for the same reason and with more at stake: an unprovable
-      // login is never mailed.
+      // Fail closed, for the same reason and with more at stake: a link that
+      // could reach the wrong inbox is never minted, let alone mailed.
       await markRecipientFailed(claimId, job.campaignId, built.reason)
       return
     }
-    credentials = built.card
-    credentialedStudentId = built.studentId
-    subject = `${job.subject} – ${built.childName}`
+    proven = built
+    subject = `${job.subject} – ${built.childNames.join(', ')}`
   } else if (job.kind === 'SCHEDULE') {
     const built = await buildSchedulesForRecipient(recipient, job.city, job.sourceSchoolYear)
     if (!built.ok) {
@@ -1949,6 +1896,21 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
   if (!(await claimRecipient(job, claimId))) return
 
   try {
+    if (proven) {
+      // Minted only now that this run owns the row — see BuiltPasswordLink.
+      // `createdById` is null: the campaign row already records who sent it.
+      const { token } = await issuePasswordToken({
+        userId: proven.accountId,
+        purpose: 'SETUP',
+        createdById: null,
+      })
+      passwordLink = {
+        email: recipient.parentEmail,
+        children: proven.children,
+        url: passwordLinkUrl(token),
+        validFor: PASSWORD_LINK_VALID_FOR.SETUP,
+      }
+    }
     // Non-throw counts as sent — matches app-wide semantics (the no-key
     // no-op also "succeeds", so dev sends still write SENT log rows).
     await sendBulkMessageEmail({
@@ -1960,19 +1922,14 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
       options: job.options,
       signupPath: job.signupPath,
       cards,
-      credentials,
+      passwordLink,
       schedules,
       attachments: job.attachments,
     })
-    // "This parent holds a password that currently works." Stamped only after a
-    // non-throwing send, and cleared again by resetStudentPassword — so it never
-    // claims a rotated password was delivered.
-    if (credentialedStudentId) {
+    // "A link reached this login." Stamped only after a non-throwing send.
+    if (proven) {
       await db.user
-        .update({
-          where: { id: credentialedStudentId },
-          data: { credentialsSentAt: new Date() },
-        })
+        .update({ where: { id: proven.accountId }, data: { credentialsSentAt: new Date() } })
         .catch(() => {})
     }
     // Counts increment per recipient so progress polling is live and an

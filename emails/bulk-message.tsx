@@ -1,13 +1,13 @@
 import { Hr, Link, Section, Text } from '@react-email/components'
 import { EmailLayout, emailStyles } from './components/email-layout'
 import { EvaluationCardBlock } from './components/evaluation-card'
-import { CredentialsCardBlock } from './components/credentials-card'
+import { PasswordLinkBlock } from './components/password-link-card'
 import { ScheduleCardBlock } from './components/schedule-card'
 import { RichTextBody } from './components/rich-text'
 import type { GroupOption } from './schedule-options'
 import type { EmailRichBlock } from '../src/lib/email-rich-text'
 import type { EvaluationCard } from '../src/lib/evaluation-email-cards'
-import type { CredentialsCard } from '../src/lib/credentials-email-recipients'
+import type { PasswordLinkCard } from '../src/lib/credentials-email-recipients'
 import type { ScheduleCard } from '../src/lib/schedule-email-recipients'
 import type { AttachmentSummary } from '../src/lib/email-attachment-rules'
 
@@ -40,14 +40,14 @@ interface BulkMessageProps {
    */
   cards?: EvaluationCard[]
   /**
-   * When present, renders this child's portal login — the CREDENTIALS kind.
-   * Exactly one child per mail, always: two siblings on one address have two
-   * different logins, so merging would put someone else's account in the mail.
+   * When present, renders the parent login's one-time "choose your password"
+   * link and the children it opens — the CREDENTIALS kind. One per mail: a row
+   * is one parent account, built inside the send loop.
    */
-  credentials?: CredentialsCard
+  passwordLink?: PasswordLinkCard
   /**
    * When present, renders one card per child with that child's groups — the
-   * SCHEDULE kind. Unlike `cards` and `credentials` this legitimately holds
+   * SCHEDULE kind. Unlike `cards` and `passwordLink` this legitimately holds
    * several: siblings on one address are mailed together, by design.
    */
   schedules?: ScheduleCard[]
@@ -65,7 +65,7 @@ interface BulkMessageProps {
 /**
  * One template for every /admin/email campaign kind: a CUSTOM send passes only
  * bodyText; the REENROLLMENT invitation adds `options` + `signupUrl`; the
- * EVALUATION send adds `cards`; CREDENTIALS adds `credentials`; SCHEDULE adds
+ * EVALUATION send adds `cards`; CREDENTIALS adds `passwordLink`; SCHEDULE adds
  * `schedules`.
  */
 function BulkMessageEmail({
@@ -74,7 +74,7 @@ function BulkMessageEmail({
   options,
   signupUrl,
   cards,
-  credentials,
+  passwordLink,
   schedules,
   attachments,
   subject,
@@ -128,16 +128,16 @@ function BulkMessageEmail({
           </Text>
         </>
       )}
-      {credentials && (
+      {passwordLink && (
         <>
           <Hr style={emailStyles.hr} />
-          <CredentialsCardBlock card={credentials} />
+          <PasswordLinkBlock card={passwordLink} />
           <Text style={emailStyles.textSmall}>
             Prijava je na&nbsp;
             <Link href="https://udruga-inovatic.hr/portal" style={{ color: '#0891b2' }}>
               udruga-inovatic.hr/portal
             </Link>
-            . Lozinku možete zatražiti ponovno u bilo kojem trenutku — javite nam se.
+            . Ako poveznica istekne, javite nam se i poslat ćemo novu.
           </Text>
         </>
       )}

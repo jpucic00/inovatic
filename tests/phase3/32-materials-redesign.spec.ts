@@ -94,7 +94,7 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
 
     seeded = {
       teacher: { email: TEACHER.email, password: t.password },
-      student: { email: `${s.username}@student.inovatic.local`, password: s.password },
+      student: { email: s.loginEmail, password: s.password },
       groupId,
       courseId,
       courseTitle,

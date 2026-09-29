@@ -198,37 +198,36 @@ async function createStudentManuallyViaDialog(
   // Scope it to the dialog to avoid strict-mode violations.
   const dialog = page.locator('[role="dialog"]')
   await dialog.getByRole('button', { name: 'Kreiraj učenika' }).click()
+  // Joining a parent login that already sees a child (a sibling fixture on the
+  // same address) needs the admin's yes; answer it so the create goes through.
+  // `isVisible` does not wait, so race the two outcomes instead of peeking once.
+  const confirm = dialog.getByRole('button', { name: 'Potvrdi i kreiraj' })
+  await Promise.race([
+    dialog.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => undefined),
+    confirm.waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined),
+  ])
+  if (await confirm.isVisible().catch(() => false)) await confirm.click()
 }
 
 /**
- * Searches the student list for `lastName`, opens every matching student's
- * detail page, and returns the username shown in the "Pristupni podaci" card.
- * The create dialog no longer surfaces the generated username, so the
- * username-generation assertions read it off the detail page instead.
+ * The usernames generated for every student named `lastName` (matching
+ * `nameRegex`), oldest first. Read from the database: a child no longer signs
+ * in, so the username is not shown anywhere — but it is still generated as the
+ * account's unique handle, and its shape is still worth pinning.
  */
 async function readGeneratedUsernames(
-  page: Page,
+  _page: Page,
   lastName: string,
   nameRegex: RegExp,
 ): Promise<string[]> {
-  await page.goto(`${BASE}/admin/ucenici?search=${encodeURIComponent(lastName)}`)
-  const links = page.getByRole('link', { name: nameRegex })
-  await expect(links.first()).toBeVisible({ timeout: 10000 })
-  const hrefs = await links.evaluateAll((els) =>
-    els.map((el) => el.getAttribute('href') ?? ''),
-  )
-  const usernames: string[] = []
-  for (const href of hrefs) {
-    await page.goto(`${BASE}${href}`)
-    const username = (
-      await page
-        .locator('xpath=//dt[normalize-space()="Korisničko ime"]/following-sibling::dd')
-        .first()
-        .innerText()
-    ).trim()
-    usernames.push(username)
-  }
-  return usernames
+  const rows = await db.user.findMany({
+    where: { role: 'STUDENT', lastName, deletedAt: null },
+    select: { username: true, firstName: true, lastName: true },
+    orderBy: { createdAt: 'asc' },
+  })
+  return rows
+    .filter((r) => nameRegex.test(`${r.firstName} ${r.lastName}`))
+    .map((r) => r.username ?? '')
 }
 
 // ─── Test suite ──────────────────────────────────────────────────────────────
@@ -426,9 +425,9 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       await expect(
         page.locator('h1', { hasText: `${MANUAL_STUDENT.firstName} ${MANUAL_STUDENT.lastName}` }),
       ).toBeVisible()
-      // Sections — use exact matches since "Pristupni podaci" and "Podaci"
+      // Sections — use exact matches since "Pristup portalu" and "Podaci"
       // would otherwise collide under strict mode.
-      await expect(page.getByRole('heading', { name: 'Pristupni podaci' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Pristup portalu' })).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Podaci', exact: true })).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Upisane grupe' })).toBeVisible()
       // Exact: the student now arrives with an enrollment, which brings the
@@ -437,8 +436,9 @@ test.describe.serial('Phase 2 Step 8 — Student Management', () => {
       await expect(page.getByRole('heading', { name: 'Opasna zona' })).toBeVisible()
 
       // Personal data fields
-      await expect(page.getByText('Korisničko ime')).toBeVisible()
-      await expect(page.getByText('Lozinka')).toBeVisible()
+      // The parent login, never a password (none is stored readably).
+      await expect(page.getByText('Roditeljski račun')).toBeVisible()
+      await expect(page.getByText('Lozinka roditelja')).toBeVisible()
       await expect(page.getByText('Datum rođenja')).toBeVisible()
       await expect(page.getByText(MANUAL_STUDENT.childSchool)).toBeVisible()
       await expect(page.getByText(MANUAL_STUDENT.parentName)).toBeVisible()

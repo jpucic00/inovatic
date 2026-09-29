@@ -57,12 +57,67 @@ export async function seedTeacher(
       lastName: t.lastName,
       phone: t.phone,
       passwordHash,
-      plainPassword: password,
       role: 'TEACHER',
       city: 'SPLIT',
     },
   })
   return { teacherId: user.id, password }
+}
+
+/**
+ * Give `userId` a known password, straight in the database — what the setup
+ * link would do, minus the mail. E2E needs a login; nothing in the app hands
+ * one out any more (2026-09-29).
+ */
+export async function grantLogin(userId: string): Promise<string> {
+  const password = generatePassword(10)
+  await db.user.update({
+    where: { id: userId },
+    data: { passwordHash: await bcrypt.hash(password, HASH_ROUNDS) },
+  })
+  return password
+}
+
+/**
+ * The address a fixture child's parent signs in with: the fixture's own
+ * address with a unique `+tag`. Fixtures share parent e-mails across specs, and
+ * one shared address would be ONE parent login seeing every such child — the
+ * login would land on the child picker instead of the portal.
+ */
+export function uniqueParentEmail(base: string): string {
+  const [local, domain] = base.split('@')
+  return `${local}+${uniqSuffix()}@${domain}`.toLowerCase()
+}
+
+/**
+ * A working parent login for `studentId`: the parent account the child is
+ * already linked to (the admin UI links it on creation), or a new one on the
+ * child's own parent e-mail. Returns what `loginWithEmail` takes.
+ */
+export async function grantParentLogin(
+  studentId: string,
+): Promise<{ loginEmail: string; password: string }> {
+  const child = await db.user.findUniqueOrThrow({
+    where: { id: studentId },
+    select: { parentEmail: true, city: true, parentAccount: { select: { id: true, email: true } } },
+  })
+  let account = child.parentAccount
+  if (!account) {
+    if (!child.parentEmail) throw new Error(`grantParentLogin: ${studentId} has no parent e-mail`)
+    account = await db.user.create({
+      data: {
+        email: child.parentEmail.trim().toLowerCase(),
+        passwordHash: await bcrypt.hash(generatePassword(), HASH_ROUNDS),
+        firstName: 'Roditelj',
+        lastName: 'E2E',
+        role: 'PARENT',
+        city: child.city,
+      },
+      select: { id: true, email: true },
+    })
+    await db.user.update({ where: { id: studentId }, data: { parentAccountId: account.id } })
+  }
+  return { loginEmail: account.email, password: await grantLogin(account.id) }
 }
 
 /** Direct-Prisma equivalent of `phase3.ts:assignTeacherToGroup`. */
@@ -77,22 +132,20 @@ export async function seedTeacherAssignment(
 
 /**
  * Direct-Prisma equivalent of `phase3.ts:createStudentInGroup` — creates a
- * STUDENT user + Enrollment row in one shot. `username` is derived from
- * firstName.lastName + a unique suffix to avoid colliding with siblings
- * across test runs; `email` is set to `${username}@student.inovatic.local`
- * (the same shape the admin UI generates) so `loginWithEmail` works
- * unchanged.
+ * STUDENT user + Enrollment row in one shot, plus the child's own parent login
+ * (a unique `+tag` address, see {@link uniqueParentEmail}) with a known
+ * password. `loginEmail` + `password` is what the family signs in with.
  */
 export async function seedStudentInGroup(
   groupId: string,
   s: StudentData,
 ): Promise<{
   studentId: string
-  username: string
+  loginEmail: string
   password: string
 }> {
-  const password = generatePassword()
-  const passwordHash = await bcrypt.hash(password, HASH_ROUNDS)
+  // A child never signs in; this hash only fills the column.
+  const passwordHash = await bcrypt.hash(generatePassword(24), HASH_ROUNDS)
   const suffix = uniqSuffix()
   const base = `${s.firstName}.${s.lastName}`
     .toLowerCase()
@@ -133,10 +186,9 @@ export async function seedStudentInGroup(
         dateOfBirth: s.dateOfBirth,
         childSchool: s.childSchool,
         parentName: s.parentName,
-        parentEmail: s.parentEmail,
+        parentEmail: uniqueParentEmail(s.parentEmail),
         parentPhone: s.parentPhone,
         passwordHash,
-        plainPassword: password,
         role: 'STUDENT',
         city: group.city,
       },
@@ -156,7 +208,7 @@ export async function seedStudentInGroup(
     return user
   })
 
-  return { studentId: result.id, username, password }
+  return { studentId: result.id, ...(await grantParentLogin(result.id)) }
 }
 
 
@@ -200,7 +252,19 @@ export async function clearFixtureGroupEnrollments(groupIds: string[]): Promise<
     select: { id: true },
   })
   if (orphaned.length > 0) {
+    const parentIds = (
+      await db.user.findMany({
+        where: { id: { in: orphaned.map((u) => u.id) }, parentAccountId: { not: null } },
+        select: { parentAccountId: true },
+      })
+    ).map((u) => u.parentAccountId as string)
     await db.user.deleteMany({ where: { id: { in: orphaned.map((u) => u.id) } } })
+    // Their parent logins go too once no child is left on them — only PARENT
+    // rows, never a staff account a fixture happened to link to.
+    await db.passwordToken.deleteMany({ where: { userId: { in: parentIds } } })
+    await db.user.deleteMany({
+      where: { id: { in: parentIds }, role: 'PARENT', children: { none: {} } },
+    })
   }
   return enrollments.length
 }

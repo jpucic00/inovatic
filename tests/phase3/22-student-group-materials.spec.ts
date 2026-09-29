@@ -59,7 +59,7 @@ test.describe('Phase 3 Step 11 — Student Group Materials', () => {
     // it doesn't break when the shared bootstrap group fills up across runs.
     const creds = await seedStudentInGroup(a, STUDENT)
     seeded = {
-      loginEmail: `${creds.username}@student.inovatic.local`,
+      loginEmail: creds.loginEmail,
       password: creds.password,
       myGroupId: a,
       otherGroupId: b,

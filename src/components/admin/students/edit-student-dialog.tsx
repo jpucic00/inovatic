@@ -120,7 +120,7 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
         <DialogHeader>
           <DialogTitle>Uredi podatke učenika</DialogTitle>
           <DialogDescription>
-            Uredite podatke djeteta i kontakt roditelja. Pristupni podaci i upisi
+            Uredite podatke djeteta i kontakt roditelja. Pristup portalu i upisi
             se uređuju zasebno.
           </DialogDescription>
         </DialogHeader>

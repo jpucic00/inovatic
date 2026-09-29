@@ -1,6 +1,6 @@
 'use server'
 
-import { headers } from 'next/headers'
+import { clientIp } from '@/lib/client-ip'
 import { sendStemEducationConfirmationEmail, sendStemEducationInquiryEmail } from '@/lib/email'
 import { allowRequest } from '@/lib/rate-limit'
 import {
@@ -29,12 +29,6 @@ import {
 const MAX_PER_IP = 5
 const MAX_PER_EMAIL = 3
 const WINDOW_MS = 60 * 60 * 1000
-
-/** First hop of `x-forwarded-for` (Railway sets it); unknown clients share a bucket. */
-async function clientIp(): Promise<string> {
-  const forwarded = (await headers()).get('x-forwarded-for')
-  return forwarded?.split(',')[0]?.trim() || 'unknown'
-}
 
 export async function submitStemEducationInquiry(
   data: StemEducationInquiryFormData,

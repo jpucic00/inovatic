@@ -93,7 +93,7 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
       teacher: { email: TEACHER.email, password: t.password, teacherId: t.teacherId },
       studentId: s.studentId,
       studentLogin: {
-        email: `${s.username}@student.inovatic.local`,
+        email: s.loginEmail,
         password: s.password,
       },
       groupId,

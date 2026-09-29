@@ -5,7 +5,6 @@
  * the healed account immediately leaves the fuzzy pool.
  */
 import { describe, expect, it, vi, beforeAll } from 'vitest'
-import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
 import { mockSession } from './setup'
@@ -45,7 +44,7 @@ async function createLegacyStudent(overrides: { city?: 'SPLIT' | 'SIBENIK' } = {
   })
   await db.user.update({
     where: { id: student.id },
-    data: { parentEmail, plainPassword: null },
+    data: { parentEmail },
   })
   return { student, lastName, parentEmail }
 }
@@ -187,7 +186,7 @@ describe('createStudentFromInquiry — legacy reuse heals the DOB', () => {
     expect(differentChild).toBeNull()
   })
 
-  it('mints real credentials for the imported account instead of a blank password', async () => {
+  it('reuses the imported account and links it to the parent login — no password is minted', async () => {
     const admin = await createAdmin({ city: 'SPLIT' })
     mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
 
@@ -208,12 +207,16 @@ describe('createStudentFromInquiry — legacy reuse heals the DOB', () => {
     expect(result.success).toBe(true)
     if (!result.success) throw new Error('unreachable')
 
-    // The reused row had no `plainPassword`; the parent's credentials email
-    // must not ship an empty Lozinka line, and the child must be able to log in.
-    expect(result.password).not.toBe('')
-    const healed = await db.user.findUnique({ where: { id: student.id } })
-    expect(healed?.plainPassword).toBe(result.password)
-    expect(await bcrypt.compare(result.password, healed!.passwordHash)).toBe(true)
+    // Since 2026-09-29 a child never signs in: the reused row keeps its
+    // unusable hash untouched and gains the parent login instead.
+    expect(result.studentId).toBe(student.id)
+    const healed = await db.user.findUnique({
+      where: { id: student.id },
+      select: { passwordHash: true, plainPassword: true, parentAccount: { select: { email: true } } },
+    })
+    expect(healed?.passwordHash).toBe(student.passwordHash)
+    expect(healed?.plainPassword).toBeNull()
+    expect(healed?.parentAccount?.email).toBe(parentEmail.toLowerCase())
   })
 
   it('applies identically to manual creation (Dodaj učenika, no inquiry)', async () => {

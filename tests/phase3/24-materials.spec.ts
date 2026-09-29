@@ -70,7 +70,7 @@ test.describe('Phase 3 Step 13 — Materials', () => {
     const s = await seedStudentInGroup(groupId, STUDENT)
     seeded = {
       teacher: { email: TEACHER.email, password: t.password, teacherId: t.teacherId },
-      student: { email: `${s.username}@student.inovatic.local`, password: s.password },
+      student: { email: s.loginEmail, password: s.password },
       groupId,
     }
   })
@@ -659,7 +659,7 @@ test.describe('Phase 3 Step 13 — COURSE-scope material on a radionica', () => 
       parentPhone: '0911117777',
     })
 
-    await loginWithEmail(page, `${s.username}@student.inovatic.local`, s.password)
+    await loginWithEmail(page, s.loginEmail, s.password)
     // One enrollment: /portal forwards straight to the group page.
     await page.waitForURL(new RegExp(`/portal/grupa/${radionicaSeeded.groupA}`), {
       timeout: 30000,

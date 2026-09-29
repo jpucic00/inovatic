@@ -12,7 +12,8 @@ import type { FamilyDiscountsByYear } from '@/lib/family-discount'
 import { BackToListLink } from '@/components/admin/back-to-list-link'
 import { DeleteStudentDialog } from '@/components/admin/students/delete-student-dialog'
 import { EditStudentDialog } from '@/components/admin/students/edit-student-dialog'
-import { ResetPasswordButton } from '@/components/admin/students/reset-password-button'
+import { SendPasswordLinkButton } from '@/components/shared/send-password-link-button'
+import { PasswordStatus } from '@/components/shared/password-status'
 import { StudentYearSections } from '@/components/shared/student-year-sections'
 import { CopyButton } from './copy-button'
 import { formatDate, formatDateKey } from '@/lib/format'
@@ -183,15 +184,20 @@ export function StudentDetailView({
         </p>
       </div>
 
-      {/* Credentials */}
+      {/* Portal access — the parent login that opens this child. Anyone who can
+          see this page may send its link (owner decision 2026-09-29); no
+          password is ever shown, because none is stored readably. */}
       <div className="bg-white rounded-xl border p-6 mb-6">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <h2 className="text-sm font-semibold text-gray-700">Pristupni podaci</h2>
-          {isAdmin && (
-            <ResetPasswordButton
-              studentId={student.id}
-              username={student.username}
-              hasPassword={Boolean(student.plainPassword)}
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <h2 className="text-sm font-semibold text-gray-700">Pristup portalu</h2>
+          {student.parentAccount && (
+            <SendPasswordLinkButton
+              target={{
+                kind: 'parent',
+                studentId: student.id,
+                email: student.parentAccount.email,
+                childCount: student.parentAccount._count.children,
+              }}
             />
           )}
         </div>
@@ -210,36 +216,23 @@ export function StudentDetailView({
                   )}
                 </span>
               ) : (
-                <span className="text-gray-400 italic">Nema — portal nije dostupan</span>
+                <span className="text-gray-400 italic">
+                  Nema — portal nije dostupan dok se ne upiše ispravan e-mail roditelja
+                </span>
               )
             }
           />
-          <DetailRow
-            label="Korisničko ime"
-            value={
-              student.username ? (
-                <div className="flex items-center gap-2">
-                  <span className="font-mono">{student.username}</span>
-                  <CopyButton value={student.username} label="korisničko ime" />
-                </div>
-              ) : (
-                <span className="font-mono">—</span>
-              )
-            }
-          />
-          <DetailRow
-            label="Lozinka"
-            value={
-              student.plainPassword ? (
-                <div className="flex items-center gap-2">
-                  <span className="font-mono">{student.plainPassword}</span>
-                  <CopyButton value={student.plainPassword} label="lozinku" />
-                </div>
-              ) : (
-                <span className="text-gray-400 italic">Nije dostupna</span>
-              )
-            }
-          />
+          {student.parentAccount && (
+            <DetailRow
+              label="Lozinka roditelja"
+              value={
+                <PasswordStatus
+                  passwordSetAt={student.parentAccount.passwordSetAt}
+                  linkSentAt={student.parentAccount.credentialsSentAt}
+                />
+              }
+            />
+          )}
         </dl>
       </div>
 

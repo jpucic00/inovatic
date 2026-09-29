@@ -17,7 +17,7 @@ import {
   type UpdateStudentInput,
   type AddEnrollmentInput,
 } from '@/lib/validators/admin/student'
-import { hashPassword, generateSimplePassword } from '@/lib/password'
+import { unusablePasswordHash } from '@/lib/password'
 import {
   GroupFullError,
   assertGroupHasAvailableSpot,
@@ -150,22 +150,14 @@ type StudentListResult = PaginatedResult<StudentRow> & {
 type CreateStudentResult =
   | {
       success: true
-      username: string
-      password: string
       isExisting: boolean
       studentId: string
-      // No `emailFailed`: since 2026-08-17 neither creation path mails anything.
-      // Credentials leave only through the CREDENTIALS e-mail campaign, so there
-      // is no send here that could fail.
+      // Nothing is mailed and no password exists: the family reaches the portal
+      // through its parent login, whose link goes out from the profile or the
+      // setup-link campaign.
     }
   | { success: false; error: string; code?: 'GROUP_FULL' }
   | ({ success: false; error: string } & ParentLinkConfirmation)
-
-// No `emailSent` counterpart to the teacher result — a student password reset
-// is never mailed (see resetStudentPassword).
-type ResetStudentPasswordResult =
-  | { success: true; password: string }
-  | { success: false; error: string }
 
 const DIACRITICS_MAP: Record<string, string> = {
   'č': 'c', 'ć': 'c', 'š': 's', 'ž': 'z', 'đ': 'd',
@@ -227,7 +219,6 @@ type CoreInput = {
 
 type CoreResult = {
   user: { id: string; username: string | null }
-  password: string
   isExisting: boolean
   enrollmentId: string | null
   group: {
@@ -260,7 +251,7 @@ const sameIgnoringCase = (a: string, b: string) =>
 async function findOrCreateStudent(
   tx: TxClient,
   input: CoreInput,
-): Promise<{ user: { id: string; username: string | null }; password: string; isExisting: boolean }> {
+): Promise<{ user: { id: string; username: string | null }; isExisting: boolean }> {
   // Normalization happens HERE, at account creation, never on the inquiry
   // (owner decision 2026-09-06): the upit stays exactly as the parent typed it,
   // and what reaches the User row is trimmed, NFC and single-spaced. A trailing
@@ -271,7 +262,7 @@ async function findOrCreateStudent(
   const identity = { firstName, lastName, dateOfBirth: input.dateOfBirth, parentEmail }
 
   const matchSelect = {
-    id: true, username: true, plainPassword: true, city: true,
+    id: true, username: true, city: true,
     firstName: true, lastName: true, dateOfBirth: true, parentEmail: true,
   } as const
   // The DB narrows candidates by the exact parts (DOB; parent e-mail for the
@@ -305,20 +296,6 @@ async function findOrCreateStudent(
     if (!existingStudent.dateOfBirth && input.dateOfBirth) {
       backfill.dateOfBirth = input.dateOfBirth
     }
-    // A historically-imported account carries an unusable hash and no
-    // `plainPassword` (src/lib/import-history/apply.ts). Re-enrolling one has
-    // to mint real credentials here, or the parent's confirmation email ships
-    // a blank Lozinka line and the child still cannot log in.
-    const password = existingStudent.plainPassword ?? generateSimplePassword(6)
-    if (!existingStudent.plainPassword) {
-      backfill.plainPassword = password
-      backfill.passwordHash = await hashPassword(password)
-      // Rotating the password always invalidates anything a campaign mailed.
-      // A no-op today (a null plainPassword means nothing was ever sendable),
-      // written so the invariant stays local to the rotation rather than
-      // depending on that coincidence holding.
-      backfill.credentialsSentAt = null
-    }
     if (Object.keys(backfill).length > 0) {
       await tx.user.update({
         where: { id: existingStudent.id },
@@ -331,20 +308,19 @@ async function findOrCreateStudent(
     await linkParentAccount(tx, existingStudent.id, existingStudent.id, input, parentEmail)
     return {
       user: { id: existingStudent.id, username: existingStudent.username },
-      password,
       isExisting: true,
     }
   }
 
   const username = await generateUsername(tx, firstName, lastName)
-  const password = generateSimplePassword(6)
-  const passwordHash = await hashPassword(password)
+  // A child never signs in (2026-09-29) — the username stays only as a stable,
+  // unique handle behind the synthetic address. No password exists to find.
+  const passwordHash = await unusablePasswordHash()
 
   const created = await tx.user.create({
     data: {
       email: `${username}@student.inovatic.local`,
       username,
-      plainPassword: password,
       passwordHash,
       firstName,
       lastName,
@@ -360,7 +336,7 @@ async function findOrCreateStudent(
     select: { id: true, username: true },
   })
   await linkParentAccount(tx, null, created.id, input, parentEmail)
-  return { user: created, password, isExisting: false }
+  return { user: created, isExisting: false }
 }
 
 /**
@@ -501,10 +477,10 @@ async function createSeasonMonths(
  *   createStudentCore so the count doesn't double.
  */
 async function createStudentCore(tx: TxClient, input: CoreInput): Promise<CoreResult> {
-  const { user, password, isExisting } = await findOrCreateStudent(tx, input)
+  const { user, isExisting } = await findOrCreateStudent(tx, input)
 
   if (!input.groupId) {
-    return { user, password, isExisting, enrollmentId: null, group: null }
+    return { user, isExisting, enrollmentId: null, group: null }
   }
 
   const { enrollmentId, group } = await ensureEnrollment(
@@ -515,7 +491,7 @@ async function createStudentCore(tx: TxClient, input: CoreInput): Promise<CoreRe
     input.city,
     input.paymentOption,
   )
-  return { user, password, isExisting, enrollmentId, group }
+  return { user, isExisting, enrollmentId, group }
 }
 
 /**
@@ -675,11 +651,10 @@ export async function createStudentFromInquiry(
     return { success: false, error: 'Grupa nije pronađena.' }
   }
 
-  // Accepting an inquiry deliberately mails NOTHING (2026-08-17). Credentials
-  // leave the building only through the CREDENTIALS e-mail campaign, which the
-  // admin runs once the contracts are signed — see `/admin/email`. The password
-  // stays readable on the student profile, which is now the primary way to hand
-  // it over early rather than a fallback.
+  // Accepting an inquiry deliberately mails NOTHING (2026-08-17). The family's
+  // login is the parent account; its password link goes out from the child's
+  // profile or the setup-link campaign on `/admin/email`, when the admin
+  // decides the family should have portal access.
   revalidatePath('/admin/upiti')
   // Creating this student may make OTHER inquiries with the same child identity
   // read as "Ponovni upis", so revalidate every inquiry detail page, not just
@@ -689,8 +664,6 @@ export async function createStudentFromInquiry(
 
   return {
     success: true,
-    username: core.user.username ?? '',
-    password: core.password,
     isExisting: core.isExisting,
     studentId: core.user.id,
   }
@@ -749,8 +722,6 @@ export async function createStudentManually(
 
   return {
     success: true,
-    username: core.user.username ?? '',
-    password: core.password,
     isExisting: core.isExisting,
     studentId: core.user.id,
   }
@@ -1060,56 +1031,6 @@ export async function getStudent(id: string) {
   const { city } = await requireAdminCtx()
   await assertUserInCity(id, city)
   return buildStudentDetailForAdmin(id, city)
-}
-
-/**
- * Regenerates a student's login password and reveals it to the admin.
- *
- * Display-only by design — nothing is emailed here: a child's `email` is the
- * synthetic @student.inovatic.local address, and credentials reach a parent only
- * through the CREDENTIALS e-mail campaign. The admin hands the new password over
- * directly, or runs that campaign.
- *
- * Clearing `credentialsSentAt` is the point of that column: any password a
- * previous campaign mailed no longer works, so the child must read as "not sent"
- * again rather than as a parent who already has working details.
- *
- * This is also one way to unlock a historically-imported account, which is
- * created with an unusable hash and no `plainPassword` — see the promise made in
- * src/lib/import-history/apply.ts. (The credentials campaign mints one too, for
- * every such child in its cohort.)
- */
-export async function resetStudentPassword(
-  studentId: string,
-): Promise<ResetStudentPasswordResult> {
-  const { city } = await requireAdminCtx()
-
-  if (!studentId) return { success: false, error: 'ID nije pronađen.' }
-
-  // Role-narrowed so a same-city TEACHER/ADMIN id can't be reset through the
-  // student path. Wrong-role and cross-city ids both read as missing, matching
-  // the city-guard notFound() convention used by deleteStudent.
-  const target = await db.user.findFirst({
-    where: { id: studentId, role: 'STUDENT' },
-    select: { city: true },
-  })
-  if (target?.city !== city) notFound()
-
-  try {
-    const password = generateSimplePassword(6)
-    const passwordHash = await hashPassword(password)
-
-    await db.user.update({
-      where: { id: studentId },
-      data: { passwordHash, plainPassword: password, credentialsSentAt: null },
-    })
-
-    revalidatePath(`/admin/ucenici/${studentId}`)
-    return { success: true, password }
-  } catch (err) {
-    console.error('resetStudentPassword failed:', err)
-    return { success: false, error: 'Greška pri resetiranju lozinke.' }
-  }
 }
 
 export async function deleteEnrollment(enrollmentId: string): Promise<AdminActionResult> {

@@ -90,7 +90,7 @@ test.describe('Phase 3 Step 12 — Teacher Panel', () => {
       groupBId,
       groupACourseTitle,
       studentId: s.studentId,
-      studentLoginEmail: `${s.username}@student.inovatic.local`,
+      studentLoginEmail: s.loginEmail,
       studentPassword: s.password,
     }
     await page.close()
@@ -132,9 +132,10 @@ test.describe('Phase 3 Step 12 — Teacher Panel', () => {
     const row = page.locator('tr', { has: page.getByRole('link', { name: studentFullName }) })
     await expect(row).toBeVisible()
 
-    const mailto = row.locator(`a[href="mailto:${STUDENT.parentEmail}"]`)
+    // The fixture's parent address carries a per-run `+tag`, so read it back.
+    const mailto = row.locator(`a[href="mailto:${seeded.studentLoginEmail}"]`)
     await expect(mailto).toBeVisible()
-    await expect(mailto).toContainText(STUDENT.parentEmail)
+    await expect(mailto).toContainText(seeded.studentLoginEmail)
 
     const tel = row.locator(`a[href="tel:${STUDENT.parentPhone.replace(/\s+/g, '')}"]`)
     await expect(tel).toBeVisible()

@@ -5,6 +5,7 @@ import { loginWithEmail, openLoginForm, BASE, addLinkMaterial, markSession, croa
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 import { fillInquiryStep1, selectPaymentOptionIfShown } from '../helpers/prijava'
 import { newRunId } from '../helpers/cleanup'
+import { grantParentLogin } from '../helpers/seed'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PR9 — E2E Šibenik journey (launch gate for the two-city separation)
@@ -104,7 +105,7 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
 
   let groupId = ''
   let studentId = ''
-  let credentials = { username: '', password: '' }
+  let credentials = { loginEmail: '', password: '' }
 
   await test.step('Slavica logs in city-bound, with an unplanned Šibenik year', async () => {
     await loginAsSlavica(page)
@@ -219,9 +220,10 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
     await openLoginForm(page)
     await page.locator('#identifier').fill(SLAVICA_EMAIL)
     await page.locator('input[type="password"]').fill(SLAVICA_PASSWORD)
-    const teacherChoice = page.getByRole('button', { name: 'Nastavnički panel' })
+    // The choice is the /portal/odabir picker — links, one per panel.
+    const teacherChoice = page.getByRole('link', { name: 'Nastavnički panel' })
     await clickUntilVisible(page.locator('button[type="submit"]'), teacherChoice)
-    await expect(page.getByRole('button', { name: 'Administracija' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Administracija' })).toBeVisible()
     await submitUntilUrl(page, teacherChoice, /\/nastavnik/)
     await expect(page.getByText(GROUP_NAME).first()).toBeVisible({ timeout: 15000 })
 
@@ -297,21 +299,20 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
     }
 
     await dialog.getByRole('button', { name: /Kreiraj račun/ }).click()
+    // A child left over from an earlier run (same name + birth date, another
+    // run's parent address) is recognised and needs the admin's yes to move.
+    const confirmLink = dialog.getByRole('button', { name: 'Potvrdi i kreiraj' })
+    if (await confirmLink.isVisible({ timeout: 3000 }).catch(() => false)) await confirmLink.click()
     const profileLink = page.getByRole('link', { name: /Pogledaj profil učenika/ })
     await expect(profileLink).toBeVisible({ timeout: 15000 })
     await submitUntilUrl(page, profileLink, /\/admin\/ucenici\/[a-z0-9]+/)
     studentId = /\/admin\/ucenici\/([a-z0-9]+)/.exec(page.url())![1]
 
-    await expect(page.getByRole('heading', { name: 'Pristupni podaci' })).toBeVisible()
-    const username = (
-      await page.locator('xpath=//dt[normalize-space()="Korisničko ime"]/following-sibling::dd').first().innerText()
-    ).trim()
-    const password = (
-      await page.locator('xpath=//dt[normalize-space()="Lozinka"]/following-sibling::dd').first().innerText()
-    ).trim()
-    credentials = { username, password }
-    expect(credentials.username).not.toBe('')
-    expect(credentials.password).not.toBe('')
+    // The upit's parent address became the family login; no password is shown
+    // anywhere, so the fixture sets one straight in the database.
+    await expect(page.getByRole('heading', { name: 'Pristup portalu' })).toBeVisible()
+    await expect(page.getByText(PARENT.parentEmail.toLowerCase()).first()).toBeVisible()
+    credentials = await grantParentLogin(studentId)
 
     const student = await db.user.findUnique({ where: { id: studentId }, select: { city: true } })
     expect(student?.city).toBe('SIBENIK')
@@ -323,7 +324,7 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
 
   await test.step('the student logs in and lands on the Trokut group with its material', async () => {
     await page.context().clearCookies()
-    await loginWithEmail(page, credentials.username, credentials.password)
+    await loginWithEmail(page, credentials.loginEmail, credentials.password)
     await page.waitForURL(/\/portal/, { timeout: 30000 })
 
     // Single enrollment → direct landing on the group's materials.
@@ -345,7 +346,7 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
   await test.step('the admin student profile shows the marked session', async () => {
     await loginAsSlavica(page)
     await page.goto(`${BASE}/admin/ucenici/${studentId}`)
-    await expect(page.getByRole('heading', { name: 'Pristupni podaci' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Pristup portalu' })).toBeVisible()
     await expect(page.getByText(croatianDateRegex(SESSION_DATE)).first()).toBeVisible()
   })
 })

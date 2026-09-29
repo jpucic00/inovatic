@@ -154,7 +154,7 @@ test.describe('Phase 3 Step 15 — Comments UI', () => {
       groupBId,
       studentId: s.studentId,
       studentLogin: {
-        email: `${s.username}@student.inovatic.local`,
+        email: s.loginEmail,
         password: s.password,
       },
     }

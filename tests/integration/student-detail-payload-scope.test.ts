@@ -13,7 +13,7 @@ import { buildStudentDetailForAdmin, buildStudentDetailForTeacher } from '@/lib/
 
 // P4 fail-closed contract for the shared student-detail view builders:
 // - passwordHash is NEVER selected (neither variant),
-// - plainPassword IS retained (kids' passwords are shown to teachers by design),
+// - no password of any kind is selected: a child has none to show (2026-09-29),
 // - payment fields (Enrollment.fullYearPaidAt, ModuleEnrollment.paidAt) appear
 //   ONLY in the admin variant; the teacher variant hard-nulls them,
 // - contractSignedAt is the deliberate EXCEPTION to that scrub: teachers collect
@@ -24,7 +24,6 @@ const CONTRACT_SIGNED_AT = new Date('2026-08-20T00:00:00.000Z')
 
 async function seedPaidStudent() {
   const student = await createStudent()
-  await db.user.update({ where: { id: student.id }, data: { plainPassword: 'dijete-lozinka' } })
   const course = await createCourse()
   const mod = await createModule(course.id)
   const schedule = await createModuleSchedule(mod.id)
@@ -39,15 +38,15 @@ async function seedPaidStudent() {
 }
 
 describe('student-detail payload scope (P4)', () => {
-  it('teacher payload keeps plainPassword, omits passwordHash, and nulls payment fields', async () => {
+  it('teacher payload carries no password field at all, and nulls payment fields', async () => {
     const studentId = await seedPaidStudent()
 
     const detail = await buildStudentDetailForTeacher(studentId)
 
     expect(detail).not.toBeNull()
-    expect(detail?.plainPassword).toBe('dijete-lozinka')
-    // passwordHash was never selected → the key is absent from the payload.
+    // Neither was selected → both keys are absent from the payload.
     expect(detail !== null && 'passwordHash' in detail).toBe(false)
+    expect(detail !== null && 'plainPassword' in detail).toBe(false)
     for (const e of detail!.enrollments) {
       expect(e.fullYearPaidAt).toBeNull()
       for (const me of e.moduleEnrollments) {

@@ -17,6 +17,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { v2 as cloudinarySdk } from 'cloudinary'
 import { db } from '@/lib/db'
+import { grantLogin, grantParentLogin, uniqueParentEmail } from './seed'
 
 export const BASE = 'http://localhost:3000'
 const ADMIN_EMAIL = 'jpucic00@gmail.com'
@@ -108,18 +109,18 @@ export async function loginWithEmail(page: Page, email: string, password: string
   await openLoginForm(page)
   await page.locator('#identifier').fill(email)
   await page.locator('input[type="password"]').fill(password)
-  // A dual-role admin (ADMIN with ≥1 TeacherAssignment) gets a panel-choice
-  // step instead of an auto-redirect; pick "Administracija" so specs land on
-  // /admin exactly as they did before the choice existed. Mirrors the retry
-  // shape of submitUntilUrl (hydration can swallow early clicks).
+  // A dual-role admin (ADMIN with ≥1 TeacherAssignment) lands on the
+  // /portal/odabir picker instead of a panel; pick "Administracija" so specs
+  // land on /admin exactly as they did before the choice existed. Mirrors the
+  // retry shape of submitUntilUrl (hydration can swallow early clicks).
   //
-  // /portal is BOTH the login screen and the student destination, so a URL
-  // check alone cannot tell "still logged out" from "logged in as student":
-  // staff navigate away to /admin | /nastavnik, while a student stays on
-  // /portal and the login form is replaced by the portal shell. The form's
-  // #identifier field disappearing is the student success signal.
+  // /portal is BOTH the login screen and the family destination, so a URL
+  // check alone cannot tell "still logged out" from "logged in as a parent":
+  // staff navigate away to /admin | /nastavnik, while a parent stays under
+  // /portal and the login form is replaced by the portal shell or the child
+  // picker. The form's #identifier field disappearing is the parent signal.
   const staffUrl = /\/(admin|nastavnik)/
-  const adminChoice = page.getByRole('button', { name: 'Administracija' })
+  const adminChoice = page.getByRole('link', { name: 'Administracija' })
   const submit = page.locator('button[type="submit"]')
   const identifier = page.locator('#identifier')
   const deadline = Date.now() + 45000
@@ -186,11 +187,9 @@ export async function createTeacher(
   await page.locator('#teacher-last').fill(t.lastName)
   await page.locator('#teacher-phone').fill(t.phone)
   await page.getByRole('button', { name: /^Kreiraj nastavnika$/ }).click()
-  await expect(page.getByText('Pristupni podaci', { exact: true })).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText('Nastavnik kreiran', { exact: true })).toBeVisible({ timeout: 15000 })
 
   const dialog = page.locator('[role="dialog"]')
-  const passwordText = (await dialog.locator('p', { hasText: 'Lozinka:' }).innerText()).trim()
-  const password = passwordText.replace(/^Lozinka:\s*/, '').trim()
 
   const profileLink = dialog.getByRole('link', { name: /Profil nastavnika|Otvori profil/i }).first()
   const href = (await profileLink.getAttribute('href')) ?? ''
@@ -199,7 +198,9 @@ export async function createTeacher(
   const teacherId = m[1]
 
   await page.getByRole('button', { name: 'Zatvori' }).click()
-  return { password, teacherId }
+  // No password is shown or mailed any more — the teacher would set one through
+  // the link. Give the fixture a known one straight in the database.
+  return { password: await grantLogin(teacherId), teacherId }
 }
 
 export async function assignTeacherToGroup(page: Page, teacherId: string, groupId: string) {
@@ -212,30 +213,6 @@ export async function assignTeacherToGroup(page: Page, teacherId: string, groupI
   await expect(page.locator('button[aria-label="Ukloni dodjelu"]').first()).toBeVisible({
     timeout: 10000,
   })
-}
-
-/**
- * Reads username + plainPassword off the admin student detail page's
- * "Pristupni podaci" card. The create dialogs no longer surface credentials in
- * a result modal, so callers navigate to /admin/ucenici/[id] and read them here.
- * Assumes the page is already on the student detail route.
- */
-async function readCredentialsFromDetail(
-  page: Page,
-): Promise<{ username: string; password: string }> {
-  const username = (
-    await page
-      .locator('xpath=//dt[normalize-space()="Korisničko ime"]/following-sibling::dd')
-      .first()
-      .innerText()
-  ).trim()
-  const password = (
-    await page
-      .locator('xpath=//dt[normalize-space()="Lozinka"]/following-sibling::dd')
-      .first()
-      .innerText()
-  ).trim()
-  return { username, password }
 }
 
 /**
@@ -252,11 +229,28 @@ async function fillDob(page: Page, dob: string) {
   await input.evaluate((el) => el.dispatchEvent(new Event('blur', { bubbles: true })))
 }
 
+/**
+ * Submit the "Kreiraj učenika" dialog, confirming the parent-account link when
+ * the server asks. Fixture children keep the same name + birth date across
+ * runs, so a child left over from an earlier run is recognised and — arriving
+ * with this run's unique parent address — needs the admin's yes to move.
+ */
+async function submitCreateStudent(dialog: ReturnType<Page['locator']>): Promise<void> {
+  await dialog.getByRole('button', { name: 'Kreiraj učenika' }).click()
+  const confirm = dialog.getByRole('button', { name: 'Potvrdi i kreiraj' })
+  await Promise.race([
+    dialog.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => undefined),
+    confirm.waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined),
+  ])
+  if (await confirm.isVisible().catch(() => false)) await confirm.click()
+  await expect(dialog).toBeHidden({ timeout: 15000 })
+}
+
 export async function createStudentInGroup(
   page: Page,
   groupId: string,
   student: StudentData,
-): Promise<{ studentId: string; username: string; password: string }> {
+): Promise<{ studentId: string; loginEmail: string; password: string }> {
   await page.goto(`${BASE}/admin/ucenici`)
   await page.getByRole('button', { name: 'Kreiraj učenika' }).click()
   await page.locator('#create-student-first').fill(student.firstName)
@@ -264,7 +258,9 @@ export async function createStudentInGroup(
   await fillDob(page, student.dateOfBirth)
   await page.locator('#create-student-school').fill(student.childSchool)
   await page.locator('#create-student-parent-name').fill(student.parentName)
-  await page.locator('#create-student-parent-email').fill(student.parentEmail)
+  // Unique per call — see uniqueParentEmail: a shared fixture address would be
+  // one parent login seeing every such child.
+  await page.locator('#create-student-parent-email').fill(uniqueParentEmail(student.parentEmail))
   await page.locator('#create-student-parent-phone').fill(student.parentPhone)
 
   const dialog = page.locator('[role="dialog"]')
@@ -303,11 +299,7 @@ export async function createStudentInGroup(
     if (!(await cb.isChecked())) await allModulesLabel.click()
   }
 
-  await dialog.getByRole('button', { name: 'Kreiraj učenika' }).click()
-  // The result modal was dropped: on success the dialog closes (setOpen(false))
-  // and a toast fires. Locate the new student and read credentials off the
-  // detail page's "Pristupni podaci" card.
-  await expect(dialog).toBeHidden({ timeout: 15000 })
+  await submitCreateStudent(dialog)
 
   await page.goto(`${BASE}/admin/ucenici?search=${encodeURIComponent(student.lastName)}`)
   const row = page.locator('a[href^="/admin/ucenici/"]', { hasText: student.lastName }).first()
@@ -317,17 +309,13 @@ export async function createStudentInGroup(
   await row.click()
   await page.waitForURL(/\/admin\/ucenici\/[a-z0-9]+/)
 
-  const { username, password } = await readCredentialsFromDetail(page)
-  if (!username || !password) {
-    throw new Error(`Could not read credentials for ${student.lastName}`)
-  }
-  return { studentId, username, password }
+  return { studentId, ...(await grantParentLogin(studentId)) }
 }
 
 export async function createStudentNoEnrollment(
   page: Page,
   student: StudentData,
-): Promise<{ username: string; password: string }> {
+): Promise<{ studentId: string; loginEmail: string; password: string }> {
   await page.goto(`${BASE}/admin/ucenici`)
   await page.getByRole('button', { name: 'Kreiraj učenika' }).click()
 
@@ -336,14 +324,13 @@ export async function createStudentNoEnrollment(
   await fillDob(page, student.dateOfBirth)
   await page.locator('#create-student-school').fill(student.childSchool)
   await page.locator('#create-student-parent-name').fill(student.parentName)
-  await page.locator('#create-student-parent-email').fill(student.parentEmail)
+  // Unique per call — see uniqueParentEmail: a shared fixture address would be
+  // one parent login seeing every such child.
+  await page.locator('#create-student-parent-email').fill(uniqueParentEmail(student.parentEmail))
   await page.locator('#create-student-parent-phone').fill(student.parentPhone)
 
   const dialog = page.locator('[role="dialog"]')
-  await dialog.getByRole('button', { name: 'Kreiraj učenika' }).click()
-  // Result modal dropped — dialog closes on success; read credentials off the
-  // student detail page instead.
-  await expect(dialog).toBeHidden({ timeout: 10000 })
+  await submitCreateStudent(dialog)
 
   // Deliberately NOT via /admin/ucenici: that list is year-scoped to
   // `getSelectedSchoolYear()`, and a child with no enrollment in that year is
@@ -359,13 +346,7 @@ export async function createStudentNoEnrollment(
   if (!created) {
     throw new Error(`student ${student.lastName} not found after creation`)
   }
-  await page.goto(`${BASE}/admin/ucenici/${created.id}`)
-
-  const { username, password } = await readCredentialsFromDetail(page)
-  if (!username || !password) {
-    throw new Error(`Could not read credentials for ${student.lastName}`)
-  }
-  return { username, password }
+  return { studentId: created.id, ...(await grantParentLogin(created.id)) }
 }
 
 export async function addLinkMaterial(

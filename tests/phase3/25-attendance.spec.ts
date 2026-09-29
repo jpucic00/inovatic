@@ -101,7 +101,7 @@ test.describe('Phase 3 Step 14 — Attendance', () => {
       otherGroupId,
       studentId: s.studentId,
       studentLogin: {
-        email: `${s.username}@student.inovatic.local`,
+        email: s.loginEmail,
         password: s.password,
       },
     }

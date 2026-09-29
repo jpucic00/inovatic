@@ -1,6 +1,6 @@
 'use server'
 
-import type { City, UserRole } from '@prisma/client'
+import type { UserRole } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requireAdminCtx } from '@/lib/auth-guard'
 import { assertGroupInCity, assertUserInCity } from '@/lib/city-guard'
@@ -15,8 +15,8 @@ import {
   type UpdateTeacherInput,
   type AssignTeacherInput,
 } from '@/lib/validators/admin/teacher'
-import { hashPassword, generateSimplePassword } from '@/lib/password'
-import { sendTeacherCredentialsEmail } from '@/lib/email'
+import { unusablePasswordHash } from '@/lib/password'
+import { sendPasswordLinkToAccount } from '@/lib/password-link-send'
 import { staffChangeAccessFrom } from '@/lib/session-staff'
 
 type TeacherRow = {
@@ -44,33 +44,8 @@ type TeacherFilters = {
   pageSize?: number
 }
 
-async function dispatchTeacherCredentials(
-  teacher: { email: string; firstName: string; lastName: string },
-  city: City,
-  password: string,
-  variant: 'new' | 'reset',
-): Promise<boolean> {
-  try {
-    return await sendTeacherCredentialsEmail({
-      to: teacher.email,
-      city,
-      firstName: teacher.firstName,
-      lastName: teacher.lastName,
-      password,
-      variant,
-    })
-  } catch (err) {
-    console.error('Failed to send teacher credentials email:', err)
-    return false
-  }
-}
-
 type CreateTeacherResult =
-  | { success: true; teacherId: string; password: string; emailSent: boolean }
-  | { success: false; error: string }
-
-type ResetPasswordResult =
-  | { success: true; password: string; emailSent: boolean }
+  | { success: true; teacherId: string; emailSent: boolean }
   | { success: false; error: string }
 
 export async function getTeachers(
@@ -163,7 +138,8 @@ export async function getTeacher(id: string) {
       role: true,
       createdAt: true,
       deletedAt: true,
-      plainPassword: true,
+      passwordSetAt: true,
+      credentialsSentAt: true,
       _count: { select: { teacherAttendances: true } },
       teacherAssignments: {
         select: {
@@ -193,12 +169,6 @@ export async function getTeacher(id: string) {
     user._count.teacherAttendances === 0
   ) {
     return null
-  }
-  // The page hides the credentials block for an admin account, so the password
-  // has no reader there — don't ship it. Teachers keep theirs: the block is
-  // shown, and an admin uses it to help someone who lost their login.
-  if (user?.role === 'ADMIN') {
-    return { ...user, plainPassword: null }
   }
   return user
 }
@@ -244,7 +214,7 @@ export async function getAssignableTeachers() {
 export async function createTeacher(
   input: CreateTeacherInput,
 ): Promise<CreateTeacherResult> {
-  const { city } = await requireAdminCtx()
+  const { session, city } = await requireAdminCtx()
 
   const parsed = createTeacherSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
@@ -258,9 +228,8 @@ export async function createTeacher(
       return { success: false, error: 'Korisnik s tim e-mailom već postoji.' }
     }
 
-    const password = generateSimplePassword(8)
-    const passwordHash = await hashPassword(password)
-
+    // No password is created for anyone (2026-09-29): the account opens only
+    // once the teacher chooses one through the link mailed below.
     const user = await db.user.create({
       data: {
         email,
@@ -268,25 +237,28 @@ export async function createTeacher(
         lastName: data.lastName.trim(),
         phone: data.phone?.trim() || null,
         role: 'TEACHER',
-        passwordHash,
-        plainPassword: password,
+        passwordHash: await unusablePasswordHash(),
         city,
       },
       select: { id: true },
     })
 
-    const emailSent = await dispatchTeacherCredentials(
-      { email, firstName: data.firstName, lastName: data.lastName },
-      // The city the account was just stamped with — a teacher belongs to the
-      // admin's own city, so their mail comes from that office.
+    // Swallow-and-flag, like the old credentials mail: the account is already
+    // committed, and the admin can resend from the teacher's profile.
+    const sent = await sendPasswordLinkToAccount({
+      accountId: user.id,
+      purpose: 'SETUP',
+      createdById: session.user.id,
       city,
-      password,
-      'new',
-    )
+      audience: 'STAFF',
+    }).catch((err: unknown) => {
+      console.error('createTeacher: setup link failed:', err)
+      return { ok: false as const, error: '' }
+    })
 
     revalidatePath('/admin/nastavnici')
 
-    return { success: true, teacherId: user.id, password, emailSent }
+    return { success: true, teacherId: user.id, emailSent: sent.ok }
   } catch (err) {
     console.error('createTeacher failed:', err)
     return { success: false, error: 'Greška pri kreiranju nastavnika.' }
@@ -341,39 +313,6 @@ export async function updateTeacher(
   } catch (err) {
     console.error('updateTeacher failed:', err)
     return { success: false, error: 'Greška pri ažuriranju nastavnika.' }
-  }
-}
-
-export async function resetTeacherPassword(
-  id: string,
-): Promise<ResetPasswordResult> {
-  const { city } = await requireAdminCtx()
-  if (!id) return { success: false, error: 'ID nije pronađen.' }
-
-  await assertUserInCity(id, city)
-
-  try {
-    const teacher = await db.user.findUnique({
-      where: { id, role: 'TEACHER' },
-      select: { id: true, email: true, firstName: true, lastName: true },
-    })
-    if (!teacher) return { success: false, error: 'Nastavnik nije pronađen.' }
-
-    const password = generateSimplePassword(8)
-    const passwordHash = await hashPassword(password)
-
-    await db.user.update({
-      where: { id },
-      data: { passwordHash, plainPassword: password },
-    })
-
-    const emailSent = await dispatchTeacherCredentials(teacher, city, password, 'reset')
-
-    revalidatePath(`/admin/nastavnici/${id}`)
-    return { success: true, password, emailSent }
-  } catch (err) {
-    console.error('resetTeacherPassword failed:', err)
-    return { success: false, error: 'Greška pri resetiranju lozinke.' }
   }
 }
 

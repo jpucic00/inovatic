@@ -10,6 +10,8 @@ export type TokenClaims = {
   city?: City
   checkedAt?: number
   studentId?: string
+  /** `User.sessionVersion` at login; a lower value than the row's = ended. */
+  sessionVersion?: number
 }
 
 /**
@@ -28,9 +30,14 @@ export async function revalidateTokenClaims<T extends TokenClaims>(token: T): Pr
   try {
     const dbUser = await db.user.findUnique({
       where: { id: userId },
-      select: { deletedAt: true, role: true, city: true },
+      select: { deletedAt: true, role: true, city: true, sessionVersion: true },
     })
     if (!dbUser || dbUser.deletedAt) return null
+    // The password changed since this session signed in — through a link or
+    // the change-password page. Every older session ends here, which is what
+    // makes "I changed my password" also mean "and nobody else is in". A token
+    // from before the column existed reads as 0, the value every row started at.
+    if ((token.sessionVersion ?? 0) !== dbUser.sessionVersion) return null
     // A child no longer signs in at all (2026-09-29), so a STUDENT token still
     // alive from before that deploy is ended here rather than left to run out
     // its 30 days.

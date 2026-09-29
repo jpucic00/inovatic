@@ -32,11 +32,11 @@ export const EMAIL_CAMPAIGN_KINDS: Record<
       'Svaki roditelj prima jedan e-mail s evaluacijom svog djeteta. Dijete se navodi u predmetu poruke, a poruka sadrži isključivo njegovu karticu.',
   },
   CREDENTIALS: {
-    label: 'Pristupni podaci',
-    badgeLabel: 'Pristupni podaci',
+    label: 'Postavljanje lozinke',
+    badgeLabel: 'Lozinka',
     badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
     description:
-      'Korisničko ime i lozinka za portal. Jedan e-mail po djetetu — dvoje djece na istoj adresi dobiva dvije poruke, jer svako ima svoje podatke.',
+      'Poveznica za postavljanje lozinke roditeljskog računa. Jedan e-mail po roditeljskom računu, s popisom njegove djece. Tko već ima pristup, poruku može zanemariti.',
   },
   SCHEDULE: {
     label: 'Slanje rasporeda',

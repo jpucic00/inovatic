@@ -80,7 +80,7 @@ test.describe('Phase 3 — Access-control DOM redirect flows', () => {
     await page.locator('input[type="password"]').fill('wrongpassword123')
     await page.locator('button[type="submit"]').click()
     await expect(
-      page.getByText(/Pogrešno korisničko ime ili lozinka/),
+      page.getByText(/Pogrešan e-mail ili lozinka/),
     ).toBeVisible({ timeout: 10000 })
   })
 

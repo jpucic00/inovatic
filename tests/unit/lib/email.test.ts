@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render } from '@react-email/components'
 
 // Mock the Resend SDK so no network call is made and we can assert the exact
 // payload each sender hands to `resend.emails.send`.
@@ -17,8 +18,7 @@ import {
   sendScheduleOptionsEmail,
   sendStemEducationConfirmationEmail,
   sendStemEducationInquiryEmail,
-  sendStudentCredentialsEmail,
-  sendTeacherCredentialsEmail,
+  sendPasswordLinkEmail,
 } from '@/lib/email'
 
 const inquiryArgs = {
@@ -69,21 +69,38 @@ describe('email senders', () => {
     })
   })
 
-  it('sends a Šibenik student credentials email from the Šibenik inbox', async () => {
+  const linkArgs = {
+    to: 'roditelj@example.hr',
+    city: 'SIBENIK',
+    purpose: 'SETUP',
+    audience: 'PARENT',
+    token: 'tajni-token-123',
+    validFor: '7 dana',
+    children: ['Marko Anić', 'Ana Anić'],
+  } as const
+
+  it('sends a password link from the city inbox, with the token only in the URL fragment', async () => {
     vi.stubEnv('RESEND_API_KEY', 'test_key')
-    await sendStudentCredentialsEmail({
+    await sendPasswordLinkEmail(linkArgs)
+    const payload = send.mock.calls[0][0]
+    expect(payload).toMatchObject({
       to: 'roditelj@example.hr',
-      city: 'SIBENIK',
-      parentName: 'Ana Anić',
-      childName: 'Marko Anić',
-      username: 'marko.anic',
-      password: 'x',
-      groupName: 'SLR 2',
-      schedule: 'Utorak, 17:00–18:30',
-      locationName: 'Trokut',
-      locationAddress: 'Velimira Škorpika 5, 22000 Šibenik',
+      from: 'Inovatic <prijave.sibenik@udruga-inovatic.hr>',
+      subject: 'Postavite lozinku – Inovatic',
     })
-    expect(send.mock.calls[0][0].from).toBe('Inovatic <prijave.sibenik@udruga-inovatic.hr>')
+    // The fragment never reaches a server log or a Referer — the path must not
+    // carry the token as a query parameter or a path segment.
+    const html = await render(payload.react)
+    expect(html).toContain('/postavi-lozinku#tajni-token-123')
+    expect(html).not.toContain('?token=')
+    expect(html).toContain('Marko Anić')
+    expect(html).toContain('roditelj@example.hr')
+  })
+
+  it('titles a reset link differently from a first-time setup', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test_key')
+    await sendPasswordLinkEmail({ ...linkArgs, purpose: 'RESET', audience: 'STAFF', children: [] })
+    expect(send.mock.calls[0][0].subject).toBe('Nova lozinka – Inovatic')
   })
 
   it('interpolates the child name into the schedule-options subject', async () => {
@@ -103,21 +120,6 @@ describe('email senders', () => {
       ],
     })
     expect(send.mock.calls[0][0].subject).toBe('Dostupni termini za Marko Anić – Inovatic')
-  })
-
-  it('maps the teacher variant to its subject (new vs reset)', async () => {
-    vi.stubEnv('RESEND_API_KEY', 'test_key')
-    const base = {
-      to: 'ivana@example.hr',
-      city: 'SPLIT',
-      firstName: 'Ivana',
-      lastName: 'Kovač',
-      password: 'x',
-    } as const
-    await sendTeacherCredentialsEmail({ ...base, variant: 'new' })
-    await sendTeacherCredentialsEmail({ ...base, variant: 'reset' })
-    expect(send.mock.calls[0][0].subject).toBe('Pristupni podaci – Inovatic')
-    expect(send.mock.calls[1][0].subject).toBe('Nova lozinka – Inovatic')
   })
 
   it('passes the admin-authored bulk-message subject through verbatim', async () => {

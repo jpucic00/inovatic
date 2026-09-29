@@ -1,16 +1,17 @@
-import type { City } from '@prisma/client'
+import type { City, UserRole } from '@prisma/client'
 import { normalizeParentEmail } from '@/lib/bulk-email-recipients'
 
 /**
- * One child's login details as the credentials e-mail renders them, plus the
- * groups the child currently attends. Nothing internal (ids, hashes) reaches a
- * parent's inbox.
+ * What a "choose your password" mail renders: the login (an e-mail address),
+ * the children it opens, and the one-time link. Nothing internal — no ids, no
+ * hashes, and never a password — reaches an inbox.
  */
-export type CredentialsCard = {
-  childName: string
-  username: string
-  password: string
-  groups: CredentialsGroup[]
+export type PasswordLinkCard = {
+  email: string
+  children: { name: string; groups: CredentialsGroup[] }[]
+  url: string
+  /** "7 dana" / "48 sati" — how long the link works. */
+  validFor: string
 }
 
 export type CredentialsGroup = {
@@ -24,87 +25,69 @@ export type CredentialsGroup = {
 
 // ── The ownership guard ──────────────────────────────────────────────────────
 
-/** What {@link assertCredentialsBelongTo} needs to prove a login may be mailed. */
-export type CredentialsOwnership = {
+/** A selected child as the guard loads it: the child plus the login linked to it. */
+export type PasswordLinkOwnership = {
   id: string
-  parentEmail: string | null
   city: City
-  username: string | null
-  plainPassword: string | null
   deletedAt: Date | null
+  parentAccount: { id: string; email: string; role: UserRole; deletedAt: Date | null } | null
 }
 
-type OwnershipVerdict = { ok: true } | { ok: false; reason: string }
+type OwnershipVerdict = { ok: true; accountId: string } | { ok: false; reason: string }
+
+const LINKABLE = new Set<UserRole>(['PARENT', 'TEACHER', 'ADMIN'])
 
 /**
- * The last line of defence before a credentials e-mail goes out, and the reason
- * a password cannot reach the wrong parent.
+ * The last check before a setup-link mail goes out, and why a link cannot
+ * reach the wrong inbox.
  *
- * The sibling of `assertCardsBelongTo` in src/lib/evaluation-email-cards.ts, and
- * deliberately the same shape — but the stakes are higher: a misdirected report
- * card is embarrassing, a misdirected login is account takeover of a minor's
- * portal account. A recipient row names the account it is owed (`studentIds`),
- * written when the cohort was resolved, possibly minutes or a deploy ago. Rather
- * than trust it, the send re-loads that row and re-derives ownership from the
- * student's CURRENT `parentEmail`.
+ * A recipient row names children (`studentIds`) and an address, written when
+ * the cohort was resolved — possibly minutes or a deploy ago. In between, a
+ * child may have moved to the other parent's account or had its address
+ * corrected. So the send re-loads the children and re-derives the ONE account
+ * they share from their CURRENT links, and mails only if that account still
+ * owns exactly the row's address. Every disagreement is "don't send", never
+ * "send anyway"; the admin reads the reason on the campaign page.
  *
- * Every failure mode ends in "don't send", never "send anyway": the child
- * deleted, the address corrected mid-send, a cohort row naming someone else's
- * account, or an account that still has no usable password (which would
- * otherwise mail a blank Lozinka line). The admin sees the reason on the
- * campaign detail page and can re-send deliberately.
- *
- * Pure on purpose — the caller does the query, this decides, so the decision is
- * unit-testable without a database.
+ * Pure: the caller loads, this decides.
  */
-export function assertCredentialsBelongTo(
+export function assertPasswordLinkBelongsTo(
   expected: { parentEmail: string; city: City; studentIds: string[] },
-  loaded: CredentialsOwnership[],
+  loaded: PasswordLinkOwnership[],
 ): OwnershipVerdict {
-  // Exactly one: a CREDENTIALS row is one account. A row naming two accounts is
-  // a bug upstream, and mailing it would be the merged-secrets case this kind
-  // exists to prevent.
-  if (expected.studentIds.length !== 1) {
-    return { ok: false, reason: 'Nema računa za slanje.' }
+  if (expected.studentIds.length === 0) {
+    return { ok: false, reason: 'Nema djece za slanje.' }
   }
 
-  // Set equality, not just a count: proves the loaded rows are exactly the ones
-  // the recipient row named, even if the query that fetched them were wrong.
   const wanted = new Set(expected.studentIds)
   const got = new Set(loaded.map((row) => row.id))
   if (wanted.size !== got.size || [...wanted].some((id) => !got.has(id))) {
-    return {
-      ok: false,
-      reason: 'Račun je u međuvremenu izbrisan ili izmijenjen — e-mail nije poslan.',
-    }
+    return { ok: false, reason: 'Dijete je u međuvremenu izbrisano ili izmijenjeno — e-mail nije poslan.' }
   }
 
+  let accountId: string | null = null
   for (const row of loaded) {
     if (row.deletedAt) {
-      return { ok: false, reason: 'Račun je izbrisan — e-mail nije poslan.' }
-    }
-    if (normalizeParentEmail(row.parentEmail) !== expected.parentEmail) {
-      // Either the parent's address changed after the cohort was written, or
-      // this account never belonged to this address. Both mean: stop.
-      return {
-        ok: false,
-        reason:
-          'E-mail adresa roditelja se promijenila nakon pripreme slanja — pristupni podaci nisu poslani.',
-      }
+      return { ok: false, reason: 'Dijete je izbrisano — e-mail nije poslan.' }
     }
     if (row.city !== expected.city) {
-      return { ok: false, reason: 'Račun pripada drugom gradu — e-mail nije poslan.' }
+      return { ok: false, reason: 'Dijete pripada drugom gradu — e-mail nije poslan.' }
     }
-    // Passwords are minted up front, when the campaign is created. Reaching the
-    // send loop without one means that step did not cover this child, and a mail
-    // with a blank Lozinka is worse than a reported failure.
-    if (!row.username || !row.plainPassword) {
+    const account = row.parentAccount
+    if (!account || account.deletedAt || !LINKABLE.has(account.role)) {
+      return { ok: false, reason: 'Dijete više nema roditeljski račun — e-mail nije poslan.' }
+    }
+    if (normalizeParentEmail(account.email) !== expected.parentEmail) {
       return {
         ok: false,
-        reason: 'Račun nema važeću lozinku — pristupni podaci nisu poslani.',
+        reason: 'Dijete je u međuvremenu povezano s drugim roditeljskim računom — e-mail nije poslan.',
       }
     }
+    if (accountId !== null && accountId !== account.id) {
+      return { ok: false, reason: 'Djeca više ne dijele isti roditeljski račun — e-mail nije poslan.' }
+    }
+    accountId = account.id
   }
 
-  return { ok: true }
+  return accountId ? { ok: true, accountId } : { ok: false, reason: 'Nema računa za slanje.' }
 }
