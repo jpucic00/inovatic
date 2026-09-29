@@ -5,7 +5,7 @@ import { headers } from 'next/headers'
  * which Railway's proxy sets. Unknown clients share one bucket — a limiter
  * that fails that way is stricter, never looser.
  */
-function ipFromForwardedFor(value: string | null | undefined): string {
+export function ipFromForwardedFor(value: string | null | undefined): string {
   return value?.split(',')[0]?.trim() || 'unknown'
 }
 

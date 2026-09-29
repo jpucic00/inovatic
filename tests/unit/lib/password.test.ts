@@ -1,49 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { describe, expect, it } from 'vitest'
-import { generateSimplePassword, hashPassword } from '@/lib/password'
-
-const ALLOWED = 'abcdefghkmnpqrstuvwxyz23456789'
-const AMBIGUOUS = ['i', 'j', 'l', 'o', '0', '1']
-
-describe('generateSimplePassword', () => {
-  it('respects default length of 6', () => {
-    expect(generateSimplePassword()).toHaveLength(6)
-  })
-
-  it('respects custom length', () => {
-    expect(generateSimplePassword(10)).toHaveLength(10)
-    expect(generateSimplePassword(1)).toHaveLength(1)
-    expect(generateSimplePassword(20)).toHaveLength(20)
-  })
-
-  it('returns only characters from the allowed charset', () => {
-    for (let i = 0; i < 100; i++) {
-      const pw = generateSimplePassword(8)
-      for (const c of pw) {
-        expect(ALLOWED).toContain(c)
-      }
-    }
-  })
-
-  it('never emits ambiguous characters (i, j, l, o, 0, 1)', () => {
-    for (let i = 0; i < 200; i++) {
-      const pw = generateSimplePassword(12)
-      for (const bad of AMBIGUOUS) {
-        expect(pw).not.toContain(bad)
-      }
-    }
-  })
-
-  it('produces different passwords on consecutive calls (statistically)', () => {
-    const seen = new Set<string>()
-    for (let i = 0; i < 50; i++) {
-      seen.add(generateSimplePassword(8))
-    }
-    // 50 random 8-char passwords from a 30-char alphabet should virtually
-    // never collide; require at least 40 unique to leave headroom.
-    expect(seen.size).toBeGreaterThanOrEqual(40)
-  })
-})
+import { hashPassword } from '@/lib/password'
 
 describe('hashPassword', () => {
   it('round-trips with bcryptjs.compare', async () => {

@@ -62,13 +62,17 @@ stateDiagram-v2
         User created or reused via the two-tier identity match (DOB, or name + parent e-mail for DOB-less imports)
         Names persisted normalized - NFC, trimmed, single-spaced; a reused account takes the newer spelling unless it differs by case alone
         Parent contact data + GDPR consent copied to User
+        Child linked to ONE parent account by parent e-mail
+        (created as PARENT with an unusable hash if none exists,
+        a relink, join or staff address needs admin confirmation)
         Enrollment row created (no status column)
         ModuleEnrollment rows created for standard courses
         EnrollmentMonth rows (join month → season end) for the
         Natjecateljski program instead — it is billed monthly
         Inquiry.studentId + assignedGroupId set
-        NO e-mail is sent (2026-08-17). Credentials leave
-        only through a CREDENTIALS campaign on /admin/email
+        NO e-mail is sent (2026-08-17). The parent's password
+        link leaves only through a CREDENTIALS campaign on
+        /admin/email or the profile's send-link button
         TERMINAL STATE (COURSE only)
     end note
 
@@ -371,13 +375,14 @@ flowchart TD
     G --> H{Username taken in DB?}
     H -->|No| I[Use username as-is]
     H -->|Yes| J[Append numeric suffix e.g. imeprezime2]
-    I --> K[generateSimplePassword 6 chars]
+    I --> K["unusablePasswordHash - a child never signs in since 2026-09-29"]
     J --> K
-    K --> L[hashPassword bcrypt 12 rounds]
-    L --> M["Create User: role STUDENT, dateOfBirth set, email username@student.inovatic.local, store plainPassword"]
+    K --> M["Create User: role STUDENT, dateOfBirth set, email username@student.inovatic.local, no readable password"]
+    M --> PL["planParentLink + applyParentLink: link to the ONE account on the parent e-mail - a new PARENT with an unusable hash if none exists; a relink, a join onto an account with other children, or a staff address throws PARENT_LINK_CONFIRM until the admin confirms"]
+    REUSE --> PL2["Same parent link on the reused child - a newer upit from the other parent MOVES the child, admin-confirmed"]
 
-    REUSE --> N[Check existing Enrollment for userId + groupId + schoolYear]
-    M --> N2[Create Enrollment]
+    PL2 --> N[Check existing Enrollment for userId + groupId + schoolYear]
+    PL --> N2[Create Enrollment]
     N --> O{Enrollment already exists?}
     O -->|Yes| P[Skip enrollment creation]
     O -->|No| N2
@@ -677,16 +682,19 @@ sequenceDiagram
     end
 
     alt New student
-        Server->>Server: generateUsername, generateSimplePassword, hashPassword
-        Server->>Server: Create User role STUDENT, store plainPassword for admin reference
+        Server->>Server: generateUsername, unusablePasswordHash
+        Server->>Server: Create User role STUDENT - no readable password, a child never signs in since 2026-09-29
         Server->>Server: Copy parentName, parentEmail, parentPhone, childSchool, gdprConsentAt from Inquiry
     end
+
+    Server->>Server: planParentLink + applyParentLink - link the child to the ONE account on the parent e-mail, creating a PARENT with an unusable hash if none exists
+    Note right of Server: A relink away from another address, a join onto an account that already sees other children, or a staff address returns PARENT_LINK_CONFIRM and rolls the transaction back until the admin confirms in the dialog
 
     Server->>Server: Create Enrollment (and ModuleEnrollments for standard courses)
     Note right of Server: Enrollment.paymentOption is seeded from the upit on CREATE only, and refused outright on a kind that offers no choice
     Note right of Server: Monthly-billed COMPETITION groups instead get EnrollmentMonth rows (createSeasonMonths in ensureEnrollment) - join month through season end, skipDuplicates. An unplanned season writes nothing. Setting dates later backfills via upsertCourseSeason, whose same-transaction syncSeasonMonths adds newly covered months and deletes only unpaid out-of-range ones.
     Server->>Server: assertGroupHasAvailableSpot, then backfill Inquiry studentId, assignedGroupId (same transaction)
-    Note right of Server: NO e-mail is sent on acceptance (2026-08-17). Credentials leave only through a CREDENTIALS campaign on /admin/email, run once contracts are signed - one mail per CHILD, ownership re-derived per recipient by assertCredentialsBelongTo. Passwords for accounts that have none are minted up front at campaign creation (hashed outside the transaction), and User.credentialsSentAt records the delivery. The password also stays readable on the student profile, which is the primary early hand-over.
+    Note right of Server: NO e-mail is sent on acceptance (2026-08-17). The parent account gets its password only through a one-time link (2026-09-29) - a CREDENTIALS campaign on /admin/email, one mail per PARENT ACCOUNT with siblings merged, ownership re-derived per recipient by assertPasswordLinkBelongsTo and the token issued only after the row is claimed, or the send-link button on the student profile. User.credentialsSentAt on the parent account records the delivery. No password is ever readable in the app.
 
     Note over Parent, Admin: ALTERNATE ENTRY PATHS
 

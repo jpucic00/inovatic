@@ -83,9 +83,10 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["Student → /portal/grupa/:id/galerija"] --> G{"requireActiveStudent():<br/>STUDENT with an enrollment<br/>in the active year window?"}
-    G -->|No| NF404["404 / notFound"]
-    G -->|Yes| B{Enrollment row<br/>for this student + group?}
+    A["Parent session with a picked child<br/>→ /portal/grupa/:id/galerija"] --> G{"requireActivePortalChild():<br/>session.user.studentId set, and that child<br/>enrolled in the active year window?"}
+    G -->|"No child picked, or CLASSROOM"| RP["redirect → /portal"]
+    G -->|"Child not active"| NF404["404 / notFound"]
+    G -->|Yes| B{Enrollment row<br/>for this child + group?}
     B -->|No| NF[404 / notFound]
     B -->|Yes| V["buildGroupGalleryView:<br/>loads ALL of the group's images +<br/>modules[] + activeModuleId<br/>(null unless STANDARD)"]
     V --> C{"GalleryTabsAndGrid (client):<br/>flatLayout = isRadionica(kind)?"}
@@ -99,7 +100,7 @@ flowchart LR
     style K fill:#dbeafe
 ```
 
-> The reader mirrors the writer's invariant, but the partitioning is **client-side**: `buildGroupGalleryView` (`src/lib/group-gallery-view.ts`) returns every image of the group in one list, and `GalleryTabsAndGrid` filters by `moduleId` per tab (`flatLayout` filters `moduleId === null`). `activeModuleId` comes from `getCurrentActiveModuleForGroup`, which returns null for anything without dated modules — so a standard group's gallery opens on the module it is working on now, while a competition group's opens on the URL's `?tab=` or the first natjecanje. The view only runs after the caller's gate passes (student enrollment row here; `teacherGroupAccessWhere` — an assignment or an upcoming per-termin change — / same-city admin on the staff pages) — students of other groups get a 404, not a leaked image list.
+> The reader mirrors the writer's invariant, but the partitioning is **client-side**: `buildGroupGalleryView` (`src/lib/group-gallery-view.ts`) returns every image of the group in one list, and `GalleryTabsAndGrid` filters by `moduleId` per tab (`flatLayout` filters `moduleId === null`). `activeModuleId` comes from `getCurrentActiveModuleForGroup`, which returns null for anything without dated modules — so a standard group's gallery opens on the module it is working on now, while a competition group's opens on the URL's `?tab=` or the first natjecanje. The view only runs after the caller's gate passes (the picked child's enrollment row here — keyed on the session's `studentId` claim, never on `session.user.id`, which is the parent account; `teacherGroupAccessWhere` — an assignment or an upcoming per-termin change — / same-city admin on the staff pages) — a child of another group gets a 404, not a leaked image list, and the shared CLASSROOM login is sent back to `/portal` because the gallery stays behind `requirePortalChild()`.
 
 ## Summary
 

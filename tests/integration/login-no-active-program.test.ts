@@ -27,6 +27,10 @@ class WrongPassword extends AuthError {
   code = 'credentials'
 }
 
+class TooManyAttempts extends AuthError {
+  code = 'too_many_attempts'
+}
+
 class UnknownAuthFailure extends AuthError {}
 
 beforeEach(() => {
@@ -68,6 +72,19 @@ describe('loginAction — no active program', () => {
 
     expect(res.success).toBe(false)
     if (!res.success) expect(res.error).toMatch(/Pogrešan e-mail ili lozinka/i)
+  })
+
+  it('says a locked login is locked, rather than inviting the next guess', async () => {
+    mockedSignIn.mockRejectedValueOnce(new TooManyAttempts())
+
+    const parent = await createParent()
+    const res = await loginAction({ identifier: parent.email, password: 'nope' })
+
+    expect(res.success).toBe(false)
+    if (!res.success) {
+      expect(res.error).toMatch(/Previše neuspjelih pokušaja/)
+      expect(res.error).not.toMatch(/Pogrešan e-mail/i)
+    }
   })
 
   it('falls back to the generic message for an unrecognised auth error', async () => {

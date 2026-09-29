@@ -21,6 +21,8 @@ const WRONG_CREDENTIALS = 'Pogrešan e-mail ili lozinka.'
  * exists — accepted, since these parents know it does and the whole point is to
  * tell them why it stopped working.
  */
+const TOO_MANY_ATTEMPTS =
+  'Previše neuspjelih pokušaja prijave. Pričekajte 15 minuta pa pokušajte ponovno.'
 const NO_ACTIVE_PROGRAM =
   'Nijedno vaše dijete trenutno nije upisano u program. Ako mislite da je ovo greška, javite nam se.'
 
@@ -42,10 +44,9 @@ export async function loginAction(data: LoginFormData): Promise<LoginActionResul
       // failure is 'credentials'. Anything unrecognised falls back to the
       // generic message rather than leaking an internal token.
       const code = (error as { code?: unknown }).code
-      return {
-        success: false,
-        error: code === 'no_active_program' ? NO_ACTIVE_PROGRAM : WRONG_CREDENTIALS,
-      }
+      if (code === 'no_active_program') return { success: false, error: NO_ACTIVE_PROGRAM }
+      if (code === 'too_many_attempts') return { success: false, error: TOO_MANY_ATTEMPTS }
+      return { success: false, error: WRONG_CREDENTIALS }
     }
     throw error
   }

@@ -21,7 +21,7 @@ const INTRO: Record<PasswordLinkProps['audience'], Record<PasswordLinkProps['pur
   },
   STAFF: {
     SETUP:
-      'Za rad u sustavu Inovatic prijavljujete se svojim e-mailom. Umjesto lozinke koju ste dobili od nas, odaberite vlastitu — preko poveznice ispod.',
+      'Za rad u sustavu Inovatic prijavljujete se svojim e-mailom, a lozinku birate sami — preko poveznice ispod. Ako ste lozinku dobili od nas, ona vrijedi dok ne postavite svoju.',
     RESET: 'Poslali smo vam poveznicu za novu lozinku za sustav Inovatic, kako ste zatražili.',
   },
 }

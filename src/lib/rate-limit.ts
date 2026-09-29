@@ -43,6 +43,33 @@ export function allowRequest(
   return true
 }
 
+/**
+ * `allowRequest` split in two, for limits that count only SOME calls — a login
+ * throttle counts failures, and a successful login must not use up the quota.
+ * `isRateLimited` peeks without recording; `recordHit` records unconditionally.
+ */
+export function isRateLimited(
+  key: string,
+  limit: number,
+  windowMs: number,
+  now: number = Date.now(),
+): boolean {
+  return (hits.get(key) ?? []).filter((t) => t > now - windowMs).length >= limit
+}
+
+/** Records one hit; returns how many are live in the window, this one included. */
+export function recordHit(key: string, windowMs: number, now: number = Date.now()): number {
+  const live = (hits.get(key) ?? []).filter((t) => t > now - windowMs)
+  live.push(now)
+  hits.set(key, live)
+  if (hits.size > MAX_KEYS) prune(now, windowMs)
+  return live.length
+}
+
+export function clearHits(key: string): void {
+  hits.delete(key)
+}
+
 /** Test seam — never called in production code. */
 export function resetRateLimits(): void {
   hits.clear()

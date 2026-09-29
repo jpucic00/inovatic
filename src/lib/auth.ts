@@ -1,12 +1,11 @@
 import NextAuth, { CredentialsSignin } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
-import { z } from 'zod'
-import bcrypt from 'bcryptjs'
-import { db } from './db'
 import type { City, UserRole } from '@prisma/client'
 import { authConfig } from './auth.config'
 import { revalidateTokenClaims, type TokenClaims } from './auth-token'
-import { applyChildSelection, listPortalChildren } from './portal-children'
+import { ipFromForwardedFor } from './client-ip'
+import { authorizeCredentials } from './credentials-authorize'
+import { applyChildSelection } from './portal-children'
 
 /**
  * The password was right, but none of this parent's children is in a program
@@ -26,6 +25,16 @@ class NoActiveProgramError extends CredentialsSignin {
   code = 'no_active_program'
 }
 
+/**
+ * Too many failed logins for this account or from this address in the last 15
+ * minutes (`src/lib/credentials-authorize.ts`). Its own code so the form can say
+ * so: "wrong password" would only invite the next guess. It reveals nothing
+ * about the account — an unknown address is throttled exactly the same way.
+ */
+class TooManyAttemptsError extends CredentialsSignin {
+  code = 'too_many_attempts'
+}
+
 export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
   ...authConfig,
   providers: [
@@ -34,62 +43,15 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         identifier: { label: 'Korisničko ime ili e-mail', type: 'text' },
         password: { label: 'Lozinka', type: 'password' },
       },
-      authorize: async (credentials) => {
-        const parsed = z
-          .object({
-            identifier: z.string().min(1),
-            password: z.string().min(1),
-          })
-          .safeParse(credentials)
-
-        if (!parsed.success) return null
-
-        const identifier = parsed.data.identifier.trim()
-        const isEmail = z.string().email().safeParse(identifier).success
-        // E-mail is matched case-insensitively: a parent types it on a phone
-        // that capitalises the first letter, and every stored address is
-        // lower-case already.
-        const user = isEmail
-          ? await db.user.findFirst({ where: { email: { equals: identifier, mode: 'insensitive' } } })
-          : await db.user.findUnique({ where: { username: identifier } })
-
-        if (!user) return null
-        if (user.deletedAt) return null
-
-        const valid = await bcrypt.compare(parsed.data.password, user.passwordHash)
-        if (!valid) return null
-
-        // A child never signs in (2026-09-29): the family's login is the parent
-        // e-mail, and the child is picked after it. A username now identifies
-        // only the shared classroom login. Both refusals sit after the hash
-        // check so they cost what a wrong password costs.
-        if (user.role === 'STUDENT') return null
-        if (!isEmail && user.role !== 'CLASSROOM') return null
-
-        // Parents only, and only after the password checks out — an
-        // unauthenticated caller must not be able to probe enrollment state.
-        // This is the primary gate rather than a guard further in because it is
-        // the only place where NO cookie is ever minted, which is what "the
-        // credentials do not work" actually means: `/api/download` and the
-        // elearning proxy authorise off a session, so anything that lets one
-        // exist leaves them reachable.
-        let studentId: string | null = null
-        if (user.role === 'PARENT') {
-          const children = await listPortalChildren(user.id)
-          if (children.length === 0) throw new NoActiveProgramError()
-          // One child needs no picker — the session opens straight on it.
-          if (children.length === 1) studentId = children[0].id
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: `${user.firstName} ${user.lastName}`.trim(),
-          role: user.role,
-          city: user.city,
-          studentId,
-          sessionVersion: user.sessionVersion,
-        }
+      authorize: async (credentials, request) => {
+        const result = await authorizeCredentials(
+          credentials,
+          ipFromForwardedFor(request.headers.get('x-forwarded-for')),
+        )
+        if (result.ok) return result.user
+        if (result.reason === 'NO_ACTIVE_PROGRAM') throw new NoActiveProgramError()
+        if (result.reason === 'THROTTLED') throw new TooManyAttemptsError()
+        return null
       },
     }),
   ],

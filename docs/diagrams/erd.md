@@ -169,21 +169,34 @@ erDiagram
         string email UK
         string username UK "nullable"
         string passwordHash
-        string plainPassword "nullable - stored for admin reference"
+        string plainPassword "nullable - CLASSROOM only, DB CHECK; since 2026-09-29 no other account has a readable password"
         string firstName
         string lastName
         string phone "nullable"
         string dateOfBirth "nullable - YYYY-MM-DD for students"
-        UserRole role "ADMIN - TEACHER - STUDENT - CLASSROOM"
+        UserRole role "ADMIN - TEACHER - STUDENT - CLASSROOM - PARENT"
+        string parentAccountId FK "nullable - STUDENT only: the ONE account (PARENT, or a staff account whose e-mail the parent used) that sees this child in the portal; SetNull"
         string parentName "nullable - migrated from Inquiry"
         string parentEmail "nullable - migrated from Inquiry"
         string parentPhone "nullable - migrated from Inquiry"
         string childSchool "nullable - migrated from Inquiry"
         int hourlyRateCents "nullable - payout rate in euro CENTS per hour for a TEACHER or teaching ADMIN; admin-only - never selected into a teacher- or student-facing payload"
-        datetime credentialsSentAt "nullable - when a CREDENTIALS campaign last mailed working login details. Cleared by resetStudentPassword. Deliberately NOT backfilled: null means not sent BY THIS SYSTEM, never a guess"
+        datetime credentialsSentAt "nullable - when a password link was last mailed to THIS account (parent, teacher or admin; never a child). Not proof it was used. Deliberately NOT backfilled: null means not sent BY THIS SYSTEM, never a guess"
+        datetime passwordSetAt "nullable - when the account's owner last chose its password, via a link or the staff change-password page"
+        int sessionVersion "default 0 - bumped on every password set and stamped into the JWT; an older token is ended by revalidateTokenClaims, logging other devices out"
         datetime gdprConsentAt "nullable"
         datetime deletedAt "nullable - soft-delete for teachers (migration 20260513101212)"
         City city "tenant - drives session scoping for all three roles"
+    }
+
+    PasswordToken {
+        string id PK
+        string userId FK "Cascade"
+        string tokenHash UK "SHA-256 of the token - the plaintext only lives in the mailed /postavi-lozinku#token link"
+        PasswordTokenPurpose purpose "SETUP 7 days - RESET 48 h"
+        datetime expiresAt
+        datetime usedAt "nullable - one use only"
+        string createdById FK "nullable - staff who sent it; null for the system rollout or campaign; SetNull"
     }
 
     Enrollment {
@@ -293,7 +306,7 @@ erDiagram
         EmailRecipientStatus status "PENDING - SENT - FAILED - ALREADY_SENT - SKIPPED"
         string childNames "String[] - snapshot at send time"
         string assessmentIds "String[] - EVALUATION only: the exact card(s) this row mails, re-verified via assertCardsBelongTo before each send; empty otherwise"
-        string studentIds "String[] - CREDENTIALS: the one child account; SCHEDULE: every child on the address; re-verified via assertCredentialsBelongTo / assertScheduleBelongsTo; empty otherwise"
+        string studentIds "String[] - CREDENTIALS: every child linked to the one parent account; SCHEDULE: every child on the address; re-verified via assertPasswordLinkBelongsTo / assertScheduleBelongsTo; empty otherwise"
         string failureReason "nullable - why FAILED, or why SKIPPED had no address"
         string sentKey "nullable - invitation idempotency key, set only on SENT"
         datetime sentAt
@@ -423,6 +436,9 @@ erDiagram
     ScheduledGroup ||--o{ InquiryWaitlistGroup : "waitlist entries - Cascade"
 
     User ||--o{ Enrollment : "enrolled in"
+    User |o--o{ User : "parentAccount - children - SetNull"
+    User ||--o{ PasswordToken : "password links - Cascade"
+    User |o--o{ PasswordToken : "createdBy - SetNull"
     Enrollment ||--o{ ModuleEnrollment : "modules taken"
     Enrollment ||--o{ EnrollmentMonth : "monthly fee - COMPETITION"
     Enrollment ||--o{ Attendance : "attendance records"
@@ -439,7 +455,7 @@ erDiagram
 
     User          ||--o{ EmailCampaign : "sentBy"
     Course        ||--o{ EmailCampaign : "targetCourse - SetNull"
-    EmailCampaign ||--o{ EmailCampaignRecipient : "one row per inbox - per child for EVALUATION and CREDENTIALS"
+    EmailCampaign ||--o{ EmailCampaignRecipient : "one row per inbox - per child for EVALUATION, per parent account for CREDENTIALS"
     EmailCampaign |o--o{ EmailAttachment : "campaign files - null campaignId = draft - Cascade"
     EmailAttachment ||--o| EmailAttachmentContent : "bytes - Cascade"
 
@@ -453,7 +469,8 @@ erDiagram
 | Enum | Values |
 |------|--------|
 | City | `SPLIT`, `SIBENIK` — the tenant boundary; **no `@default`**, every create stamps it explicitly |
-| UserRole | `ADMIN`, `TEACHER`, `STUDENT`, `CLASSROOM` — `CLASSROOM` is the shared classroom login (2026-09-20), one permanent row per city; see *City Tenancy* below |
+| UserRole | `ADMIN`, `TEACHER`, `STUDENT`, `CLASSROOM`, `PARENT` — `CLASSROOM` is the shared classroom login (2026-09-20), one permanent row per city; see *City Tenancy* below. `PARENT` (2026-09-29) is one login per parent e-mail and the only way a family reaches the portal — a `STUDENT` row no longer signs in at all |
+| PasswordTokenPurpose | `SETUP` (first password — a new account, the setup-link campaign, the staff rollout; valid 7 days), `RESET` (sent from a profile because someone lost access; valid 48 h) |
 | CourseLevel | `UVOD`, `SLR_1`, `SLR_2`, `SLR_3`, `SLR_4` — `UVOD` (predškolci, WeDo 2.0) is a rung *before* the ladder; the SLR levels were deliberately **not** renumbered (each one's name is its level). The competition program has `level = null` |
 | ProgramKind | `STANDARD`, `RADIONICA`, `COMPETITION` — the authoritative program discriminator on `Course.kind`. Branch through the predicates in `src/lib/program-kind.ts` (`isRadionica`, `isCompetition`, `hasDatedModules`, `hasModules`, `showsAllModules`, `isMonthlyBilled`, `isGradable`, `isEditableCourse`), never on a bare enum comparison |
 | InquiryType | `COURSE`, `PARTY` |
@@ -464,7 +481,7 @@ erDiagram
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
 | MaterialScope | `MODULE`, `COURSE`, `GROUP` |
 | PaymentOption | `PO_MODULU`, `CIJELA_GODINA` — how a family settles an SLR program. **STANDARD only**, gated by `offersPaymentOption` (which is `hasDatedModules`): a radionica settles by the akontacija + ostatak its confirmation e-mail spells out, and COMPETITION is billed monthly through `EnrollmentMonth`, so neither has a choice to record. **Null means "nije odabrano" and is never backfilled.** Decoupled from the paid marks on purpose — this is intent, `fullYearPaidAt` / `ModuleEnrollment.paidAt` are what happened, and choosing `CIJELA_GODINA` must never tick a paid mark |
-| EmailCampaignKind | `CUSTOM`, `REENROLLMENT`, `EVALUATION`, `CREDENTIALS`, `SCHEDULE`, `SCHOOL_CALENDAR` — REENROLLMENT sends are idempotent per `(city, targetCourseId, targetSchoolYear)`; CUSTOM is deliberately repeatable; EVALUATION mails report cards with one recipient row per **child** (not per inbox) and never sets `sentKey`, so a corrected card stays re-sendable. **CREDENTIALS** is one row per child ACCOUNT (a child in two selected groups is still one mail) and, since 2026-08-17, the ONLY way a student login leaves the building — neither inquiry acceptance nor manual creation mails anything. Radionica groups are deliberately NOT excluded from it: a workshop child gets a real portal account too. **SCHEDULE** ("Slanje rasporeda") is one mail per parent **inbox** with siblings merged — the row's `studentIds` holds every child on the address, each listed with all their groups in the source year — repeatable, no `sentKey`. **SCHOOL_CALENDAR** mails the city's "Raspored radionica" PDF for the source year, rendered **once** at campaign creation and stored as the campaign's own `EmailAttachment` (so a resume and the `[Kopija]` carry identical bytes); one mail per inbox, **standard groups only**, repeatable, no `sentKey` |
+| EmailCampaignKind | `CUSTOM`, `REENROLLMENT`, `EVALUATION`, `CREDENTIALS`, `SCHEDULE`, `SCHOOL_CALENDAR` — REENROLLMENT sends are idempotent per `(city, targetCourseId, targetSchoolYear)`; CUSTOM is deliberately repeatable; EVALUATION mails report cards with one recipient row per **child** (not per inbox) and never sets `sentKey`, so a corrected card stays re-sendable. **CREDENTIALS** is, since 2026-09-29, one row per **parent account** with siblings merged, and mails a one-time `SETUP` password link rather than a password — the token is issued only after the run has claimed the row. Neither inquiry acceptance nor manual creation mails anything. Radionica groups are deliberately NOT excluded from it: a workshop child's family gets a real portal login too. **SCHEDULE** ("Slanje rasporeda") is one mail per parent **inbox** with siblings merged — the row's `studentIds` holds every child on the address, each listed with all their groups in the source year — repeatable, no `sentKey`. **SCHOOL_CALENDAR** mails the city's "Raspored radionica" PDF for the source year, rendered **once** at campaign creation and stored as the campaign's own `EmailAttachment` (so a resume and the `[Kopija]` carry identical bytes); one mail per inbox, **standard groups only**, repeatable, no `sentKey` |
 | EmailRecipientStatus | `PENDING`, `SENT`, `FAILED`, `ALREADY_SENT`, `SKIPPED` — every intended recipient is written as `PENDING` upfront, so the detail view lists the whole cohort immediately and a resumed send knows exactly who is still owed a mail |
 
 > There are no `EnrollmentStatus` / `ModuleEnrollmentStatus` enums. Presence of a row means the student is in the group/module; deletion is the only way out.
@@ -485,6 +502,8 @@ erDiagram
 | Inquiry.assignedGroupId → ScheduledGroup | Admin final group assignment - set on account creation |
 | Inquiry → User | Student account created from this inquiry |
 | User → Enrollment → ScheduledGroup | Student enrolled in group for a school year |
+| User.parentAccountId → User | Self-relation `ParentChildren`, `onDelete: SetNull`. Links each `STUDENT` to **exactly one** account that sees it in the portal — a `PARENT` row, or a staff account whose e-mail the parent used. Written only by an admin creating or editing the child (`planParentLink` / `applyParentLink`, `src/lib/parent-account.ts`); a relink away from another address, a join onto an account that already sees other children, or a staff address comes back as `PARENT_LINK_CONFIRM` and is written only after the admin confirms. A newer upit from the other parent **moves** the child, never adds a second link. Null = no usable parent e-mail, so no portal access |
+| User → PasswordToken | One-time "choose your password" links (`src/lib/password-token.ts`), `onDelete: Cascade`. Only the SHA-256 is stored; the link is `/postavi-lozinku#<token>`. Redeeming one sets the hash, stamps `passwordSetAt` and bumps `sessionVersion`. `createdBy` is the sending staff member (`SetNull`) |
 | Enrollment → ModuleEnrollment → ModuleSchedule | Per-module opt-in within a group enrollment |
 | Course → CourseSeason | Per-`(courseId, schoolYear, city)` season range `[startDate, endDate]` for the COMPETITION program (`onDelete: Cascade`) — its replacement for module dates. Sessions are derived weekly on each group's own `dayOfWeek` via `computeSeasonSessions`: holiday weeks dropped outright, **no session-count target and no make-up**, so two weekdays legitimately finish with different totals. Edited via `<CourseSeasonEditor>` on `/admin/programi/[courseId]`. |
 | TrialWeek | **No relations at all.** A standalone `(schoolYear, city)` row like the `SchoolYear` registry — nothing is stored per group, because a calendar week contains exactly one occurrence of each weekday, so `computeTrialSession` (`src/lib/session-dates.ts`) derives the date from the group's existing `dayOfWeek`. An **ABSENT row is the "no probni sat this year" state**, the same doctrine as `CourseGradeRule`, which also means the feature is dark until an admin sets a week on `/admin/skolska-godina`. Read through `resolveTrialDateForGroup` (`src/lib/trial-week.ts`), always keyed on the GROUP'S own `schoolYear` — never `computeSchoolYear()`, the trap `getCourseGradeRules` documents. STANDARD only (`hasDatedModules`): a radionica is a one-off trial of its own and the competitive program is invitation-only. |
@@ -501,7 +520,7 @@ erDiagram
 | User → SchoolYearHoliday | `createdBy` relation (nullable) — admin who added the holiday. |
 | SchoolYear | Standalone registry of valid year labels (`YYYY/YYYY`). The `schoolYear` string columns on `ScheduledGroup`, `ModuleSchedule`, `Enrollment`, `Inquiry`, `Course` (radionice) and `CourseEnrollmentWindow` reference `SchoolYear.label` by string with **no** Prisma FK relation; only `SchoolYearHoliday.schoolYear` is a true FK. |
 | User → TeacherAttendance ← ScheduledGroup | Teaching hours, keyed `(userId, scheduledGroupId, sessionDate)` — deliberately **not** keyed on `TeacherAssignment`, so unassigning a teacher or a stand-in covering one session never rewrites who worked which hour. Sole source of **hours** for the admin payout report (`src/lib/teacher-work-report.ts`), which prices them at the teacher's current `User.hourlyRateCents` over the last `REPORT_MONTH_COUNT` (12) months — a null rate makes every `amountCents` null rather than 0, and changing the rate re-prices every month in the window, including ones already paid. Cascades from `User`, but **RESTRICT** from `ScheduledGroup`: these rows are payout evidence, so `deleteGroup`/`deleteCourse` block on them explicitly and the FK is the backstop. `recordedBy` is a separate non-cascading `User` relation — authorship, not entitlement. |
-| EmailCampaign → EmailCampaignRecipient | One row per parent inbox per send — except EVALUATION, where a row is one **child** (two siblings on one address get two rows, each mailing exactly one card via the row's `assessmentIds`, re-verified by `assertCardsBelongTo` immediately before each send), and CREDENTIALS, where a row is one child **account** (`studentIds`, re-verified by `assertCredentialsBelongTo`). Rows cascade (`onDelete: Cascade`) and are written as `PENDING` **before** any mail goes out. A `SENT` row carries `sentKey`, and the `(sentKey, parentEmail)` unique index is what actually prevents a double invitation — two overlapping sends can't both win the insert. Cleared to null on `FAILED` so a retry may re-invite. The four `*Count` columns are display counters; recipient rows are ground truth. |
+| EmailCampaign → EmailCampaignRecipient | One row per parent inbox per send — except EVALUATION, where a row is one **child** (two siblings on one address get two rows, each mailing exactly one card via the row's `assessmentIds`, re-verified by `assertCardsBelongTo` immediately before each send), and CREDENTIALS, where a row is one **parent account** (`studentIds` = its selected children, re-verified by `assertPasswordLinkBelongsTo` against their current `parentAccountId`). Rows cascade (`onDelete: Cascade`) and are written as `PENDING` **before** any mail goes out. A `SENT` row carries `sentKey`, and the `(sentKey, parentEmail)` unique index is what actually prevents a double invitation — two overlapping sends can't both win the insert. Cleared to null on `FAILED` so a retry may re-invite. The four `*Count` columns are display counters; recipient rows are ground truth. |
 | Course → EmailCampaign | `targetCourse` for REENROLLMENT invitations, `onDelete: SetNull` — deleting a program keeps the send history readable. |
 | EmailCampaign → EmailAttachment → EmailAttachmentContent | Campaign-level files (any kind; at most 5, 10 MB each, 15 MB together) — every recipient and the `[Kopija]` get the identical set, never per-child documents. An upload (`POST /api/upload/email-attachment`) writes a **draft** (`campaignId` null, stamped with the admin's city); `linkDraftAttachments` (`src/lib/email-attachments.ts`) claims the drafts inside the campaign-creating transaction, and a draft already swept or claimed rolls the whole campaign back. Unlinked drafts older than 24 h are deleted by `sweepStaleDraftAttachments`, which every upload runs (no cron). SCHOOL_CALENDAR's PDF is written straight into the campaign by `storeAttachment` in the same transaction. Both FKs Cascade: a sent file lives as long as its campaign. The bytes sit in `EmailAttachmentContent`, read only by the send job and the admin download. |
 
@@ -511,6 +530,7 @@ erDiagram
 |-------|-----------|
 | User.email | unique |
 | User.username | unique (nullable) |
+| PasswordToken.tokenHash | unique |
 | Course.slug | unique |
 | Article.slug | unique |
 | Tag.name | unique |
@@ -539,7 +559,7 @@ erDiagram
 
 | Model | Indexes |
 |-------|---------|
-| User | `(role, city)` |
+| User | `(role, city)`, `parentAccountId` |
 | Location | `city` |
 | ScheduledGroup | `(city, schoolYear)` |
 | Inquiry | `scheduledGroupId`, `status`, `assignedGroupId`, `courseId`, `studentId`, `schoolYear`, `(type, status)`, `(city, schoolYear, status)`, `(city, schoolYear, waitlistedAt)` |
@@ -559,6 +579,7 @@ erDiagram
 | InquiryWaitlistGroup | `scheduledGroupId` |
 | EmailCampaign | `(city, createdAt)`, `(city, kind, targetCourseId, targetSchoolYear)`, `sentById`, `targetCourseId` |
 | EmailCampaignRecipient | `campaignId` |
+| PasswordToken | `(userId, createdAt)` |
 | EmailAttachment | `(campaignId, createdAt)` — serves both the per-campaign load and the draft sweep (`campaignId IS NULL AND createdAt < cutoff`) |
 
 > The trailing single-column entries on `TeacherAttendance` and `EmailCampaign` are FK-support indexes. Postgres does not create them automatically, and each of those FKs is `RESTRICT` or `SET NULL` — without the index every `User`/`Course` delete seq-scans the referencing table.
@@ -577,7 +598,9 @@ Split and Šibenik run as fully separated tenants inside one app. "City" is the 
 
 **No `@default` on any city column** — a create that forgets to stamp `city` is a compile/DB error, never a silent SPLIT mis-stamp. Scoping is session-driven: `session.user.city` is a JWT claim (re-checked against the DB every 60s), and admin/teacher/student queries filter by it server-side. There is no city switcher and no super-admin.
 
-**`UserRole.CLASSROOM` — exactly one row per city (2026-09-20).** `ucionica-split` and `ucionica-sibenik` are the shared logins teachers type on the classroom PCs so children reach materials without their own passwords. They are created **only** by migration `20260920160100_classroom_accounts` (password generated in SQL with pgcrypto `crypt(pw, gen_salt('bf', 12))`, so it differs per environment and is never in git; `ON CONFLICT (username)` makes a re-run or a restored backup a no-op) — there is deliberately **no admin CRUD** to create, rotate or delete one. Its identity is **role + `city`, with no extra column**, and it holds **no `Enrollment` rows, ever**: an upis would put it on rosters, into capacity and into payment status. Its membership is computed instead — `classroomGroupWhere(city)` (`src/lib/classroom-access.ts`) = every `ScheduledGroup` of its **own city** in the **CURRENT** school year, deliberately narrower than `activeEnrollmentWhere` (current **plus next**): a child enrolled over the summer must be able to log in, but a classroom PC in June has nothing to offer from September's groups. Because it is a separate role rather than a flag on `STUDENT`, every `role: 'STUDENT'` query — `/admin/ucenici`, the Učenici counter, campaign cohorts, `student-match`, the importers — excludes it **by construction**, and each surface that admits it is an explicit opt-in.
+**`UserRole.CLASSROOM` — exactly one row per city (2026-09-20).** `ucionica-split` and `ucionica-sibenik` are the shared logins teachers type on the classroom PCs so children reach materials without their own passwords. They are created **only** by migration `20260920160100_classroom_accounts` (password generated in SQL with pgcrypto `crypt(pw, gen_salt('bf', 12))`, so it differs per environment and is never in git; `ON CONFLICT (username)` makes a re-run or a restored backup a no-op) — there is deliberately **no admin CRUD** to create, rotate or delete one. Its identity is **role + `city`, with no extra column**, and it holds **no `Enrollment` rows, ever**: an upis would put it on rosters, into capacity and into payment status. Its membership is computed instead — `classroomGroupWhere(city)` (`src/lib/classroom-access.ts`) = every `ScheduledGroup` of its **own city** in the **CURRENT** school year, deliberately narrower than `activeEnrollmentWhere` (current **plus next**): a family whose child was enrolled over the summer must be able to log in, but a classroom PC in June has nothing to offer from September's groups. Because it is a separate role rather than a flag on `STUDENT`, every `role: 'STUDENT'` query — `/admin/ucenici`, the Učenici counter, campaign cohorts, `student-match`, the importers — excludes it **by construction**, and each surface that admits it is an explicit opt-in.
+
+**`UserRole.PARENT` — one login per parent e-mail, not city-scoped (2026-09-29).** Children no longer sign in; the family signs in with the parent's e-mail and sees every child whose `parentAccountId` points at it, **in either city** — the account's own `city` only picks which office writes to it. The session carries the child being looked at as a JWT `studentId` claim, and every portal read keys on that, never on `session.user.id`. Like CLASSROOM it holds no enrollments, so every `role: 'STUDENT'` query excludes it by construction. It is created with an unusable password hash by `applyParentLink` and becomes usable only through a `PasswordToken` link.
 
 ## Schedule Pattern
 
