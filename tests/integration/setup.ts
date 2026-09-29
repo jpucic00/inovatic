@@ -11,6 +11,7 @@ vi.mock('@/lib/auth', () => ({
   auth: vi.fn(() => Promise.resolve(null)),
   signIn: vi.fn(() => Promise.resolve(undefined)),
   signOut: vi.fn(() => Promise.resolve(undefined)),
+  unstable_update: vi.fn(() => Promise.resolve(null)),
 }))
 
 import { auth as authImport } from '@/lib/auth'
@@ -33,6 +34,8 @@ type SessionUser = {
    * without a city claim (the auth guards must fail closed on those).
    */
   city?: City | null
+  /** The child a family session is looking at in the portal. */
+  studentId?: string | null
 }
 
 /**
@@ -52,9 +55,20 @@ export function mockSession(user: SessionUser | null = null) {
       name: user.name ?? null,
       role: user.role,
       city: user.city === null ? undefined : (user.city ?? 'SPLIT'),
+      studentId: user.studentId ?? null,
     },
     expires: new Date(Date.now() + 86_400_000).toISOString(),
   } as Session)
+}
+
+/**
+ * A parent looking at `studentId` in the portal — what a child's portal
+ * session is since 2026-09-29. The parent id is synthetic: the portal reads key
+ * on the picked `studentId` alone (the claim was proven when it was written),
+ * so no parent row is needed unless a test exercises the picker itself.
+ */
+export function mockChildSession(studentId: string, city: City = 'SPLIT') {
+  mockSession({ id: `parent-of-${studentId}`, role: 'PARENT', studentId, city })
 }
 
 afterEach(() => {

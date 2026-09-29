@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/proxy/elearning/[...path]/route'
-import { mockSession } from '../setup'
+import { mockChildSession, mockSession } from '../setup'
 import { classroomAccount, createAdmin, createStudent } from '../helpers/factory'
 
 // All 4 remaining tests from tests/phase3/31-proxy-elearning.spec.ts migrated.
@@ -92,13 +92,27 @@ describe('GET /api/proxy/elearning/[...path] — wiring', () => {
 })
 
 describe('Role gate', () => {
-  it('STUDENT user passes (STUDENT is in ALLOWED_ROLES)', async () => {
-    // The route allows STUDENT/TEACHER/ADMIN. Verify STUDENT is not 403'd.
+  it('a parent looking at a child passes', async () => {
     const student = await createStudent()
-    mockSession({ id: student.id, role: 'STUDENT', email: student.email })
+    mockChildSession(student.id)
     mockUpstream(new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } }))
     const res = await callProxy(['anything'])
-    expect(res.status, 'STUDENT must not be 403\'d').not.toBe(403)
+    expect(res.status, 'a family session must not be 403\'d').not.toBe(403)
+  })
+
+  it('a parent who has not picked a child → 403 (nothing of its own to open)', async () => {
+    mockSession({ id: 'some-parent', role: 'PARENT' })
+    mockUpstream(new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } }))
+    const res = await callProxy(['anything'])
+    expect(res.status).toBe(403)
+  })
+
+  it('a leftover STUDENT token → 403 (children no longer sign in)', async () => {
+    const student = await createStudent()
+    mockSession({ id: student.id, role: 'STUDENT' })
+    mockUpstream(new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } }))
+    const res = await callProxy(['anything'])
+    expect(res.status).toBe(403)
   })
 
   it('CLASSROOM user passes — the guide iframe on a classroom PC goes through here', async () => {

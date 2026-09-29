@@ -197,6 +197,24 @@ export function StudentDetailView({
         </div>
         <dl>
           <DetailRow
+            label="Roditeljski račun"
+            value={
+              student.parentAccount ? (
+                <span>
+                  {student.parentAccount.email}
+                  {student.parentAccount._count.children > 1 && (
+                    <span className="text-gray-400">
+                      {' '}
+                      · {student.parentAccount._count.children} djece na računu
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-gray-400 italic">Nema — portal nije dostupan</span>
+              )
+            }
+          />
+          <DetailRow
             label="Korisničko ime"
             value={
               student.username ? (

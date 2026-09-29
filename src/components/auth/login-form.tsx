@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { LayoutDashboard, Loader2, Presentation } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { loginSchema, type LoginFormData } from '@/lib/validators/login'
 import { loginAction } from '@/actions/login'
 
@@ -16,7 +16,6 @@ const errorInputClass =
 export function LoginForm() {
   const router = useRouter()
   const [serverError, setServerError] = useState<string | null>(null)
-  const [showPanelChoice, setShowPanelChoice] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const {
@@ -28,64 +27,38 @@ export function LoginForm() {
     mode: 'onTouched',
   })
 
-  function goTo(destination: string) {
-    router.push(destination)
-    router.refresh()
-  }
-
   function onSubmit(data: LoginFormData) {
     setServerError(null)
     startTransition(async () => {
       const result = await loginAction(data)
       if (result.success) {
-        // A dual-role admin (also assigned as teacher) picks a panel instead
-        // of being auto-redirected.
-        if (result.role === 'ADMIN' && result.showTeacherPanel) {
-          setShowPanelChoice(true)
-          return
-        }
-        // STUDENT and the shared CLASSROOM login both land on the portal.
-        let destination = '/portal'
-        if (result.role === 'ADMIN') destination = '/admin'
-        else if (result.role === 'TEACHER') destination = '/nastavnik'
-        goTo(destination)
+        // The action decides: a panel, the portal, or the picker when there is
+        // more than one thing this account can open.
+        router.push(result.destination)
+        router.refresh()
       } else {
         setServerError(result.error)
       }
     })
   }
 
-  if (showPanelChoice) {
-    const choiceClass =
-      'w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-cyan-500 hover:text-cyan-600 transition-colors'
-    return (
-      <div className="space-y-3">
-        <p className="text-sm text-gray-500 text-center">
-          Prijava uspješna. Odaberite panel:
-        </p>
-        <button type="button" onClick={() => goTo('/admin')} className={choiceClass}>
-          <LayoutDashboard className="w-4 h-4 text-cyan-500" />
-          Administracija
-        </button>
-        <button type="button" onClick={() => goTo('/nastavnik')} className={choiceClass}>
-          <Presentation className="w-4 h-4 text-cyan-500" />
-          Nastavnički panel
-        </button>
-      </div>
-    )
-  }
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
       <div>
         <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-1.5">
-          Korisničko ime ili e-mail
+          E-mail
         </label>
+        {/* type="text", not "email": the classroom login still signs in with
+            its username, and the browser would refuse that before submit. */}
         <input
           id="identifier"
           type="text"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           autoComplete="username"
-          placeholder="korisnickoime ili email@primjer.hr"
+          placeholder="email@primjer.hr"
           className={errors.identifier ? errorInputClass : inputClass}
           {...register('identifier')}
         />

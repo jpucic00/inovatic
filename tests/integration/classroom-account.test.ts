@@ -12,7 +12,7 @@ import bcrypt from 'bcryptjs'
 import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
 import { revalidateTokenClaims } from '@/lib/auth-token'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 import { classroomAccount, createAdmin, createTeacher } from './helpers/factory'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -115,7 +115,7 @@ describe('getClassroomCredentials', () => {
 
   it('refuses a student', async () => {
     const student = await (await import('./helpers/factory')).createStudent()
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
     await expect(getClassroomCredentials()).rejects.toThrow()
   })
 })

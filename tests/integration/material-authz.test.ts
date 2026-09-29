@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 import {
   createAdmin,
   createTeacher,
@@ -271,7 +271,7 @@ describe('COURSE-on-standard visibility, propagation and per-group hide', () => 
       uploadedById: admin.id,
     })
 
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
     const viewA1 = await getEffectiveMaterialsForStudent(groupA.id)
     const viewB1 = await getEffectiveMaterialsForStudent(groupB.id)
     expect(viewA1.programMaterials.links.some((m) => m.id === mat.id)).toBe(true)
@@ -282,7 +282,7 @@ describe('COURSE-on-standard visibility, propagation and per-group hide', () => 
     const hideRes = await setMaterialHidden(mat.id, groupA.id, true)
     expect(hideRes.success).toBe(true)
 
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
     const viewA2 = await getEffectiveMaterialsForStudent(groupA.id)
     const viewB2 = await getEffectiveMaterialsForStudent(groupB.id)
     expect(viewA2.programMaterials.links.some((m) => m.id === mat.id)).toBe(false)

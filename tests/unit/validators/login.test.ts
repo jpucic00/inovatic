@@ -2,9 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { loginSchema } from '@/lib/validators/login'
 
 describe('loginSchema', () => {
+  // A bare username is still valid input — the classroom login signs in with one.
   it('accepts a valid identifier + password', () => {
-    const result = loginSchema.parse({ identifier: 'admin', password: 'secret' })
-    expect(result).toEqual({ identifier: 'admin', password: 'secret' })
+    const result = loginSchema.parse({ identifier: 'ucionica-split', password: 'secret' })
+    expect(result).toEqual({ identifier: 'ucionica-split', password: 'secret' })
+  })
+
+  it('trims the identifier — a phone keyboard often appends a space', () => {
+    const result = loginSchema.parse({ identifier: ' user@example.com ', password: 'pw' })
+    expect(result.identifier).toBe('user@example.com')
+  })
+
+  it('treats a whitespace-only identifier as empty', () => {
+    expect(loginSchema.safeParse({ identifier: '   ', password: 'pw' }).success).toBe(false)
   })
 
   it('accepts an email as identifier', () => {
@@ -17,7 +27,7 @@ describe('loginSchema', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       const issue = result.error.issues.find((i) => i.path[0] === 'identifier')
-      expect(issue?.message).toBe('Unesite korisničko ime ili e-mail')
+      expect(issue?.message).toBe('Unesite e-mail')
     }
   })
 

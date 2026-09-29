@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { MaterialType } from '@prisma/client'
 import { GET } from '@/app/api/download/[materialId]/route'
 import { db } from '@/lib/db'
-import { mockSession } from '../setup'
+import { mockChildSession, mockSession } from '../setup'
 import { zagrebDateKey } from '@/lib/attendance-window'
 import {
   classroomAccount,
@@ -272,30 +272,42 @@ describe('GET /api/download/[materialId] — TEACHER on a zamjena', () => {
   })
 })
 
-describe('GET /api/download/[materialId] — STUDENT', () => {
-  it('STUDENT enrolled in groupA → groupA material → 200 + Content-Disposition', async () => {
-    mockSession({ id: seeded.studentEnrolled.id, role: 'STUDENT' })
+describe('GET /api/download/[materialId] — family session (picked child)', () => {
+  it('child enrolled in groupA → groupA material → 200 + Content-Disposition', async () => {
+    mockChildSession(seeded.studentEnrolled.id)
     const res = await callDownload(seeded.materialGroupA)
     expect(res.status).toBe(200)
     expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename=/)
   })
 
-  it('STUDENT enrolled in groupA → MODULE material (hidden in A) → 404 (hide blocks student)', async () => {
-    mockSession({ id: seeded.studentEnrolled.id, role: 'STUDENT' })
+  it('child enrolled in groupA → MODULE material (hidden in A) → 404 (hide blocks student)', async () => {
+    mockChildSession(seeded.studentEnrolled.id)
     const res = await callDownload(seeded.materialModule)
     expect(res.status).toBe(404)
   })
 
-  it('STUDENT enrolled in groupA → groupB material → 404 (not enrolled in B)', async () => {
-    mockSession({ id: seeded.studentEnrolled.id, role: 'STUDENT' })
+  it('child enrolled in groupA → groupB material → 404 (not enrolled in B)', async () => {
+    mockChildSession(seeded.studentEnrolled.id)
     const res = await callDownload(seeded.materialGroupB)
     expect(res.status).toBe(404)
   })
 
-  it('STUDENT with no enrollments → groupA material → 404', async () => {
-    mockSession({ id: seeded.studentNone.id, role: 'STUDENT' })
+  it('child with no enrollments → groupA material → 404', async () => {
+    mockChildSession(seeded.studentNone.id)
     const res = await callDownload(seeded.materialGroupA)
     expect(res.status).toBe(404)
+  })
+  it('a leftover STUDENT token (children no longer sign in) → 404', async () => {
+    mockSession({ id: seeded.studentEnrolled.id, role: 'STUDENT' })
+    const res = await callDownload(seeded.materialGroupA)
+    expect(res.status).toBe(404)
+  })
+
+  it('a teacher looking at their own child reads that child\'s group material', async () => {
+    const teacher = await createTeacher()
+    mockSession({ id: teacher.id, role: 'TEACHER', studentId: seeded.studentEnrolled.id })
+    const res = await callDownload(seeded.materialGroupA)
+    expect(res.status).toBe(200)
   })
 })
 

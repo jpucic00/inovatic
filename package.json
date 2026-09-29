@@ -33,6 +33,7 @@
     "db:refresh-dev-dates": "tsx scripts/refresh-dev-dates.ts",
     "db:import-history": "tsx scripts/import-history.ts",
     "db:watermark-images": "tsx scripts/watermark-existing-urls.ts",
+    "db:create-parent-accounts": "tsx scripts/create-parent-accounts.ts",
     "db:import-competition": "tsx scripts/import-competition.ts",
     "download-wp-images": "tsx scripts/download-wp-images.ts",
     "migrate-images": "tsx scripts/migrate-images-to-cloudinary.ts",

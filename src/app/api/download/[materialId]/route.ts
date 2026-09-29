@@ -151,13 +151,18 @@ export async function GET(
     allowed =
       (target !== null && (await canManageMaterial(session, target))) ||
       (await teacherReadAllowed(session.user.id, materialId))
-  } else if (role === 'STUDENT') {
-    allowed = await studentAllowed(session.user.id, materialId)
   } else if (role === 'CLASSROOM') {
     // `city` is typed but may be undefined on a legacy token kept alive through a
     // transient DB error; Prisma reads `city: undefined` as "no filter", which
     // would open BOTH cities. Fail closed, like the ADMIN branch above.
     allowed = !!session.user.city && (await classroomAllowed(session.user.city, materialId))
+  }
+
+  // The child a parent (or a staff member who is also a parent) is looking at
+  // in the portal. Checked after the staff branches, never instead of them —
+  // the picked child can only ever ADD what that child may already open.
+  if (!allowed && session.user.studentId) {
+    allowed = await studentAllowed(session.user.studentId, materialId)
   }
 
   if (!allowed) {

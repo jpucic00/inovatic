@@ -3,12 +3,12 @@
  * the tab strip that every panel renders under. It is a NEW access gate
  * (2026-08-24): the layout resolves it before any panel loads, so it has to
  * refuse exactly what the panels' own reads refuse. The enrollment lookup is
- * the gate, as in materials/gallery/assessment; `requireActiveStudent` in
+ * the gate, as in materials/gallery/assessment; `requireActivePortalChild` in
  * front of it is what keeps an expired account out entirely.
  */
 import { describe, expect, it } from 'vitest'
 import { computeSchoolYear } from '@/lib/school-year'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 import {
   createCourse,
   createEnrollment,
@@ -42,7 +42,7 @@ describe('getStudentGroupShell — access gate', () => {
     await createEnrollment(student.id, ownGroup.id, { schoolYear: CY })
     const otherGroup = await createGroup()
 
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     await expectNotFound(getStudentGroupShell(otherGroup.id))
   })
@@ -50,13 +50,13 @@ describe('getStudentGroupShell — access gate', () => {
   it('refuses a student whose only enrollment is a settled past year', async () => {
     // The enrollment lookup itself is deliberately year-blind (looking back at
     // your own old group is legitimate) — what refuses this caller is
-    // `requireActiveStudent`, which needs an enrollment in the current or next
+    // `requireActivePortalChild`, which needs an enrollment in the current or next
     // year. Only enrolled long ago, the child gets a 404, not a redirect loop.
     const student = await createStudent()
     const group = await createGroup({ schoolYear: PAST })
     await createEnrollment(student.id, group.id, { schoolYear: PAST })
 
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     await expectNotFound(getStudentGroupShell(group.id))
   })
@@ -82,7 +82,7 @@ describe('getStudentGroupShell — shell contract', () => {
     const group = await createGroup({ courseId: course.id, schoolYear: CY })
     await createEnrollment(student.id, group.id, { schoolYear: CY })
 
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
     const shell = await getStudentGroupShell(group.id)
 
     expect(shell.group.id).toBe(group.id)
@@ -99,7 +99,7 @@ describe('getStudentGroupShell — shell contract', () => {
     const group = await createGroup({ courseId: course.id, schoolYear: CY })
     await createEnrollment(student.id, group.id, { schoolYear: CY })
 
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
     const shell = await getStudentGroupShell(group.id)
 
     expect(shell.kind).toBe('RADIONICA')

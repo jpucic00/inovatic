@@ -1,12 +1,11 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireStudent } from '@/lib/auth-guard'
+import { requirePortalChild } from '@/lib/auth-guard'
 
 type StudentProfile = {
   firstName: string
   lastName: string
-  username: string | null
   phone: string | null
   dateOfBirth: string | null
   childSchool: string | null
@@ -16,14 +15,13 @@ type StudentProfile = {
 }
 
 export async function getMyProfile(): Promise<StudentProfile> {
-  const session = await requireStudent()
+  const { studentId } = await requirePortalChild()
 
   const user = await db.user.findUniqueOrThrow({
-    where: { id: session.user.id },
+    where: { id: studentId },
     select: {
       firstName: true,
       lastName: true,
-      username: true,
       phone: true,
       dateOfBirth: true,
       childSchool: true,

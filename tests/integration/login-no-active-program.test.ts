@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { AuthError } from 'next-auth'
 import { signIn } from '@/lib/auth'
 import { loginAction } from '@/actions/login'
-import { createStudent } from './helpers/factory'
+import { createParent } from './helpers/factory'
 
 // loginAction clears the school-year cookie on success; `cookies()` has no
 // request scope in the integration tier, so stub the cookie helper.
@@ -45,42 +45,42 @@ describe('loginAction — no active program', () => {
   it('maps the no_active_program code to its own message, not "wrong password"', async () => {
     mockedSignIn.mockRejectedValueOnce(new NoActiveProgram())
 
-    const student = await createStudent()
+    const parent = await createParent()
     const res = await loginAction({
-      identifier: student.username!,
-      password: student.plainPassword,
+      identifier: parent.email,
+      password: parent.plainPassword,
     })
 
     expect(res.success).toBe(false)
     if (!res.success) {
-      expect(res.error).toMatch(/više nije dio nijednog programa/i)
+      expect(res.error).toMatch(/nije upisano u program/i)
       // The distinction is the whole point: a parent told "wrong password"
       // would hunt for a typo that does not exist.
-      expect(res.error).not.toMatch(/Pogrešno korisničko ime/i)
+      expect(res.error).not.toMatch(/Pogrešan e-mail/i)
     }
   })
 
-  it('still reports a genuine credential failure as wrong username or password', async () => {
+  it('still reports a genuine credential failure as wrong e-mail or password', async () => {
     mockedSignIn.mockRejectedValueOnce(new WrongPassword())
 
-    const student = await createStudent()
-    const res = await loginAction({ identifier: student.username!, password: 'nope' })
+    const parent = await createParent()
+    const res = await loginAction({ identifier: parent.email, password: 'nope' })
 
     expect(res.success).toBe(false)
-    if (!res.success) expect(res.error).toMatch(/Pogrešno korisničko ime ili lozinka/i)
+    if (!res.success) expect(res.error).toMatch(/Pogrešan e-mail ili lozinka/i)
   })
 
   it('falls back to the generic message for an unrecognised auth error', async () => {
     // Never leak an internal token to the login form.
     mockedSignIn.mockRejectedValueOnce(new UnknownAuthFailure())
 
-    const student = await createStudent()
+    const parent = await createParent()
     const res = await loginAction({
-      identifier: student.username!,
-      password: student.plainPassword,
+      identifier: parent.email,
+      password: parent.plainPassword,
     })
 
     expect(res.success).toBe(false)
-    if (!res.success) expect(res.error).toMatch(/Pogrešno korisničko ime ili lozinka/i)
+    if (!res.success) expect(res.error).toMatch(/Pogrešan e-mail ili lozinka/i)
   })
 })

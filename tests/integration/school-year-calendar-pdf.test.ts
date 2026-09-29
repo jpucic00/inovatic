@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import type { City } from '@prisma/client'
 import { db } from '@/lib/db'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 import {
   createAdmin,
   createCourse,
@@ -117,7 +117,7 @@ describe('GET /api/admin/school-year-calendar', () => {
     expect((await download(SPLIT_ONLY_YEAR)).status).toBe(401)
 
     const student = await createStudent({ city: 'SPLIT' })
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
     expect((await download(SPLIT_ONLY_YEAR)).status).toBe(401)
 
     mockSession(null)

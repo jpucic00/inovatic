@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client'
 
 import { SKILL_KEYS } from '../assessment-rubric'
-import { generateSimplePassword, hashPassword } from '../password'
+import { unusablePasswordHash } from '../password'
 import type { CompetitionPlan } from './plan'
 
 type ApplyResult = {
@@ -15,12 +15,6 @@ type ApplyResult = {
   monthsMarkedPaid: number
   assessmentsCreated: number
   assessmentsUpdated: number
-}
-
-/** Random, never-shown password: the account exists for history, not login.
- *  Credentials become usable only after an explicit admin reset. */
-async function unusablePasswordHash(): Promise<string> {
-  return hashPassword(generateSimplePassword(24))
 }
 
 /**

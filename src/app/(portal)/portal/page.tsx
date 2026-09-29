@@ -12,7 +12,7 @@ import { isRadionica } from '@/lib/program-kind'
 
 export const metadata: Metadata = {
   title: 'Polaznički portal',
-  description: 'Prijava u Inovatic portal za učenike i nastavnike.',
+  description: 'Prijava u Inovatic portal za roditelje i djelatnike.',
   // Private auth entry point — keep it out of search indexes.
   robots: { index: false, follow: false },
 }
@@ -21,18 +21,26 @@ export const metadata: Metadata = {
  * `/portal` is both the sign-in URL and the student dashboard. A guest — and,
  * failing closed, a legacy session without a city claim — gets the login
  * screen rendered in place: every auth guard redirects here, so redirecting
- * onward would loop. Signed-in staff bounce to their own panel, mirroring the
- * login action's role routing.
+ * onward would loop.
+ *
+ * A session looking at a child gets that child's dashboard — whatever the
+ * account's role, since a teacher's own child is opened the same way a
+ * parent's is. Without a picked child, staff bounce to their own panel and a
+ * parent goes to the picker.
  */
 export default async function PortalPage() {
   const session = await auth()
   if (!session?.user?.city) return <LoginScreen />
-  if (session.user.role === 'ADMIN') redirect('/admin')
-  if (session.user.role === 'TEACHER') redirect('/nastavnik')
   // The shared classroom login picks a program, then a group — it has no
   // enrollments for the dashboard below to route on.
   if (session.user.role === 'CLASSROOM') return <ClassroomPrograms programs={await getClassroomPrograms()} />
-  return <PortalDashboard />
+  if (session.user.studentId) return <PortalDashboard />
+  if (session.user.role === 'ADMIN') redirect('/admin')
+  if (session.user.role === 'TEACHER') redirect('/nastavnik')
+  // A parent with no child picked, and — failing closed — a STUDENT token from
+  // before the parent-account deploy that revalidation has not ended yet.
+  if (session.user.role === 'PARENT') redirect('/portal/odabir')
+  return <LoginScreen />
 }
 
 async function PortalDashboard() {

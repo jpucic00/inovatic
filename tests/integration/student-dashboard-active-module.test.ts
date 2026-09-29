@@ -15,7 +15,7 @@ import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { createEnrollment, createModule, createStudent } from './helpers/factory'
 import { fixtureScope } from './helpers/cleanup'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/navigation', async () => {
@@ -122,7 +122,7 @@ describe('getMyCurrentEnrollments — the active module is per group', () => {
     const student = await createStudent()
     await createEnrollment(student.id, slowGroup.id, { schoolYear: YEAR })
     await createEnrollment(student.id, fastGroup.id, { schoolYear: YEAR })
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     const summaries = await getMyCurrentEnrollments()
 
@@ -145,7 +145,7 @@ describe('getMyCurrentEnrollments — the active module is per group', () => {
     })
     const student = await createStudent()
     await createEnrollment(student.id, group.id, { schoolYear: YEAR })
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     const summaries = await getMyCurrentEnrollments()
 
@@ -186,7 +186,7 @@ describe('getMyCurrentEnrollments — ordering', () => {
     await createEnrollment(student.id, laterGroup.id, { schoolYear: YEAR })
     await createEnrollment(student.id, secondOfEarlier.id, { schoolYear: YEAR })
     await createEnrollment(student.id, firstOfEarlier.id, { schoolYear: YEAR })
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     const summaries = await getMyCurrentEnrollments()
 
@@ -204,7 +204,7 @@ describe('getMyCurrentEnrollments — ordering', () => {
     const theirs = await createStudent()
     await createEnrollment(mine.id, group.id, { schoolYear: YEAR })
     await createEnrollment(theirs.id, group.id, { schoolYear: YEAR })
-    mockSession({ id: mine.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(mine.id)
 
     const summaries = await getMyCurrentEnrollments()
 

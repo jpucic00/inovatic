@@ -22,6 +22,7 @@ export const authConfig = {
       // May be undefined on a legacy token kept alive through a transient DB
       // error — the auth guards fail closed on a missing city.
       session.user.city = token.city as City
+      session.user.studentId = (token.studentId as string | undefined) ?? null
       return session
     },
   },

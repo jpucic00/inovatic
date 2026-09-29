@@ -3,7 +3,7 @@
 import { notFound } from 'next/navigation'
 import type { ProgramKind, SkillLevel } from '@prisma/client'
 import { db } from '@/lib/db'
-import { requireActiveStudent } from '@/lib/auth-guard'
+import { requireActivePortalChild } from '@/lib/auth-guard'
 import { formatRecommendationLabel, isBlankAssessment } from '@/lib/assessment-rubric'
 import { formatDate } from '@/lib/format'
 import { isGradable } from '@/lib/program-kind'
@@ -44,7 +44,7 @@ type StudentAssessmentView = {
 }
 
 /**
- * Read-only report card for a group the logged-in student is enrolled in.
+ * Read-only report card for a group the picked child is enrolled in.
  * The enrollment lookup is the access gate: someone else's group 404s, which is
  * indistinguishable from a nonexistent one. A row whose every field is still
  * blank counts as "not graded yet" so a parent never opens an empty card.
@@ -52,10 +52,10 @@ type StudentAssessmentView = {
 export async function getMyAssessmentForGroup(
   groupId: string,
 ): Promise<StudentAssessmentView> {
-  const session = await requireActiveStudent()
+  const { studentId } = await requireActivePortalChild()
 
   const enrollment = await db.enrollment.findFirst({
-    where: { userId: session.user.id, scheduledGroupId: groupId },
+    where: { userId: studentId, scheduledGroupId: groupId },
     select: { id: true },
   })
   if (!enrollment) notFound()
@@ -80,7 +80,7 @@ export async function getMyAssessmentForGroup(
 
   const row = await db.studentAssessment.findUnique({
     where: {
-      studentId_groupId: { studentId: session.user.id, groupId },
+      studentId_groupId: { studentId, groupId },
     },
     select: {
       slaganje: true,

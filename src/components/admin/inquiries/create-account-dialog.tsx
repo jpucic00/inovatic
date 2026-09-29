@@ -19,6 +19,8 @@ import { formatGroupSchedule, formatModuleDateRange as fmtModuleDateRange } from
 import { toast } from 'sonner'
 import { hasDatedModules, isRadionica } from '@/lib/program-kind'
 import type { ProgramKind } from '@prisma/client'
+import type { ParentLinkPreview } from '@/lib/parent-account'
+import { ParentLinkNotice } from '@/components/admin/students/parent-link-notice'
 
 type ModuleOption = {
   id: string
@@ -121,6 +123,9 @@ export function CreateAccountDialog({
 }: Readonly<CreateAccountDialogProps>) {
   const [open, setOpen] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState(preferredGroupId ?? '')
+  // Set when the server says this account link needs the admin's yes; the
+  // primary button then re-submits with the confirmation.
+  const [parentLink, setParentLink] = useState<ParentLinkPreview | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const [selectedCourseId, setSelectedCourseId] = useState(preferredCourseId ?? '')
@@ -167,7 +172,7 @@ export function CreateAccountDialog({
     )
   }
 
-  const handleCreate = () => {
+  const handleCreate = (confirmParentLink = false) => {
     if (!selectedGroupId) {
       toast.error('Odaberite grupu za upis.')
       return
@@ -181,7 +186,12 @@ export function CreateAccountDialog({
         inquiryId,
         selectedGroupId,
         isStandardCourse && selectedScheduleIds.length > 0 ? selectedScheduleIds : undefined,
+        confirmParentLink,
       )
+      if (!res.success && 'parentLink' in res) {
+        setParentLink(res.parentLink)
+        return
+      }
       if (res.success) {
         // Nothing is mailed here any more — say so plainly, or the admin will
         // assume the parent has the login and never run the campaign.
@@ -203,8 +213,16 @@ export function CreateAccountDialog({
     })
   }
 
+  const submitLabel = parentLink ? 'Potvrdi i kreiraj' : 'Kreiraj račun i upiši'
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) setParentLink(null)
+      }}
+    >
       <DialogTrigger asChild>
         <button className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors">
           <UserPlus className="w-4 h-4" />
@@ -344,6 +362,8 @@ export function CreateAccountDialog({
               </div>
             )}
 
+            {parentLink && <ParentLinkNotice preview={parentLink} />}
+
             <DialogFooter>
               <button
                 onClick={() => setOpen(false)}
@@ -353,7 +373,7 @@ export function CreateAccountDialog({
                 Odustani
               </button>
               <button
-                onClick={handleCreate}
+                onClick={() => handleCreate(parentLink !== null)}
                 disabled={
                   isPending ||
                   !selectedGroupId ||
@@ -362,7 +382,7 @@ export function CreateAccountDialog({
                 }
                 className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
               >
-                {isPending ? 'Kreiram...' : 'Kreiraj račun i upiši'}
+                {isPending ? 'Kreiram...' : submitLabel}
               </button>
             </DialogFooter>
         </>

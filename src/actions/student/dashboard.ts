@@ -2,7 +2,7 @@
 
 import type { City, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
-import { requireStudent } from '@/lib/auth-guard'
+import { requirePortalChild } from '@/lib/auth-guard'
 import { activeEnrollmentWhere } from '@/lib/enrollment-activity'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
 import { loadHolidayDateKeys } from '@/lib/holidays'
@@ -33,19 +33,19 @@ export type StudentEnrollmentSummary = {
 }
 
 /**
- * Returns enrollments for the current school year belonging to the logged-in
+ * Returns enrollments for the current school year belonging to the picked
  * student, with the active module attached per group. Used by the portal
  * dashboard to route single vs multi-enrollment views.
  */
 export async function getMyCurrentEnrollments(): Promise<StudentEnrollmentSummary[]> {
-  const session = await requireStudent()
+  const { studentId } = await requirePortalChild()
 
   // Current OR next year, matching the login gate exactly. Filtering on
   // `computeSchoolYear()` alone meant a child enrolled only for NEXT year — the
   // whole point of creating accounts over the summer — could log in and be shown
   // an empty dashboard.
   const enrollments = await db.enrollment.findMany({
-    where: { userId: session.user.id, ...activeEnrollmentWhere() },
+    where: { userId: studentId, ...activeEnrollmentWhere() },
     orderBy: [
       { scheduledGroup: { course: { sortOrder: 'asc' } } },
       { scheduledGroup: { name: 'asc' } },

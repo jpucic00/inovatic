@@ -34,8 +34,8 @@ type ClassroomGroup = {
  * list every group in the city.
  */
 async function requireClassroom() {
-  const session = await requirePortalUser()
-  if (session.user.role !== 'CLASSROOM') redirect('/portal')
+  const { session, studentId } = await requirePortalUser()
+  if (studentId !== null) redirect('/portal')
   return session
 }
 

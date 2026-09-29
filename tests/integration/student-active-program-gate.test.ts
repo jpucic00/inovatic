@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 import {
   createAdmin,
   createCourse,
   createEnrollment,
   createGroup,
+  createParent,
   createStudent,
   createTeacher,
+  linkToParent,
 } from './helpers/factory'
 import { computeSchoolYear, getNextSchoolYear, getPreviousSchoolYear } from '@/lib/school-year'
 import { revalidateTokenClaims } from '@/lib/auth-token'
@@ -36,35 +38,74 @@ async function studentEnrolledIn(schoolYear: string) {
   return { student, group }
 }
 
-// ── The token-eviction layer ────────────────────────────────────────────────
-// This is what ejects a student who was ALREADY logged in when their last
-// enrollment left the window; without it a cookie minted on 31 August stays
-// valid into late September (@auth/core's 30-day JWT default).
-
-function staleToken(id: string) {
-  // `city` present + an expired checkedAt forces the DB re-check path.
-  return { id, role: 'STUDENT' as const, city: 'SPLIT' as const, checkedAt: 0 }
+/** A parent account whose one child is enrolled only in the given year. */
+async function parentOfChildIn(schoolYear: string) {
+  const parent = await createParent({ city: 'SPLIT' })
+  const { student } = await studentEnrolledIn(schoolYear)
+  await linkToParent(student.id, parent.id)
+  return { parent, student }
 }
 
-describe('revalidateTokenClaims — student activity', () => {
-  it('keeps a student with a current-year enrollment', async () => {
+// ── The token-eviction layer ────────────────────────────────────────────────
+// This is what ejects a parent who was ALREADY logged in when their last child
+// left the window; without it a cookie minted on 31 August stays valid into
+// late September (@auth/core's 30-day JWT default).
+
+function staleToken(id: string, role: 'PARENT' | 'STUDENT' = 'PARENT', studentId?: string) {
+  // `city` present + an expired checkedAt forces the DB re-check path.
+  return { id, role, city: 'SPLIT' as const, checkedAt: 0, ...(studentId ? { studentId } : {}) }
+}
+
+describe('revalidateTokenClaims — family sessions', () => {
+  it('keeps a parent whose child has a current-year enrollment', async () => {
+    const { parent } = await parentOfChildIn(CURRENT)
+    expect(await revalidateTokenClaims(staleToken(parent.id))).not.toBeNull()
+  })
+
+  it('keeps a parent whose child is enrolled only for NEXT year', async () => {
+    const { parent } = await parentOfChildIn(NEXT)
+    expect(await revalidateTokenClaims(staleToken(parent.id))).not.toBeNull()
+  })
+
+  it('evicts a parent whose only child is enrolled only in a past year', async () => {
+    const { parent } = await parentOfChildIn(PAST)
+    expect(await revalidateTokenClaims(staleToken(parent.id))).toBeNull()
+  })
+
+  it('evicts a parent with no linked child at all', async () => {
+    const parent = await createParent({ city: 'SPLIT' })
+    expect(await revalidateTokenClaims(staleToken(parent.id))).toBeNull()
+  })
+
+  it('ends a leftover STUDENT token even for an actively enrolled child', async () => {
     const { student } = await studentEnrolledIn(CURRENT)
-    expect(await revalidateTokenClaims(staleToken(student.id))).not.toBeNull()
+    expect(await revalidateTokenClaims(staleToken(student.id, 'STUDENT'))).toBeNull()
   })
 
-  it('keeps a student enrolled only for NEXT year', async () => {
-    const { student } = await studentEnrolledIn(NEXT)
-    expect(await revalidateTokenClaims(staleToken(student.id))).not.toBeNull()
+  it('keeps the picked child while the parent may still open it', async () => {
+    const { parent, student } = await parentOfChildIn(CURRENT)
+    const token = await revalidateTokenClaims(staleToken(parent.id, 'PARENT', student.id))
+    expect(token?.studentId).toBe(student.id)
   })
 
-  it('evicts a student whose only enrollment is in a past year', async () => {
-    const { student } = await studentEnrolledIn(PAST)
-    expect(await revalidateTokenClaims(staleToken(student.id))).toBeNull()
+  it('drops the picked child — but not the session — once it moves to the other parent', async () => {
+    const { parent, student } = await parentOfChildIn(CURRENT)
+    await linkToParent((await studentEnrolledIn(CURRENT)).student.id, parent.id)
+    const otherParent = await createParent({ city: 'SPLIT' })
+    await linkToParent(student.id, otherParent.id)
+
+    const token = await revalidateTokenClaims(staleToken(parent.id, 'PARENT', student.id))
+    expect(token).not.toBeNull()
+    expect(token?.studentId).toBeUndefined()
   })
 
-  it('evicts a student with no enrollment at all', async () => {
-    const student = await createStudent({ city: 'SPLIT' })
-    expect(await revalidateTokenClaims(staleToken(student.id))).toBeNull()
+  it('drops a picked child that is deleted', async () => {
+    const { parent, student } = await parentOfChildIn(CURRENT)
+    await linkToParent((await studentEnrolledIn(CURRENT)).student.id, parent.id)
+    await db.user.update({ where: { id: student.id }, data: { deletedAt: new Date() } })
+
+    const token = await revalidateTokenClaims(staleToken(parent.id, 'PARENT', student.id))
+    expect(token?.studentId).toBeUndefined()
   })
 
   it('never evicts an admin or a teacher, however they are enrolled', async () => {
@@ -91,16 +132,14 @@ describe('revalidateTokenClaims — student activity', () => {
 
   /**
    * The check lives INSIDE the existing try so the deliberate fail-open on
-   * transient DB errors still covers it — a Neon cold start must not log out the
-   * entire student body at once.
+   * transient DB errors still covers it — a Neon cold start must not log out
+   * every family at once.
    */
   it('fails OPEN on a transient DB error rather than evicting everyone', async () => {
-    const { student } = await studentEnrolledIn(CURRENT)
-    const spy = vi
-      .spyOn(db.enrollment, 'count')
-      .mockRejectedValueOnce(new Error('connection reset'))
+    const { parent } = await parentOfChildIn(CURRENT)
+    const spy = vi.spyOn(db.user, 'count').mockRejectedValueOnce(new Error('connection reset'))
 
-    const token = await revalidateTokenClaims(staleToken(student.id))
+    const token = await revalidateTokenClaims(staleToken(parent.id))
     expect(token).not.toBeNull()
     spy.mockRestore()
   })
@@ -114,8 +153,8 @@ describe('revalidateTokenClaims — student activity', () => {
  * Asserts a guard refused with `notFound()` and not `redirect()`.
  *
  * Both throw, so a bare `.rejects.toThrow()` cannot tell them apart — and the
- * difference is the whole point: `requireActiveStudent` must 404, because
- * `requireStudent`'s `redirect('/portal')` would bounce a student to the page
+ * difference is the whole point: `requireActivePortalChild` must 404, because
+ * `requirePortalChild`'s `redirect('/portal')` would bounce a family to the page
  * that renders their dashboard and loop forever. Matched on the 404 half of the
  * digest rather than the exact string, which Next has already renamed once
  * (`NEXT_NOT_FOUND` → `NEXT_HTTP_ERROR_FALLBACK;404`); a redirect digest starts
@@ -130,39 +169,39 @@ async function expectNotFound(p: Promise<unknown>): Promise<void> {
 describe('portal reads require an active program', () => {
   it('serves materials to an actively enrolled student', async () => {
     const { student, group } = await studentEnrolledIn(CURRENT)
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     await expect(getEffectiveMaterialsForStudent(group.id)).resolves.toBeTruthy()
   })
 
   /**
-   * The digest matters, not just "it threw". `requireActiveStudent` must fail
-   * with `notFound()` and NOT `requireStudent`'s `redirect('/portal')`: /portal
-   * renders the dashboard for a STUDENT session, so bouncing there would loop
+   * The digest matters, not just "it threw". `requireActivePortalChild` must
+   * fail with `notFound()` and NOT `requirePortalChild`'s `redirect('/portal')`:
+   * /portal renders the dashboard for a session holding a child, so bouncing there would loop
    * forever. Both throw, so a bare `.rejects.toThrow()` is blind to exactly the
    * regression `auth-guard.ts` documents.
    */
   it('refuses materials to a student whose enrollment is only in a past year', async () => {
     const { student, group } = await studentEnrolledIn(PAST)
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     await expectNotFound(getEffectiveMaterialsForStudent(group.id))
   })
 
   it('refuses the gallery to the same student', async () => {
     const { student, group } = await studentEnrolledIn(PAST)
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     await expectNotFound(getGroupGalleryForStudent(group.id))
   })
 
   /**
    * The portal report card is the parent-visible surface, and it runs the same
-   * guard — it was the one `requireActiveStudent` caller nothing exercised.
+   * guard — it was the one `requireActivePortalChild` caller nothing exercised.
    */
   it('refuses the portal evaluation to the same student', async () => {
     const { student, group } = await studentEnrolledIn(PAST)
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     await expectNotFound(getMyAssessmentForGroup(group.id))
   })
@@ -177,7 +216,7 @@ describe('portal reads require an active program', () => {
     const { student } = await studentEnrolledIn(CURRENT)
     const oldGroup = await groupIn(PAST)
     await createEnrollment(student.id, oldGroup.id, { schoolYear: PAST })
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     await expect(getEffectiveMaterialsForStudent(oldGroup.id)).resolves.toBeTruthy()
   })
@@ -191,7 +230,7 @@ describe('dashboard year window', () => {
    */
   it('shows a next-year-only enrollment rather than an empty dashboard', async () => {
     const { student, group } = await studentEnrolledIn(NEXT)
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     const rows = await getMyCurrentEnrollments()
     expect(rows.map((r) => r.group.id)).toContain(group.id)
@@ -201,7 +240,7 @@ describe('dashboard year window', () => {
     const { student } = await studentEnrolledIn(CURRENT)
     const oldGroup = await groupIn(PAST)
     await createEnrollment(student.id, oldGroup.id, { schoolYear: PAST })
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     const rows = await getMyCurrentEnrollments()
     expect(rows.map((r) => r.group.id)).not.toContain(oldGroup.id)

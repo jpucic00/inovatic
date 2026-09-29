@@ -14,7 +14,7 @@ export function LoginScreen() {
         <div className="text-center mb-8">
           <Logo variant="dark" className="justify-center" />
           <h1 className="mt-6 text-2xl font-bold text-gray-900">Prijava</h1>
-          <p className="mt-2 text-sm text-gray-500">Pristup portalu za učenike i nastavnike</p>
+          <p className="mt-2 text-sm text-gray-500">Pristup portalu za roditelje i djelatnike</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

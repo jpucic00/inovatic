@@ -2,26 +2,27 @@
 
 import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
-import type { UserRole } from '@prisma/client'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { loginSchema, type LoginFormData } from '@/lib/validators/login'
 import { clearSchoolYearCookie } from '@/lib/school-year-cookie'
+import { portalChoicesFor } from '@/lib/portal-children'
+import { landingFor } from '@/lib/portal-landing'
 
 type LoginActionResult =
-  | { success: true; role: UserRole; showTeacherPanel: boolean }
+  | { success: true; destination: string }
   | { success: false; error: string }
 
-const WRONG_CREDENTIALS = 'Pogrešno korisničko ime ili lozinka.'
+const WRONG_CREDENTIALS = 'Pogrešan e-mail ili lozinka.'
 /**
  * Deliberately specific, and deliberately different from the wrong-password
- * message: the password WAS right, and a parent told "wrong username or
- * password" would hunt for a typo that does not exist. Yes, this confirms the
- * account exists — accepted, since these parents know it does and the whole
- * point is to tell them why it stopped working.
+ * message: the password WAS right, and a parent told "wrong e-mail or password"
+ * would hunt for a typo that does not exist. Yes, this confirms the account
+ * exists — accepted, since these parents know it does and the whole point is to
+ * tell them why it stopped working.
  */
 const NO_ACTIVE_PROGRAM =
-  'Vaš račun više nije dio nijednog programa. Ako mislite da je ovo greška, javite nam se.'
+  'Nijedno vaše dijete trenutno nije upisano u program. Ako mislite da je ovo greška, javite nam se.'
 
 export async function loginAction(data: LoginFormData): Promise<LoginActionResult> {
   const parsed = loginSchema.safeParse(data)
@@ -49,23 +50,22 @@ export async function loginAction(data: LoginFormData): Promise<LoginActionResul
     throw error
   }
 
-  const { identifier } = parsed.data
+  // Resolved exactly as `authorize()` resolved it, which has just accepted it.
+  const identifier = parsed.data.identifier.trim()
   const isEmail = z.string().email().safeParse(identifier).success
+  const select = { id: true, role: true } as const
   const user = isEmail
-    ? await db.user.findUnique({ where: { email: identifier }, select: { id: true, role: true } })
-    : await db.user.findUnique({ where: { username: identifier }, select: { id: true, role: true } })
-  if (!user) return { success: false, error: 'Pogrešno korisničko ime ili lozinka.' }
+    ? await db.user.findFirst({ where: { email: { equals: identifier, mode: 'insensitive' } }, select })
+    : await db.user.findUnique({ where: { username: identifier }, select })
+  if (!user) return { success: false, error: WRONG_CREDENTIALS }
 
-  // A dual-role admin (city admin who also teaches, e.g. Slavica in Šibenik)
-  // gets a post-login panel choice instead of an auto-redirect to /admin —
-  // her landing page is the ambiguous one. Every admin can still reach
-  // /nastavnik from the sidebar shortcut.
-  const showTeacherPanel =
-    user.role === 'ADMIN' &&
-    (await db.teacherAssignment.count({ where: { userId: user.id } })) > 0
+  // One option lands straight on it; more than one — a parent of siblings, a
+  // dual-role admin, a teacher whose own child attends — goes through the
+  // picker at /portal/odabir, which lists the same choices.
+  const destination = landingFor(user.role, await portalChoicesFor(user.id, user.role))
 
   // Reset the school-year selection so every login lands on the current year.
   await clearSchoolYearCookie()
 
-  return { success: true, role: user.role, showTeacherPanel }
+  return { success: true, destination }
 }

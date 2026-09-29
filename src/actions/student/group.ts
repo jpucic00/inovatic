@@ -4,7 +4,7 @@ import { assertPortalGroupAccess } from '@/lib/portal-group-access'
 import { buildGroupShell, type GroupShell } from '@/lib/group-materials-view'
 
 /**
- * The group header + pacing for a group the logged-in student is enrolled in —
+ * The group header + pacing for a group the picked child is enrolled in —
  * what the portal group layout needs to draw its heading and tab strip, without
  * loading any panel's contents.
  *

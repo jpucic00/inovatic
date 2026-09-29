@@ -133,6 +133,15 @@ const userBaseSelect = {
   deletedAt: true,
   createdAt: true,
   updatedAt: true,
+  // The one login that sees this child, and how many children it sees in
+  // total — so a staff member notices a family account that is bigger (or
+  // different) than they expected. Counts across cities, names none.
+  parentAccount: {
+    select: {
+      email: true,
+      _count: { select: { children: { where: { role: 'STUDENT' as const, deletedAt: null } } } },
+    },
+  },
 } as const
 
 // ── Types ────────────────────────────────────────────────────────────────────

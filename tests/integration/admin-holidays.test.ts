@@ -66,7 +66,7 @@ afterEach(async () => {
 
 describe('upsertHoliday', () => {
   it('rejects callers without ADMIN role', async () => {
-    mockSession({ id: 'nobody', role: 'STUDENT' })
+    mockSession({ id: 'nobody', role: 'PARENT' })
     await expect(
       upsertHoliday({ schoolYear: SY, date: '2026-12-25', name: 'Božić' }),
     ).rejects.toThrow()
@@ -543,7 +543,7 @@ describe('previewHolidaysFromApi', () => {
   })
 
   it('rejects callers without ADMIN role', async () => {
-    mockSession({ id: 'nobody', role: 'STUDENT' })
+    mockSession({ id: 'nobody', role: 'PARENT' })
     await expect(previewHolidaysFromApi(SY)).rejects.toThrow()
   })
 

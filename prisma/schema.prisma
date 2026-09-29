@@ -21,6 +21,12 @@ enum UserRole {
   // `classroomGroupWhere`, and every `role: 'STUDENT'` query keeps it out of
   // rosters, counts and campaigns by construction.
   CLASSROOM
+  // One login per parent e-mail — the only way a family reaches the portal
+  // since 2026-09-29; a STUDENT row no longer signs in at all. Children point
+  // at it through `User.parentAccountId`, and the session carries the child
+  // picked after login (`studentId`). Holds no enrollments and no child data of
+  // its own, so every `role: 'STUDENT'` query keeps it out as well.
+  PARENT
 }
 
 // Tenant key: Split and Šibenik operate as fully separated organizations.
@@ -226,10 +232,17 @@ model User {
   /// guess as an audit trail. Null therefore means "not sent by this system".
   credentialsSentAt DateTime?
   gdprConsentAt DateTime?
+  /// STUDENT only: the one account that sees this child in the portal — a
+  /// PARENT, or a staff account whose e-mail the parent used. Strictly one; a
+  /// newer upit from the other parent re-points it (admin-confirmed), it never
+  /// adds a second. Null = no usable parent e-mail, so no portal access.
+  parentAccountId String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
+  parentAccount        User?               @relation("ParentChildren", fields: [parentAccountId], references: [id], onDelete: SetNull)
+  children             User[]              @relation("ParentChildren")
   teacherAssignments   TeacherAssignment[]
   enrollments          Enrollment[]
   articles             Article[]
@@ -250,6 +263,7 @@ model User {
   sentEmailCampaigns   EmailCampaign[]     @relation("EmailCampaignSender")
 
   @@index([role, city])
+  @@index([parentAccountId])
 }
 
 model Course {

@@ -2,11 +2,11 @@
  * What the shared classroom login may open in the portal: the materials of any
  * CURRENT-year group of its own city, and nothing else. The gate is
  * `assertPortalGroupAccess`, shared with the child's shell/materials reads;
- * gallery, evaluation and profile keep `requireStudent()` and must refuse it.
+ * gallery, evaluation and profile keep `requirePortalChild()` and must refuse it.
  */
 import { describe, expect, it, vi } from 'vitest'
 import { computeSchoolYear, getNextSchoolYear, getPreviousSchoolYear } from '@/lib/school-year'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 import {
   classroomAccount,
   createCourse,
@@ -76,7 +76,7 @@ describe('what stays behind the child account', () => {
   it('gallery, evaluation and profile refuse the classroom login', async () => {
     const group = await createGroup({ schoolYear: CY, city: 'SPLIT' })
     await asClassroom('SPLIT')
-    // requireStudent() redirects a non-student; the digest is NEXT_REDIRECT.
+    // requirePortalChild() redirects a session with no picked child; the digest is NEXT_REDIRECT.
     await expect(getGroupGalleryForStudent(group.id)).rejects.toMatchObject({
       digest: expect.stringMatching(/^NEXT_REDIRECT/),
     })
@@ -112,7 +112,7 @@ describe('program → group lists', () => {
 
   it('sends a child session back to its own dashboard', async () => {
     const student = await createStudent()
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
     await expect(getClassroomPrograms()).rejects.toMatchObject({
       digest: expect.stringMatching(/^NEXT_REDIRECT/),
     })

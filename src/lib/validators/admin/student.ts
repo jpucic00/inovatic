@@ -19,6 +19,8 @@ export const createStudentManuallySchema = z.object({
   childSchool: z.string().optional().nullable(),
   groupId: z.string().optional().nullable(),
   moduleScheduleIds: z.array(z.string()).optional(),
+  // The admin's yes to a parent-account link that changes who sees this child.
+  confirmParentLink: z.boolean().optional(),
 })
 
 // Admin-only edit of an existing student's child + parent data from the
@@ -35,6 +37,9 @@ export const updateStudentSchema = z.object({
   // recipient and the legacy-tier matcher.
   parentEmail: z.string().trim().email('Unesite valjanu email adresu'),
   parentPhone: z.string().optional().nullable(),
+  // A changed parent e-mail moves the child to that address's account — the
+  // admin confirms it, exactly as on create.
+  confirmParentLink: z.boolean().optional(),
 })
 
 export const addEnrollmentSchema = z.object({

@@ -30,7 +30,7 @@ vi.mock('@/lib/cloudinary', () => ({
 }))
 
 import { POST } from '@/app/api/upload/route'
-import { mockSession } from '../setup'
+import { mockChildSession, mockSession } from '../setup'
 import { createAdmin, createStudent, createTeacher } from '../helpers/factory'
 
 // First 12 bytes of a valid PNG — used as a spoofed payload for the JPEG test.
@@ -61,9 +61,9 @@ describe('POST /api/upload — auth gate', () => {
     expect(res.status).toBe(401)
   })
 
-  it('STUDENT cookie → 401 (ADMIN-only route)', async () => {
+  it('family session → 401 (ADMIN-only route)', async () => {
     const student = await createStudent()
-    mockSession({ id: student.id, role: 'STUDENT', email: student.email })
+    mockChildSession(student.id)
     const res = await postUpload(makeForm({ name: 'x.png', type: 'image/png', bytes: PNG_HEAD }))
     expect(res.status).toBe(401)
   })

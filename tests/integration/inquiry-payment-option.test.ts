@@ -156,7 +156,10 @@ function inquiryFor(overrides: Partial<InquiryFormData> = {}): InquiryFormData {
     parentEmail: uniqueEmail(),
     parentPhone: '+385912345678',
     childFirstName: 'Dijete',
-    childLastName: 'Test',
+    // Unique per call: the same name + DOB under another parent e-mail is, since
+    // 2026-09-29, the other parent signing the SAME child up — a move the admin
+    // must confirm, which is not what these tests are about.
+    childLastName: `Test${Date.now().toString(36)}${++emailCounter}`,
     childDateOfBirth: '2016-06-12',
     grade: '1',
     consent: true,
@@ -331,6 +334,7 @@ describe('createStudentFromInquiry — seeding the enrollment', () => {
     // The same child files a second upit answering differently.
     const second = inquiryFor({
       parentEmail: first.parentEmail,
+      childLastName: first.childLastName,
       courseId: course.id,
       scheduledGroupId: group.id,
       paymentOption: 'PO_MODULU',

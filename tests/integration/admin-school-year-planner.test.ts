@@ -59,7 +59,7 @@ async function seedFourStandardCourses() {
 
 describe('completeSchoolYearPlan', () => {
   it('rejects callers without ADMIN role', async () => {
-    mockSession({ id: 'nobody', role: 'STUDENT' })
+    mockSession({ id: 'nobody', role: 'PARENT' })
     await expect(
       completeSchoolYearPlan({ schoolYear: SY, startDate: SY_START }),
     ).rejects.toThrow()

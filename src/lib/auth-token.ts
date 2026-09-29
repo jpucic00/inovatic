@@ -1,6 +1,6 @@
 import type { City, UserRole } from '@prisma/client'
 import { db } from './db'
-import { activeEnrollmentWhere } from './enrollment-activity'
+import { countPortalChildren, isSelectableChild } from './portal-children'
 
 const TTL_MS = 60_000
 
@@ -9,6 +9,7 @@ export type TokenClaims = {
   role?: UserRole
   city?: City
   checkedAt?: number
+  studentId?: string
 }
 
 /**
@@ -30,20 +31,26 @@ export async function revalidateTokenClaims<T extends TokenClaims>(token: T): Pr
       select: { deletedAt: true, role: true, city: true },
     })
     if (!dbUser || dbUser.deletedAt) return null
-    // Ejects a student who was ALREADY logged in when their last enrollment left
-    // the active window — the JWT has no maxAge override, so @auth/core's 30-day
+    // A child no longer signs in at all (2026-09-29), so a STUDENT token still
+    // alive from before that deploy is ended here rather than left to run out
+    // its 30 days.
+    if (dbUser.role === 'STUDENT') return null
+    // Ejects a parent who was ALREADY logged in when their last child left the
+    // active window — the JWT has no maxAge override, so @auth/core's 30-day
     // default would otherwise keep a cookie minted on 31 August valid deep into
     // September. Reuses the same channel that already evicts soft-deleted users
     // above, so the worst case is ~60s of stale access at the rollover.
     //
     // Inside the try on purpose: the deliberate fail-open below must cover it
-    // too, or a Neon cold start logs out the entire student body at once. Gated
-    // on the freshly-read role so it never costs an admin or teacher a query.
-    if (dbUser.role === 'STUDENT') {
-      const activeEnrollments = await db.enrollment.count({
-        where: { userId, ...activeEnrollmentWhere() },
-      })
-      if (activeEnrollments === 0) return null
+    // too, or a Neon cold start logs out every family at once. Gated on the
+    // freshly-read role so it never costs an admin or teacher a query.
+    if (dbUser.role === 'PARENT' && (await countPortalChildren(userId)) === 0) return null
+    // The picked child is re-proven every cycle: a child moved to the other
+    // parent's account, deleted, or out of every program drops out of this
+    // session within ~60s. Only the CLAIM goes — the parent stays logged in and
+    // lands back on the picker.
+    if (token.studentId && !(await isSelectableChild(userId, token.studentId))) {
+      delete token.studentId
     }
     token.role = dbUser.role
     token.city = dbUser.city

@@ -88,7 +88,8 @@ async function createUser(
   const user = await db.user.create({
     data: {
       email: overrides.email ?? `${role.toLowerCase()}-${id}@test.local`,
-      username: overrides.username ?? `${role.toLowerCase()}_${id}`,
+      // A parent account signs in with its e-mail only, as in production.
+      username: overrides.username ?? (role === UserRole.PARENT ? null : `${role.toLowerCase()}_${id}`),
       firstName: overrides.firstName ?? 'Test',
       lastName: overrides.lastName ?? `User${id}`,
       dateOfBirth: overrides.dateOfBirth ?? null,
@@ -112,6 +113,14 @@ export const createTeacher = (overrides: Parameters<typeof createUser>[0] = {}) 
 
 export const createStudent = (overrides: Parameters<typeof createUser>[0] = {}) =>
   createUser({ ...overrides, role: UserRole.STUDENT })
+
+export const createParent = (overrides: Parameters<typeof createUser>[0] = {}) =>
+  createUser({ ...overrides, role: UserRole.PARENT })
+
+/** Point a child at the one account that sees it in the portal. */
+export async function linkToParent(studentId: string, parentAccountId: string): Promise<void> {
+  await db.user.update({ where: { id: studentId }, data: { parentAccountId } })
+}
 
 /**
  * The shared classroom login of a city — FOUND, never created. The

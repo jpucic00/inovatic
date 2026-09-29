@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
 import { computeSchoolYear, getPreviousSchoolYear } from '@/lib/school-year'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 import {
   createAdmin,
   createCourse,
@@ -172,7 +172,7 @@ describe('setEnrollmentContractSignedByTeacher', () => {
   it('rejects a student without revealing whether the enrollment exists', async () => {
     const student = await createStudent({ city: 'SPLIT' })
     const { enrollment } = await seedEnrollment('SPLIT')
-    mockSession({ id: student.id, role: 'STUDENT', city: 'SPLIT' })
+    mockChildSession(student.id)
 
     await expect(
       setEnrollmentContractSignedByTeacher('does-not-exist', true),

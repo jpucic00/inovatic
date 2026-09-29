@@ -14,6 +14,8 @@ import {
 import { Pencil } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
 import { updateStudent } from '@/actions/admin/student'
+import type { ParentLinkPreview } from '@/lib/parent-account'
+import { ParentLinkNotice } from '@/components/admin/students/parent-link-notice'
 import { toast } from 'sonner'
 
 interface Props {
@@ -44,6 +46,10 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
   const [parentEmail, setParentEmail] = useState(student.parentEmail ?? '')
   const [parentPhone, setParentPhone] = useState(student.parentPhone ?? '')
   const [isPending, startTransition] = useTransition()
+  // Remembered with the e-mail it was issued for — a different address is a
+  // different link, so the old confirmation stops applying on its own.
+  const [parentLinkAsk, setParentLinkAsk] = useState<{ email: string; preview: ParentLinkPreview } | null>(null)
+  const parentLink = parentLinkAsk?.email === parentEmail.trim() ? parentLinkAsk.preview : null
 
   const canSubmit =
     firstName.trim().length >= 2 &&
@@ -64,6 +70,7 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
       setParentName(student.parentName ?? '')
       setParentEmail(student.parentEmail ?? '')
       setParentPhone(student.parentPhone ?? '')
+      setParentLinkAsk(null)
     }
     setOpen(next)
   }
@@ -83,7 +90,12 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
         parentName: parentName.trim() || null,
         parentEmail: parentEmail.trim(),
         parentPhone: parentPhone.trim() || null,
+        confirmParentLink: parentLink !== null,
       })
+      if (!res.success && 'parentLink' in res) {
+        setParentLinkAsk({ email: parentEmail.trim(), preview: res.parentLink })
+        return
+      }
       if (res.success) {
         toast.success('Spremljeno.')
         setOpen(false)
@@ -93,6 +105,8 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
       }
     })
   }
+
+  const submitLabel = parentLink ? 'Potvrdi i spremi' : 'Spremi'
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -213,6 +227,8 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
             </div>
           </div>
 
+          {parentLink && <ParentLinkNotice preview={parentLink} />}
+
           <DialogFooter>
             <button
               onClick={() => setOpen(false)}
@@ -226,7 +242,7 @@ export function EditStudentDialog({ student }: Readonly<Props>) {
               disabled={isPending || !canSubmit}
               className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
             >
-              {isPending ? 'Spremam...' : 'Spremi'}
+              {isPending ? 'Spremam...' : submitLabel}
             </button>
           </DialogFooter>
         </div>

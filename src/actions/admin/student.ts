@@ -31,6 +31,13 @@ import {
   normalizeName,
 } from '@/lib/student-match'
 import { computeSchoolYear } from '@/lib/school-year'
+import {
+  ParentLinkConfirmRequired,
+  ParentLinkRefused,
+  applyParentLink,
+  planParentLink,
+  type ParentLinkConfirmation,
+} from '@/lib/parent-account'
 import { isMonthlyBilled } from '@/lib/program-kind'
 import { offersPaymentOption } from '@/lib/payment-option'
 import { unaccentSearchFilter } from '@/lib/unaccent-search'
@@ -152,6 +159,7 @@ type CreateStudentResult =
       // is no send here that could fail.
     }
   | { success: false; error: string; code?: 'GROUP_FULL' }
+  | ({ success: false; error: string } & ParentLinkConfirmation)
 
 // No `emailSent` counterpart to the teacher result — a student password reset
 // is never mailed (see resetStudentPassword).
@@ -209,6 +217,12 @@ type CoreInput = {
    * only — the upit stores null for every other kind.
    */
   paymentOption?: PaymentOption | null
+  /**
+   * The admin's yes to a parent-account link that changes who can see this
+   * child (see `planParentLink`). Without it such a link throws
+   * `ParentLinkConfirmRequired` and the whole creation rolls back.
+   */
+  confirmParentLink?: boolean
 }
 
 type CoreResult = {
@@ -311,6 +325,10 @@ async function findOrCreateStudent(
         data: backfill,
       })
     }
+    // A returning child whose upit came from the other parent MOVES to that
+    // parent's account (owner decision 2026-09-29) — admin-confirmed, never
+    // silently.
+    await linkParentAccount(tx, existingStudent.id, existingStudent.id, input, parentEmail)
     return {
       user: { id: existingStudent.id, username: existingStudent.username },
       password,
@@ -341,7 +359,28 @@ async function findOrCreateStudent(
     },
     select: { id: true, username: true },
   })
+  await linkParentAccount(tx, null, created.id, input, parentEmail)
   return { user: created, password, isExisting: false }
+}
+
+/**
+ * Plan against the child as it was BEFORE this write (`currentId`, null for a
+ * brand-new child — it has no link to move away from), then apply to the row.
+ */
+async function linkParentAccount(
+  tx: TxClient,
+  currentId: string | null,
+  studentId: string,
+  input: CoreInput,
+  parentEmail: string | null,
+): Promise<void> {
+  const plan = await planParentLink(tx, { studentId: currentId, parentEmail, city: input.city })
+  await applyParentLink(tx, plan, {
+    studentId,
+    parentName: input.parentName,
+    city: input.city,
+    confirmed: input.confirmParentLink ?? false,
+  })
 }
 
 const ENSURE_ENROLLMENT_DEFAULT_OPTIONS = { assertCapacity: true } as const
@@ -484,6 +523,25 @@ async function createStudentCore(tx: TxClient, input: CoreInput): Promise<CoreRe
  * inquiry-state guards, missing group) into their Croatian result. Returns null
  * for anything unrecognized so the caller logs it and surfaces a generic message.
  */
+/** The two parent-link outcomes that end a write early, as action results. */
+function mapParentLinkError(
+  err: unknown,
+):
+  | ({ success: false; error: string } & ParentLinkConfirmation)
+  | { success: false; error: string }
+  | null {
+  if (err instanceof ParentLinkConfirmRequired) {
+    return {
+      success: false,
+      error: 'Potvrdite roditeljski račun.',
+      code: 'PARENT_LINK_CONFIRM',
+      parentLink: err.preview,
+    }
+  }
+  if (err instanceof ParentLinkRefused) return { success: false, error: err.message }
+  return null
+}
+
 function mapStudentCreationError(err: unknown): CreateStudentResult | null {
   if (err instanceof GroupFullError) {
     return { success: false, error: GROUP_FULL_ERROR, code: 'GROUP_FULL' }
@@ -503,6 +561,8 @@ function mapStudentCreationError(err: unknown): CreateStudentResult | null {
   if (err instanceof GroupCityMismatchError) {
     return { success: false, error: 'Odabrana grupa je u drugom gradu.' }
   }
+  const parentLink = mapParentLinkError(err)
+  if (parentLink) return parentLink
   if (err instanceof CrossCityStudentError) {
     return {
       success: false,
@@ -517,6 +577,7 @@ export async function createStudentFromInquiry(
   inquiryId: string,
   groupId: string,
   moduleScheduleIds?: string[],
+  confirmParentLink = false,
 ): Promise<CreateStudentResult> {
   const { city } = await requireAdminCtx()
 
@@ -588,6 +649,7 @@ export async function createStudentFromInquiry(
         groupId,
         moduleScheduleIds,
         paymentOption: fresh.paymentOption,
+        confirmParentLink,
       })
 
       if (!created.group) {
@@ -663,6 +725,7 @@ export async function createStudentManually(
         gdprConsentAt: null,
         groupId: data.groupId ?? null,
         moduleScheduleIds: data.moduleScheduleIds,
+        confirmParentLink: data.confirmParentLink ?? false,
       }),
     )
   } catch (err) {
@@ -700,16 +763,29 @@ export async function createStudentManually(
  * empty → null so a cleared field wipes the stored value. Editing name/DOB can
  * change returning-student matching, so inquiry pages are revalidated too.
  */
+type UpdateStudentResult =
+  | AdminActionResult
+  | ({ success: false; error: string } & ParentLinkConfirmation)
+
 export async function updateStudent(
   input: UpdateStudentInput,
-): Promise<AdminActionResult> {
+): Promise<UpdateStudentResult> {
   const { city } = await requireAdminCtx()
 
   const parsed = updateStudentSchema.safeParse(input)
   if (!parsed.success) return { success: false, error: 'Nevaljani podaci.' }
 
-  const { id, firstName, lastName, dateOfBirth, childSchool, parentName, parentEmail, parentPhone } =
-    parsed.data
+  const {
+    id,
+    firstName,
+    lastName,
+    dateOfBirth,
+    childSchool,
+    parentName,
+    parentEmail,
+    parentPhone,
+    confirmParentLink,
+  } = parsed.data
 
   // Outside the try — the notFound() throw must not be swallowed by the catch.
   await assertUserInCity(id, city)
@@ -721,19 +797,30 @@ export async function updateStudent(
     })
     if (!student) return { success: false, error: 'Učenik nije pronađen.' }
 
-    await db.user.update({
-      where: { id },
-      data: {
-        firstName: normalizeName(firstName),
-        lastName: normalizeName(lastName),
-        dateOfBirth,
-        childSchool: childSchool?.trim() || null,
-        parentName: parentName?.trim() || null,
-        // Required by the schema (and already trimmed there) — an edit can no
-        // longer blank the credentials recipient / legacy-match key.
-        parentEmail,
-        parentPhone: parentPhone?.trim() || null,
-      },
+    await db.$transaction(async (tx) => {
+      // Planned BEFORE the write, against the link the child has now: a changed
+      // e-mail moves the child to that address's account, admin-confirmed.
+      const plan = await planParentLink(tx, { studentId: id, parentEmail, city })
+      await tx.user.update({
+        where: { id },
+        data: {
+          firstName: normalizeName(firstName),
+          lastName: normalizeName(lastName),
+          dateOfBirth,
+          childSchool: childSchool?.trim() || null,
+          parentName: parentName?.trim() || null,
+          // Required by the schema (and already trimmed there) — an edit can no
+          // longer blank the credentials recipient / legacy-match key.
+          parentEmail,
+          parentPhone: parentPhone?.trim() || null,
+        },
+      })
+      await applyParentLink(tx, plan, {
+        studentId: id,
+        parentName,
+        city,
+        confirmed: confirmParentLink ?? false,
+      })
     })
 
     revalidatePath('/admin/ucenici')
@@ -743,6 +830,8 @@ export async function updateStudent(
     revalidatePath('/admin/upiti/[id]', 'page')
     return { success: true }
   } catch (err) {
+    const parentLink = mapParentLinkError(err)
+    if (parentLink) return parentLink
     console.error('updateStudent failed:', err)
     return { success: false, error: 'Greška pri ažuriranju učenika.' }
   }

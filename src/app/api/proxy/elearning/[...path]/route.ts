@@ -14,8 +14,10 @@ export const runtime = 'nodejs'
 
 const ALLOWED_ORIGIN = 'https://elearning.robocamp.eu'
 // CLASSROOM: the shared classroom login opens RoboCamp guides through this same
-// iframe, which is same-origin and carries the session cookie.
-const ALLOWED_ROLES = new Set<UserRole>(['STUDENT', 'TEACHER', 'ADMIN', 'CLASSROOM'])
+// iframe, which is same-origin and carries the session cookie. A parent gets in
+// only while looking at a child (`studentId`), the same condition as the rest of
+// the portal — a parent account on its own has nothing to open.
+const ALLOWED_ROLES = new Set<UserRole>(['TEACHER', 'ADMIN', 'CLASSROOM'])
 const PROXY_PREFIX = '/api/proxy/elearning'
 
 const STRIP_HEADERS = [
@@ -49,7 +51,7 @@ function authorize(session: Session | null): NextResponse | null {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!ALLOWED_ROLES.has(session.user.role)) {
+  if (!ALLOWED_ROLES.has(session.user.role) && !session.user.studentId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   return null

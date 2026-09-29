@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 import { computeSchoolYear } from '@/lib/school-year'
 import type { GroupMaterialsView, KindBuckets } from '@/lib/group-materials-view'
 import {
@@ -66,7 +66,7 @@ describe('kids see only the active module for their group', () => {
     await seedMaterial({ scope: 'COURSE', courseId: course.id, type: 'LINK', uploadedById: admin.id, title: 'Program material' })
     await seedMaterial({ scope: 'GROUP', scheduledGroupId: group.id, type: 'LINK', uploadedById: admin.id, title: 'Group material' })
 
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
     const view = await getEffectiveMaterialsForStudent(group.id)
 
     expect(view.activeModuleId).toBe(m2.id)
@@ -104,9 +104,9 @@ describe('kids see only the active module for their group', () => {
 
     await seedMaterial({ scope: 'MODULE', moduleId: m1.id, type: 'LINK', uploadedById: admin.id, title: 'M1 material' })
 
-    mockSession({ id: studentMon.id, role: 'STUDENT' })
+    mockChildSession(studentMon.id)
     const monView = await getEffectiveMaterialsForStudent(groupMon.id)
-    mockSession({ id: studentTue.id, role: 'STUDENT' })
+    mockChildSession(studentTue.id)
     const tueView = await getEffectiveMaterialsForStudent(groupTue.id)
 
     // Both groups are in Modul 1's window now → both see the Modul 1 material,

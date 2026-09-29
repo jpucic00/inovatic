@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { db } from '@/lib/db'
-import { mockSession } from './setup'
+import { mockChildSession, mockSession } from './setup'
 import {
   createCourse,
   createEnrollment,
@@ -44,7 +44,7 @@ describe('getMyAssessmentForGroup — access gate', () => {
   it("404s on a group the student isn't enrolled in", async () => {
     const student = await createStudent()
     const group = await createGroup()
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
 
     await expect(getMyAssessmentForGroup(group.id)).rejects.toThrow()
   })
@@ -60,7 +60,7 @@ describe('getMyAssessmentForGroup — access gate', () => {
       opisnaOcjena: 'Ocjena za polaznika A.',
     })
 
-    mockSession({ id: studentB.id, role: 'STUDENT' })
+    mockChildSession(studentB.id)
     const view = await getMyAssessmentForGroup(group.id)
 
     expect(view.assessment).toBeNull()
@@ -95,7 +95,7 @@ describe('getMyAssessmentForGroup — report card', () => {
       recommendedCourseId: nextCourse.id,
     })
 
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
     const view = await getMyAssessmentForGroup(group.id)
 
     expect(view.gradable).toBe(true)
@@ -121,7 +121,7 @@ describe('getMyAssessmentForGroup — report card', () => {
       recommendationKind: 'COMPETITION_PREP',
     })
 
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
     const view = await getMyAssessmentForGroup(group.id)
 
     expect(view.assessment?.recommendationLabel).toBe('Priprema za natjecanja')
@@ -134,7 +134,7 @@ describe('getMyAssessmentForGroup — report card', () => {
     await createEnrollment(student.id, group.id)
     await seedAssessment(student.id, group.id, teacher.id, { opisnaOcjena: '   ' })
 
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
     const view = await getMyAssessmentForGroup(group.id)
 
     expect(view.gradable).toBe(true)
@@ -151,7 +151,7 @@ describe('getMyAssessmentForGroup — report card', () => {
     })
     await createEnrollment(student.id, group.id)
 
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
     const view = await getMyAssessmentForGroup(group.id)
 
     expect(view.gradable).toBe(false)
@@ -173,7 +173,7 @@ describe('getMyAssessmentForGroup — report card', () => {
       opisnaOcjena: 'Ne bi trebalo postojati.',
     })
 
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
     const view = await getMyAssessmentForGroup(group.id)
 
     expect(view.assessment).toBeNull()
@@ -197,7 +197,7 @@ describe('getMyAssessmentForGroup — bilješke stay staff-only', () => {
       },
     })
 
-    mockSession({ id: student.id, role: 'STUDENT' })
+    mockChildSession(student.id)
     const view = await getMyAssessmentForGroup(group.id)
 
     expect(JSON.stringify(view)).not.toContain('Interna bilješka')

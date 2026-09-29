@@ -20,6 +20,8 @@ import { toast } from 'sonner'
 import { formatModuleDateRange } from '@/lib/format'
 import { hasDatedModules } from '@/lib/program-kind'
 import type { ProgramKind } from '@prisma/client'
+import type { ParentLinkPreview } from '@/lib/parent-account'
+import { ParentLinkNotice } from '@/components/admin/students/parent-link-notice'
 
 type ModuleOption = {
   id: string
@@ -81,6 +83,13 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
   const [loadingGroups, setLoadingGroups] = useState(false)
 
   const [isPending, startTransition] = useTransition()
+  // The server's "confirm this parent account" answer, remembered together
+  // with the identity it was given for: editing the child or the e-mail can
+  // change which account (and which existing child) the link points at, so a
+  // stale confirmation simply stops applying rather than being cleared by hand.
+  const [parentLinkAsk, setParentLinkAsk] = useState<{ key: string; preview: ParentLinkPreview } | null>(null)
+  const identityKey = [firstName, lastName, dateOfBirth, parentEmail].map((v) => v.trim()).join('|')
+  const parentLink = parentLinkAsk?.key === identityKey ? parentLinkAsk.preview : null
 
   const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null
   const courseModules = selectedGroup?.course.modules ?? []
@@ -107,6 +116,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
     setSelectedGroupId('')
     setSelectedScheduleIds([])
     setGroups([])
+    setParentLinkAsk(null)
   }
 
   const handleCourseChange = async (courseId: string) => {
@@ -184,7 +194,12 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
           selectedGroupId && isStandardCourse && selectedScheduleIds.length > 0
             ? selectedScheduleIds
             : undefined,
+        confirmParentLink: parentLink !== null,
       })
+      if (!res.success && 'parentLink' in res) {
+        setParentLinkAsk({ key: identityKey, preview: res.parentLink })
+        return
+      }
       if (res.success) {
         // Nothing is mailed here any more — say so plainly, or the admin will
         // assume the parent has the login and never run the campaign.
@@ -205,6 +220,8 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
       }
     })
   }
+
+  const submitLabel = parentLink ? 'Potvrdi i kreiraj' : 'Kreiraj učenika'
 
   return (
     <Dialog
@@ -492,6 +509,8 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
               )}
             </div>
 
+            {parentLink && <ParentLinkNotice preview={parentLink} />}
+
             <DialogFooter>
               <button
                 onClick={() => setOpen(false)}
@@ -505,7 +524,7 @@ export function CreateStudentDialog({ courses }: Readonly<Props>) {
                 disabled={isPending || !canSubmit || (selectedGroup?.isFull ?? false)}
                 className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50"
               >
-                {isPending ? 'Kreiram...' : 'Kreiraj učenika'}
+                {isPending ? 'Kreiram...' : submitLabel}
               </button>
             </DialogFooter>
         </div>

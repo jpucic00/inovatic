@@ -2,15 +2,15 @@
 
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
-import { requireActiveStudent } from '@/lib/auth-guard'
+import { requireActivePortalChild } from '@/lib/auth-guard'
 import { buildGroupGalleryView } from '@/lib/group-gallery-view'
 
 
 export async function getGroupGalleryForStudent(groupId: string) {
-  const session = await requireActiveStudent()
+  const { studentId } = await requireActivePortalChild()
 
   const enrollment = await db.enrollment.findFirst({
-    where: { userId: session.user.id, scheduledGroupId: groupId },
+    where: { userId: studentId, scheduledGroupId: groupId },
     select: { id: true },
   })
   if (!enrollment) notFound()
