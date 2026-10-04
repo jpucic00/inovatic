@@ -33,12 +33,18 @@ import {
   type BulkMarkSessionInput,
 } from '@/lib/validators/attendance'
 import type { AdminActionResult } from '@/lib/action-types'
+import { pickConsents, type EnrollmentConsents } from '@/lib/enrollment-consent'
 
 export type AttendanceRosterRow = {
   enrollmentId: string
   studentId: string
   firstName: string
   lastName: string
+  /**
+   * The enrollment's privole, so the row can say whom not to photograph. Read
+   * only here — the office enters them on the student profile.
+   */
+  consents: EnrollmentConsents
 }
 
 export type AttendanceRecord = {
@@ -474,6 +480,7 @@ export async function getGroupAttendance(
     studentId: e.user.id,
     firstName: e.user.firstName,
     lastName: e.user.lastName,
+    consents: pickConsents(e),
   }))
 
   const records = flattenAttendanceRecords(enrollments)

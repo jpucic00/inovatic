@@ -5,6 +5,7 @@ import { getStudent } from '@/actions/admin/student'
 import { getCourses } from '@/actions/admin/course'
 import { getStudentAttendance } from '@/actions/admin/attendance'
 import { setEnrollmentContractSigned } from '@/actions/admin/payment'
+import { setEnrollmentConsents } from '@/actions/admin/enrollment-consent'
 import { createComment, deleteComment } from '@/actions/admin/student-comment'
 import {
   clearAssessment,
@@ -62,6 +63,7 @@ export default async function StudentDetailPage({ params }: Readonly<PageProps>)
       onSaveAssessment={upsertAssessment}
       onClearAssessment={clearAssessment}
       onSetContractSigned={setEnrollmentContractSigned}
+      onSetConsents={setEnrollmentConsents}
       familyDiscountsByYear={familyDiscountsByYear}
     />
   )

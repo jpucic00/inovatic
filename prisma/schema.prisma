@@ -661,6 +661,16 @@ model Enrollment {
   // (see PaymentOption); admin-only, so it is scrubbed from the teacher payload
   // alongside every paid mark rather than shared like contractSignedAt above.
   paymentOption    PaymentOption?
+  // The four privole the family signs with the contract for THIS group and year.
+  // Three states each: true = Da, false = Ne, null = not entered yet. Null is
+  // read as "no consent" everywhere a photo might go out (Dolazak marker, the
+  // Privole filter) — a missing form must never look like a yes. Admin-only to
+  // write; teachers read them so they know whom not to photograph.
+  // See src/lib/enrollment-consent.ts.
+  consentGallery   Boolean?
+  consentWebsite   Boolean?
+  consentSocial    Boolean?
+  consentEmail     Boolean?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

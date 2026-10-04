@@ -88,6 +88,12 @@ const baseEnrollmentSelect = {
   // Shared, NOT admin-only — deliberately unlike every paid mark below. Teachers
   // collect the signed contracts at the group, so they both see and set this one.
   contractSignedAt: true,
+  // Shared too, but READ-only for a teacher: they need to know whom not to
+  // photograph; only an admin enters the forms (setEnrollmentConsents).
+  consentGallery: true,
+  consentWebsite: true,
+  consentSocial: true,
+  consentEmail: true,
   scheduledGroup: {
     select: {
       id: true,

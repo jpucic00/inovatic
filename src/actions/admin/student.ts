@@ -53,6 +53,11 @@ import {
   returningStudentWhere,
   type ReturningFilter,
 } from '@/lib/returning-filter'
+import {
+  consentEnrollmentWhere,
+  type ConsentFilter,
+  type EnrollmentConsents,
+} from '@/lib/enrollment-consent'
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
 
@@ -117,7 +122,7 @@ export type StudentRow = {
   paymentStatus: PaymentStatus
   /** Enrolled in the result's `returningYear` and in some year before it. */
   isReturning: boolean
-  enrollments: {
+  enrollments: ({
     id: string
     schoolYear: string
     fullYearPaidAt: Date | null
@@ -134,7 +139,7 @@ export type StudentRow = {
       paidAt: Date | null
       moduleSchedule: { startDate: Date | null }
     }[]
-  }[]
+  } & EnrollmentConsents)[]
 }
 
 /**
@@ -905,6 +910,12 @@ type StudentFilters = {
   paymentStatus?: PaymentFilter
   returning?: ReturningFilter
   /**
+   * Privole narrowing. Applied inside the same `enrollments.some` as the year
+   * and the group/program filters, so it asks about the enrollment the other
+   * filters picked — not about some other group the child also attends.
+   */
+  consent?: ConsentFilter
+  /**
    * Overrides the year that `isReturning` and the payment badge are resolved
    * against, for a caller that wants to ask about a year it is not narrowing to.
    * `/admin/ucenici` never passes it — it scopes to the sidebar year and lets
@@ -925,7 +936,7 @@ export async function getStudents(
 ): Promise<StudentListResult> {
   const { city } = await requireAdminCtx()
 
-  const { search, courseId, groupId, scheduleId, schoolYear, paymentStatus, returning, page = 1, pageSize = 20 } = filters
+  const { search, courseId, groupId, scheduleId, schoolYear, paymentStatus, returning, consent, page = 1, pageSize = 20 } = filters
 
   const now = new Date()
   const currentYear = computeSchoolYear(now)
@@ -955,7 +966,7 @@ export async function getStudents(
     role: 'STUDENT' as const,
     city,
     ...searchFilter,
-    ...(courseId || groupId || scheduleId || schoolYear
+    ...(courseId || groupId || scheduleId || schoolYear || consent
       ? {
           enrollments: {
             some: {
@@ -963,6 +974,7 @@ export async function getStudents(
               ...(courseId ? { scheduledGroup: { courseId } } : {}),
               ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId } } } : {}),
               ...(schoolYear ? { schoolYear } : {}),
+              ...(consent ? consentEnrollmentWhere(consent) : {}),
             },
           },
         }

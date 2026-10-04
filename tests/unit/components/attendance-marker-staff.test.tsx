@@ -29,7 +29,15 @@ function props(staffChanges: GroupAttendance['staffChanges']): GroupAttendance {
     endTime: '13:00',
     expectedSessions: SESSIONS,
     extraSessions: [],
-    roster: [{ enrollmentId: 'e-1', studentId: 's-1', firstName: 'Luka', lastName: 'Babić' }],
+    roster: [
+      {
+        enrollmentId: 'e-1',
+        studentId: 's-1',
+        firstName: 'Luka',
+        lastName: 'Babić',
+        consents: { consentGallery: true, consentWebsite: true, consentSocial: true, consentEmail: true },
+      },
+    ],
     records: [],
     teachers: [
       { userId: 'ivo', name: 'Ivo Horvat' },

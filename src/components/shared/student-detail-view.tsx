@@ -14,7 +14,10 @@ import { DeleteStudentDialog } from '@/components/admin/students/delete-student-
 import { EditStudentDialog } from '@/components/admin/students/edit-student-dialog'
 import { SendPasswordLinkButton } from '@/components/shared/send-password-link-button'
 import { PasswordStatus } from '@/components/shared/password-status'
-import { StudentYearSections } from '@/components/shared/student-year-sections'
+import {
+  StudentYearSections,
+  type SetConsentsAction,
+} from '@/components/shared/student-year-sections'
 import { CopyButton } from './copy-button'
 import { formatDate, formatDateKey } from '@/lib/format'
 
@@ -80,6 +83,8 @@ interface Props {
   onSetContractSigned: SetContractSignedAction
   /** Groups whose contract mark this viewer may change; undefined = unrestricted (admin). */
   contractEditableGroupIds?: readonly string[]
+  /** Admin only — absent renders the privole read-only (teacher). */
+  onSetConsents?: SetConsentsAction
   /** Sibling-discount markers per school year. Admin viewer only. */
   familyDiscountsByYear?: FamilyDiscountsByYear
 }
@@ -111,6 +116,7 @@ export function StudentDetailView({
   onClearAssessment,
   onSetContractSigned,
   contractEditableGroupIds,
+  onSetConsents,
   familyDiscountsByYear,
 }: Readonly<Props>) {
   const isAdmin = viewerRole === 'ADMIN'
@@ -286,6 +292,7 @@ export function StudentDetailView({
         onClearAssessment={onClearAssessment}
         onSetContractSigned={onSetContractSigned}
         contractEditableGroupIds={contractEditableGroupIds}
+        onSetConsents={onSetConsents}
         familyDiscountsByYear={familyDiscountsByYear}
       />
 

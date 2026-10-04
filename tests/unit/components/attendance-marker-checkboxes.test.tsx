@@ -10,8 +10,10 @@ vi.mock('@/actions/teacher/attendance', () => ({
   bulkMarkSession: vi.fn(async () => ({ success: true as const })),
 }))
 
-const ANA = { enrollmentId: 'e-1', studentId: 's-1', firstName: 'Ana', lastName: 'Anić' }
-const LUKA = { enrollmentId: 'e-2', studentId: 's-2', firstName: 'Luka', lastName: 'Babić' }
+// Every privola given, so no row carries the "ne objavljivati" marker.
+const ALL_CONSENTS = { consentGallery: true, consentWebsite: true, consentSocial: true, consentEmail: true }
+const ANA = { enrollmentId: 'e-1', studentId: 's-1', firstName: 'Ana', lastName: 'Anić', consents: ALL_CONSENTS }
+const LUKA = { enrollmentId: 'e-2', studentId: 's-2', firstName: 'Luka', lastName: 'Babić', consents: ALL_CONSENTS }
 
 // Long past, so `pickFlatDefault` deterministically lands on the last date
 // rather than on "today" — the marker picks the newest session already held.

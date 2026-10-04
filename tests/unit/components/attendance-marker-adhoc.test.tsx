@@ -8,7 +8,13 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 vi.mock('@/actions/teacher/attendance', () => ({ bulkMarkSession: vi.fn() }))
 
 const ROSTER = [
-  { enrollmentId: 'e-1', studentId: 's-1', firstName: 'Ana', lastName: 'Anić' },
+  {
+    enrollmentId: 'e-1',
+    studentId: 's-1',
+    firstName: 'Ana',
+    lastName: 'Anić',
+    consents: { consentGallery: true, consentWebsite: true, consentSocial: true, consentEmail: true },
+  },
 ]
 
 function flatProps(

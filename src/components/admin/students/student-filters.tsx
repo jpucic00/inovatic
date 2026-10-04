@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 import { RETURNING_FILTER_LABELS } from '@/lib/returning-filter'
 import { PAYMENT_FILTER_VALUES, PAYMENT_STATUS_LABELS } from '@/lib/payment-status'
+import { CONSENT_FILTER_LABELS, CONSENT_FILTER_VALUES } from '@/lib/enrollment-consent'
 
 type CourseOption = { id: string; title: string }
 type GroupOption = { id: string; name: string | null; course: { title: string } }
@@ -16,6 +17,7 @@ interface StudentFiltersProps {
   currentGroupId?: string
   currentPayment?: string
   currentReturning?: string
+  currentConsent?: string
   /**
    * The school year the whole list is scoped to (the sidebar selection), named
    * in the ponovni-upis options. There is deliberately no Godina control here —
@@ -32,6 +34,7 @@ export function StudentFilters({
   currentGroupId,
   currentPayment,
   currentReturning,
+  currentConsent,
   returningYear,
   courses,
   groups,
@@ -58,10 +61,12 @@ export function StudentFilters({
       const groupId = overrides.groupId ?? currentGroupId ?? ''
       const payment = overrides.payment ?? currentPayment ?? ''
       const returning = overrides.returning ?? currentReturning ?? ''
+      const consent = overrides.consent ?? currentConsent ?? ''
       if (courseId) sp.set('courseId', courseId)
       if (groupId) sp.set('groupId', groupId)
       if (payment) sp.set('payment', payment)
       if (returning) sp.set('returning', returning)
+      if (consent) sp.set('consent', consent)
     }
 
     return sp.toString()
@@ -95,6 +100,12 @@ export function StudentFilters({
   const handleReturningChange = (returning: string) => {
     startTransition(() => {
       router.push(`${pathname}?${buildParams({ returning })}`)
+    })
+  }
+
+  const handleConsentChange = (consent: string) => {
+    startTransition(() => {
+      router.push(`${pathname}?${buildParams({ consent })}`)
     })
   }
 
@@ -177,6 +188,21 @@ export function StudentFilters({
             <option value="NEW">
               {RETURNING_FILTER_LABELS.NEW} {returningYear}
             </option>
+          </select>
+
+          {/* "Bez privole" includes forms not entered yet: an unentered
+              consent is not permission to publish. */}
+          <select
+            value={currentConsent ?? ''}
+            onChange={(e) => handleConsentChange(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Privole: sve</option>
+            {CONSENT_FILTER_VALUES.map((value) => (
+              <option key={value} value={value}>
+                {CONSENT_FILTER_LABELS[value]}
+              </option>
+            ))}
           </select>
         </div>
       )}

@@ -16,6 +16,8 @@ import { AddEnrollmentDialog } from '@/components/admin/students/add-enrollment-
 import { ManageEnrollmentModules } from '@/components/admin/students/manage-enrollment-modules'
 import { EnrollmentPaymentPanel } from '@/components/admin/students/enrollment-payment-panel'
 import { EnrollmentContractToggle } from '@/components/shared/enrollment-contract-toggle'
+import { EnrollmentConsents } from '@/components/shared/enrollment-consents'
+import type { EnrollmentConsents as EnrollmentConsentValues } from '@/lib/enrollment-consent'
 import { FamilyDiscountNote } from '@/components/admin/students/family-discount-note'
 import type { FamilyDiscountsByYear } from '@/lib/family-discount'
 import { hasDatedModules } from '@/lib/program-kind'
@@ -43,6 +45,10 @@ type ClearAssessmentAction = (input: {
 type SetContractSignedAction = (
   enrollmentId: string,
   signed: boolean,
+) => Promise<AdminActionResult>
+
+export type SetConsentsAction = (
+  input: EnrollmentConsentValues & { enrollmentId: string },
 ) => Promise<AdminActionResult>
 
 interface Props {
@@ -74,6 +80,12 @@ interface Props {
    * throwing, which would take the whole page down rather than show a toast.
    */
   contractEditableGroupIds?: readonly string[]
+  /**
+   * Admin only, by owner decision: a teacher reads the privole (they need to
+   * know whom not to photograph) but the office enters the signed forms.
+   * Absent = read-only.
+   */
+  onSetConsents?: SetConsentsAction
   /**
    * Which of this child's school years qualify for the sibling discount, and who
    * makes each one qualify. Admin only — like the paid marks, it is a payment
@@ -107,6 +119,7 @@ export function StudentYearSections({
   onClearAssessment,
   onSetContractSigned,
   contractEditableGroupIds,
+  onSetConsents,
   familyDiscountsByYear,
 }: Readonly<Props>) {
   const years = useMemo(() => {
@@ -243,6 +256,12 @@ export function StudentYearSections({
                       contractEditableGroupIds !== undefined &&
                       !contractEditableGroupIds.includes(sg.id)
                     }
+                  />
+                  <EnrollmentConsents
+                    enrollmentId={enrollment.id}
+                    consents={enrollment}
+                    groupLabel={groupLabel}
+                    onSetConsents={onSetConsents}
                   />
                   {/* Only SLR cards carry it: radionica and natjecateljski
                       payments are deliberately untouched by the family discount,

@@ -7,6 +7,51 @@ import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { PaymentStatusBadge } from '@/components/admin/students/payment-status-badge'
 import { ReturningBadge } from '@/components/admin/returning-badge'
 import { PAYMENT_STATUS_SORT_KEY } from '@/lib/payment-status'
+import {
+  CONSENT_KEYS,
+  CONSENT_SHORT_LABELS,
+  consentRestrictions,
+  pickConsents,
+  strictestConsents,
+  type ConsentKey,
+} from '@/lib/enrollment-consent'
+
+const shortLabels = (keys: readonly ConsentKey[]) =>
+  keys.map((k) => CONSENT_SHORT_LABELS[k]).join(', ')
+
+/**
+ * The year's privole for one child, strictest enrollment wins (a child in two
+ * groups is never shown as more publishable than their stricter form). Says
+ * only what restricts: "Ne" for a refusal, "Nije uneseno" for a form still to
+ * be typed in — both mean "do not publish" there.
+ */
+function ConsentCell({ row, schoolYear }: Readonly<{ row: StudentRow; schoolYear: string }>) {
+  const inYear = row.enrollments.filter((e) => e.schoolYear === schoolYear)
+  if (inYear.length === 0) return <span className="text-gray-400">—</span>
+
+  const consents = strictestConsents(inYear.map(pickConsents))
+  const { denied, missing } = consentRestrictions(consents)
+  if (denied.length === 0 && missing.length === 0) {
+    return <span className="text-xs text-green-700">Sve dane</span>
+  }
+  if (missing.length === CONSENT_KEYS.length) {
+    return <span className="text-xs text-gray-500">Nisu unesene</span>
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {denied.length > 0 && (
+        <span className="inline-block px-1.5 py-0.5 text-xs rounded-md bg-red-50 text-red-700 border border-red-200">
+          Ne: {shortLabels(denied)}
+        </span>
+      )}
+      {missing.length > 0 && (
+        <span className="inline-block px-1.5 py-0.5 text-xs rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+          Nije uneseno: {shortLabels(missing)}
+        </span>
+      )}
+    </div>
+  )
+}
 
 /**
  * Every column that can differ by school year is resolved against the one the
@@ -87,6 +132,11 @@ const buildColumns = (schoolYear: string): ColumnDef<StudentRow>[] => [
     sortable: true,
     sortValue: (row) => PAYMENT_STATUS_SORT_KEY[row.paymentStatus],
     cell: (row) => <PaymentStatusBadge status={row.paymentStatus} />,
+  },
+  {
+    key: 'consents',
+    header: `Privole (${schoolYear})`,
+    cell: (row) => <ConsentCell row={row} schoolYear={schoolYear} />,
   },
   {
     key: 'createdAt',

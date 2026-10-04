@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Loader2, Lock, Minus, Pencil, Plus, Save, X } from 'lucide-react'
+import { CameraOff, Check, Loader2, Lock, Minus, Pencil, Plus, Save, X } from 'lucide-react'
 import { readAdhocDates, writeAdhocDates } from '@/lib/adhoc-date-memory'
 import type { MarkingWindow } from '@/lib/attendance-window'
 import { DateInput } from '@/components/ui/date-input'
@@ -45,6 +45,13 @@ import {
 } from '@/lib/session-staff'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import {
+  CONSENT_LABELS,
+  CONSENT_SHORT_LABELS,
+  consentRestrictions,
+  PHOTO_CONSENT_KEYS,
+  type EnrollmentConsents,
+} from '@/lib/enrollment-consent'
 import { fromDateKey, todayUtc, toDateKey } from '@/lib/session-dates'
 
 type SectionKey = number | 'other'
@@ -355,6 +362,46 @@ interface RosterRowProps {
   readOnly: boolean
 }
 
+/**
+ * Whom not to photograph, said on the row itself — the roster is the screen a
+ * teacher has open in the classroom. Rendered only when something restricts:
+ * a child cleared for every channel gets no marker, so the ones that matter
+ * stand out. A consent not entered yet counts as withheld (amber, named apart
+ * from an explicit Ne) — a missing form must never read as a yes.
+ */
+function PhotoConsentNote({ consents }: Readonly<{ consents: EnrollmentConsents }>) {
+  const { denied, missing } = consentRestrictions(consents, PHOTO_CONSENT_KEYS)
+  if (denied.length === 0 && missing.length === 0) return null
+
+  const short = (keys: readonly (keyof typeof CONSENT_SHORT_LABELS)[]) =>
+    keys.map((k) => CONSENT_SHORT_LABELS[k]).join(', ')
+  const long = (keys: readonly (keyof typeof CONSENT_LABELS)[]) =>
+    keys.map((k) => CONSENT_LABELS[k]).join(', ')
+  const title = [
+    denied.length > 0 && `Roditelj nije dao privolu: ${long(denied)}`,
+    missing.length > 0 && `Privola još nije unesena (ne objavljivati): ${long(missing)}`,
+  ]
+    .filter(Boolean)
+    .join('. ')
+
+  return (
+    <span className="mt-0.5 flex flex-wrap items-center gap-1" title={title}>
+      <CameraOff className="size-3 shrink-0 text-red-600" aria-hidden />
+      <span className="sr-only">{title}</span>
+      {denied.length > 0 ? (
+        <span aria-hidden className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+          Ne objavljivati: {short(denied)}
+        </span>
+      ) : null}
+      {missing.length > 0 ? (
+        <span aria-hidden className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+          Nije uneseno: {short(missing)}
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
 function RosterRow({
   row,
   draft,
@@ -408,6 +455,7 @@ function RosterRow({
               </span>
             ) : null}
           </span>
+          <PhotoConsentNote consents={row.consents} />
           {existing?.recordedBy ? (
             <span className="block text-[11px] font-normal text-gray-400" title="Zapisao">
               {existing.recordedBy}
