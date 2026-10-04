@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "ignore": ["src/components/ui/**"],
+  "ignore": ["src/components/ui/**", "docker/**"],
   "ignoreDependencies": [
     "sharp",
     "@eslint/eslintrc",

@@ -40,9 +40,46 @@ services:
       db:
         condition: service_healthy
 
+  # Local e-mail catcher: every mail the dev app sends shows up at
+  # http://localhost:8025 instead of reaching anyone. See emails/README.md.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: inovatic-mailpit
+    restart: unless-stopped
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: 2000
+    ports:
+      - "8025:8025"
+    volumes:
+      - inovatic_mailpit:/data
+    networks:
+      - inovatic_net
+
+  # Speaks the Resend HTTP API and delivers into Mailpit. The app is pointed at
+  # it with RESEND_BASE_URL=http://localhost:3025 in .env.local — nothing in
+  # the sending code changes.
+  resend-relay:
+    image: node:22-alpine
+    container_name: inovatic-resend-relay
+    restart: unless-stopped
+    command: ["node", "/app/server.mjs"]
+    environment:
+      PORT: 3025
+      MAILPIT_URL: http://mailpit:8025
+    ports:
+      - "3025:3025"
+    volumes:
+      - ./docker/resend-relay:/app:ro
+    networks:
+      - inovatic_net
+    depends_on:
+      - mailpit
+
 volumes:
   inovatic_pgdata:
   inovatic_pgadmin:
+  inovatic_mailpit:
 
 networks:
   inovatic_net:

@@ -19,18 +19,15 @@ All outbound mail goes through **Resend** + **React Email**, in two layers.
   | `sendPartyInquiryConfirmationEmail` | public party (proslava) inquiry submitted | parent |
   | `sendPartyInquiryNotificationEmail` | public party (proslava) inquiry submitted | `prijave@`, reply-to the parent |
   | `sendScheduleOptionsEmail` | admin sends group options for a NEW inquiry | parent |
-  | `sendStudentCredentialsEmail` | **nothing — no caller since 2026-08-17** (see below) | parent |
-  | `sendTeacherCredentialsEmail` | teacher account created / password reset (`variant: 'new' \| 'reset'`) | teacher |
+  | `sendPasswordLinkEmail` | a one-time set-password link (`purpose: 'SETUP' \| 'RESET'`, `audience: 'PARENT' \| 'STAFF'`) — profile buttons, `createTeacher`, the deploy-day staff rollout, `npm run auth:send-password-link` | the account's own e-mail |
   | `sendBulkMessageEmail` | an admin runs a campaign from `/admin/email` | one mail per recipient row |
   | `sendReleaseNotesEmail` | a new version in `src/lib/releases.ts` reaches production | every non-deleted ADMIN, once per version |
 
-**Student logins leave the building ONLY through a CREDENTIALS campaign (2026-08-17).** Creating
-a student account — from an inquiry or manually — now mails nothing at all. An admin sends the
-logins from `/admin/email` once contracts are signed, which is what makes the send deliberate,
-auditable per family, and repeatable. `sendStudentCredentialsEmail` is kept for a possible
-future single-child send but currently has no caller; do not wire it back into an account
-creation path, because it has none of the campaign's per-child ownership check
-(`assertCredentialsBelongTo`). Note `knip` cannot flag it — two unit tests reference it.
+**The app never mails a password (2026-09-29).** It mails a one-time link instead
+(`/postavi-lozinku#<token>`), and the owner chooses the password. Families get theirs from the
+"Postavljanje lozinke" campaign on `/admin/email` (one mail per parent account, ownership
+re-checked by `assertPasswordLinkBelongsTo`) or from the child's profile; staff from their
+teacher page. See `docs/runbooks/password-links.md`.
 
 **A booked termin is printed back to the parent (2026-09-16).** `sendInquiryConfirmationEmail`
 takes an optional `termin` (`GroupTermin` from `src/lib/group-termin.ts` — program, group, day
@@ -50,9 +47,9 @@ address. The inbound notifications flip reply-to around — they go *to* an inbo
 person who submitted the form, so staff answer straight from Outlook.
 
 Server actions call the senders and never touch Resend directly. The **error policy lives at
-the call site**, not in the service: confirmations swallow-and-log, teacher credentials
-swallow-and-flag (`emailSent` — the account is already committed and the password stays readable
-in the UI), and schedule-options surfaces a send failure to the admin. Campaign sends record
+the call site**, not in the service: confirmations swallow-and-log, the setup link on a new teacher
+swallow-and-flag (`emailSent` — the account is already committed; the admin resends from the
+teacher page), and schedule-options surfaces a send failure to the admin. Campaign sends record
 their outcome per recipient row instead, so a failure is visible on `/admin/email/[campaignId]`
 rather than thrown away.
 
@@ -79,6 +76,35 @@ template's `PreviewProps` — edit that object (or change values live in the pre
 different states: the optional city / proposed-date lines present vs. absent, multiple schedule
 options, the two teacher subjects, etc. Port 3001 keeps it clear of the Next dev server on 3000.
 (The preview requires the `react-email` + `@react-email/ui` devDependencies, already installed.)
+
+## Catching real sends locally (Mailpit)
+
+`npm run email` shows a template with sample data. To see what the **running app** actually
+sends — real data, real subject, per-city From and Reply-To, attachments, links — without it
+reaching anyone:
+
+```bash
+docker compose up -d mailpit resend-relay   # inbox → http://localhost:8025
+```
+
+and in `.env.local`:
+
+```bash
+RESEND_BASE_URL=http://localhost:3025       # the relay instead of api.resend.com
+RESEND_API_KEY=re_local_mailpit             # any value; the relay ignores it
+NEXT_PUBLIC_APP_URL=http://localhost:3000   # links inside mails open the dev server
+```
+
+Restart `npm run dev` after editing `.env.local`. **No sending code changes**: the Resend SDK
+reads `RESEND_BASE_URL`, renders the React element itself and POSTs it exactly as it would to
+Resend; `docker/resend-relay/server.mjs` (Node, no dependencies) accepts `POST /emails` and
+`/emails/batch` in Resend's shape and delivers into Mailpit. A malformed payload gets Resend's
+422, and a stopped relay makes the send throw — it never falls back to the real Resend.
+Remove `RESEND_BASE_URL` (and put a real key back) to send for real again. **Never set
+`RESEND_BASE_URL` on Railway.**
+
+Boot-time mails (release notes, the staff password rollout) stay off in dev regardless — they
+are gated on `NODE_ENV=production`.
 
 ## Adding a new email
 
