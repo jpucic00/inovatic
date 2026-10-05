@@ -16,8 +16,9 @@ vi.mock('@/actions/admin/payment', () => ({
   setEnrollmentMonthPaid: vi.fn(async () => ({ success: true })),
 }))
 
-// November 2026, as the SERVER would compute it — the whole point of the prop
-// is that the panel never reads a clock of its own, so no test here may either.
+// The due cutoff landing exactly on 1 November 2026 (i.e. "now" is 25 October,
+// a week ahead), as the SERVER would compute it — the whole point of the prop is
+// that the panel never reads a clock of its own, so no test here may either.
 const NOVEMBER = Date.UTC(2026, 10, 1)
 
 const month = (year: number, monthIndex: number, paidAt: Date | null = null) => ({
@@ -32,7 +33,7 @@ function renderPanel(
   return render(
     <EnrollmentPaymentPanel
       enrollmentId="e1"
-      currentMonthStartMs={NOVEMBER}
+      dueCutoffMs={NOVEMBER}
       kind="COMPETITION"
       paymentOption={null}
       fullYearPaidAt={null}
@@ -52,9 +53,9 @@ describe('EnrollmentPaymentPanel — the owed/future month boundary', () => {
     )
   })
 
-  it('treats the current month as owed — the boundary is inclusive', () => {
+  it('treats a month starting exactly on the cutoff as owed — the boundary is inclusive', () => {
     // The regression this guards: `>=` instead of `>` would mute the very month
-    // being settled, and a whole cohort silently stops reading as owed on the 1st.
+    // being settled, and a whole cohort silently stops reading as owed.
     renderPanel()
     expect(screen.getByRole('button', { name: 'Studeni 2026.' }).getAttribute('title')).toBe(
       'Označi kao plaćeno',
@@ -69,9 +70,9 @@ describe('EnrollmentPaymentPanel — the owed/future month boundary', () => {
   })
 
   it('reads only the prop — a month is owed or not regardless of the real clock', () => {
-    // Same three months, but the server says it is still September. December is
-    // unchanged (future), and now October and November are future too.
-    renderPanel({ currentMonthStartMs: Date.UTC(2026, 8, 1) })
+    // Same three months, but the server's cutoff is still in September. December
+    // is unchanged (future), and now October and November are future too.
+    renderPanel({ dueCutoffMs: Date.UTC(2026, 8, 1) })
     for (const label of ['Listopad 2026.', 'Studeni 2026.', 'Prosinac 2026.']) {
       expect(screen.getByRole('button', { name: label }).getAttribute('title')).toBe(
         'Mjesec još nije počeo — označi kao plaćeno unaprijed',

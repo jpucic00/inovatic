@@ -22,8 +22,12 @@ const { getStudents } = await import('@/actions/admin/student')
 const CY = computeSchoolYear() // current school year as of today
 const PAST = '2024/2025'
 
-const STARTED = new Date('2025-10-01T00:00:00.000Z') // before today (2026-06-13)
-const FUTURE = new Date('2026-12-01T00:00:00.000Z') // after today
+const DAY_MS = 24 * 60 * 60 * 1000
+const STARTED = new Date('2025-10-01T00:00:00.000Z') // before today
+// Relative, so it stays beyond the 7-day payment lead window whenever this runs.
+const FUTURE = new Date(Date.now() + 60 * DAY_MS)
+// Not started yet, but inside the lead window — parents are asked to pay now.
+const IN_LEAD_WINDOW = new Date(Date.now() + 3 * DAY_MS)
 const PAST_STARTED = new Date('2024-10-01T00:00:00.000Z')
 
 describe('setModulePaid', () => {
@@ -217,6 +221,10 @@ describe('getStudents payment filter + computed status', () => {
     // mirror of A_pending and E_future.
     await competitionStudent('I_comp_pending', { periodStart: STARTED })
     await competitionStudent('J_comp_notdue', { periodStart: FUTURE })
+    // Payment is asked for a week before the start: an unpaid module or month
+    // that has not begun but is a few days away is already owed.
+    await standardStudent('M_lead', { schoolYear: CY, startDate: IN_LEAD_WINDOW, paid: false })
+    await competitionStudent('N_comp_lead', { periodStart: IN_LEAD_WINDOW })
   })
 
   // setup.ts resets the auth mock to null after every test; re-arm the admin
@@ -242,6 +250,8 @@ describe('getStudents payment filter + computed status', () => {
     expect(byId.get(ids.E_future)).toBe('NOT_DUE')
     expect(byId.get(ids.I_comp_pending)).toBe('PENDING')
     expect(byId.get(ids.J_comp_notdue)).toBe('NOT_DUE')
+    expect(byId.get(ids.M_lead)).toBe('PENDING')
+    expect(byId.get(ids.N_comp_lead)).toBe('PENDING')
     expect(byId.get(ids.F_pastpaid)).toBe('NONE')
     // A past-year debt is no longer carried into the year being looked at: with
     // no current-year enrollment there is nothing here to report at all.
@@ -283,6 +293,9 @@ describe('getStudents payment filter + computed status', () => {
     expect(got.has(ids.G_pastunpaid)).toBe(false)
     expect(got.has(ids.K_pastdebt)).toBe(false)
     expect(got.has(ids.H_courseX)).toBe(true)
+    // Starts within a week — owed before the first session, not on it.
+    expect(got.has(ids.M_lead)).toBe(true)
+    expect(got.has(ids.N_comp_lead)).toBe(true)
     expect(got.has(ids.B_allpaid)).toBe(false)
     expect(got.has(ids.C_yearpaid)).toBe(false)
     expect(got.has(ids.D2_radio_paid)).toBe(false)

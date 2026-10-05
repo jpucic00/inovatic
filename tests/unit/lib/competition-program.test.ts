@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeSeasonSessions, toDateKey } from '@/lib/session-dates'
 import { seasonMonths } from '@/lib/monthly-charges'
-import { isEnrollmentPending, pendingEnrollmentWhere } from '@/lib/payment-status'
+import { isEnrollmentPending, pendingEnrollmentWhere, paymentDueCutoff } from '@/lib/payment-status'
 import type { PaymentStatusEnrollment } from '@/lib/payment-status'
 import { programsForSelection } from '@/lib/inquiry-availability'
 import type { ActiveProgram } from '@/actions/public/programs'
@@ -138,10 +138,10 @@ describe('isEnrollmentPending — competition', () => {
     expect(isEnrollmentPending(e, NOW)).toBe(false)
   })
 
-  it('flips to owed the moment the 1st arrives, with no job to run', () => {
+  it('flips to owed a week before the 1st, with no job to run', () => {
     const e = competitionEnrollment([{ periodStart: d('2026-12-01'), paidAt: null }])
-    expect(isEnrollmentPending(e, d('2026-11-30'))).toBe(false)
-    expect(isEnrollmentPending(e, d('2026-12-01'))).toBe(true)
+    expect(isEnrollmentPending(e, d('2026-11-23'))).toBe(false)
+    expect(isEnrollmentPending(e, d('2026-11-24'))).toBe(true)
   })
 
   it('is covered by the whole-year paid mark', () => {
@@ -161,7 +161,7 @@ describe('pendingEnrollmentWhere — competition arm mirrors isEnrollmentPending
     expect(arm).toBeDefined()
     expect(arm).toMatchObject({
       scheduledGroup: { course: { kind: 'COMPETITION' } },
-      enrollmentMonths: { some: { paidAt: null, periodStart: { lte: NOW } } },
+      enrollmentMonths: { some: { paidAt: null, periodStart: { lte: paymentDueCutoff(NOW) } } },
     })
   })
 })

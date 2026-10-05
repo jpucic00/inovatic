@@ -34,6 +34,23 @@ export const PAYMENT_STATUS_SORT_KEY: Record<PaymentStatus, number> = {
 export const PAYMENT_FILTER_VALUES = ['PENDING', 'NOT_DUE', 'PAID'] as const
 export type PaymentFilter = (typeof PAYMENT_FILTER_VALUES)[number]
 
+/**
+ * Parents pay BEFORE a module (or a competition month) starts, so an item comes
+ * due this many days ahead of its start — an unpaid module turns "Nije plaćeno"
+ * a week before its first session, not on it. Radionice are unaffected: they are
+ * owed from the moment of enrollment.
+ */
+export const PAYMENT_LEAD_DAYS = 7
+
+/**
+ * Every item starting on or before this instant is due. The single boundary the
+ * in-memory rules, their Prisma mirrors and the payment panel's month chips all
+ * compare against, so none of them can apply a different lead time.
+ */
+export function paymentDueCutoff(now: Date): Date {
+  return new Date(now.getTime() + PAYMENT_LEAD_DAYS * 24 * 60 * 60 * 1000)
+}
+
 export type PaymentStatusEnrollment = {
   schoolYear: string
   fullYearPaidAt: Date | null
@@ -56,11 +73,11 @@ export type PaymentStatusEnrollment = {
  * money) when it is not marked whole-year-paid AND, per program kind:
  *
  *   RADIONICA   always — the enrollment itself is the single payable item.
- *   COMPETITION at least one month whose 1st has passed is unpaid. This is what
- *               makes the status flip on the 1st with no scheduled job.
- *   STANDARD    at least one started, unpaid module. A module is "started" once
- *               its window has begun (startDate <= now); a NULL startDate is
- *               treated as started/owed.
+ *   COMPETITION at least one due month is unpaid. A month is due from
+ *               `PAYMENT_LEAD_DAYS` before its 1st, with no scheduled job.
+ *   STANDARD    at least one due, unpaid module. A module is due from
+ *               `PAYMENT_LEAD_DAYS` before its window begins
+ *               (`paymentDueCutoff`); a NULL startDate is treated as due.
  *
  * MUST stay in sync with `pendingEnrollmentWhere` below.
  */
@@ -71,15 +88,16 @@ export function isEnrollmentPending(
   if (enrollment.fullYearPaidAt) return false
   const kind = enrollment.scheduledGroup.course.kind
   if (isRadionica(kind)) return true
+  const cutoff = paymentDueCutoff(now)
   if (isMonthlyBilled(kind)) {
     return enrollment.enrollmentMonths.some(
-      (m) => m.paidAt === null && m.periodStart <= now,
+      (m) => m.paidAt === null && m.periodStart <= cutoff,
     )
   }
   return enrollment.moduleEnrollments.some(
     (me) =>
       me.paidAt === null &&
-      (me.moduleSchedule.startDate === null || me.moduleSchedule.startDate <= now),
+      (me.moduleSchedule.startDate === null || me.moduleSchedule.startDate <= cutoff),
   )
 }
 
@@ -103,11 +121,12 @@ export function hasDueItems(enrollment: PaymentStatusEnrollment, now: Date): boo
   if (enrollment.fullYearPaidAt) return true
   const kind = enrollment.scheduledGroup.course.kind
   if (isRadionica(kind)) return true
+  const cutoff = paymentDueCutoff(now)
   if (isMonthlyBilled(kind)) {
-    return enrollment.enrollmentMonths.some((m) => m.periodStart <= now)
+    return enrollment.enrollmentMonths.some((m) => m.periodStart <= cutoff)
   }
   return enrollment.moduleEnrollments.some(
-    (me) => me.moduleSchedule.startDate === null || me.moduleSchedule.startDate <= now,
+    (me) => me.moduleSchedule.startDate === null || me.moduleSchedule.startDate <= cutoff,
   )
 }
 
@@ -148,20 +167,21 @@ export function computeStudentPaymentStatus(
  * exactly like `dueEnrollmentWhere`). MUST stay in sync.
  */
 export function pendingEnrollmentWhere(now: Date): Prisma.EnrollmentWhereInput {
+  const cutoff = paymentDueCutoff(now)
   return {
     fullYearPaidAt: null,
     OR: [
       { scheduledGroup: { course: { kind: 'RADIONICA' } } },
       {
         scheduledGroup: { course: { kind: 'COMPETITION' } },
-        enrollmentMonths: { some: { paidAt: null, periodStart: { lte: now } } },
+        enrollmentMonths: { some: { paidAt: null, periodStart: { lte: cutoff } } },
       },
       {
         moduleEnrollments: {
           some: {
             paidAt: null,
             moduleSchedule: {
-              OR: [{ startDate: null }, { startDate: { lte: now } }],
+              OR: [{ startDate: null }, { startDate: { lte: cutoff } }],
             },
           },
         },
@@ -175,19 +195,20 @@ export function pendingEnrollmentWhere(now: Date): Prisma.EnrollmentWhereInput {
  * MUST stay in sync.
  */
 export function dueEnrollmentWhere(now: Date): Prisma.EnrollmentWhereInput {
+  const cutoff = paymentDueCutoff(now)
   return {
     OR: [
       { fullYearPaidAt: { not: null } },
       { scheduledGroup: { course: { kind: 'RADIONICA' } } },
       {
         scheduledGroup: { course: { kind: 'COMPETITION' } },
-        enrollmentMonths: { some: { periodStart: { lte: now } } },
+        enrollmentMonths: { some: { periodStart: { lte: cutoff } } },
       },
       {
         moduleEnrollments: {
           some: {
             moduleSchedule: {
-              OR: [{ startDate: null }, { startDate: { lte: now } }],
+              OR: [{ startDate: null }, { startDate: { lte: cutoff } }],
             },
           },
         },

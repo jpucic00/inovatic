@@ -20,18 +20,18 @@ import {
 } from '@/components/shared/student-year-sections'
 import { CopyButton } from './copy-button'
 import { formatDate, formatDateKey } from '@/lib/format'
+import { paymentDueCutoff } from '@/lib/payment-status'
 
 type StudentWithRelations = StudentDetail
 
 /**
  * The owed/future boundary for monthly fees, computed HERE — on the server —
- * so it matches `seasonMonths`' UTC month flooring and hydrates identically in
- * every viewer timezone. Computing it during client render disagreed with the
- * SSR pass for ~2h around each month edge (UTC vs local month).
+ * so it is the same `paymentDueCutoff` the Plaćanje badge uses and hydrates
+ * identically in every viewer timezone. Computing it during client render
+ * disagreed with the SSR pass (server vs viewer clock).
  */
-function currentUtcMonthStartMs(): number {
-  const now = new Date()
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+function paymentDueCutoffMs(): number {
+  return paymentDueCutoff(new Date()).getTime()
 }
 
 type CreateCommentAction = (input: {
@@ -277,7 +277,7 @@ export function StudentDetailView({
       {/* Year-dependent sections: one selector drives groups + attendance + notes */}
       <StudentYearSections
         studentId={student.id}
-        currentMonthStartMs={currentUtcMonthStartMs()}
+        dueCutoffMs={paymentDueCutoffMs()}
         defaultYear={defaultYear}
         enrollments={student.enrollments}
         attendance={attendance}

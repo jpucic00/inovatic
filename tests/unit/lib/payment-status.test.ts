@@ -6,6 +6,8 @@ import {
   pendingEnrollmentWhere,
   dueEnrollmentWhere,
   paymentStatusUserWhere,
+  paymentDueCutoff,
+  PAYMENT_LEAD_DAYS,
   type PaymentStatusEnrollment,
 } from '@/lib/payment-status'
 
@@ -14,8 +16,14 @@ const CURRENT_YEAR = '2026/2027'
 const PAST_YEAR = '2025/2026'
 
 const STARTED = new Date('2026-10-01T00:00:00.000Z') // before NOW
-const FUTURE = new Date('2026-12-20T00:00:00.000Z') // after NOW
+const FUTURE = new Date('2026-12-20T00:00:00.000Z') // after NOW + the lead window
 const TODAY = NOW
+// Inside the payment lead window: not started yet, but parents pay before it starts.
+const IN_LEAD_WINDOW = new Date('2026-11-19T00:00:00.000Z')
+// Exactly PAYMENT_LEAD_DAYS ahead of NOW — the inclusive edge of the window.
+const LEAD_EDGE = new Date('2026-11-22T00:00:00.000Z')
+// One day past the window.
+const AFTER_LEAD = new Date('2026-11-23T00:00:00.000Z')
 
 function standardEnrollment(
   modules: { paidAt: Date | null; startDate: Date | null }[],
@@ -58,6 +66,13 @@ function competition(
   }
 }
 
+describe('paymentDueCutoff', () => {
+  it('lies a week ahead of now', () => {
+    expect(PAYMENT_LEAD_DAYS).toBe(7)
+    expect(paymentDueCutoff(NOW)).toEqual(LEAD_EDGE)
+  })
+})
+
 describe('isEnrollmentPending', () => {
   it('is pending when a started module is unpaid', () => {
     expect(isEnrollmentPending(standardEnrollment([{ paidAt: null, startDate: STARTED }]), NOW)).toBe(true)
@@ -69,6 +84,30 @@ describe('isEnrollmentPending', () => {
 
   it('is pending when startDate is exactly today', () => {
     expect(isEnrollmentPending(standardEnrollment([{ paidAt: null, startDate: TODAY }]), NOW)).toBe(true)
+  })
+
+  it('is pending a week before an unpaid module starts — parents pay ahead', () => {
+    expect(
+      isEnrollmentPending(standardEnrollment([{ paidAt: null, startDate: IN_LEAD_WINDOW }]), NOW),
+    ).toBe(true)
+    expect(
+      isEnrollmentPending(standardEnrollment([{ paidAt: null, startDate: LEAD_EDGE }]), NOW),
+    ).toBe(true)
+  })
+
+  it('is NOT pending while an unpaid module is more than a week away', () => {
+    expect(
+      isEnrollmentPending(standardEnrollment([{ paidAt: null, startDate: AFTER_LEAD }]), NOW),
+    ).toBe(false)
+  })
+
+  it('competition: pending a week before an unpaid month begins, not earlier', () => {
+    expect(isEnrollmentPending(competition([{ paidAt: null, periodStart: LEAD_EDGE }]), NOW)).toBe(
+      true,
+    )
+    expect(
+      isEnrollmentPending(competition([{ paidAt: null, periodStart: AFTER_LEAD }]), NOW),
+    ).toBe(false)
   })
 
   it('is NOT pending when the only unpaid module starts in the future', () => {
@@ -114,6 +153,13 @@ describe('hasDueItems', () => {
     ).toBe(true)
   })
 
+  it('is due from a week before a module starts', () => {
+    expect(hasDueItems(standardEnrollment([{ paidAt: null, startDate: LEAD_EDGE }]), NOW)).toBe(true)
+    expect(hasDueItems(standardEnrollment([{ paidAt: null, startDate: AFTER_LEAD }]), NOW)).toBe(
+      false,
+    )
+  })
+
   it('is NOT due while the only module still lies in the future', () => {
     expect(hasDueItems(standardEnrollment([{ paidAt: null, startDate: FUTURE }]), NOW)).toBe(false)
   })
@@ -143,7 +189,7 @@ describe('hasDueItems', () => {
     expect(hasDueItems(radionica(), NOW)).toBe(true)
   })
 
-  it('competition: due once a month has begun, not before', () => {
+  it('competition: due from a week before a month begins, not earlier', () => {
     expect(hasDueItems(competition([{ paidAt: null, periodStart: STARTED }]), NOW)).toBe(true)
     expect(hasDueItems(competition([{ paidAt: null, periodStart: FUTURE }]), NOW)).toBe(false)
   })
@@ -160,6 +206,23 @@ describe('computeStudentPaymentStatus', () => {
     expect(
       computeStudentPaymentStatus(
         [standardEnrollment([{ paidAt: null, startDate: FUTURE }])],
+        CURRENT_YEAR,
+        NOW,
+      ),
+    ).toBe('NOT_DUE')
+  })
+
+  it('PENDING once an unpaid module is a week from starting, NOT_DUE before that', () => {
+    expect(
+      computeStudentPaymentStatus(
+        [standardEnrollment([{ paidAt: null, startDate: IN_LEAD_WINDOW }])],
+        CURRENT_YEAR,
+        NOW,
+      ),
+    ).toBe('PENDING')
+    expect(
+      computeStudentPaymentStatus(
+        [standardEnrollment([{ paidAt: null, startDate: AFTER_LEAD }])],
         CURRENT_YEAR,
         NOW,
       ),
@@ -320,6 +383,20 @@ describe('computeStudentPaymentStatus', () => {
         NOW,
       ),
     ).toBe('NOT_DUE')
+  })
+})
+
+describe('Prisma mirrors use the same lead window', () => {
+  // The badge and the Plaćanje filter are two renderings of one rule — if only
+  // one side moved the boundary, a row would read red and be missing from the
+  // red filter for a week.
+  it('compares module and month starts against paymentDueCutoff, not now', () => {
+    const cutoff = paymentDueCutoff(NOW)
+    for (const where of [pendingEnrollmentWhere(NOW), dueEnrollmentWhere(NOW)]) {
+      const json = JSON.stringify(where)
+      expect(json).toContain(JSON.stringify({ lte: cutoff }))
+      expect(json).not.toContain(JSON.stringify({ lte: NOW }))
+    }
   })
 })
 

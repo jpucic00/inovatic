@@ -53,8 +53,8 @@ export type SetConsentsAction = (
 
 interface Props {
   studentId: string
-  /** Server-computed UTC month start (ms) — the monthly-fee owed/future boundary. */
-  currentMonthStartMs: number
+  /** Server-computed `paymentDueCutoff` (ms) — the monthly-fee owed/future boundary. */
+  dueCutoffMs: number
   /** Year the selector opens on — admin: nav-selected cookie year; teacher: computed current year. */
   defaultYear: string
   enrollments: StudentEnrollments
@@ -104,7 +104,7 @@ interface Props {
  */
 export function StudentYearSections({
   studentId,
-  currentMonthStartMs,
+  dueCutoffMs,
   defaultYear,
   enrollments,
   attendance,
@@ -275,7 +275,7 @@ export function StudentYearSections({
                   {isAdmin && (
                     <EnrollmentPaymentPanel
                       enrollmentId={enrollment.id}
-                      currentMonthStartMs={currentMonthStartMs}
+                      dueCutoffMs={dueCutoffMs}
                       kind={sg.course.kind}
                       paymentOption={enrollment.paymentOption}
                       fullYearPaidAt={enrollment.fullYearPaidAt}
