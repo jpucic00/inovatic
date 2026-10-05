@@ -28,6 +28,11 @@ import {
   parseConsentFilter,
   type ConsentFilter,
 } from '@/lib/enrollment-consent'
+import {
+  CONTRACT_FILTER_LABELS,
+  parseContractFilter,
+  type ContractFilter,
+} from '@/lib/contract-filter'
 
 export const metadata: Metadata = { title: 'Admin – Učenici' }
 
@@ -60,6 +65,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
     : undefined
   const returning = parseReturningFilter(params.returning)
   const consent = parseConsentFilter(params.consent)
+  const contract = parseContractFilter(params.contract)
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1)
 
   const isModuleView = !!scheduleId
@@ -75,6 +81,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
       paymentStatus,
       returning,
       consent,
+      contract,
       page,
       pageSize: PAGE_SIZE,
     }),
@@ -99,6 +106,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
     paymentStatus,
     returning,
     consent,
+    contract,
     courses,
     groups,
     scheduleInfo,
@@ -137,6 +145,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
           currentPayment: paymentStatus ?? '',
           currentReturning: returning ?? '',
           currentConsent: consent ?? '',
+          currentContract: contract ?? '',
           returningYear: selectedYear,
           courses: courses.map((c) => ({ id: c.id, title: c.title })),
           groups: groups.map((g) => ({
@@ -180,12 +189,24 @@ function buildStudentChips(args: {
   paymentStatus: PaymentFilter | undefined
   returning: ReturningFilter | undefined
   consent: ConsentFilter | undefined
+  contract: ContractFilter | undefined
   courses: ReadonlyArray<{ id: string; title: string }>
   groups: ReadonlyArray<{ id: string; name: string | null; course: { title: string } }>
   scheduleInfo: { module: { title: string; course: { title: string } } } | null
 }): ActiveFilterChip[] {
-  const { courseId, groupId, scheduleId, search, paymentStatus, returning, consent, courses, groups, scheduleInfo } =
-    args
+  const {
+    courseId,
+    groupId,
+    scheduleId,
+    search,
+    paymentStatus,
+    returning,
+    consent,
+    contract,
+    courses,
+    groups,
+    scheduleInfo,
+  } = args
   const selectedGroup = groups.find((g) => g.id === groupId)
   return [
     returning && { key: 'returning', label: RETURNING_FILTER_LABELS[returning] },
@@ -201,6 +222,7 @@ function buildStudentChips(args: {
       key: 'payment',
       label: PAYMENT_STATUS_LABELS[paymentStatus],
     },
+    contract && { key: 'contract', label: CONTRACT_FILTER_LABELS[contract] },
     consent && { key: 'consent', label: CONSENT_FILTER_LABELS[consent] },
     scheduleId && {
       key: 'scheduleId',

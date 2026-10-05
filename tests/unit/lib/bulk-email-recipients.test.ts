@@ -80,8 +80,8 @@ describe('buildEmailRecipients', () => {
       student({ id: 's2', firstName: 'Luka', parentEmail: 'mama@test.hr' }),
     ])
     expect(recipients[0].children).toEqual([
-      { name: 'Marko Prezime', recommendation: 'Svijet LEGO Robotike 3' },
-      { name: 'Luka Prezime', recommendation: null },
+      { studentId: 's1', name: 'Marko Prezime', recommendation: 'Svijet LEGO Robotike 3' },
+      { studentId: 's2', name: 'Luka Prezime', recommendation: null },
     ])
   })
 

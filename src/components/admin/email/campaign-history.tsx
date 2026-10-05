@@ -30,10 +30,11 @@ export function CampaignHistory({ campaigns }: Readonly<{ campaigns: Campaigns }
                 const badge = EMAIL_CAMPAIGN_KINDS[c.kind]
                 const groupCount = c.sourceGroupIds.length
                 const groupNoun = croatianPlural(groupCount, 'grupa', 'grupe', 'grupa')
-                const cohort =
+                const source =
                   groupCount > 0
                     ? `${groupCount} ${groupNoun}`
                     : `preporuka: ${c.sourceRecommendations.join(', ')}`
+                const cohort = [source, ...c.sourceFilters].join(' · ')
                 return (
                   <tr key={c.id} className="border-b border-gray-100 last:border-0">
                     <td className="px-4 py-3 whitespace-nowrap text-gray-700">

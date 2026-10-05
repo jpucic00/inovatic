@@ -58,6 +58,7 @@ import {
   type ConsentFilter,
   type EnrollmentConsents,
 } from '@/lib/enrollment-consent'
+import { contractEnrollmentWhere, type ContractFilter } from '@/lib/contract-filter'
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
 
@@ -915,6 +916,8 @@ type StudentFilters = {
    * filters picked — not about some other group the child also attends.
    */
   consent?: ConsentFilter
+  /** "Ugovor potpisan" narrowing — same enrollment as `consent`, same reason. */
+  contract?: ContractFilter
   /**
    * Overrides the year that `isReturning` and the payment badge are resolved
    * against, for a caller that wants to ask about a year it is not narrowing to.
@@ -936,7 +939,7 @@ export async function getStudents(
 ): Promise<StudentListResult> {
   const { city } = await requireAdminCtx()
 
-  const { search, courseId, groupId, scheduleId, schoolYear, paymentStatus, returning, consent, page = 1, pageSize = 20 } = filters
+  const { search, courseId, groupId, scheduleId, schoolYear, paymentStatus, returning, consent, contract, page = 1, pageSize = 20 } = filters
 
   const now = new Date()
   const currentYear = computeSchoolYear(now)
@@ -966,7 +969,7 @@ export async function getStudents(
     role: 'STUDENT' as const,
     city,
     ...searchFilter,
-    ...(courseId || groupId || scheduleId || schoolYear || consent
+    ...(courseId || groupId || scheduleId || schoolYear || consent || contract
       ? {
           enrollments: {
             some: {
@@ -975,6 +978,7 @@ export async function getStudents(
               ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId } } } : {}),
               ...(schoolYear ? { schoolYear } : {}),
               ...(consent ? consentEnrollmentWhere(consent) : {}),
+              ...(contract ? contractEnrollmentWhere(contract) : {}),
             },
           },
         }

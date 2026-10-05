@@ -37,6 +37,11 @@ export default async function CampaignDetailPage({
           {campaign.targetCourse ? ` · ${campaign.targetCourse.title}` : ''}
           {campaign.targetSchoolYear ? ` · ${campaign.targetSchoolYear}` : ''}
         </p>
+        {campaign.sourceFilters.length > 0 && (
+          <p className="text-gray-500 text-sm mt-1">
+            Filteri ({campaign.sourceSchoolYear}): {campaign.sourceFilters.join(' · ')}
+          </p>
+        )}
       </div>
 
       <CampaignContent

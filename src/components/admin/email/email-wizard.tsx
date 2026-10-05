@@ -20,6 +20,24 @@ import {
   EMAIL_CAMPAIGN_KIND_ORDER,
 } from '@/lib/email-campaign-kind'
 import { formatSchoolYearDotted } from '@/lib/school-year-calendar'
+import {
+  PAYMENT_FILTER_VALUES,
+  PAYMENT_STATUS_COLORS,
+  PAYMENT_STATUS_LABELS,
+  type PaymentFilter,
+} from '@/lib/payment-status'
+import {
+  CONTRACT_FILTER_LABELS,
+  CONTRACT_FILTER_VALUES,
+  CONTRACT_STATE_COLORS,
+  CONTRACT_STATE_LABELS,
+  type ContractFilter,
+} from '@/lib/contract-filter'
+import {
+  CONSENT_FILTER_LABELS,
+  CONSENT_FILTER_VALUES,
+  type ConsentFilter,
+} from '@/lib/enrollment-consent'
 import { GroupCapacityChip } from '@/components/admin/group-capacity-chip'
 import { getGroupsForCourse } from '@/actions/admin/inquiry'
 import {
@@ -194,6 +212,9 @@ const DEFAULT_SCHOOL_CALENDAR_BODY = [
 
 const SELECT_CLASS =
   'w-full px-3 py-2 text-sm rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent'
+const FILTER_SELECT_CLASS = SELECT_CLASS.replace('w-full', 'w-full sm:w-auto')
+const CHILD_BADGE_CLASS =
+  'inline-block align-middle text-[10px] font-medium rounded px-1.5 py-0.5 border whitespace-nowrap'
 const INPUT_CLASS =
   'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent'
 const SECONDARY_BUTTON =
@@ -247,6 +268,10 @@ export function EmailWizard({
   const [tree, setTree] = useState<GroupTree>(initialTree)
   const [loadingTree, setLoadingTree] = useState(false)
   const [sourceGroupIds, setSourceGroupIds] = useState<string[]>([])
+  // The /admin/ucenici filters on top of the selection. '' = "Svi", the default.
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter | ''>('')
+  const [contractFilter, setContractFilter] = useState<ContractFilter | ''>('')
+  const [consentFilter, setConsentFilter] = useState<ConsentFilter | ''>('')
   const [recipientData, setRecipientData] = useState<RecipientData | null>(null)
   const [loadingRecipients, setLoadingRecipients] = useState(false)
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
@@ -374,6 +399,19 @@ export function EmailWizard({
     }
   }, [selectionMode, sourceYear])
 
+  // Hand-picked children are named outright, so nothing narrows them.
+  const studentFilters = useMemo(
+    () =>
+      selectionMode === 'STUDENTS'
+        ? {}
+        : {
+            paymentFilter: paymentFilter || undefined,
+            contractFilter: contractFilter || undefined,
+            consentFilter: consentFilter || undefined,
+          },
+    [selectionMode, paymentFilter, contractFilter, consentFilter],
+  )
+
   // Live recipient resolution; the request id drops stale responses.
   const requestIdRef = useRef(0)
   let hasSelection: boolean
@@ -393,6 +431,7 @@ export function EmailWizard({
       sourceGroupIds: selectionMode === 'GROUPS' ? sourceGroupIds : undefined,
       recommendations: selectionMode === 'RECOMMENDATION' ? recommendations : undefined,
       sourceStudentIds: selectionMode === 'STUDENTS' ? sourceStudentIds : undefined,
+      ...studentFilters,
       targetCourseId: kind === 'REENROLLMENT' && targetCourseId ? targetCourseId : undefined,
     })
       .then((res) => {
@@ -421,6 +460,7 @@ export function EmailWizard({
     sourceStudentIds,
     selectionMode,
     hasSelection,
+    studentFilters,
     targetCourseId,
   ])
 
@@ -607,6 +647,7 @@ export function EmailWizard({
       attachmentIds,
       sourceSchoolYear: sourceYear,
       sourceGroupIds,
+      ...studentFilters,
       assessmentId: rowKey,
     })
       .then((res) => {
@@ -695,6 +736,7 @@ export function EmailWizard({
         sourceGroupIds: selectionMode === 'GROUPS' ? sourceGroupIds : undefined,
         recommendations: selectionMode === 'RECOMMENDATION' ? recommendations : undefined,
         sourceStudentIds: selectionMode === 'STUDENTS' ? sourceStudentIds : undefined,
+        ...studentFilters,
         subject,
         bodyText,
         bodyBlocks,
@@ -1276,6 +1318,66 @@ export function EmailWizard({
                 })}
             </div>
             )}
+
+            {/* Same filters and labels as /admin/ucenici, decided in the source
+                year. Hidden for hand-picked children, who are named outright. */}
+            {selectionMode !== 'STUDENTS' && (
+              <div className="mt-4">
+                <span className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Dodatni filteri ({sourceYear})
+                </span>
+                <div className="flex flex-wrap gap-3">
+                  <select
+                    aria-label="Plaćanje"
+                    value={paymentFilter}
+                    onChange={(e) => {
+                      setPaymentFilter(e.target.value as PaymentFilter | '')
+                      setConfirming(false)
+                    }}
+                    className={FILTER_SELECT_CLASS}
+                  >
+                    <option value="">Plaćanje: svi</option>
+                    {PAYMENT_FILTER_VALUES.map((value) => (
+                      <option key={value} value={value}>
+                        {PAYMENT_STATUS_LABELS[value]}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Ugovor"
+                    value={contractFilter}
+                    onChange={(e) => {
+                      setContractFilter(e.target.value as ContractFilter | '')
+                      setConfirming(false)
+                    }}
+                    className={FILTER_SELECT_CLASS}
+                  >
+                    <option value="">Ugovor: svi</option>
+                    {CONTRACT_FILTER_VALUES.map((value) => (
+                      <option key={value} value={value}>
+                        {CONTRACT_FILTER_LABELS[value]}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Privole"
+                    value={consentFilter}
+                    onChange={(e) => {
+                      setConsentFilter(e.target.value as ConsentFilter | '')
+                      setConfirming(false)
+                    }}
+                    className={FILTER_SELECT_CLASS}
+                  >
+                    <option value="">Privole: sve</option>
+                    {CONSENT_FILTER_VALUES.map((value) => (
+                      <option key={value} value={value}>
+                        {CONSENT_FILTER_LABELS[value]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-5">
@@ -1376,6 +1478,21 @@ export function EmailWizard({
                                       title={`Preporuka iz prošle godine: ${c.recommendation}`}
                                     >
                                       Preporuka: {c.recommendation}
+                                    </span>
+                                  )}
+                                  {c.paymentStatus && (
+                                    <span
+                                      className={`ml-1.5 ${CHILD_BADGE_CLASS} ${PAYMENT_STATUS_COLORS[c.paymentStatus]}`}
+                                      title={`Plaćanje u ${sourceYear}`}
+                                    >
+                                      {PAYMENT_STATUS_LABELS[c.paymentStatus]}
+                                    </span>
+                                  )}
+                                  {c.contract && (
+                                    <span
+                                      className={`ml-1.5 ${CHILD_BADGE_CLASS} ${CONTRACT_STATE_COLORS[c.contract]}`}
+                                    >
+                                      {CONTRACT_STATE_LABELS[c.contract]}
                                     </span>
                                   )}
                                 </span>

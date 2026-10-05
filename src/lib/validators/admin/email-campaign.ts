@@ -6,6 +6,9 @@ import {
   resolveEmailBody,
 } from '@/lib/email-rich-text'
 import { MAX_ATTACHMENTS } from '@/lib/email-attachment-rules'
+import { PAYMENT_FILTER_VALUES } from '@/lib/payment-status'
+import { CONTRACT_FILTER_VALUES } from '@/lib/contract-filter'
+import { CONSENT_FILTER_VALUES } from '@/lib/enrollment-consent'
 
 const schoolYearField = z
   .string()
@@ -46,6 +49,11 @@ const selectionFields = {
     .array(z.string().min(1).max(50))
     .max(500, 'Najviše 500 djece.')
     .optional(),
+  // The /admin/ucenici filters, narrowing whichever cohort the mode selected.
+  // Absent = "Svi". Server-applied, so they can only shrink the audience.
+  paymentFilter: z.enum(PAYMENT_FILTER_VALUES).optional(),
+  contractFilter: z.enum(CONTRACT_FILTER_VALUES).optional(),
+  consentFilter: z.enum(CONSENT_FILTER_VALUES).optional(),
 }
 
 function requireExactlyOneSelection(

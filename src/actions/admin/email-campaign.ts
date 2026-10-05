@@ -79,6 +79,13 @@ import {
 } from '@/lib/email-attachments'
 import { schoolYearCalendarFilename } from '@/lib/school-year-calendar'
 import {
+  campaignStudentFilterLabels,
+  campaignStudentWhere,
+} from '@/lib/campaign-student-filters'
+import { computeStudentPaymentStatus, type PaymentFilter } from '@/lib/payment-status'
+import { contractState, type ContractFilter } from '@/lib/contract-filter'
+import type { ConsentFilter } from '@/lib/enrollment-consent'
+import {
   SchoolYearCalendarUnavailableError,
   renderSchoolYearCalendarPdf,
 } from '@/lib/pdf/school-year-calendar-pdf'
@@ -301,6 +308,27 @@ type CohortFilters = {
   sourceGroupIds?: string[]
   recommendations?: string[]
   sourceStudentIds?: string[]
+  paymentFilter?: PaymentFilter
+  contractFilter?: ContractFilter
+  consentFilter?: ConsentFilter
+}
+
+/**
+ * The Plaćanje / Ugovor / Privole narrowing for one resolver, given the groups
+ * its selection validated (null outside group mode). Spread into the resolver's
+ * own student clause, so a filtered-out child is simply not in the cohort —
+ * never a skipped row.
+ */
+type NarrowStudents = (groupIds: string[] | null) => Prisma.UserWhereInput
+
+function studentNarrowing(filters: CohortFilters, now: Date): NarrowStudents {
+  const studentFilters = {
+    payment: filters.paymentFilter,
+    contract: filters.contractFilter,
+    consent: filters.consentFilter,
+  }
+  return (groupIds) =>
+    campaignStudentWhere(studentFilters, filters.sourceSchoolYear, groupIds, now) ?? {}
 }
 
 /**
@@ -313,10 +341,16 @@ async function resolveCohort(
   kind: EmailCampaignKind,
   filters: CohortFilters,
 ): Promise<ResolvedCohort> {
+  const narrow = studentNarrowing(filters, new Date())
   if (kind === 'EVALUATION') {
     // Groups only — the validator rejects a preporuka selection for this kind,
     // since a preporuka names children rather than the cards being sent.
-    return resolveEvaluationCohort(city, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
+    return resolveEvaluationCohort(
+      city,
+      filters.sourceSchoolYear,
+      filters.sourceGroupIds ?? [],
+      narrow,
+    )
   }
   if (kind === 'CREDENTIALS') {
     // Groups or explicitly named children — never a preporuka, which says
@@ -326,23 +360,45 @@ async function resolveCohort(
       filters.sourceSchoolYear,
       filters.sourceGroupIds ?? [],
       filters.sourceStudentIds ?? [],
+      narrow,
     )
   }
   if (kind === 'SCHEDULE') {
     // Groups only — the validator rejects the other two modes for this kind.
-    return resolveScheduleCohort(city, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
+    return resolveScheduleCohort(
+      city,
+      filters.sourceSchoolYear,
+      filters.sourceGroupIds ?? [],
+      narrow,
+    )
   }
   if (kind === 'SCHOOL_CALENDAR') {
     // Groups only, standard groups only (validateSourceGroups); one row per
     // inbox exactly like CUSTOM — the attached file names no child.
-    return resolveGroupCohort(city, kind, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
+    return resolveGroupCohort(
+      city,
+      kind,
+      filters.sourceSchoolYear,
+      filters.sourceGroupIds ?? [],
+      narrow,
+    )
   }
   if (filters.recommendations?.length) {
-    return resolveRecommendationCohort(city, kind, filters.sourceSchoolYear, [
-      ...new Set(filters.recommendations),
-    ])
+    return resolveRecommendationCohort(
+      city,
+      kind,
+      filters.sourceSchoolYear,
+      [...new Set(filters.recommendations)],
+      narrow,
+    )
   }
-  return resolveGroupCohort(city, kind, filters.sourceSchoolYear, filters.sourceGroupIds ?? [])
+  return resolveGroupCohort(
+    city,
+    kind,
+    filters.sourceSchoolYear,
+    filters.sourceGroupIds ?? [],
+    narrow,
+  )
 }
 
 /**
@@ -384,17 +440,19 @@ async function resolveEvaluationCohort(
   city: City,
   sourceSchoolYear: string,
   sourceGroupIds: string[],
+  narrow: NarrowStudents,
 ): Promise<ResolvedCohort> {
   const validated = await validateSourceGroups(city, 'EVALUATION', sourceSchoolYear, sourceGroupIds)
   if (!validated.ok) return validated
   const groupIds = validated.ids
+  const studentWhere = narrow(groupIds)
 
   const [roster, assessments] = await Promise.all([
     db.enrollment.findMany({
       where: {
         schoolYear: sourceSchoolYear,
         scheduledGroupId: { in: groupIds },
-        user: { role: 'STUDENT', deletedAt: null },
+        user: { role: 'STUDENT', deletedAt: null, ...studentWhere },
       },
       select: {
         scheduledGroupId: true,
@@ -404,7 +462,7 @@ async function resolveEvaluationCohort(
     db.studentAssessment.findMany({
       where: {
         groupId: { in: groupIds },
-        student: { role: 'STUDENT', deletedAt: null },
+        student: { role: 'STUDENT', deletedAt: null, ...studentWhere },
       },
       select: {
         id: true,
@@ -472,8 +530,10 @@ async function resolveCredentialsCohort(
   sourceSchoolYear: string,
   sourceGroupIds: string[],
   sourceStudentIds: string[],
+  narrow: NarrowStudents,
 ): Promise<ResolvedCohort> {
   let studentIds: string[]
+  let groupIds: string[] | null = null
 
   if (sourceStudentIds.length > 0) {
     const ids = [...new Set(sourceStudentIds)]
@@ -491,6 +551,7 @@ async function resolveCredentialsCohort(
       sourceGroupIds,
     )
     if (!validated.ok) return validated
+    groupIds = validated.ids
     const enrollments = await db.enrollment.findMany({
       where: {
         schoolYear: sourceSchoolYear,
@@ -505,7 +566,13 @@ async function resolveCredentialsCohort(
   if (studentIds.length === 0) return { ok: true, recipients: [], skipped: [] }
 
   const students = await db.user.findMany({
-    where: { id: { in: studentIds }, role: 'STUDENT', deletedAt: null, city },
+    where: {
+      id: { in: studentIds },
+      role: 'STUDENT',
+      deletedAt: null,
+      city,
+      ...narrow(groupIds),
+    },
     select: {
       id: true,
       firstName: true,
@@ -573,6 +640,7 @@ async function resolveScheduleCohort(
   city: City,
   sourceSchoolYear: string,
   sourceGroupIds: string[],
+  narrow: NarrowStudents,
 ): Promise<ResolvedCohort> {
   const validated = await validateSourceGroups(city, 'SCHEDULE', sourceSchoolYear, sourceGroupIds)
   if (!validated.ok) return validated
@@ -581,7 +649,7 @@ async function resolveScheduleCohort(
     where: {
       schoolYear: sourceSchoolYear,
       scheduledGroupId: { in: validated.ids },
-      user: { role: 'STUDENT', deletedAt: null },
+      user: { role: 'STUDENT', deletedAt: null, ...narrow(validated.ids) },
     },
     select: { userId: true },
   })
@@ -685,6 +753,7 @@ async function resolveRecommendationCohort(
   kind: EmailCampaignKind,
   sourceSchoolYear: string,
   values: string[],
+  narrow: NarrowStudents,
 ): Promise<ResolvedCohort> {
   const conditions = decodeRecommendationConditions(values)
   if (conditions.length === 0) return { ok: false, error: INVALID_DATA }
@@ -699,7 +768,7 @@ async function resolveRecommendationCohort(
         // rather than assumed.
         ...(kind === 'REENROLLMENT' ? GROUP_NOT_RADIONICA : {}),
       },
-      student: { role: 'STUDENT', deletedAt: null },
+      student: { role: 'STUDENT', deletedAt: null, ...narrow(null) },
     },
     select: {
       recommendationKind: true,
@@ -733,6 +802,7 @@ async function resolveGroupCohort(
   kind: EmailCampaignKind,
   sourceSchoolYear: string,
   sourceGroupIds: string[],
+  narrow: NarrowStudents,
 ): Promise<ResolvedCohort> {
   const validated = await validateSourceGroups(city, kind, sourceSchoolYear, sourceGroupIds)
   if (!validated.ok) return validated
@@ -742,7 +812,7 @@ async function resolveGroupCohort(
     where: {
       schoolYear: sourceSchoolYear,
       scheduledGroupId: { in: uniqueIds },
-      user: { role: 'STUDENT', deletedAt: null },
+      user: { role: 'STUDENT', deletedAt: null, ...narrow(uniqueIds) },
     },
     select: {
       user: {
@@ -877,6 +947,62 @@ export type PreviewRecipientsResult =
     }
   | { success: false; error: string }
 
+/**
+ * The composer's Plaćanje and Ugovor badges, one per child — the same facts
+ * the cohort filters select on, so a filtered list can be read back and an
+ * unfiltered one triaged without leaving the page.
+ *
+ * Plaćanje is the child's status in the source year over every enrollment, the
+ * way the Učenici column computes it. Ugovor asks about the enrollments the
+ * selection is about (the selected groups in group mode), like the filter.
+ * Preview-only: the send never reads these, so they cannot change what is sent.
+ */
+async function annotateChildStatus(
+  recipients: EmailRecipient[],
+  sourceSchoolYear: string,
+  groupIds: string[] | null,
+): Promise<EmailRecipient[]> {
+  const studentIds = [...new Set(recipients.flatMap((r) => r.children.map((c) => c.studentId)))]
+  if (studentIds.length === 0) return recipients
+
+  const enrollments = await db.enrollment.findMany({
+    where: { userId: { in: studentIds }, schoolYear: sourceSchoolYear },
+    select: {
+      userId: true,
+      scheduledGroupId: true,
+      contractSignedAt: true,
+      schoolYear: true,
+      fullYearPaidAt: true,
+      scheduledGroup: { select: { course: { select: { kind: true } } } },
+      moduleEnrollments: {
+        select: { paidAt: true, moduleSchedule: { select: { startDate: true } } },
+      },
+      enrollmentMonths: { select: { paidAt: true, periodStart: true } },
+    },
+  })
+  const byStudent = new Map<string, typeof enrollments>()
+  for (const e of enrollments) {
+    const list = byStudent.get(e.userId) ?? []
+    list.push(e)
+    byStudent.set(e.userId, list)
+  }
+
+  const inScope = groupIds ? new Set(groupIds) : null
+  const now = new Date()
+  return recipients.map((r) => ({
+    ...r,
+    children: r.children.map((c) => {
+      const list = byStudent.get(c.studentId) ?? []
+      const scoped = inScope ? list.filter((e) => inScope.has(e.scheduledGroupId)) : list
+      return {
+        ...c,
+        paymentStatus: computeStudentPaymentStatus(list, sourceSchoolYear, now),
+        contract: contractState(scoped.map((e) => e.contractSignedAt)) ?? undefined,
+      }
+    }),
+  }))
+}
+
 export async function previewEmailRecipients(
   input: PreviewRecipientsInput,
 ): Promise<PreviewRecipientsResult> {
@@ -891,6 +1017,14 @@ export async function previewEmailRecipients(
     const cohort = await resolveCohort(city, parsed.data.kind, parsed.data)
     if (!cohort.ok) return { success: false, error: cohort.error }
 
+    // resolveCohort validated these against the city and year already.
+    const groupIds = parsed.data.sourceGroupIds?.length ? parsed.data.sourceGroupIds : null
+    const recipients = await annotateChildStatus(
+      cohort.recipients,
+      parsed.data.sourceSchoolYear,
+      groupIds,
+    )
+
     let alreadySent: string[] = []
     if (parsed.data.kind === 'REENROLLMENT' && parsed.data.targetCourseId) {
       const targetYear = await getSelectedSchoolYear()
@@ -900,7 +1034,7 @@ export async function previewEmailRecipients(
 
     return {
       success: true,
-      recipients: cohort.recipients,
+      recipients,
       skipped: cohort.skipped,
       alreadySent,
     }
@@ -1328,6 +1462,11 @@ export async function sendEmailCampaign(
           sourceGroupIds: data.sourceGroupIds ?? [],
           sourceRecommendations,
           sourceStudentIds: data.sourceStudentIds ?? [],
+          sourceFilters: campaignStudentFilterLabels({
+            payment: data.paymentFilter,
+            contract: data.contractFilter,
+            consent: data.consentFilter,
+          }),
           targetSchoolYear: data.kind === 'REENROLLMENT' ? targetYear : null,
           targetCourseId: data.kind === 'REENROLLMENT' ? data.targetCourseId : null,
           targetGroupIds: data.kind === 'REENROLLMENT' ? data.targetGroupIds : [],
@@ -1996,6 +2135,7 @@ export async function getEmailCampaigns() {
       sourceSchoolYear: true,
       sourceGroupIds: true,
       sourceRecommendations: true,
+      sourceFilters: true,
       targetSchoolYear: true,
       subject: true,
       sentCount: true,
@@ -2120,6 +2260,7 @@ export async function getCampaignDetail(campaignId: string) {
       sourceSchoolYear: true,
       targetSchoolYear: true,
       sourceRecommendations: true,
+      sourceFilters: true,
       sentCount: true,
       failedCount: true,
       skippedCount: true,

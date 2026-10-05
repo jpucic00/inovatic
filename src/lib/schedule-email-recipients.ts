@@ -65,7 +65,12 @@ export function buildScheduleRecipients(candidates: ScheduleCandidate[]): {
       continue
     }
 
-    const child = { name: studentName, recommendation: null, groupLabel: candidate.groupLabel }
+    const child = {
+      studentId: candidate.studentId,
+      name: studentName,
+      recommendation: null,
+      groupLabel: candidate.groupLabel,
+    }
     const existing = byEmail.get(email)
     if (existing) {
       existing.children.push(child)

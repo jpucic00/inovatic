@@ -861,7 +861,7 @@ describe('preporuka selection mode', () => {
     expect(prepOnly.success).toBe(true)
     if (prepOnly.success) {
       const byEmail = new Map(prepOnly.recipients.map((r) => [r.parentEmail, r]))
-      expect(byEmail.get(prep.parentEmail!)?.children[0]).toEqual({
+      expect(byEmail.get(prep.parentEmail!)?.children[0]).toMatchObject({
         name: `Pero ${prep.lastName}`,
         recommendation: 'Priprema za natjecanja',
       })
@@ -879,7 +879,7 @@ describe('preporuka selection mode', () => {
     expect(courseOnly.success).toBe(true)
     if (courseOnly.success) {
       const byEmail = new Map(courseOnly.recipients.map((r) => [r.parentEmail, r]))
-      expect(byEmail.get(course.parentEmail!)?.children[0]).toEqual({
+      expect(byEmail.get(course.parentEmail!)?.children[0]).toMatchObject({
         name: `Karlo ${course.lastName}`,
         recommendation: 'Ciljani program X',
       })

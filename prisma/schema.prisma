@@ -987,6 +987,11 @@ model EmailCampaign {
   /// recipient rows' `childNames` keep the history readable. Empty in the group
   /// and preporuka modes.
   sourceStudentIds String[] @default([])
+  /// Display labels of the Plaćanje / Ugovor / Privole filters that narrowed the
+  /// cohort (e.g. "Plaćanje: Nije plaćeno"). Labels, like
+  /// `sourceRecommendations`, so the history reads without the vocabulary.
+  /// Empty = no narrowing, which is every campaign sent before the filters.
+  sourceFilters    String[] @default([])
   targetSchoolYear String?
   targetCourseId   String?
   /// The termini offered in an invitation. Audit-only (no FK — groups may be

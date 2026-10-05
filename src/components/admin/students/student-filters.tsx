@@ -7,6 +7,7 @@ import { Search } from 'lucide-react'
 import { RETURNING_FILTER_LABELS } from '@/lib/returning-filter'
 import { PAYMENT_FILTER_VALUES, PAYMENT_STATUS_LABELS } from '@/lib/payment-status'
 import { CONSENT_FILTER_LABELS, CONSENT_FILTER_VALUES } from '@/lib/enrollment-consent'
+import { CONTRACT_FILTER_LABELS, CONTRACT_FILTER_VALUES } from '@/lib/contract-filter'
 
 type CourseOption = { id: string; title: string }
 type GroupOption = { id: string; name: string | null; course: { title: string } }
@@ -18,6 +19,7 @@ interface StudentFiltersProps {
   currentPayment?: string
   currentReturning?: string
   currentConsent?: string
+  currentContract?: string
   /**
    * The school year the whole list is scoped to (the sidebar selection), named
    * in the ponovni-upis options. There is deliberately no Godina control here —
@@ -35,6 +37,7 @@ export function StudentFilters({
   currentPayment,
   currentReturning,
   currentConsent,
+  currentContract,
   returningYear,
   courses,
   groups,
@@ -62,11 +65,13 @@ export function StudentFilters({
       const payment = overrides.payment ?? currentPayment ?? ''
       const returning = overrides.returning ?? currentReturning ?? ''
       const consent = overrides.consent ?? currentConsent ?? ''
+      const contract = overrides.contract ?? currentContract ?? ''
       if (courseId) sp.set('courseId', courseId)
       if (groupId) sp.set('groupId', groupId)
       if (payment) sp.set('payment', payment)
       if (returning) sp.set('returning', returning)
       if (consent) sp.set('consent', consent)
+      if (contract) sp.set('contract', contract)
     }
 
     return sp.toString()
@@ -100,6 +105,12 @@ export function StudentFilters({
   const handleReturningChange = (returning: string) => {
     startTransition(() => {
       router.push(`${pathname}?${buildParams({ returning })}`)
+    })
+  }
+
+  const handleContractChange = (contract: string) => {
+    startTransition(() => {
+      router.push(`${pathname}?${buildParams({ contract })}`)
     })
   }
 
@@ -188,6 +199,19 @@ export function StudentFilters({
             <option value="NEW">
               {RETURNING_FILTER_LABELS.NEW} {returningYear}
             </option>
+          </select>
+
+          <select
+            value={currentContract ?? ''}
+            onChange={(e) => handleContractChange(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Ugovor: svi</option>
+            {CONTRACT_FILTER_VALUES.map((value) => (
+              <option key={value} value={value}>
+                {CONTRACT_FILTER_LABELS[value]}
+              </option>
+            ))}
           </select>
 
           {/* "Bez privole" includes forms not entered yet: an unentered

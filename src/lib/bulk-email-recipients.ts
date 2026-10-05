@@ -1,3 +1,6 @@
+import type { PaymentStatus } from '@/lib/payment-status'
+import type { ContractState } from '@/lib/contract-filter'
+
 export type EmailRecipientStudent = {
   id: string
   firstName: string
@@ -8,6 +11,7 @@ export type EmailRecipientStudent = {
 }
 
 export type EmailRecipientChild = {
+  studentId: string
   name: string
   recommendation: string | null
   /**
@@ -22,6 +26,13 @@ export type EmailRecipientChild = {
   passwordSet?: boolean
   /** CREDENTIALS only: a password link was mailed to this account before. */
   alreadySent?: boolean
+  /**
+   * Composer badges, set by the recipient preview only (never by the send):
+   * the child's Plaćanje status in the source year and its contract state —
+   * the same facts the Plaćanje / Ugovor filters select on.
+   */
+  paymentStatus?: PaymentStatus
+  contract?: ContractState
 }
 
 export type EmailRecipient = {
@@ -122,7 +133,11 @@ export function buildEmailRecipients(students: EmailRecipientStudent[]): {
       continue
     }
 
-    const child = { name: studentName, recommendation: student.recommendation ?? null }
+    const child = {
+      studentId: student.id,
+      name: studentName,
+      recommendation: student.recommendation ?? null,
+    }
     const existing = byEmail.get(email)
     if (existing) {
       existing.children.push(child)
@@ -197,6 +212,7 @@ export function buildEvaluationRecipients(candidates: EvaluationCandidate[]): {
       parentEmail: email,
       children: [
         {
+          studentId: candidate.studentId,
           name: studentName,
           recommendation: null,
           groupLabel: candidate.groupLabel,
@@ -277,6 +293,7 @@ export function buildCredentialsRecipients(candidates: CredentialsCandidate[]): 
       rowKey: email,
     }
     row.children.push({
+      studentId: candidate.studentId,
       name: studentName,
       recommendation: null,
       groupLabel: candidate.groupLabel,
