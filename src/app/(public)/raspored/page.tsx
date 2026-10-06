@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, MapPin } from 'lucide-react'
 import { OG_DEFAULTS } from '@/lib/seo'
-import { getActivePrograms } from '@/actions/public/programs'
+import { getPublicSchedulePrograms } from '@/actions/public/programs'
 import { buildPublicSchedule } from '@/lib/public-schedule'
 import { CITY_LABELS, CITY_VALUES, cityFromSlug, citySlug } from '@/lib/city'
 import { PublicScheduleView } from '@/components/public/schedule/public-schedule-view'
@@ -12,14 +12,14 @@ import { PublicScheduleView } from '@/components/public/schedule/public-schedule
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Raspored i slobodna mjesta',
+  title: 'Raspored termina',
   description:
-    'Termini LEGO robotike za djecu u Splitu i Šibeniku s brojem slobodnih mjesta po programu. Provjerite raspored prije prijave – prijava ne obvezuje.',
+    'Termini LEGO robotike za djecu u Splitu i Šibeniku, a dok su upisi otvoreni i broj slobodnih mjesta po programu. Prijava ne obvezuje.',
   openGraph: {
     ...OG_DEFAULTS,
-    title: 'Raspored i slobodna mjesta | Inovatic',
+    title: 'Raspored termina | Inovatic',
     description:
-      'Termini LEGO robotike za djecu u Splitu i Šibeniku s brojem slobodnih mjesta po programu.',
+      'Termini LEGO robotike za djecu u Splitu i Šibeniku.',
     url: 'https://udruga-inovatic.hr/raspored',
     images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Inovatic – raspored' }],
   },
@@ -37,7 +37,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
   const { grad } = await searchParams
   const city = cityFromSlug(grad) ?? 'SPLIT'
   const cityLabel = CITY_LABELS[city]
-  const schedule = buildPublicSchedule(await getActivePrograms(city))
+  const schedule = buildPublicSchedule(await getPublicSchedulePrograms(city))
 
   return (
     <>
@@ -46,10 +46,13 @@ export default async function SchedulePage({ searchParams }: PageProps) {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-12 -right-12 h-56 w-56 rounded-full bg-yellow-200 opacity-40 blur-3xl" />
         <div className="container relative mx-auto max-w-3xl text-center">
           <span className="mb-3 inline-block text-xs font-bold uppercase tracking-widest text-cyan-500">Raspored</span>
-          <h1 className="mb-4 text-4xl font-extrabold text-gray-900 md:text-5xl">Raspored i slobodna mjesta</h1>
+          <h1 className="mb-4 text-4xl font-extrabold text-gray-900 md:text-5xl">
+            {schedule.showsSpots ? 'Raspored i slobodna mjesta' : 'Raspored'}
+          </h1>
           <p className="text-lg leading-relaxed text-gray-600">
-            Termini na koje se trenutno možete prijaviti. Broj slobodnih mjesta aktualan je u trenutku
-            otvaranja stranice, a prijava ne obvezuje.
+            {schedule.showsSpots
+              ? 'Termini naših programa. Broj slobodnih mjesta aktualan je u trenutku otvaranja stranice, a prijava ne obvezuje.'
+              : 'Termini naših programa. Prijava ne obvezuje.'}
           </p>
 
           <nav aria-label="Grad" className="mt-6 inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white/70 p-1 shadow-sm backdrop-blur">
@@ -88,9 +91,13 @@ export default async function SchedulePage({ searchParams }: PageProps) {
         <div className="container mx-auto max-w-6xl">
           <div className="flex flex-col items-start gap-4 rounded-2xl bg-gray-900 px-6 py-7 md:flex-row md:items-center md:justify-between md:px-8">
             <div>
-              <p className="text-xl font-extrabold text-white">Odabrali ste termin?</p>
+              <p className="text-xl font-extrabold text-white">
+                {schedule.showsSpots ? 'Odabrali ste termin?' : 'Zainteresirani ste?'}
+              </p>
               <p className="mt-1 text-sm text-gray-300">
-                Termin birate u prijavi – mjesto je rezervirano čim zaprimimo vaš upit.
+                {schedule.showsSpots
+                  ? 'Termin birate u prijavi – mjesto je rezervirano čim zaprimimo vaš upit.'
+                  : 'Pošaljite prijavu – javit ćemo vam se čim se otvore upisi.'}
               </p>
             </div>
             <Link

@@ -2,13 +2,15 @@
 
 import type { City, Prisma, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
-import { computeSchoolYear } from '@/lib/school-year'
+import { computeSchoolYear, getNextSchoolYear, schoolYearOfDateKey } from '@/lib/school-year'
 import { computeGroupCapacity, RESERVING_INQUIRY_WHERE } from '@/lib/group-capacity'
 import { hasDatedModules, isRadionica } from '@/lib/program-kind'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import {
   isRadionicaOpenForSignup,
 } from '@/lib/session-dates'
+import { zagrebDateKey } from '@/lib/attendance-window'
+import type { ScheduleProgram } from '@/lib/public-schedule'
 import type { CourseGradeRules } from '@/lib/inquiry-availability'
 import type { Grade } from '@/lib/inquiry-status'
 
@@ -96,6 +98,11 @@ function toActiveGroup(
   }
 }
 
+/** A (course, year) window of `city` that is open at `now`. */
+function openWindowWhere(city: City, now: Date): Prisma.CourseEnrollmentWindowWhereInput {
+  return { city, enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } }
+}
+
 /**
  * Programs a parent may currently sign up for in `city`, with their open groups.
  *
@@ -125,12 +132,7 @@ async function loadPrograms(
   // in a single `where`, so resolve this city's open windows first and gate
   // groups on the composite key.
   const openWindows = await db.courseEnrollmentWindow.findMany({
-    where: {
-      city,
-      enrollmentStart: { lte: now },
-      enrollmentEnd: { gte: now },
-      course: courseWhere,
-    },
+    where: { ...openWindowWhere(city, now), course: courseWhere },
     select: { courseId: true, schoolYear: true, city: true },
   })
   if (openWindows.length === 0) return []
@@ -245,6 +247,116 @@ export async function getActivePrograms(city: City): Promise<ActiveProgram[]> {
   return loadPrograms(city, { kind: { not: 'COMPETITION' } })
 }
 
+/** The programs `/raspored` lists — the same public set as `/prijava`. */
+const PUBLIC_SCHEDULE_COURSES: Prisma.CourseWhereInput = { kind: { not: 'COMPETITION' } }
+
+/**
+ * Which school year the closed half of `/raspored` lists. The school year flips
+ * on 1 September, so through July and August "current" names the year that has
+ * just ended; once the city has groups for the coming one, those are the
+ * timetable a parent is looking for (owner, 2026-10-06). Otherwise the ending
+ * year stays — better last year's termini than an empty page.
+ */
+async function closedScheduleYear(city: City, today: string): Promise<string> {
+  const current = schoolYearOfDateKey(today)
+  const month = Number(today.slice(5, 7))
+  if (month !== 7 && month !== 8) return current
+  const next = getNextSchoolYear(current)
+  const upcoming = await db.scheduledGroup.findFirst({
+    where: { city, schoolYear: next, course: PUBLIC_SCHEDULE_COURSES },
+    select: { id: true },
+  })
+  return upcoming ? next : current
+}
+
+/**
+ * Everything `/raspored` shows for `city`: the schedule is public all year,
+ * while seats are only spoken about where a parent can actually take one.
+ *
+ * Decided per PROGRAM, by whether it has an open window (owner, 2026-10-05):
+ *   - open → exactly the `/prijava` feed, spots included, so the schedule can
+ *     never name a termin the form refuses or hide one it offers;
+ *   - closed → its groups in the current school year (the coming one through
+ *     the summer, see {@link closedScheduleYear}), with `availableSpots:
+ *     null`. No capacity, no module-arc gate: a running group is part of the
+ *     timetable whether or not it takes anyone new. A radionica that has already
+ *     ended is dropped — it is history, not schedule.
+ *
+ * Competition stays out of both halves (invitation-only, never in a public listing).
+ */
+export async function getPublicSchedulePrograms(city: City): Promise<ScheduleProgram[]> {
+  const now = new Date()
+  const [open, openWindows] = await Promise.all([
+    loadPrograms(city, PUBLIC_SCHEDULE_COURSES),
+    db.courseEnrollmentWindow.findMany({
+      where: { ...openWindowWhere(city, now), course: PUBLIC_SCHEDULE_COURSES },
+      select: { courseId: true, course: { select: { sortOrder: true } } },
+    }),
+  ])
+  const sortOrders = new Map(openWindows.map((w) => [w.courseId, w.course.sortOrder]))
+  const openCourseIds = Array.from(sortOrders.keys())
+
+  const today = zagrebDateKey(now)
+  const groups = await db.scheduledGroup.findMany({
+    where: {
+      city,
+      schoolYear: await closedScheduleYear(city, today),
+      courseId: { notIn: openCourseIds },
+      course: PUBLIC_SCHEDULE_COURSES,
+    },
+    select: {
+      id: true,
+      name: true,
+      dayOfWeek: true,
+      dateStart: true,
+      dateEnd: true,
+      startTime: true,
+      endTime: true,
+      location: { select: { name: true, address: true } },
+      course: {
+        select: {
+          id: true, slug: true, title: true, level: true, kind: true,
+          ageMin: true, ageMax: true, price: true, sortOrder: true,
+        },
+      },
+    },
+    orderBy: [{ course: { sortOrder: 'asc' } }, { createdAt: 'asc' }],
+  })
+
+  const closed = new Map<string, ScheduleProgram>()
+  for (const g of groups) {
+    const lastDay = g.dateEnd ?? g.dateStart
+    if (isRadionica(g.course.kind) && lastDay && lastDay < today) continue
+    let program = closed.get(g.course.id)
+    if (!program) {
+      const { sortOrder, ...course } = g.course
+      sortOrders.set(course.id, sortOrder)
+      program = { ...course, groups: [] }
+      closed.set(course.id, program)
+    }
+    program.groups.push({
+      id: g.id,
+      name: g.name,
+      dayOfWeek: g.dayOfWeek,
+      dateStart: g.dateStart,
+      dateEnd: g.dateEnd,
+      startTime: g.startTime,
+      endTime: g.endTime,
+      availableSpots: null,
+      isFull: false,
+      locationName: g.location.name,
+      locationAddress: g.location.address,
+    })
+  }
+  if (closed.size === 0) return open
+
+  // One list in catalog order, so a same-time tie reads the same whichever
+  // half a program came from.
+  return [...open, ...closed.values()].sort(
+    (a, b) => (sortOrders.get(a.id) ?? 0) - (sortOrders.get(b.id) ?? 0),
+  )
+}
+
 /**
  * One program by slug, for its own signup link (`/prijava/<slug>`). Returns null
  * when the slug is unknown or that program has no open window / no bookable
@@ -282,7 +394,7 @@ export async function getSignupProgram(
 export async function getCourseGradeRules(city: City): Promise<CourseGradeRules> {
   const now = new Date()
   const openWindows = await db.courseEnrollmentWindow.findMany({
-    where: { city, enrollmentStart: { lte: now }, enrollmentEnd: { gte: now } },
+    where: openWindowWhere(city, now),
     select: { courseId: true, schoolYear: true },
     // A program may have this year's and next year's windows open at once. Take
     // the earlier one's rule: that is the enrollment already under way.

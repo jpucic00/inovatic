@@ -7,13 +7,13 @@
  * is ONE slot, because with group names hidden two would read as a duplicate.
  */
 import { describe, expect, it } from 'vitest'
-import type { ActiveGroup, ActiveProgram } from '@/actions/public/programs'
 import { buildPublicSchedule, formatVenue } from '@/lib/public-schedule'
+import type { ScheduleGroup, ScheduleProgram } from '@/lib/public-schedule'
 
 const VENUE = { locationName: 'Velebitska 32', locationAddress: 'Velebitska 32, 21000 Split' }
 
 let seq = 0
-function group(overrides: Partial<ActiveGroup> = {}): ActiveGroup {
+function group(overrides: Partial<ScheduleGroup> = {}): ScheduleGroup {
   seq += 1
   return {
     id: `g${seq}`,
@@ -30,7 +30,7 @@ function group(overrides: Partial<ActiveGroup> = {}): ActiveGroup {
   }
 }
 
-function program(overrides: Partial<ActiveProgram> & { groups: ActiveGroup[] }): ActiveProgram {
+function program(overrides: Partial<ScheduleProgram> & { groups: ScheduleGroup[] }): ScheduleProgram {
   return {
     id: 'slr-1',
     slug: 'slr-1',
@@ -206,6 +206,43 @@ describe('buildPublicSchedule — ordering and buckets', () => {
   it('is empty with no programs and with programs that have no groups', () => {
     expect(buildPublicSchedule([]).isEmpty).toBe(true)
     expect(buildPublicSchedule([program({ groups: [] })]).isEmpty).toBe(true)
+  })
+})
+
+describe('buildPublicSchedule — programs without open signups', () => {
+  it('lists their termini but carries no seat count and never reads full', () => {
+    const schedule = buildPublicSchedule([
+      program({
+        groups: [
+          group({ availableSpots: null, isFull: false }),
+          group({ availableSpots: null, isFull: false }),
+        ],
+      }),
+    ])
+
+    const monday = slotsOf(schedule, 'Ponedjeljak')
+    expect(monday).toHaveLength(1)
+    expect(monday[0].availableSpots).toBeNull()
+    expect(monday[0].isFull).toBe(false)
+    expect(schedule.isEmpty).toBe(false)
+    expect(schedule.showsSpots).toBe(false)
+  })
+
+  it('shows spots for the open program beside a closed one', () => {
+    const schedule = buildPublicSchedule([
+      program({ groups: [group({ availableSpots: 2 })] }),
+      program({
+        id: 'slr-2',
+        slug: 'slr-2',
+        title: 'Svijet LEGO Robotike 2',
+        groups: [group({ availableSpots: null })],
+      }),
+    ])
+
+    const [open, closed] = slotsOf(schedule, 'Ponedjeljak')
+    expect(open.availableSpots).toBe(2)
+    expect(closed.availableSpots).toBeNull()
+    expect(schedule.showsSpots).toBe(true)
   })
 })
 

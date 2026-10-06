@@ -12,6 +12,10 @@
  * parallel SLR 1 groups on Monday wants the page to say "Monday, 17:00, SLR 1,
  * 8 seats", not the same line twice.
  *
+ * A program without an open enrollment window still has a timetable: its
+ * groups arrive with `availableSpots: null`, and every slot built from them
+ * says nothing about seats — no number, no "Popunjeno", no greying.
+ *
  * Pure: the page passes the feed in, so the rules are unit-tested without a DB.
  */
 
@@ -20,6 +24,13 @@ import type { ActiveGroup, ActiveProgram } from '@/actions/public/programs'
 import { getCourseBySlug } from '@/lib/courses-data'
 import { DAYS_HR, formatGroupSchedule } from '@/lib/format'
 import { isRadionica } from '@/lib/program-kind'
+
+/** A feed group; `availableSpots: null` = its program takes no signups now. */
+export type ScheduleGroup = Omit<ActiveGroup, 'availableSpots'> & {
+  availableSpots: number | null
+}
+
+export type ScheduleProgram = Omit<ActiveProgram, 'groups'> & { groups: ScheduleGroup[] }
 
 export type ScheduleSlot = {
   key: string
@@ -34,8 +45,8 @@ export type ScheduleSlot = {
   time: string
   /** Radionice only: "26.10.2026. – 30.10.2026."; empty for weekly programs. */
   dates: string
-  /** Summed over every group merged into this slot. */
-  availableSpots: number
+  /** Summed over every group merged into this slot; null = signups closed, show no seats. */
+  availableSpots: number | null
   isFull: boolean
   /** Distinct venues of the merged groups, formatted by {@link formatVenue}. */
   venues: string[]
@@ -50,6 +61,8 @@ export type PublicSchedule = {
   /** Every venue on the page — one entry means the header can name it once. */
   venues: string[]
   isEmpty: boolean
+  /** Some slot carries a seat count — the only case the legend means anything. */
+  showsSpots: boolean
 }
 
 /** A group whose weekday is blank still has to land somewhere visible. */
@@ -75,14 +88,14 @@ type Keyed = {
   dateStart: string
 }
 
-function slotKey(program: ActiveProgram, g: ActiveGroup): string {
+function slotKey(program: ScheduleProgram, g: ScheduleGroup): string {
   const time = `${g.startTime ?? ''}|${g.endTime ?? ''}`
   return isRadionica(program.kind)
     ? `${program.id}|${g.dateStart ?? ''}|${g.dateEnd ?? ''}|${time}`
     : `${program.id}|${g.dayOfWeek ?? ''}|${time}`
 }
 
-function newSlot(program: ActiveProgram, g: ActiveGroup, key: string): ScheduleSlot {
+function newSlot(program: ScheduleProgram, g: ScheduleGroup, key: string): ScheduleSlot {
   const radionica = isRadionica(program.kind)
   return {
     key,
@@ -102,9 +115,12 @@ function newSlot(program: ActiveProgram, g: ActiveGroup, key: string): ScheduleS
   }
 }
 
-function mergeInto(slot: ScheduleSlot, g: ActiveGroup): void {
-  slot.availableSpots += g.availableSpots
-  slot.isFull = slot.availableSpots === 0
+function mergeInto(slot: ScheduleSlot, g: ScheduleGroup): void {
+  // One program is open or closed as a whole, so both sides agree on null.
+  if (slot.availableSpots !== null && g.availableSpots !== null) {
+    slot.availableSpots += g.availableSpots
+    slot.isFull = slot.availableSpots === 0
+  }
   const venue = formatVenue(g.locationName, g.locationAddress)
   if (!slot.venues.includes(venue)) slot.venues.push(venue)
 }
@@ -114,7 +130,7 @@ const byTimeThenOrder = (a: Keyed, b: Keyed) =>
 const byDateThenTime = (a: Keyed, b: Keyed) =>
   a.dateStart.localeCompare(b.dateStart) || byTimeThenOrder(a, b)
 
-export function buildPublicSchedule(programs: ActiveProgram[]): PublicSchedule {
+export function buildPublicSchedule(programs: ScheduleProgram[]): PublicSchedule {
   // day label → slot key → slot; insertion order of days is irrelevant, the
   // output walks DAYS_HR.
   const weeklyByDay = new Map<string, Map<string, Keyed>>()
@@ -170,6 +186,7 @@ export function buildPublicSchedule(programs: ActiveProgram[]): PublicSchedule {
     radionice: radionicaSlots,
     venues,
     isEmpty: allSlots.length === 0,
+    showsSpots: allSlots.some((s) => s.availableSpots !== null),
   }
 }
 

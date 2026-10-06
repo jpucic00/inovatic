@@ -17,9 +17,10 @@ const DOT_CLASS = {
 /**
  * Only the two warnings are shown: a termin with room needs no badge, since
  * the card itself already says it is offered — the pill exists to say hurry
- * or too late.
+ * or too late. A program not taking signups (`null`) says nothing about seats.
  */
-function SpotsPill({ availableSpots }: Readonly<{ availableSpots: number }>) {
+function SpotsPill({ availableSpots }: Readonly<{ availableSpots: number | null }>) {
+  if (availableSpots === null) return null
   const tone = availableSpotsTone(availableSpots)
   if (tone === 'open') return null
   return (
@@ -99,7 +100,7 @@ function TerminCard({ slot, showVenue }: Readonly<{ slot: ScheduleSlot; showVenu
           <span>{slot.venues.join(' / ')}</span>
         </p>
       )}
-      {availableSpotsTone(slot.availableSpots) !== 'open' && (
+      {slot.availableSpots !== null && availableSpotsTone(slot.availableSpots) !== 'open' && (
         <div>
           <SpotsPill availableSpots={slot.availableSpots} />
         </div>
@@ -122,10 +123,10 @@ export function PublicScheduleView({ schedule, cityLabel }: Readonly<Props>) {
   if (schedule.isEmpty) {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center">
-        <h2 className="mb-2 text-lg font-bold text-gray-900">Trenutno nema otvorenih termina za {cityLabel}</h2>
+        <h2 className="mb-2 text-lg font-bold text-gray-900">Raspored za {cityLabel} još nije objavljen</h2>
         <p className="text-sm leading-relaxed text-gray-500">
-          Čim se otvore upisi, ovdje ćete vidjeti termine i broj slobodnih mjesta. U međuvremenu
-          nam možete poslati prijavu – javit ćemo vam se s terminima čim budu poznati.
+          Čim termini budu poznati, ovdje ćete ih vidjeti. U međuvremenu nam možete poslati
+          prijavu – javit ćemo vam se s terminima.
         </p>
       </div>
     )
@@ -144,7 +145,7 @@ export function PublicScheduleView({ schedule, cityLabel }: Readonly<Props>) {
             <h2 id="tjedni-programi" className="text-xl font-extrabold text-gray-900 md:text-2xl">
               Tjedni programi
             </h2>
-            <Legend />
+            {schedule.showsSpots && <Legend />}
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
             {schedule.weekly.map((day) => {
@@ -178,7 +179,7 @@ export function PublicScheduleView({ schedule, cityLabel }: Readonly<Props>) {
             <h2 id="radionice" className="text-xl font-extrabold text-gray-900 md:text-2xl">
               Radionice
             </h2>
-            {!hasWeekly && <Legend />}
+            {!hasWeekly && schedule.showsSpots && <Legend />}
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {schedule.radionice.map((slot) => (
