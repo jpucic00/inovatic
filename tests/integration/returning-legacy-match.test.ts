@@ -7,6 +7,7 @@
 import { describe, expect, it, vi, beforeAll } from 'vitest'
 import { db } from '@/lib/db'
 import { flagReturningInquiries } from '@/lib/returning-inquiry'
+import { candidateWheres } from '@/lib/student-match'
 import { mockSession } from './setup'
 import {
   createAdmin,
@@ -34,9 +35,11 @@ let seq = 0
 const uniq = () => `${Date.now().toString(36)}${(++seq).toString(36)}`
 
 /** Imported-style student: no DOB, no usable password, parent email on file. */
-async function createLegacyStudent(overrides: { city?: 'SPLIT' | 'SIBENIK' } = {}) {
+async function createLegacyStudent(
+  overrides: { city?: 'SPLIT' | 'SIBENIK'; parentEmail?: string } = {},
+) {
   const lastName = `Uvozni${uniq()}`
-  const parentEmail = `roditelj.${uniq()}@example.com`
+  const parentEmail = overrides.parentEmail ?? `roditelj.${uniq()}@example.com`
   const student = await createStudent({
     firstName: 'Legonja',
     lastName,
@@ -258,5 +261,65 @@ describe('createStudentFromInquiry — legacy reuse heals the DOB', () => {
 
     const result = await createStudentFromInquiry(inquiry.id, group.id)
     expect(result.success).toBe(false)
+  })
+})
+
+describe('legacy tier — parent e-mail is compared whole, not as an ILIKE pattern', () => {
+  // Prisma's insensitive `equals` is an unescaped ILIKE, so `_` in the upit's
+  // address matches any one character in SQL. The candidate query may widen;
+  // the in-memory key must still refuse another family's look-alike address.
+  it('does not match ivanxhorvat@… from an upit sent by ivan_horvat@…', async () => {
+    const stamp = uniq()
+    const { student, lastName } = await createLegacyStudent({
+      parentEmail: `ivanxhorvat.${stamp}@example.com`,
+    })
+    const upitEmail = `ivan_horvat.${stamp}@example.com`
+
+    // Guard against a vacuous test: the SQL narrowing really does return the
+    // other family's row, so only the in-memory decision keeps it out.
+    const sqlCandidates = await db.user.findMany({
+      where: {
+        OR: candidateWheres({ firstName: 'Legonja', lastName, parentEmail: upitEmail }),
+      },
+      select: { id: true },
+    })
+    expect(sqlCandidates.map((c) => c.id)).toContain(student.id)
+
+    const [row] = await flagReturningInquiries([
+      inquiryRow({ childLastName: lastName, parentEmail: upitEmail }),
+    ])
+    expect(row.isReturning).toBe(false)
+    expect(row.isReturningOtherCity).toBe(false)
+
+    const admin = await createAdmin({ city: 'SPLIT' })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    const info = await getReturningStudentInfo({
+      firstName: 'Legonja',
+      lastName,
+      dateOfBirth: '2016-05-05',
+      parentEmail: upitEmail,
+    })
+    expect(info).toBeNull()
+
+    const course = await createCourse()
+    const group = await createGroup({ courseId: course.id, city: 'SPLIT' })
+    const inquiry = await createInquiry({
+      childFirstName: 'Legonja',
+      childLastName: lastName,
+      childDateOfBirth: '2016-09-09',
+      parentEmail: upitEmail,
+      city: 'SPLIT',
+      courseId: course.id,
+    })
+    const result = await createStudentFromInquiry(inquiry.id, group.id)
+    expect(result.success).toBe(true)
+    if (!result.success) throw new Error('unreachable')
+    expect(result.isExisting).toBe(false)
+    expect(result.studentId).not.toBe(student.id)
+
+    // The other family's account is untouched: no DOB healed onto it.
+    const untouched = await db.user.findUnique({ where: { id: student.id } })
+    expect(untouched?.dateOfBirth).toBeNull()
+    expect(untouched?.parentEmail).toBe(`ivanxhorvat.${stamp}@example.com`)
   })
 })

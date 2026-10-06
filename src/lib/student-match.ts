@@ -115,6 +115,11 @@ export function isIdentityMatch(row: MatchableStudent, identity: ChildIdentity):
  * SQL equality would reintroduce the whitespace/diacritic blindness this exists
  * to remove. Empty when the identity can match nobody.
  *
+ * The e-mail clause only widens too: Prisma's insensitive `equals` is an
+ * unescaped `ILIKE`, so `ivan_horvat@…` also fetches `ivanxhorvat@…`. The legacy
+ * key carries the whole lower-cased address, which is what refuses that row
+ * (see `src/lib/email-lookup.ts`) — never trust the candidate list as a match.
+ *
  * Matching is intentionally GLOBAL across cities (owner decision 2026-07-10):
  * the same child must never get a second account in the other city. Callers
  * that act on a match are responsible for the cross-city handling — reuse is
