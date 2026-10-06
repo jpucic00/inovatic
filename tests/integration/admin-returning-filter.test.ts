@@ -13,7 +13,9 @@ import {
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 // getInquiries reads the selected-year cookie; stub next/headers so the list
-// resolves to a deterministic year. (getStudents deliberately does not — its
+// resolves to a deterministic year. The cookie is only honoured for a year in
+// the SchoolYear registry (seeded in beforeAll) — otherwise it silently falls
+// back to computeSchoolYear(). (getStudents deliberately does not read it — its
 // reference year is passed in by the page.)
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
 
@@ -45,6 +47,7 @@ beforeAll(async () => {
     get: (name: string) =>
       name === 'inovatic_school_year' ? { value: YEAR, name } : undefined,
   })
+  await db.schoolYear.upsert({ where: { label: YEAR }, create: { label: YEAR }, update: {} })
 
   adminId = (await createAdmin()).id
   sibenikAdminId = (await createAdmin({ city: 'SIBENIK' })).id
