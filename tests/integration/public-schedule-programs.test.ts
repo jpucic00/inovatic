@@ -103,6 +103,119 @@ describe('getPublicSchedulePrograms', () => {
 })
 
 /**
+ * "Open" is what the `/prijava` feed RETURNED, not whether a window is open
+ * (owner, 2026-10-06). A program with an open window and no bookable group
+ * must still show its running groups, without seats; a partly-bookable one is
+ * exactly the feed. Pinned to mid-October so the closed half reads YEAR.
+ */
+describe('getPublicSchedulePrograms — open window, nothing bookable', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const inOctober = () =>
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(`${YEAR.slice(0, 4)}-10-15T10:00:00Z`) })
+
+  const openWindow = (courseId: string, schoolYear = YEAR) =>
+    db.courseEnrollmentWindow.create({
+      data: {
+        courseId,
+        schoolYear,
+        city: 'SPLIT',
+        enrollmentStart: daysFromNow(-5),
+        enrollmentEnd: daysFromNow(30),
+      },
+    })
+
+  it('shows a radionica whose only termin already started, without seats', async () => {
+    inOctober()
+    const course = await scope.course({ kind: 'RADIONICA' })
+    await openWindow(course.id)
+    const running = await scope.group({
+      courseId: course.id,
+      schoolYear: YEAR,
+      city: 'SPLIT',
+      dateStart: relativeDateKey(-3),
+      dateEnd: relativeDateKey(3),
+    })
+
+    const program = await programOf(course.id)
+
+    expect(program?.groups.map((g) => g.id)).toEqual([running.id])
+    expect(program?.groups[0].availableSpots).toBeNull()
+  })
+
+  it('shows this year’s groups when the window is open only for next year', async () => {
+    inOctober()
+    const course = await scope.course({ kind: 'STANDARD' })
+    await openWindow(course.id, getNextSchoolYear(YEAR))
+    const current = await scope.group({ courseId: course.id, schoolYear: YEAR, city: 'SPLIT' })
+
+    const program = await programOf(course.id)
+
+    expect(program?.groups.map((g) => g.id)).toEqual([current.id])
+    expect(program?.groups[0].availableSpots).toBeNull()
+  })
+
+  it('a partly-bookable program is exactly the feed — no seat-less extras', async () => {
+    inOctober()
+    const course = await scope.course({ kind: 'RADIONICA' })
+    await openWindow(course.id)
+    const bookable = await scope.group({
+      courseId: course.id,
+      schoolYear: YEAR,
+      city: 'SPLIT',
+      dateStart: relativeDateKey(5),
+      dateEnd: relativeDateKey(7),
+    })
+    await scope.group({
+      courseId: course.id,
+      schoolYear: YEAR,
+      city: 'SPLIT',
+      dateStart: relativeDateKey(-3),
+      dateEnd: relativeDateKey(3),
+    })
+
+    const program = await programOf(course.id)
+
+    expect(program?.groups.map((g) => g.id)).toEqual([bookable.id])
+    expect(program?.groups[0].availableSpots).toBe(12)
+  })
+
+  it('keeps catalog order across an open program and one the feed returned empty', async () => {
+    inOctober()
+    // The empty-feed program lands in the closed half, which is appended after
+    // the open one — only a real sortOrder on BOTH sides puts it first.
+    const empty = await scope.course({ kind: 'RADIONICA' })
+    await db.course.update({ where: { id: empty.id }, data: { sortOrder: 980 } })
+    await openWindow(empty.id)
+    await scope.group({
+      courseId: empty.id,
+      schoolYear: YEAR,
+      city: 'SPLIT',
+      dateStart: relativeDateKey(-3),
+      dateEnd: relativeDateKey(3),
+    })
+    const open = await scope.course({ kind: 'RADIONICA' })
+    await db.course.update({ where: { id: open.id }, data: { sortOrder: 981 } })
+    await openWindow(open.id)
+    await scope.group({
+      courseId: open.id,
+      schoolYear: YEAR,
+      city: 'SPLIT',
+      dateStart: relativeDateKey(5),
+      dateEnd: relativeDateKey(7),
+    })
+
+    const ids = (await getPublicSchedulePrograms('SPLIT')).map((p) => p.id)
+
+    expect(ids).toContain(empty.id)
+    expect(ids).toContain(open.id)
+    expect(ids.indexOf(empty.id)).toBeLessThan(ids.indexOf(open.id))
+  })
+})
+
+/**
  * The school year flips on 1 September, so in July and August "current" is the
  * year that has just ended. Once the city has groups for the coming year, the
  * closed half lists those (owner, 2026-10-06). Far-off years, so no other

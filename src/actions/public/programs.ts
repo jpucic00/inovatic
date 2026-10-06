@@ -273,55 +273,65 @@ async function closedScheduleYear(city: City, today: string): Promise<string> {
  * Everything `/raspored` shows for `city`: the schedule is public all year,
  * while seats are only spoken about where a parent can actually take one.
  *
- * Decided per PROGRAM, by whether it has an open window (owner, 2026-10-05):
- *   - open → exactly the `/prijava` feed, spots included, so the schedule can
+ * Decided per PROGRAM, by whether the `/prijava` feed returned it (owner,
+ * 2026-10-05, narrowed 2026-10-06):
+ *   - in the feed → exactly the feed, spots included, so the schedule can
  *     never name a termin the form refuses or hide one it offers;
- *   - closed → its groups in the current school year (the coming one through
- *     the summer, see {@link closedScheduleYear}), with `availableSpots:
- *     null`. No capacity, no module-arc gate: a running group is part of the
- *     timetable whether or not it takes anyone new. A radionica that has already
- *     ended is dropped — it is history, not schedule.
+ *   - not in the feed (no open window, or one with no bookable group) → its
+ *     groups in the current school year (the coming one through the summer,
+ *     see {@link closedScheduleYear}), with `availableSpots: null`. No
+ *     capacity, no module-arc gate: a running group is part of the timetable
+ *     whether or not it takes anyone new. A radionica that has already ended
+ *     is dropped — it is history, not schedule.
  *
  * Competition stays out of both halves (invitation-only, never in a public listing).
  */
 export async function getPublicSchedulePrograms(city: City): Promise<ScheduleProgram[]> {
   const now = new Date()
-  const [open, openWindows] = await Promise.all([
-    loadPrograms(city, PUBLIC_SCHEDULE_COURSES),
-    db.courseEnrollmentWindow.findMany({
-      where: { ...openWindowWhere(city, now), course: PUBLIC_SCHEDULE_COURSES },
-      select: { courseId: true, course: { select: { sortOrder: true } } },
-    }),
-  ])
-  const sortOrders = new Map(openWindows.map((w) => [w.courseId, w.course.sortOrder]))
-  const openCourseIds = Array.from(sortOrders.keys())
+  const open = await loadPrograms(city, PUBLIC_SCHEDULE_COURSES)
+  // "Open" is what the feed RETURNED, not whether a window is open: a program
+  // with an open window but no bookable group (every standard group past its
+  // last module, or a window opened for next year before its groups exist)
+  // would otherwise be in neither half and vanish while its groups still run
+  // every week. Each feed program has at least one group by construction.
+  // A partly-bookable program deliberately does NOT get its other groups back
+  // without seats: a seat-less termin looks exactly like an open one with room,
+  // so it would read as joinable while `/prijava` refuses it.
+  const openCourseIds = open.map((p) => p.id)
 
   const today = zagrebDateKey(now)
-  const groups = await db.scheduledGroup.findMany({
-    where: {
-      city,
-      schoolYear: await closedScheduleYear(city, today),
-      courseId: { notIn: openCourseIds },
-      course: PUBLIC_SCHEDULE_COURSES,
-    },
-    select: {
-      id: true,
-      name: true,
-      dayOfWeek: true,
-      dateStart: true,
-      dateEnd: true,
-      startTime: true,
-      endTime: true,
-      location: { select: { name: true, address: true } },
-      course: {
-        select: {
-          id: true, slug: true, title: true, level: true, kind: true,
-          ageMin: true, ageMax: true, price: true, sortOrder: true,
+  const [openCourses, groups] = await Promise.all([
+    db.course.findMany({
+      where: { id: { in: openCourseIds } },
+      select: { id: true, sortOrder: true },
+    }),
+    db.scheduledGroup.findMany({
+      where: {
+        city,
+        schoolYear: await closedScheduleYear(city, today),
+        courseId: { notIn: openCourseIds },
+        course: PUBLIC_SCHEDULE_COURSES,
+      },
+      select: {
+        id: true,
+        name: true,
+        dayOfWeek: true,
+        dateStart: true,
+        dateEnd: true,
+        startTime: true,
+        endTime: true,
+        location: { select: { name: true, address: true } },
+        course: {
+          select: {
+            id: true, slug: true, title: true, level: true, kind: true,
+            ageMin: true, ageMax: true, price: true, sortOrder: true,
+          },
         },
       },
-    },
-    orderBy: [{ course: { sortOrder: 'asc' } }, { createdAt: 'asc' }],
-  })
+      orderBy: [{ course: { sortOrder: 'asc' } }, { createdAt: 'asc' }],
+    }),
+  ])
+  const sortOrders = new Map(openCourses.map((c) => [c.id, c.sortOrder]))
 
   const closed = new Map<string, ScheduleProgram>()
   for (const g of groups) {
