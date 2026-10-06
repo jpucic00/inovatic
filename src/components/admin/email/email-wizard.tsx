@@ -222,6 +222,88 @@ const SECONDARY_BUTTON =
 const PRIMARY_BUTTON =
   'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 
+/** Whether the active selection mode has picked anything to resolve. */
+function hasCohortSelection(
+  mode: SelectionMode,
+  groupIds: string[],
+  studentIds: string[],
+  recommendations: string[],
+): boolean {
+  if (mode === 'GROUPS') return groupIds.length > 0
+  if (mode === 'STUDENTS') return studentIds.length > 0
+  return recommendations.length > 0
+}
+
+/** Plaćanje / Ugovor / Privole narrowing of the cohort. Hand-picked children
+ *  are named outright, so nothing narrows them and the selects are hidden. */
+function StudentFilterSelects({
+  hidden,
+  sourceYear,
+  payment,
+  contract,
+  consent,
+  onPayment,
+  onContract,
+  onConsent,
+}: Readonly<{
+  hidden: boolean
+  sourceYear: string
+  payment: PaymentFilter | ''
+  contract: ContractFilter | ''
+  consent: ConsentFilter | ''
+  onPayment: (value: PaymentFilter | '') => void
+  onContract: (value: ContractFilter | '') => void
+  onConsent: (value: ConsentFilter | '') => void
+}>) {
+  if (hidden) return null
+  return (
+    <div className="mt-4">
+      <span className="block text-sm font-medium text-gray-700 mb-1.5">Dodatni filteri ({sourceYear})</span>
+      <div className="flex flex-wrap gap-3">
+        <select
+          aria-label="Plaćanje"
+          value={payment}
+          onChange={(e) => onPayment(e.target.value as PaymentFilter | '')}
+          className={FILTER_SELECT_CLASS}
+        >
+          <option value="">Plaćanje: svi</option>
+          {PAYMENT_FILTER_VALUES.map((value) => (
+            <option key={value} value={value}>
+              {PAYMENT_STATUS_LABELS[value]}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Ugovor"
+          value={contract}
+          onChange={(e) => onContract(e.target.value as ContractFilter | '')}
+          className={FILTER_SELECT_CLASS}
+        >
+          <option value="">Ugovor: svi</option>
+          {CONTRACT_FILTER_VALUES.map((value) => (
+            <option key={value} value={value}>
+              {CONTRACT_FILTER_LABELS[value]}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Privole"
+          value={consent}
+          onChange={(e) => onConsent(e.target.value as ConsentFilter | '')}
+          className={FILTER_SELECT_CLASS}
+        >
+          <option value="">Privole: sve</option>
+          {CONSENT_FILTER_VALUES.map((value) => (
+            <option key={value} value={value}>
+              {CONSENT_FILTER_LABELS[value]}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
+
 export function EmailWizard({
   years,
   selectedYear,
@@ -414,10 +496,7 @@ export function EmailWizard({
 
   // Live recipient resolution; the request id drops stale responses.
   const requestIdRef = useRef(0)
-  let hasSelection: boolean
-  if (selectionMode === 'GROUPS') hasSelection = sourceGroupIds.length > 0
-  else if (selectionMode === 'STUDENTS') hasSelection = sourceStudentIds.length > 0
-  else hasSelection = recommendations.length > 0
+  const hasSelection = hasCohortSelection(selectionMode, sourceGroupIds, sourceStudentIds, recommendations)
   useEffect(() => {
     if (!hasSelection) {
       setRecipientData(null)
@@ -1321,63 +1400,25 @@ export function EmailWizard({
 
             {/* Same filters and labels as /admin/ucenici, decided in the source
                 year. Hidden for hand-picked children, who are named outright. */}
-            {selectionMode !== 'STUDENTS' && (
-              <div className="mt-4">
-                <span className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Dodatni filteri ({sourceYear})
-                </span>
-                <div className="flex flex-wrap gap-3">
-                  <select
-                    aria-label="Plaćanje"
-                    value={paymentFilter}
-                    onChange={(e) => {
-                      setPaymentFilter(e.target.value as PaymentFilter | '')
-                      setConfirming(false)
-                    }}
-                    className={FILTER_SELECT_CLASS}
-                  >
-                    <option value="">Plaćanje: svi</option>
-                    {PAYMENT_FILTER_VALUES.map((value) => (
-                      <option key={value} value={value}>
-                        {PAYMENT_STATUS_LABELS[value]}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="Ugovor"
-                    value={contractFilter}
-                    onChange={(e) => {
-                      setContractFilter(e.target.value as ContractFilter | '')
-                      setConfirming(false)
-                    }}
-                    className={FILTER_SELECT_CLASS}
-                  >
-                    <option value="">Ugovor: svi</option>
-                    {CONTRACT_FILTER_VALUES.map((value) => (
-                      <option key={value} value={value}>
-                        {CONTRACT_FILTER_LABELS[value]}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="Privole"
-                    value={consentFilter}
-                    onChange={(e) => {
-                      setConsentFilter(e.target.value as ConsentFilter | '')
-                      setConfirming(false)
-                    }}
-                    className={FILTER_SELECT_CLASS}
-                  >
-                    <option value="">Privole: sve</option>
-                    {CONSENT_FILTER_VALUES.map((value) => (
-                      <option key={value} value={value}>
-                        {CONSENT_FILTER_LABELS[value]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
+            <StudentFilterSelects
+              hidden={selectionMode === 'STUDENTS'}
+              sourceYear={sourceYear}
+              payment={paymentFilter}
+              contract={contractFilter}
+              consent={consentFilter}
+              onPayment={(value) => {
+                setPaymentFilter(value)
+                setConfirming(false)
+              }}
+              onContract={(value) => {
+                setContractFilter(value)
+                setConfirming(false)
+              }}
+              onConsent={(value) => {
+                setConsentFilter(value)
+                setConfirming(false)
+              }}
+            />
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-5">

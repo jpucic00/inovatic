@@ -56,6 +56,18 @@ type Tx = Prisma.TransactionClient
 const PRUNE_AFTER_MS = 30 * 24 * 60 * 60 * 1000
 
 /**
+ * Kills every unused link of the account. Expired, never deleted: the per-account
+ * send limit counts these rows.
+ */
+export async function expireLivePasswordTokens(userId: string, tx: Tx = db): Promise<void> {
+  const now = new Date()
+  await tx.passwordToken.updateMany({
+    where: { userId, usedAt: null, expiresAt: { gt: now } },
+    data: { expiresAt: now },
+  })
+}
+
+/**
  * Mint a link for `userId` and return the PLAINTEXT token — the caller mails it
  * and drops it. Every unused earlier link for the account is expired first.
  */
@@ -66,10 +78,7 @@ export async function issuePasswordToken(
   const token = randomBytes(32).toString('base64url')
   const expiresAt = new Date(Date.now() + PASSWORD_TOKEN_TTL_MS[input.purpose])
   const now = new Date()
-  await tx.passwordToken.updateMany({
-    where: { userId: input.userId, usedAt: null, expiresAt: { gt: now } },
-    data: { expiresAt: now },
-  })
+  await expireLivePasswordTokens(input.userId, tx)
   await tx.passwordToken.deleteMany({
     where: { userId: input.userId, createdAt: { lt: new Date(now.getTime() - PRUNE_AFTER_MS) } },
   })
@@ -195,10 +204,7 @@ export async function redeemPasswordToken(
       data: { passwordHash, passwordSetAt: new Date(), sessionVersion: { increment: 1 } },
     })
     // Any other live link for the account dies with this one.
-    await tx.passwordToken.updateMany({
-      where: { userId: row.userId, usedAt: null, expiresAt: { gt: new Date() } },
-      data: { expiresAt: new Date() },
-    })
+    await expireLivePasswordTokens(row.userId, tx)
     return { ok: true as const, email: row.user.email }
   })
 }

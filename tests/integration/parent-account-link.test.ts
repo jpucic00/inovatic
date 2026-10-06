@@ -88,6 +88,23 @@ describe('creating an account links the child to its parent e-mail', () => {
     expect((await linkOf(res.studentId))?.email).toBe(parentEmail.toLowerCase())
   })
 
+  it('"_" in the address is not a wildcard: a look-alike family account is never joined', async () => {
+    await asAdmin()
+    const stamp = uniq()
+    // Another family's account that an unescaped ILIKE `ivan_horvat` would match.
+    const lookAlike = await createStudentManually(manualChild(`ivanxhorvat.${stamp}@example.com`))
+    if (!lookAlike.success) throw new Error(lookAlike.error)
+    const otherAccount = await linkOf(lookAlike.studentId)
+
+    const parentEmail = `ivan_horvat.${stamp}@example.com`
+    const res = await createStudentManually(manualChild(parentEmail))
+    if (!res.success) throw new Error(res.error)
+
+    const link = await linkOf(res.studentId)
+    expect(link).toMatchObject({ email: parentEmail, role: 'PARENT' })
+    expect(link?.id).not.toBe(otherAccount?.id)
+  })
+
   it('asks before a sibling joins an account that already sees a child, then joins it', async () => {
     await asAdmin()
     const parentEmail = email('braca')

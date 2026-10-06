@@ -66,6 +66,15 @@ export function recordHit(key: string, windowMs: number, now: number = Date.now(
   return live.length
 }
 
+/** Takes back one hit recorded at `at` by {@link recordHit} — a reservation that turned out not to count. */
+export function releaseHit(key: string, at: number): void {
+  const times = hits.get(key)
+  const index = times?.indexOf(at) ?? -1
+  if (!times || index === -1) return
+  times.splice(index, 1)
+  if (times.length === 0) hits.delete(key)
+}
+
 export function clearHits(key: string): void {
   hits.delete(key)
 }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
 import {
   authorizeCredentials,
@@ -101,6 +102,24 @@ describe('authorizeCredentials — who signs in', () => {
   })
 })
 
+describe('authorizeCredentials — e-mail is matched exactly, not as an ILIKE pattern', () => {
+  it('"_" in the typed address is not a wildcard: a spelling variant reaches no account', async () => {
+    const teacher = await createTeacher({ email: `ivana-${Date.now()}@test.local` })
+    const variant = `_${teacher.email.slice(1)}`
+    expect(await login(variant, teacher.plainPassword)).toEqual({ ok: false, reason: 'INVALID' })
+  })
+
+  it('an address with "_" opens its own account even when a look-alike exists', async () => {
+    const stamp = Date.now()
+    // Created first, so an unescaped ILIKE would be likely to return it.
+    await createTeacher({ email: `ivanxhorvat-${stamp}@test.local` })
+    const real = await createTeacher({ email: `ivan_horvat-${stamp}@test.local` })
+    const res = await login(real.email, real.plainPassword)
+    expect(res.ok).toBe(true)
+    if (res.ok) expect(res.user.id).toBe(real.id)
+  })
+})
+
 describe('authorizeCredentials — failed-login throttle', () => {
   it(`locks an account after ${LOGIN_FAILURES_PER_IDENTIFIER} failures, even for the right password and from another address`, async () => {
     const teacher = await createTeacher()
@@ -121,9 +140,41 @@ describe('authorizeCredentials — failed-login throttle', () => {
   it('a locked account does not touch the database or the hash', async () => {
     const teacher = await createTeacher()
     await failTimes(teacher.email, LOGIN_FAILURES_PER_IDENTIFIER)
-    const lookup = vi.spyOn(db.user, 'findFirst')
-    await login(teacher.email, teacher.plainPassword)
+    const lookup = vi.spyOn(db.user, 'findMany')
+    const hash = vi.spyOn(bcrypt, 'compare')
+    expect(await login(teacher.email, teacher.plainPassword)).toEqual({ ok: false, reason: 'THROTTLED' })
     expect(lookup).not.toHaveBeenCalled()
+    expect(hash).not.toHaveBeenCalled()
+  })
+
+  it('a parallel burst gets no more guesses than the limit (attempts are counted before the first await)', async () => {
+    const teacher = await createTeacher()
+    const hash = vi.spyOn(bcrypt, 'compare')
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () => login(teacher.email, 'kriva-lozinka')),
+    )
+    expect(hash).toHaveBeenCalledTimes(LOGIN_FAILURES_PER_IDENTIFIER)
+    expect(results.filter((r) => !r.ok && r.reason === 'INVALID')).toHaveLength(LOGIN_FAILURES_PER_IDENTIFIER)
+    expect(results.filter((r) => !r.ok && r.reason === 'THROTTLED')).toHaveLength(20 - LOGIN_FAILURES_PER_IDENTIFIER)
+  })
+
+  it('a successful login takes back its own IP hit — it never counts toward the address lock', async () => {
+    const teacher = await createTeacher()
+    for (let i = 0; i < LOGIN_FAILURES_PER_IP + 1; i++) {
+      expect((await login(teacher.email, teacher.plainPassword)).ok).toBe(true)
+    }
+    const other = await createTeacher()
+    expect((await login(other.email, other.plainPassword)).ok).toBe(true)
+  }, 30_000)
+
+  it('a lookup that throws gives the reservation back — an outage is not a guess', async () => {
+    const teacher = await createTeacher()
+    vi.spyOn(db.user, 'findMany').mockRejectedValue(new Error('P1017'))
+    for (let i = 0; i < LOGIN_FAILURES_PER_IDENTIFIER; i++) {
+      await expect(login(teacher.email, teacher.plainPassword)).rejects.toThrow('P1017')
+    }
+    vi.restoreAllMocks()
+    expect((await login(teacher.email, teacher.plainPassword)).ok).toBe(true)
   })
 
   it('locks an unknown address exactly like a real one, so the lock reveals nothing', async () => {

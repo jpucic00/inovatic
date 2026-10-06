@@ -221,7 +221,7 @@ test.describe('admin list filters survive leaving the list', () => {
     await page.getByRole('button', { name: /SLR 2/ }).click()
     await page.waitForURL(`${BASE}/admin/grupe?tab=SLR_2`, { timeout: RESTORE_TIMEOUT })
 
-    const groupLink = page.getByRole('link', { name: `Grupa ${MARKER}` })
+    const groupLink = page.getByRole('link', { name: `Grupa ${MARKER}`, exact: true })
     await expect(groupLink).toBeVisible({ timeout: RESTORE_TIMEOUT })
     await groupLink.click()
     await page.waitForURL(/\/admin\/grupe\/[^/?]+$/, { timeout: RESTORE_TIMEOUT })

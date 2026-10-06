@@ -1,5 +1,6 @@
 import type { City, Prisma } from '@prisma/client'
 import { normalizeParentEmail } from '@/lib/bulk-email-recipients'
+import { emailCandidatesWhere, pickExactEmail } from '@/lib/email-lookup'
 import { unusablePasswordHash } from '@/lib/password'
 
 /**
@@ -89,10 +90,14 @@ export async function planParentLink(
     : null
   const currentAccount = current?.parentAccount ?? null
 
-  const target = await tx.user.findFirst({
-    where: { email: { equals: email, mode: 'insensitive' } },
-    select: { id: true, role: true, deletedAt: true, firstName: true, lastName: true },
-  })
+  // Exact match: the ILIKE pattern alone could name another family's account.
+  const target = pickExactEmail(
+    await tx.user.findMany({
+      where: emailCandidatesWhere(email),
+      select: { id: true, email: true, role: true, deletedAt: true, firstName: true, lastName: true },
+    }),
+    email,
+  )
 
   if (target && currentAccount?.id === target.id) return { kind: 'UNCHANGED' }
 

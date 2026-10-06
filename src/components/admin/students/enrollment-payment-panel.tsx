@@ -69,9 +69,10 @@ function shortMonthLabel(periodStart: Date): string {
 }
 
 /**
- * One chip per month of the season. A month only reads as unpaid once it has
- * actually started — future months are muted rather than red, so a September
- * enrollment does not look like nine months of debt on day one.
+ * One chip per month of the season. A month reads as unpaid once it is due —
+ * `PAYMENT_LEAD_DAYS` before its 1st (`dueCutoffMs`, the same cutoff as the
+ * Plaćanje badge). Months further out are muted rather than red, so a
+ * September enrollment does not look like nine months of debt on day one.
  */
 function MonthlyPaymentSection({
   months,

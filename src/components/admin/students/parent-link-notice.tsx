@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react'
 import type { ParentLinkPreview } from '@/lib/parent-account'
+import { croatianPlural } from '@/lib/format'
 
 /**
  * What an admin is confirming when a child's parent account changes hands or
@@ -10,10 +11,8 @@ import type { ParentLinkPreview } from '@/lib/parent-account'
  */
 export function ParentLinkNotice({ preview }: Readonly<{ preview: ParentLinkPreview }>) {
   const others = preview.otherChildren.join(', ')
-  const otherCity =
-    preview.otherCityChildren > 0
-      ? `${preview.otherCityChildren} ${preview.otherCityChildren === 1 ? 'dijete' : 'djece'} u drugom gradu`
-      : ''
+  const n = preview.otherCityChildren
+  const otherCity = n > 0 ? `${n} ${croatianPlural(n, 'dijete', 'djeteta', 'djece')} u drugom gradu` : ''
   const sees = [others, otherCity].filter(Boolean).join(' i ')
 
   return (

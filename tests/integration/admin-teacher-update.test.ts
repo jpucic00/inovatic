@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
 import { createAdmin, createTeacher } from './helpers/factory'
+import { inspectPasswordToken, issuePasswordToken } from '@/lib/password-token'
 
 // The admin actions call revalidatePath on success. next/cache is a no-op
 // outside a request scope; stub it so the action body runs to completion.
@@ -69,5 +70,44 @@ describe('updateTeacher — email editing', () => {
     const row = await db.user.findUnique({ where: { id: teacher.id } })
     expect(row?.firstName).toBe('Novo')
     expect(row?.email).toBe(teacher.email)
+  })
+})
+
+describe('updateTeacher — a corrected e-mail kills the links mailed to the old one', () => {
+  it('expires every live setup link when the e-mail changes', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    const teacher = await createTeacher({ city: 'SPLIT' })
+    // createTeacher mails a SETUP link to whatever was typed — a typo's inbox.
+    const { token } = await issuePasswordToken({ userId: teacher.id, purpose: 'SETUP', createdById: admin.id })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+
+    const res = await updateTeacher({
+      id: teacher.id,
+      firstName: teacher.firstName,
+      lastName: teacher.lastName,
+      email: `ispravljeno-${teacher.id}@test.local`,
+      phone: null,
+    })
+
+    expect(res).toEqual({ success: true })
+    expect(await inspectPasswordToken(token)).toEqual({ ok: false, reason: 'EXPIRED' })
+  })
+
+  it('leaves the link alone when only the name or phone changes', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    const teacher = await createTeacher({ city: 'SPLIT' })
+    const { token } = await issuePasswordToken({ userId: teacher.id, purpose: 'SETUP', createdById: admin.id })
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+
+    const res = await updateTeacher({
+      id: teacher.id,
+      firstName: 'Novo',
+      lastName: teacher.lastName,
+      email: teacher.email.toUpperCase(),
+      phone: '091 000 0000',
+    })
+
+    expect(res).toEqual({ success: true })
+    expect((await inspectPasswordToken(token)).ok).toBe(true)
   })
 })

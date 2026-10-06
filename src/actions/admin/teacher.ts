@@ -17,6 +17,7 @@ import {
 } from '@/lib/validators/admin/teacher'
 import { unusablePasswordHash } from '@/lib/password'
 import { sendPasswordLinkToAccount } from '@/lib/password-link-send'
+import { expireLivePasswordTokens } from '@/lib/password-token'
 import { staffChangeAccessFrom } from '@/lib/session-staff'
 
 type TeacherRow = {
@@ -282,7 +283,7 @@ export async function updateTeacher(
   try {
     const teacher = await db.user.findUnique({
       where: { id, role: 'TEACHER' },
-      select: { id: true },
+      select: { id: true, email: true },
     })
     if (!teacher) return { success: false, error: 'Nastavnik nije pronađen.' }
 
@@ -297,14 +298,20 @@ export async function updateTeacher(
       return { success: false, error: 'Korisnik s tim e-mailom već postoji.' }
     }
 
-    await db.user.update({
-      where: { id },
-      data: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email,
-        phone: phone?.trim() || null,
-      },
+    await db.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email,
+          phone: phone?.trim() || null,
+        },
+      })
+      // A setup link already mailed belongs to the OLD address — typically a
+      // typo, so possibly a stranger's inbox. It must not outlive the
+      // correction; the admin sends a fresh one from this page.
+      if (email !== teacher.email) await expireLivePasswordTokens(id, tx)
     })
 
     revalidatePath('/admin/nastavnici')

@@ -19,7 +19,7 @@ import {
   type SetConsentsAction,
 } from '@/components/shared/student-year-sections'
 import { CopyButton } from './copy-button'
-import { formatDate, formatDateKey } from '@/lib/format'
+import { croatianPlural, formatDate, formatDateKey } from '@/lib/format'
 import { paymentDueCutoff } from '@/lib/payment-status'
 
 type StudentWithRelations = StudentDetail
@@ -217,7 +217,8 @@ export function StudentDetailView({
                   {student.parentAccount._count.children > 1 && (
                     <span className="text-gray-400">
                       {' '}
-                      · {student.parentAccount._count.children} djece na računu
+                      · {student.parentAccount._count.children}{' '}
+                      {croatianPlural(student.parentAccount._count.children, 'dijete', 'djeteta', 'djece')} na računu
                     </span>
                   )}
                 </span>

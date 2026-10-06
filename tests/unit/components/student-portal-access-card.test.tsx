@@ -72,7 +72,7 @@ describe('portal access card', () => {
   it('names the parent login and offers an admin the link', () => {
     renderView()
     expect(screen.getByText('roditelj@example.com')).toBeInTheDocument()
-    expect(screen.getByText(/2 djece na računu/)).toBeInTheDocument()
+    expect(screen.getByText(/2 djeteta na računu/)).toBeInTheDocument()
     expect(screen.getByText('Još nije postavljena')).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Pošalji poveznicu za lozinku' }),

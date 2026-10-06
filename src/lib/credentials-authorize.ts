@@ -2,9 +2,10 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import type { City, UserRole } from '@prisma/client'
 import { db } from '@/lib/db'
+import { emailCandidatesWhere, pickExactEmail } from '@/lib/email-lookup'
 import { unusablePasswordHash } from '@/lib/password'
 import { listPortalChildren } from '@/lib/portal-children'
-import { clearHits, isRateLimited, recordHit } from '@/lib/rate-limit'
+import { clearHits, isRateLimited, recordHit, releaseHit } from '@/lib/rate-limit'
 
 /**
  * The credentials check behind `authorize()` in `src/lib/auth.ts`, kept free of
@@ -46,19 +47,69 @@ const ipKey = (ip: string) => `login:ip:${ip}`
 let dummyHash: Promise<string> | undefined
 const dummyPasswordHash = () => (dummyHash ??= unusablePasswordHash())
 
-/** Counts one failure against both buckets, and logs the moment either locks. */
-function recordFailure(identifier: string, ip: string): void {
-  const byIdentifier = recordHit(identifierKey(identifier), WINDOW_MS)
-  const byIp = recordHit(ipKey(ip), WINDOW_MS)
-  // Once, on the failure that crosses the line — a bot hammering a locked
-  // account would otherwise write a log line per attempt. The identifier is
-  // left out: it is a person's e-mail, and the address is enough to act on.
-  if (byIdentifier === LOGIN_FAILURES_PER_IDENTIFIER) {
-    console.warn(`[auth] login throttled: ${LOGIN_FAILURES_PER_IDENTIFIER} failures on one account, last from ${ip}`)
+/**
+ * Counts the attempt against both buckets BEFORE the lookup and the hash. The
+ * check-then-count order is racy: every request of a parallel burst passes
+ * `isRateLimited` before the first one gets as far as recording, so 200
+ * concurrent guesses would all be tried. Reserving synchronously — no await
+ * between the check and this — makes the sixth concurrent attempt see five.
+ * An attempt that turns out not to be a failure gives its hits back.
+ */
+function reserveAttempt(identifier: string, ip: string) {
+  const at = Date.now()
+  const byIdentifier = recordHit(identifierKey(identifier), WINDOW_MS, at)
+  const byIp = recordHit(ipKey(ip), WINDOW_MS, at)
+  return {
+    /** A wrong password: the reservation stands. Logs once, on the attempt that locks. */
+    fail() {
+      // A bot hammering a locked account would otherwise write a log line per
+      // attempt. The identifier is left out: it is a person's e-mail, and the
+      // address is enough to act on.
+      if (byIdentifier === LOGIN_FAILURES_PER_IDENTIFIER) {
+        console.warn(`[auth] login throttled: ${LOGIN_FAILURES_PER_IDENTIFIER} failures on one account, last from ${ip}`)
+      }
+      if (byIp === LOGIN_FAILURES_PER_IP) {
+        console.warn(`[auth] login throttled: ${LOGIN_FAILURES_PER_IP} failures from ${ip}`)
+      }
+    },
+    /** The password was right: this account's earlier typos are forgiven. The
+     *  IP bucket keeps its older failures — one working login must not buy a
+     *  bot a fresh allowance — and only this attempt's hit is taken back. */
+    succeed() {
+      clearHits(identifierKey(identifier))
+      releaseHit(ipKey(ip), at)
+    },
+    /** Neither outcome (the lookup threw): nothing was guessed. */
+    cancel() {
+      releaseHit(identifierKey(identifier), at)
+      releaseHit(ipKey(ip), at)
+    },
   }
-  if (byIp === LOGIN_FAILURES_PER_IP) {
-    console.warn(`[auth] login throttled: ${LOGIN_FAILURES_PER_IP} failures from ${ip}`)
-  }
+}
+
+/**
+ * The account behind `identifier` and whether `password` opens it. Always
+ * pays for one bcrypt compare, so an unknown e-mail costs what a wrong
+ * password costs.
+ */
+async function checkPassword(identifier: string, password: string) {
+  const isEmail = z.string().email().safeParse(identifier).success
+  // E-mail is matched case-insensitively: a parent types it on a phone that
+  // capitalises the first letter. Exact match, not the ILIKE pattern on its
+  // own (see email-lookup.ts).
+  const user = isEmail
+    ? pickExactEmail(await db.user.findMany({ where: emailCandidatesWhere(identifier) }), identifier)
+    : await db.user.findUnique({ where: { username: identifier } })
+  const account = user && !user.deletedAt ? user : null
+
+  const matches = await bcrypt.compare(password, account?.passwordHash ?? (await dummyPasswordHash()))
+
+  // A child never signs in (2026-09-29): the family's login is the parent
+  // e-mail, and the child is picked after it. A username now identifies only
+  // the shared classroom login. Both refusals come after the hash so they cost
+  // what a wrong password costs, and count like one.
+  const mayUse = account !== null && account.role !== 'STUDENT' && (isEmail || account.role === 'CLASSROOM')
+  return { account, valid: matches && mayUse }
 }
 
 export async function authorizeCredentials(
@@ -86,36 +137,23 @@ export async function authorizeCredentials(
     return { ok: false, reason: 'THROTTLED' }
   }
 
-  const isEmail = z.string().email().safeParse(identifier).success
-  // E-mail is matched case-insensitively: a parent types it on a phone that
-  // capitalises the first letter, and every stored address is lower-case.
-  const user = isEmail
-    ? await db.user.findFirst({ where: { email: { equals: identifier, mode: 'insensitive' } } })
-    : await db.user.findUnique({ where: { username: identifier } })
-  const account = user && !user.deletedAt ? user : null
+  const attempt = reserveAttempt(identifier, ip)
 
-  const valid = await bcrypt.compare(
-    parsed.data.password,
-    account?.passwordHash ?? (await dummyPasswordHash()),
-  )
+  let checked: Awaited<ReturnType<typeof checkPassword>>
+  try {
+    checked = await checkPassword(identifier, parsed.data.password)
+  } catch (error) {
+    attempt.cancel()
+    throw error
+  }
+  const { account, valid } = checked
 
-  // A child never signs in (2026-09-29): the family's login is the parent
-  // e-mail, and the child is picked after it. A username now identifies only
-  // the shared classroom login. Both refusals come after the hash so they cost
-  // what a wrong password costs, and count like one.
-  if (
-    !account ||
-    !valid ||
-    account.role === 'STUDENT' ||
-    (!isEmail && account.role !== 'CLASSROOM')
-  ) {
-    recordFailure(identifier, ip)
+  if (!account || !valid) {
+    attempt.fail()
     return { ok: false, reason: 'INVALID' }
   }
 
-  // The password was right: this account's earlier typos are forgiven. The IP
-  // bucket is not — one working login must not buy a bot a fresh allowance.
-  clearHits(identifierKey(identifier))
+  attempt.succeed()
 
   // Parents only, and only after the password checks out — an unauthenticated
   // caller must not be able to probe enrollment state. This is the primary gate

@@ -175,29 +175,33 @@ function ConsentsDialog({
           {CONSENT_KEYS.map((key) => (
             <div key={key} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm text-gray-800">{CONSENT_LABELS[key]}</span>
-              <div className="flex gap-1 self-start sm:self-auto rounded-lg bg-gray-100 p-1" role="radiogroup" aria-label={CONSENT_LABELS[key]}>
+              <fieldset className="flex gap-1 self-start sm:self-auto rounded-lg bg-gray-100 p-1">
+                <legend className="sr-only">{CONSENT_LABELS[key]}</legend>
                 {STATE_OPTIONS.map((option) => {
                   const active = draft[key] === option.value
                   return (
-                    <button
+                    <label
                       key={option.label}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      onClick={() => set(key, option.value)}
                       className={cn(
-                        'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                        'cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-cyan-500',
                         active && option.value === true && 'bg-green-600 text-white',
                         active && option.value === false && 'bg-red-600 text-white',
                         active && option.value === null && 'bg-white text-gray-800 shadow-sm',
                         !active && 'text-gray-600 hover:text-gray-900',
                       )}
                     >
+                      <input
+                        type="radio"
+                        name={key}
+                        className="sr-only"
+                        checked={active}
+                        onChange={() => set(key, option.value)}
+                      />
                       {option.label}
-                    </button>
+                    </label>
                   )
                 })}
-              </div>
+              </fieldset>
             </div>
           ))}
 

@@ -934,12 +934,30 @@ type StudentFilters = {
   pageSize?: number
 }
 
+/**
+ * The ONE enrollment the course/group/module/year/privole/ugovor filters all
+ * ask about — they share a single `enrollments.some`, so "bez privole u grupi
+ * X" means the enrollment in X. Null when none of them is set.
+ */
+function studentEnrollmentWhere(filters: StudentFilters): Prisma.EnrollmentWhereInput | null {
+  const { courseId, groupId, scheduleId, schoolYear, consent, contract } = filters
+  if (!courseId && !groupId && !scheduleId && !schoolYear && !consent && !contract) return null
+  return {
+    ...(groupId ? { scheduledGroupId: groupId } : {}),
+    ...(courseId ? { scheduledGroup: { courseId } } : {}),
+    ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId } } } : {}),
+    ...(schoolYear ? { schoolYear } : {}),
+    ...(consent ? consentEnrollmentWhere(consent) : {}),
+    ...(contract ? contractEnrollmentWhere(contract) : {}),
+  }
+}
+
 export async function getStudents(
   filters: StudentFilters = {},
 ): Promise<StudentListResult> {
   const { city } = await requireAdminCtx()
 
-  const { search, courseId, groupId, scheduleId, schoolYear, paymentStatus, returning, consent, contract, page = 1, pageSize = 20 } = filters
+  const { search, schoolYear, paymentStatus, returning, page = 1, pageSize = 20 } = filters
 
   const now = new Date()
   const currentYear = computeSchoolYear(now)
@@ -965,24 +983,12 @@ export async function getStudents(
   // at all.
   const searchFilter = await unaccentSearchFilter('User', search)
 
+  const enrollmentWhere = studentEnrollmentWhere(filters)
   const where = {
     role: 'STUDENT' as const,
     city,
     ...searchFilter,
-    ...(courseId || groupId || scheduleId || schoolYear || consent || contract
-      ? {
-          enrollments: {
-            some: {
-              ...(groupId ? { scheduledGroupId: groupId } : {}),
-              ...(courseId ? { scheduledGroup: { courseId } } : {}),
-              ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId } } } : {}),
-              ...(schoolYear ? { schoolYear } : {}),
-              ...(consent ? consentEnrollmentWhere(consent) : {}),
-              ...(contract ? contractEnrollmentWhere(contract) : {}),
-            },
-          },
-        }
-      : {}),
+    ...(enrollmentWhere ? { enrollments: { some: enrollmentWhere } } : {}),
     // AND-wrapped so they do not collide with the `enrollments` key claimed by
     // the course/group/schedule filter spread above — nor with each other, since
     // the payment and ponovni-upis filters both narrow on enrollments.

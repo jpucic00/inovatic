@@ -4,6 +4,7 @@ import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { emailCandidatesWhere, pickExactEmail } from '@/lib/email-lookup'
 import { loginSchema, type LoginFormData } from '@/lib/validators/login'
 import { clearSchoolYearCookie } from '@/lib/school-year-cookie'
 import { portalChoicesFor } from '@/lib/portal-children'
@@ -54,9 +55,9 @@ export async function loginAction(data: LoginFormData): Promise<LoginActionResul
   // Resolved exactly as `authorize()` resolved it, which has just accepted it.
   const identifier = parsed.data.identifier.trim()
   const isEmail = z.string().email().safeParse(identifier).success
-  const select = { id: true, role: true } as const
+  const select = { id: true, role: true, email: true } as const
   const user = isEmail
-    ? await db.user.findFirst({ where: { email: { equals: identifier, mode: 'insensitive' } }, select })
+    ? pickExactEmail(await db.user.findMany({ where: emailCandidatesWhere(identifier), select }), identifier)
     : await db.user.findUnique({ where: { username: identifier }, select })
   if (!user) return { success: false, error: WRONG_CREDENTIALS }
 
