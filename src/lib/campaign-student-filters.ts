@@ -7,6 +7,7 @@ import {
 import {
   CONSENT_FILTER_LABELS,
   consentEnrollmentWhere,
+  consentStrictWhere,
   type ConsentFilter,
 } from '@/lib/enrollment-consent'
 import {
@@ -35,6 +36,7 @@ type CampaignStudentFilters = {
  *    selection picked — in group mode one in the selected groups, otherwise any
  *    enrollment of the year. They share one `enrollments.some`, so "nije
  *    potpisan + bez privole za web" means the same enrollment, as on Učenici.
+ *    "Sve privole dane" additionally needs EVERY form in that scope all Da.
  *
  * Returns null when nothing is set, so callers spread nothing.
  */
@@ -48,18 +50,25 @@ export function campaignStudentWhere(
   if (filters.payment) {
     clauses.push(paymentStatusUserWhere(filters.payment, sourceSchoolYear, now))
   }
+  const scope: Prisma.EnrollmentWhereInput = {
+    schoolYear: sourceSchoolYear,
+    ...(groupIds ? { scheduledGroupId: { in: groupIds } } : {}),
+  }
   if (filters.contract || filters.consent) {
     clauses.push({
       enrollments: {
         some: {
-          schoolYear: sourceSchoolYear,
-          ...(groupIds ? { scheduledGroupId: { in: groupIds } } : {}),
+          ...scope,
           ...(filters.contract ? contractEnrollmentWhere(filters.contract) : {}),
           ...(filters.consent ? consentEnrollmentWhere(filters.consent) : {}),
         },
       },
     })
   }
+  // "Sve privole dane" also refuses a child whose OTHER form in the selection
+  // says Ne or is blank — the stricter form wins, as in the Privole column.
+  const strict = consentStrictWhere(filters.consent, scope)
+  if (strict) clauses.push(strict)
   return clauses.length > 0 ? { AND: clauses } : null
 }
 

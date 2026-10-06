@@ -131,6 +131,10 @@ export function parseConsentFilter(raw: string | undefined): ConsentFilter | und
  *
  * "Bez privole" covers Ne AND not-entered (see the module comment). Written as
  * an explicit OR because Prisma's `{ not: true }` follows SQL and skips NULLs.
+ *
+ * For ALL_GIVEN this alone is NOT enough — "some enrollment is all Da" still
+ * lets in a child whose other in-scope form says Ne. The caller must also apply
+ * `consentStrictWhere`.
  */
 export function consentEnrollmentWhere(filter: ConsentFilter): Prisma.EnrollmentWhereInput {
   if (filter === 'MISSING') {
@@ -141,4 +145,32 @@ export function consentEnrollmentWhere(filter: ConsentFilter): Prisma.Enrollment
   }
   const key = WITHHELD_FILTERS[filter]
   return { OR: [{ [key]: false }, { [key]: null }] }
+}
+
+/**
+ * The second half of "Sve privole dane": NO enrollment inside `scope` may have
+ * any consent Ne or not entered. Without it the filter asked about one form
+ * while the Privole column shows the strictest one (`strictestConsents`), so
+ * the two disagreed — and a campaign reached a family that refused e-pošta on
+ * another form. The stricter form wins INSIDE the scope only: picking just the
+ * group whose form is all Da still finds the child (per-group reading).
+ *
+ * `scope` is the year + group/program part of the caller's `enrollments.some`,
+ * never the contract filter — narrowing the none-clause by contract state would
+ * let a refusal on an unsigned form slip past. Null for every other filter,
+ * whose `some` already errs on the safe side.
+ */
+export function consentStrictWhere(
+  filter: ConsentFilter | undefined,
+  scope: Prisma.EnrollmentWhereInput,
+): Prisma.UserWhereInput | null {
+  if (filter !== 'ALL_GIVEN') return null
+  return {
+    enrollments: {
+      none: {
+        ...scope,
+        OR: CONSENT_KEYS.flatMap((key) => [{ [key]: false }, { [key]: null }]),
+      },
+    },
+  }
 }

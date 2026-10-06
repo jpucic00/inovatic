@@ -55,6 +55,7 @@ import {
 } from '@/lib/returning-filter'
 import {
   consentEnrollmentWhere,
+  consentStrictWhere,
   type ConsentFilter,
   type EnrollmentConsents,
 } from '@/lib/enrollment-consent'
@@ -935,6 +936,21 @@ type StudentFilters = {
 }
 
 /**
+ * Which enrollments the list is about: the year plus the group/program/module
+ * filters. Shared by the `enrollments.some` below and the "Sve privole dane"
+ * none-clause, so the two can never scope to different enrollments.
+ */
+function studentEnrollmentScope(filters: StudentFilters): Prisma.EnrollmentWhereInput {
+  const { courseId, groupId, scheduleId, schoolYear } = filters
+  return {
+    ...(groupId ? { scheduledGroupId: groupId } : {}),
+    ...(courseId ? { scheduledGroup: { courseId } } : {}),
+    ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId } } } : {}),
+    ...(schoolYear ? { schoolYear } : {}),
+  }
+}
+
+/**
  * The ONE enrollment the course/group/module/year/privole/ugovor filters all
  * ask about — they share a single `enrollments.some`, so "bez privole u grupi
  * X" means the enrollment in X. Null when none of them is set.
@@ -943,10 +959,7 @@ function studentEnrollmentWhere(filters: StudentFilters): Prisma.EnrollmentWhere
   const { courseId, groupId, scheduleId, schoolYear, consent, contract } = filters
   if (!courseId && !groupId && !scheduleId && !schoolYear && !consent && !contract) return null
   return {
-    ...(groupId ? { scheduledGroupId: groupId } : {}),
-    ...(courseId ? { scheduledGroup: { courseId } } : {}),
-    ...(scheduleId ? { moduleEnrollments: { some: { moduleScheduleId: scheduleId } } } : {}),
-    ...(schoolYear ? { schoolYear } : {}),
+    ...studentEnrollmentScope(filters),
     ...(consent ? consentEnrollmentWhere(consent) : {}),
     ...(contract ? contractEnrollmentWhere(contract) : {}),
   }
@@ -976,6 +989,10 @@ export async function getStudents(
   const andClauses: Prisma.UserWhereInput[] = []
   if (paymentStatus) andClauses.push(paymentStatusUserWhere(paymentStatus, referenceYear, now))
   if (returning) andClauses.push(returningStudentWhere(returning, referenceYear))
+  // "Sve privole dane": no form in scope may say Ne or be blank, so the filter
+  // agrees with the Privole column, which shows the strictest form.
+  const consentStrict = consentStrictWhere(filters.consent, studentEnrollmentScope(filters))
+  if (consentStrict) andClauses.push(consentStrict)
 
   // Child's name and username plus the parent's name and e-mail, matched case-
   // AND accent-insensitively so "Testic" finds "Testić" (see unaccent-search.ts),

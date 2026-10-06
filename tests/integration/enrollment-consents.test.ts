@@ -127,10 +127,12 @@ describe('setEnrollmentConsents', () => {
 describe('getStudents — Privole filter', () => {
   let adminId: string
   let groupAId: string
+  let groupBId: string
   let allGivenId: string
   let webRefusedId: string
   let webMissingId: string
   let mixedGroupsId: string
+  let emailBlankInBId: string
   let pastRefusalOnlyId: string
 
   beforeAll(async () => {
@@ -139,6 +141,7 @@ describe('getStudents — Privole filter', () => {
     const groupB = await createGroup({ schoolYear: YEAR })
     const pastGroup = await createGroup({ schoolYear: PAST })
     groupAId = groupA.id
+    groupBId = groupB.id
 
     async function enrolled(lastName: string, groupId: string, consents: EnrollmentConsents, schoolYear = YEAR) {
       const student = await createStudent({ lastName: `${MARKER}${lastName}` })
@@ -155,6 +158,11 @@ describe('getStudents — Privole filter', () => {
     mixedGroupsId = await enrolled('Dvije', groupA.id, ALL_GIVEN)
     const b = await createEnrollment(mixedGroupsId, groupB.id, { schoolYear: YEAR })
     await db.enrollment.update({ where: { id: b.id }, data: { ...ALL_GIVEN, consentWebsite: false } })
+
+    // All Da in group A, e-pošta never entered on the group B form.
+    emailBlankInBId = await enrolled('EmailPrazno', groupA.id, ALL_GIVEN)
+    const bBlank = await createEnrollment(emailBlankInBId, groupB.id, { schoolYear: YEAR })
+    await db.enrollment.update({ where: { id: bBlank.id }, data: { ...ALL_GIVEN, consentEmail: null } })
 
     // Refused last year, everything given this year.
     pastRefusalOnlyId = await enrolled('Prosla', pastGroup.id, { ...ALL_GIVEN, consentWebsite: false }, PAST)
@@ -181,13 +189,24 @@ describe('getStudents — Privole filter', () => {
   })
 
   it('"Privole nisu unesene" finds only enrollments with a blank answer', async () => {
-    expect(await ids({ consent: 'MISSING' })).toEqual([webMissingId])
+    expect(await ids({ consent: 'MISSING' })).toEqual([webMissingId, emailBlankInBId].sort())
   })
 
-  it('"Sve privole dane" needs every consent on some enrollment of the year', async () => {
-    expect(await ids({ consent: 'ALL_GIVEN' })).toEqual(
-      [allGivenId, mixedGroupsId, pastRefusalOnlyId].sort(),
+  it('"Sve privole dane" needs EVERY form of the year all Da — the stricter form wins', async () => {
+    // A Ne (mixedGroups) or a blank (emailBlankInB) on the second form excludes
+    // the child, as the Privole column shows them; last year's Ne does not.
+    expect(await ids({ consent: 'ALL_GIVEN' })).toEqual([allGivenId, pastRefusalOnlyId].sort())
+  })
+
+  it('"Sve privole dane" reads only the forms inside the group filter', async () => {
+    // Group A: both two-form children are all Da there, so they are in.
+    expect(await ids({ consent: 'ALL_GIVEN', groupId: groupAId })).toEqual(
+      [allGivenId, mixedGroupsId, emailBlankInBId, pastRefusalOnlyId].sort(),
     )
+    // Group B holds only the stricter forms — nobody there has all four.
+    expect(await ids({ consent: 'ALL_GIVEN', groupId: groupBId })).toEqual([])
+    // Positive control: both children are in group B at all.
+    expect(await ids({ groupId: groupBId })).toEqual([mixedGroupsId, emailBlankInBId].sort())
   })
 
   it('ignores last year\'s forms', async () => {

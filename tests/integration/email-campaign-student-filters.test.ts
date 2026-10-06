@@ -170,6 +170,44 @@ describe('e-mail campaign cohort — Privole filter', () => {
     expect(res).toEqual([refused.parentEmail, missing.parentEmail].sort())
     expect(res).not.toContain(given.parentEmail)
   })
+
+  it('"Sve privole dane" needs every form in the selected groups all Da', async () => {
+    const ALL_DA = { consentGallery: true, consentWebsite: true, consentSocial: true, consentEmail: true }
+    const groupA = await makeGroup()
+    const groupB = await makeGroup()
+    const setConsents = (id: string, data: Partial<Record<keyof typeof ALL_DA, boolean | null>>) =>
+      db.enrollment.update({ where: { id }, data: { ...ALL_DA, ...data } })
+
+    // Positive control: one form, all Da — in whatever is selected.
+    const clean = await enroll(groupA.id)
+    await setConsents(clean.enrollment.id, {})
+    // All Da in A; e-pošta refused (Ne) on the B form.
+    const emailRefused = await enroll(groupA.id)
+    await setConsents(emailRefused.enrollment.id, {})
+    const refusedB = await createEnrollment(emailRefused.student.id, groupB.id, { schoolYear: SOURCE_YEAR })
+    await setConsents(refusedB.id, { consentEmail: false })
+    // All Da in A; galerija never entered on the B form.
+    const galleryBlank = await enroll(groupA.id)
+    await setConsents(galleryBlank.enrollment.id, {})
+    const blankB = await createEnrollment(galleryBlank.student.id, groupB.id, { schoolYear: SOURCE_YEAR })
+    await setConsents(blankB.id, { consentGallery: null })
+
+    const cohort = (sourceGroupIds: string[]) =>
+      emails({ kind: 'CUSTOM', sourceSchoolYear: SOURCE_YEAR, sourceGroupIds, consentFilter: 'ALL_GIVEN' })
+
+    // Both groups: the stricter B form wins, so neither family is mailed.
+    expect(await cohort([groupA.id, groupB.id])).toEqual([clean.parentEmail])
+    // Only A: per-group reading — their A forms are all Da.
+    expect(await cohort([groupA.id])).toEqual(
+      [clean.parentEmail, emailRefused.parentEmail, galleryBlank.parentEmail].sort(),
+    )
+    // Only B: nobody there has all four.
+    expect(await cohort([groupB.id])).toEqual([])
+    // Positive control for B: without the filter both families are there.
+    expect(
+      await emails({ kind: 'CUSTOM', sourceSchoolYear: SOURCE_YEAR, sourceGroupIds: [groupB.id] }),
+    ).toEqual([emailRefused.parentEmail, galleryBlank.parentEmail].sort())
+  })
 })
 
 describe('e-mail campaign cohort — Plaćanje filter', () => {
