@@ -172,6 +172,14 @@ export function CreateAccountDialog({
     )
   }
 
+  // The one close path. Radix calls onOpenChange only for Esc, × and an
+  // outside click — Odustani and the post-create close go through here too, or
+  // a reopened dialog keeps the old preview and confirms it on the first click.
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) setParentLink(null)
+  }
+
   const handleCreate = (confirmParentLink = false) => {
     if (!selectedGroupId) {
       toast.error('Odaberite grupu za upis.')
@@ -200,7 +208,7 @@ export function CreateAccountDialog({
             ? 'Dijete upisano u novu grupu (postojeći račun). Roditelju nije poslana poveznica za lozinku.'
             : 'Račun kreiran i dijete upisano. Roditelju nije poslana poveznica za lozinku — pošaljite je s profila učenika ili preko E-mail → Postavljanje lozinke.',
         )
-        setOpen(false)
+        handleOpenChange(false)
         router.refresh()
       } else {
         toast.error(res.error ?? 'Greška pri kreiranju.')
@@ -216,13 +224,7 @@ export function CreateAccountDialog({
   const submitLabel = parentLink ? 'Potvrdi i kreiraj' : 'Kreiraj račun i upiši'
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next)
-        if (!next) setParentLink(null)
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <button className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors">
           <UserPlus className="w-4 h-4" />
@@ -366,7 +368,7 @@ export function CreateAccountDialog({
 
             <DialogFooter>
               <button
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
                 disabled={isPending}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >

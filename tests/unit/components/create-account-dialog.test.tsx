@@ -8,9 +8,10 @@
  * 12 upita na grupi od 12 mjesta → nijedan račun se nije mogao kreirati jer
  * je dijalog sve prikazivao kao Popunjeno.
  */
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { CreateAccountDialog } from '@/components/admin/inquiries/create-account-dialog'
+import { createStudentFromInquiry } from '@/actions/admin/student'
 
 vi.mock('@/actions/admin/student', () => ({ createStudentFromInquiry: vi.fn() }))
 vi.mock('@/actions/admin/inquiry', () => ({ getGroupsForCourse: vi.fn(async () => []) }))
@@ -83,5 +84,55 @@ describe('CreateAccountDialog — mjesto rezervirano ovim upitom', () => {
     // Trigger and submit share the accessible name; the submit is the last one.
     const buttons = screen.getAllByRole('button', { name: 'Kreiraj račun i upiši' })
     expect(buttons[buttons.length - 1]).not.toBeDisabled()
+  })
+})
+
+describe('CreateAccountDialog — potvrda roditeljskog računa', () => {
+  const createMock = vi.mocked(createStudentFromInquiry)
+
+  beforeEach(() => {
+    createMock.mockReset()
+    createMock.mockResolvedValue({
+      success: false,
+      error: 'Potvrdite roditeljski račun.',
+      code: 'PARENT_LINK_CONFIRM',
+      parentLink: {
+        email: 'roditelj@example.com',
+        previousEmail: 'stari@example.com',
+        staffName: null,
+        otherChildren: [],
+        otherCityChildren: 0,
+      },
+    })
+  })
+
+  function submitButton() {
+    const buttons = screen.getAllByRole('button', { name: /Kreiraj račun i upiši|Potvrdi i kreiraj/ })
+    return buttons[buttons.length - 1]
+  }
+
+  // Radix never calls onOpenChange for a programmatic close, so Odustani used
+  // to leave the preview behind: the reopened dialog read "Potvrdi i kreiraj"
+  // and its first click sent confirmParentLink: true for a preview the admin
+  // had walked away from, instead of asking the server again.
+  it('Odustani forgets the preview, so the reopened dialog asks the server again', async () => {
+    openDialog()
+    fireEvent.click(submitButton())
+
+    await screen.findByRole('button', { name: 'Potvrdi i kreiraj' })
+    expect(screen.getByText('Roditeljski račun')).toBeInTheDocument()
+    expect(createMock).toHaveBeenLastCalledWith('inq-1', 'g-reserved', undefined, false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Odustani' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Kreiraj račun i upiši' }))
+    await screen.findByRole('dialog')
+    expect(screen.queryByText('Roditeljski račun')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Potvrdi i kreiraj' })).not.toBeInTheDocument()
+
+    fireEvent.click(submitButton())
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2))
+    expect(createMock).toHaveBeenLastCalledWith('inq-1', 'g-reserved', undefined, false)
   })
 })
