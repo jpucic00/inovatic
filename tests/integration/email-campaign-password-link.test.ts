@@ -13,7 +13,7 @@ import {
   createStudent,
   linkToParent,
 } from './helpers/factory'
-import { inspectPasswordToken } from '@/lib/password-token'
+import { inspectPasswordToken, issuePasswordToken } from '@/lib/password-token'
 import type { PasswordLinkCard } from '@/lib/credentials-email-recipients'
 import { computeSchoolYear } from '@/lib/school-year'
 
@@ -437,6 +437,51 @@ describe('link bookkeeping', () => {
       select: { credentialsSentAt: true },
     })
     expect(after.credentialsSentAt).not.toBeNull()
+  })
+
+  // A failed send must not strand the family: the link they already hold keeps
+  // working until a newer one has actually gone out.
+  it('expires the older link only after the new one was sent', async () => {
+    await asAdmin()
+    const group = await makeGroup()
+    const parent = await parentLogin()
+    await enrolledChild(group.id, { parentId: parent.id })
+    const earlier = await issuePasswordToken({ userId: parent.id, purpose: 'SETUP', createdById: null })
+    const send = () =>
+      sendEmailCampaign({
+        kind: 'CREDENTIALS',
+        ...CONTENT,
+        sourceSchoolYear: YEAR,
+        sourceGroupIds: [group.id],
+      })
+
+    await withMailKey(async () => {
+      sendMock.mockResolvedValue({ data: null, error: { name: 'invalid_api_key', message: 'down' } })
+      const failed = await send()
+      if (!failed.success) throw new Error(failed.error)
+      expect(await settle(failed.campaignId)).toEqual({ sent: 0, failed: 1 })
+    })
+    expect((await inspectPasswordToken(earlier.token)).ok).toBe(true)
+    // The undelivered link is left as it is: a "failed" send may have arrived.
+    expect(
+      await db.passwordToken.count({ where: { userId: parent.id, expiresAt: { gt: new Date() } } }),
+    ).toBe(2)
+    expect(
+      (await db.user.findUniqueOrThrow({ where: { id: parent.id } })).credentialsSentAt,
+    ).toBeNull()
+
+    sendMock.mockReset()
+    await withMailKey(async () => {
+      const ok = await send()
+      if (!ok.success) throw new Error(ok.error)
+      expect(await settle(ok.campaignId)).toEqual({ sent: 1, failed: 0 })
+    })
+    expect(await inspectPasswordToken(earlier.token)).toEqual({ ok: false, reason: 'EXPIRED' })
+    const [payload] = sendMock.mock.calls.at(-1) as [ResendPayload]
+    expect((await inspectPasswordToken(linkOf(payload).url.split('#')[1])).ok).toBe(true)
+    expect(
+      await db.passwordToken.count({ where: { userId: parent.id, expiresAt: { gt: new Date() } } }),
+    ).toBe(1)
   })
 
   it('getEmailStudentOptions reports the login state per child', async () => {

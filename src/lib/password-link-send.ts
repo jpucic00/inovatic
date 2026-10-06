@@ -4,6 +4,7 @@ import { sendPasswordLinkEmail } from '@/lib/email'
 import { activeEnrollmentWhere } from '@/lib/enrollment-activity'
 import {
   countRecentPasswordTokens,
+  expireOtherPasswordTokens,
   isLinkableRole,
   issuePasswordToken,
   PASSWORD_LINK_VALID_FOR,
@@ -63,7 +64,7 @@ export async function sendPasswordLinkToAccount(input: {
         })
       : []
 
-  const { token } = await issuePasswordToken({
+  const { token, tokenId } = await issuePasswordToken({
     userId: input.accountId,
     purpose: input.purpose,
     createdById: input.createdById,
@@ -84,9 +85,17 @@ export async function sendPasswordLinkToAccount(input: {
     console.error('sendPasswordLinkToAccount: send failed:', err)
   }
   // A link nobody received is not a failure to hide: the admin must know the
-  // family is still waiting. The token stays behind unused and expires.
+  // family is still waiting. The earlier links stay working — the family may be
+  // holding one they have not opened yet — and the new token stays behind as it
+  // is, since a send reported as failed may still have been delivered.
   if (!sent) return { ok: false, error: 'E-mail nije poslan. Pokušajte ponovno kasnije.' }
 
+  // Only now that the new link is out do the older ones stop working. A failure
+  // here is logged, never reported: the mail went out, and an extra live link
+  // until its own expiry is the lesser harm than telling the admin it did not.
+  await expireOtherPasswordTokens(input.accountId, tokenId).catch((err: unknown) => {
+    console.error('sendPasswordLinkToAccount: could not expire older links:', err)
+  })
   await db.user
     .update({ where: { id: input.accountId }, data: { credentialsSentAt: new Date() } })
     .catch(() => {})

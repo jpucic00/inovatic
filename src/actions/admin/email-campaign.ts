@@ -36,7 +36,12 @@ import {
   type CredentialsGroup,
   type PasswordLinkCard,
 } from '@/lib/credentials-email-recipients'
-import { isLinkableRole, issuePasswordToken, PASSWORD_LINK_VALID_FOR } from '@/lib/password-token'
+import {
+  expireOtherPasswordTokens,
+  isLinkableRole,
+  issuePasswordToken,
+  PASSWORD_LINK_VALID_FOR,
+} from '@/lib/password-token'
 import {
   assertScheduleBelongsTo,
   buildScheduleRecipients,
@@ -1776,9 +1781,11 @@ const PASSWORD_LINK_SELECT = {
 
 /**
  * Proven, but WITHOUT the link: the token is minted only after the row is
- * claimed (see `sendToRecipient`), because minting deletes the account's
- * earlier links — a run that loses the claim must not kill the link the
- * winning run just mailed.
+ * claimed (see `sendToRecipient`), so only the run that owns the row ever
+ * touches the account's links. A run that lost the claim minting anyway would
+ * leave a stray live link nobody was sent, counted against the account's
+ * profile send limit — and the winner's post-send expiry is what retires the
+ * family's older links, which must happen once, for the mail that went out.
  */
 type BuiltPasswordLink =
   | {
@@ -1976,6 +1983,51 @@ async function claimRecipient(job: SendJob, claimId: string): Promise<boolean> {
   }
 }
 
+type MintedPasswordLink = { card: PasswordLinkCard; accountId: string; tokenId: string }
+
+/**
+ * Mint the setup link for a proven, claimed row. `createdById` is null: the
+ * campaign row already records who sent it. Earlier links of the account keep
+ * working until `recordPasswordLinkSent` — a send that throws leaves the family
+ * holding whatever link they had.
+ */
+async function mintCampaignPasswordLink(
+  proven: Extract<BuiltPasswordLink, { ok: true }>,
+  parentEmail: string,
+): Promise<MintedPasswordLink> {
+  const { token, tokenId } = await issuePasswordToken({
+    userId: proven.accountId,
+    purpose: 'SETUP',
+    createdById: null,
+  })
+  return {
+    accountId: proven.accountId,
+    tokenId,
+    card: {
+      email: parentEmail,
+      children: proven.children,
+      url: passwordLinkUrl(token),
+      validFor: PASSWORD_LINK_VALID_FOR.SETUP,
+    },
+  }
+}
+
+/**
+ * "A link reached this login" — run only after a non-throwing send, the same
+ * criterion that counts the row as SENT. Only now do the account's older links
+ * stop working, so a failed send never strands a family without one. Both
+ * writes swallow their errors: the mail is out, and failing here must not
+ * release the claim and invite a second send.
+ */
+async function recordPasswordLinkSent({ accountId, tokenId }: MintedPasswordLink): Promise<void> {
+  await expireOtherPasswordTokens(accountId, tokenId).catch((err: unknown) => {
+    console.error('runSendJob: could not expire older password links:', err)
+  })
+  await db.user
+    .update({ where: { id: accountId }, data: { credentialsSentAt: new Date() } })
+    .catch(() => {})
+}
+
 /**
  * One recipient, start to finish: prove the content (EVALUATION), claim the
  * row, send, record the outcome. Every early return leaves the row in a state
@@ -2034,21 +2086,12 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
 
   if (!(await claimRecipient(job, claimId))) return
 
+  let minted: MintedPasswordLink | undefined
   try {
     if (proven) {
       // Minted only now that this run owns the row — see BuiltPasswordLink.
-      // `createdById` is null: the campaign row already records who sent it.
-      const { token } = await issuePasswordToken({
-        userId: proven.accountId,
-        purpose: 'SETUP',
-        createdById: null,
-      })
-      passwordLink = {
-        email: recipient.parentEmail,
-        children: proven.children,
-        url: passwordLinkUrl(token),
-        validFor: PASSWORD_LINK_VALID_FOR.SETUP,
-      }
+      minted = await mintCampaignPasswordLink(proven, recipient.parentEmail)
+      passwordLink = minted.card
     }
     // Non-throw counts as sent — matches app-wide semantics (the no-key
     // no-op also "succeeds", so dev sends still write SENT log rows).
@@ -2065,12 +2108,7 @@ async function sendToRecipient(job: SendJob, recipient: PendingRecipient): Promi
       schedules,
       attachments: job.attachments,
     })
-    // "A link reached this login." Stamped only after a non-throwing send.
-    if (proven) {
-      await db.user
-        .update({ where: { id: proven.accountId }, data: { credentialsSentAt: new Date() } })
-        .catch(() => {})
-    }
+    if (minted) await recordPasswordLinkSent(minted)
     // Counts increment per recipient so progress polling is live and an
     // interrupted campaign still reports exactly what went out.
     await db.emailCampaign

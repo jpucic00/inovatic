@@ -13,10 +13,14 @@ import { activeEnrollmentWhere } from '@/lib/enrollment-activity'
  *  - 32 random bytes: unguessable, so the check needs no slow hash and the
  *    public page can afford to answer "invalid" instantly.
  *  - Stored as SHA-256 only: a database leak hands out no working links.
- *  - One live link per account: issuing expires every unused earlier one on
- *    the spot, so an old mail sitting in an inbox stops working the moment a
- *    new one is sent. Expired, not deleted — the rows are what the per-account
- *    send limit counts, so deleting them would reset the limit on every send.
+ *  - One live link per account, but only once the new one has ARRIVED: minting
+ *    leaves the earlier links alone, and the caller expires them
+ *    (`expireOtherPasswordTokens`) only after the mail carrying the new one was
+ *    confirmed sent. Expiring at mint time meant a failed send (Resend outage,
+ *    bad key) left the account with no working link at all — a family's
+ *    unopened campaign mail read "istekla" after a teacher's resend that never
+ *    went out. Expired, not deleted — the rows are what the per-account send
+ *    limit counts, so deleting them would reset the limit on every send.
  *  - Spent atomically: the claim is a conditional update, so two tabs submitting
  *    the same link cannot both set a password.
  *
@@ -68,21 +72,40 @@ export async function expireLivePasswordTokens(userId: string, tx: Tx = db): Pro
 }
 
 /**
+ * Kills every unused link of the account EXCEPT `keepTokenId` — called once the
+ * mail carrying `keepTokenId` was confirmed sent, so the account is never left
+ * without a link that reached it. A send that failed calls nothing: the earlier
+ * links keep working, and the new one is left as it is, since a "failed" send
+ * may still have been delivered.
+ */
+export async function expireOtherPasswordTokens(
+  userId: string,
+  keepTokenId: string,
+  tx: Tx = db,
+): Promise<void> {
+  const now = new Date()
+  await tx.passwordToken.updateMany({
+    where: { userId, id: { not: keepTokenId }, usedAt: null, expiresAt: { gt: now } },
+    data: { expiresAt: now },
+  })
+}
+
+/**
  * Mint a link for `userId` and return the PLAINTEXT token — the caller mails it
- * and drops it. Every unused earlier link for the account is expired first.
+ * and drops it. Earlier links are deliberately left working; the caller expires
+ * them with `expireOtherPasswordTokens(userId, tokenId)` once the mail is sent.
  */
 export async function issuePasswordToken(
   input: { userId: string; purpose: PasswordTokenPurpose; createdById: string | null },
   tx: Tx = db,
-): Promise<{ token: string; expiresAt: Date }> {
+): Promise<{ token: string; expiresAt: Date; tokenId: string }> {
   const token = randomBytes(32).toString('base64url')
   const expiresAt = new Date(Date.now() + PASSWORD_TOKEN_TTL_MS[input.purpose])
   const now = new Date()
-  await expireLivePasswordTokens(input.userId, tx)
   await tx.passwordToken.deleteMany({
     where: { userId: input.userId, createdAt: { lt: new Date(now.getTime() - PRUNE_AFTER_MS) } },
   })
-  await tx.passwordToken.create({
+  const row = await tx.passwordToken.create({
     data: {
       userId: input.userId,
       tokenHash: hashPasswordToken(token),
@@ -90,8 +113,9 @@ export async function issuePasswordToken(
       expiresAt,
       createdById: input.createdById,
     },
+    select: { id: true },
   })
-  return { token, expiresAt }
+  return { token, expiresAt, tokenId: row.id }
 }
 
 /** How many links were issued for `userId` since `since` — the per-account

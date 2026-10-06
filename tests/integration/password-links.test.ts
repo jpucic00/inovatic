@@ -1,7 +1,8 @@
 /**
  * Password links (2026-09-29): the only way anyone gets a password. What these
  * tests hold:
- *  - a link works once, only the latest works, and it dies at its expiry;
+ *  - a link works once, only the latest DELIVERED one works, and it dies at
+ *    its expiry — a resend that never went out leaves the earlier link alive;
  *  - setting a password through one logs every other session out;
  *  - only staff who can open a child's profile can send its parent a link,
  *    and not more than a few times an hour;
@@ -23,6 +24,7 @@ import {
   linkToParent,
 } from './helpers/factory'
 import {
+  expireOtherPasswordTokens,
   hashPasswordToken,
   inspectPasswordToken,
   issuePasswordToken,
@@ -100,16 +102,38 @@ describe('a link', () => {
     expect(await redeemPasswordToken(token, 'druga lozinka ovdje')).toEqual({ ok: false, reason: 'USED' })
   })
 
-  it('stops working the moment a newer link is issued', async () => {
+  // Minting alone must not retire the old link: until the new one is known to
+  // have been sent, the old one may be the only link the family can open.
+  it('keeps working when a newer link is merely minted', async () => {
     const parent = await createParent()
     const old = await issuePasswordToken({ userId: parent.id, purpose: 'SETUP', createdById: null })
-    await issuePasswordToken({ userId: parent.id, purpose: 'RESET', createdById: null })
+    const fresh = await issuePasswordToken({ userId: parent.id, purpose: 'RESET', createdById: null })
+
+    expect((await inspectPasswordToken(old.token)).ok).toBe(true)
+    expect((await inspectPasswordToken(fresh.token)).ok).toBe(true)
+  })
+
+  it('stops working once the newer link is confirmed sent', async () => {
+    const parent = await createParent()
+    const old = await issuePasswordToken({ userId: parent.id, purpose: 'SETUP', createdById: null })
+    const fresh = await issuePasswordToken({ userId: parent.id, purpose: 'RESET', createdById: null })
+    await expireOtherPasswordTokens(parent.id, fresh.tokenId)
 
     expect(await inspectPasswordToken(old.token)).toEqual({ ok: false, reason: 'EXPIRED' })
     expect(await redeemPasswordToken(old.token, GOOD)).toEqual({ ok: false, reason: 'EXPIRED' })
+    expect((await inspectPasswordToken(fresh.token)).ok).toBe(true)
     expect(
       await db.passwordToken.count({ where: { userId: parent.id, expiresAt: { gt: new Date() } } }),
     ).toBe(1)
+  })
+
+  it('takes every other live link down with it when redeemed', async () => {
+    const parent = await createParent()
+    const other = await issuePasswordToken({ userId: parent.id, purpose: 'SETUP', createdById: null })
+    const used = await issuePasswordToken({ userId: parent.id, purpose: 'RESET', createdById: null })
+
+    expect(await redeemPasswordToken(used.token, GOOD)).toEqual({ ok: true, email: parent.email })
+    expect(await inspectPasswordToken(other.token)).toEqual({ ok: false, reason: 'EXPIRED' })
   })
 
   it('dies at its expiry', async () => {
@@ -241,6 +265,45 @@ describe('sending a link from a profile', () => {
     const fourth = await sendParentPasswordLink(child.id)
     expect(fourth).toMatchObject({ success: false, error: expect.stringMatching(/3 puta/) })
     expect(linkMailMock).toHaveBeenCalledTimes(3)
+  })
+
+  // The incident this guards: a teacher's resend fails (Resend outage, bad
+  // key), and the family's unopened link from yesterday reads "istekla".
+  it('leaves the earlier link working when the resend does not go out', async () => {
+    const group = await createGroup()
+    const { parent, child } = await familyIn(group.id)
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const earlier = await issuePasswordToken({ userId: parent.id, purpose: 'SETUP', createdById: null })
+
+    linkMailMock.mockResolvedValueOnce(false)
+    expect((await sendParentPasswordLink(child.id)).success).toBe(false)
+    expect((await inspectPasswordToken(earlier.token)).ok).toBe(true)
+
+    const res = await sendParentPasswordLink(child.id)
+    expect(res).toEqual({ success: true, email: parent.email })
+    expect(await inspectPasswordToken(earlier.token)).toEqual({ ok: false, reason: 'EXPIRED' })
+    const [mailed] = linkMailMock.mock.calls.at(-1) as unknown as [{ token: string }]
+    expect((await inspectPasswordToken(mailed.token)).ok).toBe(true)
+    // The failed send's token was retired by the successful one too.
+    expect(
+      await db.passwordToken.count({ where: { userId: parent.id, expiresAt: { gt: new Date() } } }),
+    ).toBe(1)
+  })
+
+  it('leaves the earlier link working when the sender throws', async () => {
+    const teacher = await createTeacher()
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+    const earlier = await issuePasswordToken({ userId: teacher.id, purpose: 'RESET', createdById: null })
+
+    linkMailMock.mockRejectedValueOnce(new Error('Resend: down'))
+    expect((await sendStaffPasswordLink(teacher.id)).success).toBe(false)
+    expect((await inspectPasswordToken(earlier.token)).ok).toBe(true)
+    // The undelivered token is left as it is — a "failed" send may still have arrived.
+    expect(
+      await db.passwordToken.count({ where: { userId: teacher.id, expiresAt: { gt: new Date() } } }),
+    ).toBe(2)
   })
 
   it('reports a mail that did not go out instead of claiming success', async () => {
