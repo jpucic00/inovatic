@@ -124,6 +124,53 @@ export interface ReleaseNote {
  */
 export const RELEASES: readonly ReleaseNote[] = [
   {
+    version: '1.7.0',
+    date: '2026-10-06',
+    title: 'Nova verzija aplikacije.',
+    sections: [
+      {
+        area: 'Prijava i lozinke',
+        changes: [
+          'Obitelj se prijavljuje jednim roditeljskim računom (e-mail roditelja) i nakon prijave bira dijete (ukoliko ima više registrirane djece); dijete više nema vlastitu prijavu.',
+          'Aplikacija više ne stvara lozinke: svatko postavlja svoju preko poveznice iz e-maila. Svi administratori i nastavnici ovih dana dobivaju takvu poveznicu, a dosadašnja lozinka i dalje radi.',
+        ],
+      },
+      {
+        area: 'Profil učenika',
+        changes: [
+          'Lozinka se više ne prikazuje; gumb Pošalji poveznicu za lozinku šalje roditelju poveznicu za postavljanje nove.',
+          '**Privole**: za svaki upis četiri privole (galerija, web-stranica, Facebook i Instagram, e-pošta) s odgovorom Da, Ne ili nije uneseno; upisuje ih administrator, a nastavnik ih vidi.',
+        ],
+      },
+      {
+        area: 'Dolazak',
+        changes: [
+          'Uz ime djeteta stoji oznaka kad privola za fotografije nije dana ili nije unesena.',
+        ],
+      },
+      {
+        area: 'Učenici',
+        changes: [
+          'Novi filteri Privole i Ugovor te stupac Privole.',
+          'Neplaćen modul ili mjesec postaje „Nije plaćeno” 7 dana prije svog početka.',
+        ],
+      },
+      {
+        area: 'E-mail',
+        changes: [
+          'Primatelji se mogu suziti filterima Plaćanje, Ugovor i Privole, a svako dijete u popisu ima oznaku plaćanja i ugovora.',
+          'Poruka „Postavljanje lozinke” zamjenjuje Pristupne podatke: svaki roditeljski račun dobiva jednu poveznicu za postavljanje lozinke.',
+        ],
+      },
+      {
+        area: 'Javna stranica',
+        changes: [
+          'Raspored je vidljiv cijele godine; broj slobodnih mjesta prikazuje se samo dok traju upisi.',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.6.0',
     date: '2026-09-25',
     title: 'Nova verzija aplikacije.',
