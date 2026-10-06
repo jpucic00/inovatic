@@ -117,6 +117,7 @@ flowchart TD
     A["getGroupAttendance(groupId)"] --> B["assertTeacherOwnsGroup, then load group + holidays + roster + records + teacher hours + markingWindow"]
     B --> C{group.course.kind}
     B -.-> STF["also returns regularStaff (TeacherAssignment + role)<br/>and staffChanges (SessionStaffChange rows) —<br/>the marker derives each date's teacher rows via sessionTeacherRows"]
+    B -.-> CNS["each roster row (AttendanceRosterRow) carries consents = pickConsents(enrollment) —<br/>read-only here; the marker renders PhotoConsentNote under the name<br/>when a PHOTO_CONSENT_KEYS privola (galerija / web / FB+IG, not e-pošta)<br/>is Ne (red) or not entered (amber)"]
     C -->|"RADIONICA (isRadionica)"| R["buildFlatAttendance(base, 'custom', computeRadionicaSessions(dateStart, dateEnd, holidays))"]
     C -->|"COMPETITION (isCompetition)"| S["season = course.seasons row for this (schoolYear, city)<br/>buildFlatAttendance(base, 'season', computeSeasonSessions(dayOfWeek, season dates, holidays))"]
     C -->|STANDARD| ST["buildStandardAttendance — race-ahead arc sliced into per-module sections"]
@@ -125,6 +126,7 @@ flowchart TD
     style S fill:#fef3c7
     style ST fill:#dbeafe
     style STF fill:#e0f2fe
+    style CNS fill:#e0f2fe
 ```
 
 > The return type is a union on `kind`: the two flat branches share one shape — `{ kind: 'custom' | 'season', expectedSessions[], extraSessions[] }` (`'custom'` = radionica, `'season'` = competition) — while standard returns `{ kind: 'standard', sections[], otherDates[], defaultSelectedDate }`. On the client, `AttendanceMarker` routes `kind === 'standard'` to `StandardAttendanceMarker` and both flat kinds to one `FlatAttendanceMarker`, which picks its default date client-side with the same `pickDefaultSessionDate` (see *Default Session Selection* below). The header line is `scheduleHint(dateRange = kind === 'custom', …)` — a radionica reads as its date range, while a competition group reads as its weekday, exactly like a standard group.
@@ -159,6 +161,7 @@ sequenceDiagram
     Teacher->>UI: Selects a session date from the date picker
     UI->>UI: SessionPanel remounts (key = sessionDate) — initAttendanceDraft(roster, records)
     Note over UI: BLANK start (2026-08-24). A checkbox states the teacher's decision, never the DB —<br/>only a student with an existing Attendance row is pre-ticked. The termin's STAFF are the<br/>deliberate exception (initTeacherDraft): still present-by-default, because an unticked<br/>box there is a lost payout hour noticed a month later.
+    Note over UI: A child whose photo privola (galerija / web / FB+IG) is Ne or not entered shows<br/>PhotoConsentNote under the name — red "Ne objavljivati", amber "Nije uneseno".<br/>Null is never a yes — a child cleared everywhere gets no marker.
 
     Teacher->>UI: Ticks the present students (whole row is the tap target, except the note field)
     Note over UI: Tri-state "Označi sve prisutne": none → all · partial → all · all → clear

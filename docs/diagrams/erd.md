@@ -207,20 +207,24 @@ erDiagram
         datetime fullYearPaidAt "nullable - admin whole-year paid mark"
         datetime contractSignedAt "nullable - Ugovor potpisan. The ONLY enrollment mark a TEACHER may see and set, and only for their own groups in the CURRENT year; an admin is unrestricted, being the correction path"
         PaymentOption paymentOption "nullable - seeded from the upit on account creation, CREATE-only so a re-run never overwrites an admin correction. STANDARD only, and ADMIN-only unlike contractSignedAt - scrubbed from the teacher payload alongside every paid mark"
+        boolean consentGallery "nullable - privola: zatvorena galerija. true = Da, false = Ne, null = nije uneseno, read as NO wherever a photo may go out. Per enrollment, signed with the contract; ADMIN-write, teacher-read"
+        boolean consentWebsite "nullable - privola: web stranica, same three states"
+        boolean consentSocial "nullable - privola: Facebook i Instagram, same three states"
+        boolean consentEmail "nullable - privola: e-posta o buducim programima, same three states - not a photo consent"
     }
 
     EnrollmentMonth {
         string id PK
         string enrollmentId FK
         datetime periodStart "@db.Date first day of the billed month - unique(enrollmentId, periodStart)"
-        datetime paidAt "nullable - null = owed once periodStart passes"
+        datetime paidAt "nullable - null = owed once periodStart is within paymentDueCutoff(now), i.e. PAYMENT_LEAD_DAYS (7) ahead - still no cron"
     }
 
     ModuleEnrollment {
         string id PK
         string enrollmentId FK
         string moduleScheduleId FK
-        datetime paidAt "nullable - admin per-module paid mark"
+        datetime paidAt "nullable - admin per-module paid mark; the module is owed once its startDate is within paymentDueCutoff(now), 7 days ahead"
     }
 
     Material {
@@ -284,6 +288,8 @@ erDiagram
         string sourceSchoolYear "cohort source year"
         string sourceGroupIds "String[] - audit-only snapshot, no FK; empty in preporuka mode"
         string sourceRecommendations "String[] - preporuka labels; empty in group mode"
+        string sourceStudentIds "String[] - CREDENTIALS only: audit snapshot of individually picked children, no FK; empty otherwise"
+        string sourceFilters "String[] - labels of the Placanje / Ugovor / Privole filters that narrowed the cohort; empty = no narrowing"
         string targetSchoolYear "nullable - REENROLLMENT target year"
         string targetCourseId FK "nullable - SetNull"
         string targetGroupIds "String[] - termini offered; lets a resume rebuild the same boxes"
@@ -328,7 +334,7 @@ erDiagram
     }
 
     ReleaseAnnouncement {
-        string version PK "the version string from src/lib/releases.ts e.g. 1.2.0 - the PK IS the lock: two instances booting together both INSERT, exactly one wins, the loser reads a unique violation and skips"
+        string version PK "the version string from src/lib/releases.ts e.g. 1.2.0 - the PK IS the lock: two instances booting together both INSERT, exactly one wins, the loser reads a unique violation and skips. Also holds the free-string key password-setup-rollout, claimed by sendPasswordRolloutToStaff - never read as a release"
         datetime announcedAt "default now - stamped BEFORE the first mail, not after the last"
         int sentCount "default 0 - a run that reached NOBODY deletes its own row, so a retry cannot duplicate; any partial success keeps the claim"
         int failedCount "default 0"
@@ -440,7 +446,7 @@ erDiagram
     User ||--o{ PasswordToken : "password links - Cascade"
     User |o--o{ PasswordToken : "createdBy - SetNull"
     Enrollment ||--o{ ModuleEnrollment : "modules taken"
-    Enrollment ||--o{ EnrollmentMonth : "monthly fee - COMPETITION"
+    Enrollment ||--o{ EnrollmentMonth : "monthly fee - COMPETITION - owed 7 days before the 1st"
     Enrollment ||--o{ Attendance : "attendance records"
     ModuleSchedule ||--o{ ModuleEnrollment : "enrolled students"
 
@@ -615,7 +621,7 @@ Split and Šibenik run as fully separated tenants inside one app. "City" is the 
 - `ScheduledGroup.schoolYear` **is** part of the public-visibility filter: `getActivePrograms` only keeps a group when an open window exists for that group's exact `(courseId, schoolYear)`. (It remains historization metadata for `ModuleSchedule` / `ModuleEnrollment` / `StudentComment` too.)
 - The **Natjecateljski program never appears in `getActivePrograms(city)`** — its course filter is `kind: { not: 'COMPETITION' }`. Signup happens only through the invitation link `/prijava/natjecateljski-program`, fed by `getSignupProgram(city, slug)`; both feeds share one internal `loadPrograms` and differ **only** in the course filter, so window/capacity/holiday logic can never drift.
 - A **radionica group is offered only until the day it starts**: `isRadionicaOpenForSignup` (`src/lib/session-dates.ts`) keeps it in the public feed while `dateStart > today` on the Europe/Zagreb calendar day; from midnight of its own `dateStart`, `toActiveGroup` drops it. A radionica with **both date bounds blank** stays bookable — missing data must not silently retire a termin. `submitInquiry` re-checks the same rule and answers `code: 'TERMIN_CLOSED'`. Admin flows still see a running workshop on purpose.
-- A **COMPETITION enrollment is billed monthly** through its `EnrollmentMonth` rows (a month is owed once `periodStart <= now`), not via `fullYearPaidAt` / `ModuleEnrollment.paidAt` — though `fullYearPaidAt` still works as the pay-upfront override.
+- A **COMPETITION enrollment is billed monthly** through its `EnrollmentMonth` rows (a month is owed once `periodStart <= paymentDueCutoff(now)` = now + `PAYMENT_LEAD_DAYS` (7) — still no cron; a STANDARD module the same way off its `startDate`, a radionica from enrollment), not via `fullYearPaidAt` / `ModuleEnrollment.paidAt` — though `fullYearPaidAt` still works as the pay-upfront override.
 - An `Enrollment` row means "this student is in this group for this school year". To cancel a radionica enrollment, delete the row. `fullYearPaidAt` is the admin "whole school year paid" mark.
 - A `ModuleEnrollment` row means "this student is taking this module instance". To remove a student from a module, delete the row. Cascading to later modules is **not** automatic — each module row must be deleted individually. `paidAt` is the admin per-module paid mark.
 - A module is "done" when `ModuleSchedule.endDate < now`. Standard-program windows are never edited by hand: they are derived from module 1's start plus the city's holidays and re-derived on every holiday change (`rederiveModuleWindows`, `src/lib/module-plan-sync.ts`).
