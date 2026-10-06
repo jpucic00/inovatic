@@ -225,6 +225,29 @@ describe('authorizeCredentials — failed-login throttle', () => {
     expect(warn).toHaveBeenCalledTimes(1)
     expect(String(warn.mock.calls[0][0])).toContain(IP)
     expect(String(warn.mock.calls[0][0])).not.toContain(teacher.email)
+    // No header evidence passed: the diagnostic part still prints, as dashes.
+    expect(String(warn.mock.calls[0][0])).toContain('x-forwarded-for=- x-real-ip=- cf-connecting-ip=-')
+  })
+
+  it('the lock line carries the raw IP headers verbatim, still without the e-mail', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const email = 'ip-test@example.invalid'
+    const evidence = {
+      forwardedFor: '203.0.113.99, 198.51.100.4',
+      realIp: '198.51.100.4',
+      cfConnectingIp: '198.51.100.5',
+    }
+    for (let i = 0; i < LOGIN_FAILURES_PER_IDENTIFIER; i++) {
+      await authorizeCredentials({ identifier: email, password: 'kriva-lozinka' }, IP, evidence)
+    }
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    const line = String(warn.mock.calls[0][0])
+    expect(line).toContain(`last from ${IP}`)
+    expect(line).toContain('x-forwarded-for=203.0.113.99, 198.51.100.4')
+    expect(line).toContain('x-real-ip=198.51.100.4')
+    expect(line).toContain('cf-connecting-ip=198.51.100.5')
+    expect(line).not.toContain(email)
   })
 
   it('an empty form is not a guess and is not counted', async () => {

@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import type { City, UserRole } from '@prisma/client'
+import { formatIpEvidence, type IpEvidence } from '@/lib/client-ip'
 import { db } from '@/lib/db'
 import { emailCandidatesWhere, pickExactEmail } from '@/lib/email-lookup'
 import { unusablePasswordHash } from '@/lib/password'
@@ -55,7 +56,7 @@ const dummyPasswordHash = () => (dummyHash ??= unusablePasswordHash())
  * between the check and this — makes the sixth concurrent attempt see five.
  * An attempt that turns out not to be a failure gives its hits back.
  */
-function reserveAttempt(identifier: string, ip: string) {
+function reserveAttempt(identifier: string, ip: string, ipEvidence: IpEvidence | undefined) {
   const at = Date.now()
   const byIdentifier = recordHit(identifierKey(identifier), WINDOW_MS, at)
   const byIp = recordHit(ipKey(ip), WINDOW_MS, at)
@@ -64,12 +65,18 @@ function reserveAttempt(identifier: string, ip: string) {
     fail() {
       // A bot hammering a locked account would otherwise write a log line per
       // attempt. The identifier is left out: it is a person's e-mail, and the
-      // address is enough to act on.
+      // address is enough to act on. The raw headers ride along so one
+      // deliberate lock on production shows which of them is spoofable
+      // (Flux 3thglb6, docs/runbooks/client-ip-diagnosis.md).
       if (byIdentifier === LOGIN_FAILURES_PER_IDENTIFIER) {
-        console.warn(`[auth] login throttled: ${LOGIN_FAILURES_PER_IDENTIFIER} failures on one account, last from ${ip}`)
+        console.warn(
+          `[auth] login throttled: ${LOGIN_FAILURES_PER_IDENTIFIER} failures on one account, last from ${ip} (${formatIpEvidence(ipEvidence)})`,
+        )
       }
       if (byIp === LOGIN_FAILURES_PER_IP) {
-        console.warn(`[auth] login throttled: ${LOGIN_FAILURES_PER_IP} failures from ${ip}`)
+        console.warn(
+          `[auth] login throttled: ${LOGIN_FAILURES_PER_IP} failures from ${ip} (${formatIpEvidence(ipEvidence)})`,
+        )
       }
     },
     /** The password was right: this account's earlier typos are forgiven. The
@@ -115,6 +122,7 @@ async function checkPassword(identifier: string, password: string) {
 export async function authorizeCredentials(
   credentials: unknown,
   ip: string,
+  ipEvidence?: IpEvidence,
 ): Promise<CredentialsResult> {
   const parsed = z
     .object({ identifier: z.string().min(1), password: z.string().min(1) })
@@ -137,7 +145,7 @@ export async function authorizeCredentials(
     return { ok: false, reason: 'THROTTLED' }
   }
 
-  const attempt = reserveAttempt(identifier, ip)
+  const attempt = reserveAttempt(identifier, ip, ipEvidence)
 
   let checked: Awaited<ReturnType<typeof checkPassword>>
   try {

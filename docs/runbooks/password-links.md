@@ -83,5 +83,6 @@ računa.
 - Netko tko zna tuđu adresu može namjerno držati taj račun zaključanim. Vlasnik
   tada čeka ili dobije novu poveznicu — postavljanje lozinke preko poveznice ne
   prolazi kroz prijavu.
-- U logovima jedna linija po zaključavanju (bez e-maila, s IP adresom):
-  `[auth] login throttled: …`
+- U logovima jedna linija po zaključavanju (bez e-maila, s IP adresom i
+  sirovim IP zaglavljima): `[auth] login throttled: …`. Kako iz nje provjeriti
+  može li se IP lažirati: [client-ip-diagnosis.md](client-ip-diagnosis.md).

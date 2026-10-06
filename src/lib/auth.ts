@@ -3,7 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import type { City, UserRole } from '@prisma/client'
 import { authConfig } from './auth.config'
 import { revalidateTokenClaims, type TokenClaims } from './auth-token'
-import { ipFromForwardedFor } from './client-ip'
+import { ipEvidenceFrom, ipFromForwardedFor } from './client-ip'
 import { authorizeCredentials } from './credentials-authorize'
 import { applyChildSelection } from './portal-children'
 
@@ -47,6 +47,9 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         const result = await authorizeCredentials(
           credentials,
           ipFromForwardedFor(request.headers.get('x-forwarded-for')),
+          // Diagnostic only: which header carries the real client address
+          // behind Railway/Cloudflare (Flux 3thglb6). The limiter ignores it.
+          ipEvidenceFrom(request.headers),
         )
         if (result.ok) return result.user
         if (result.reason === 'NO_ACTIVE_PROGRAM') throw new NoActiveProgramError()
