@@ -45,7 +45,7 @@ type PasswordProblem =
   | 'MISMATCH'
 
 export const PASSWORD_PROBLEM_MESSAGE: Record<PasswordProblem, string> = {
-  TOO_SHORT: `Lozinka mora imati barem ${PASSWORD_MIN_LENGTH} znakova.`,
+  TOO_SHORT: `Lozinka mora imati barem ${PASSWORD_MIN_LENGTH} znakova (razmaci na početku i kraju se ne broje).`,
   TOO_LONG: 'Lozinka je predugačka.',
   COMMON: 'Ova lozinka je preopćenita i lako se pogodi. Odaberite drugu.',
   CONTAINS_IDENTITY: 'Lozinka ne smije sadržavati vaš e-mail.',
@@ -63,7 +63,8 @@ export function passwordProblem(
   confirm: string,
   email: string | null,
 ): PasswordProblem | null {
-  if (password.length < PASSWORD_MIN_LENGTH) return 'TOO_SHORT'
+  // Trimmed, like the block-list below — otherwise 8 spaces pass. The stored hash still takes the raw value.
+  if (password.trim().length < PASSWORD_MIN_LENGTH) return 'TOO_SHORT'
   if (new TextEncoder().encode(password).length > PASSWORD_MAX_BYTES) return 'TOO_LONG'
   const folded = password.trim().toLowerCase()
   if (COMMON_PASSWORDS.has(folded)) return 'COMMON'

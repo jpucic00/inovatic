@@ -13,6 +13,17 @@ describe('passwordProblem', () => {
     expect(ok('kratka1')).toBe('TOO_SHORT')
   })
 
+  it('does not count leading or trailing whitespace toward the minimum', () => {
+    expect(ok(' '.repeat(8))).toBe('TOO_SHORT')
+    expect(ok(`${' '.repeat(7)}a`)).toBe('TOO_SHORT')
+    expect(ok('\t kratka1 \n')).toBe('TOO_SHORT')
+    expect(ok('  zelenkup  ')).toBeNull()
+  })
+
+  it('counts an inner space like any other character', () => {
+    expect(ok('konj kup')).toBeNull()
+  })
+
   it('refuses beyond 72 BYTES, which bcrypt would silently cut', () => {
     expect(ok('a'.repeat(72))).toBeNull()
     expect(ok('a'.repeat(73))).toBe('TOO_LONG')
