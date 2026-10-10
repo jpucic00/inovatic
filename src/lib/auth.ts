@@ -3,7 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import type { City, UserRole } from '@prisma/client'
 import { authConfig } from './auth.config'
 import { revalidateTokenClaims, type TokenClaims } from './auth-token'
-import { ipEvidenceFrom, ipFromForwardedFor } from './client-ip'
+import { clientIpFrom } from './client-ip'
 import { authorizeCredentials } from './credentials-authorize'
 import { applyChildSelection } from './portal-children'
 
@@ -44,13 +44,7 @@ export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
         password: { label: 'Lozinka', type: 'password' },
       },
       authorize: async (credentials, request) => {
-        const result = await authorizeCredentials(
-          credentials,
-          ipFromForwardedFor(request.headers.get('x-forwarded-for')),
-          // Diagnostic only: which header carries the real client address
-          // behind Railway/Cloudflare (Flux 3thglb6). The limiter ignores it.
-          ipEvidenceFrom(request.headers),
-        )
+        const result = await authorizeCredentials(credentials, clientIpFrom(request.headers))
         if (result.ok) return result.user
         if (result.reason === 'NO_ACTIVE_PROGRAM') throw new NoActiveProgramError()
         if (result.reason === 'THROTTLED') throw new TooManyAttemptsError()

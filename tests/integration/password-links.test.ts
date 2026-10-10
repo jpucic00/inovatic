@@ -35,7 +35,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/headers', () => ({
-  headers: vi.fn(() => Promise.resolve(new Headers({ 'x-forwarded-for': '203.0.113.7' }))),
+  headers: vi.fn(() => Promise.resolve(new Headers({ 'x-real-ip': '203.0.113.7' }))),
   cookies: vi.fn(() => Promise.resolve({ get: () => undefined })),
 }))
 vi.mock('next/navigation', async () => {

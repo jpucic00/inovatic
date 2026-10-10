@@ -7,19 +7,44 @@
  * contact form — it is not an authorization control.
  */
 
-const hits = new Map<string, number[]>()
+/** Each bucket remembers its own window: one map serves limiters of 15 min
+ *  and 1 h alike, and pruning one by another's window would drop live hits. */
+type Bucket = { windowMs: number; times: number[] }
 
-/** Stop unbounded growth if someone cycles keys; oldest buckets go first. */
+const hits = new Map<string, Bucket>()
+
+/** Stop unbounded growth if someone cycles keys. */
 const MAX_KEYS = 5_000
+/** Overflow trims below the cap, so the next inserts do not each pay for a sort. */
+const EVICT_TO = 4_500
 
-function prune(now: number, windowMs: number): void {
-  for (const [key, times] of hits) {
-    const live = times.filter((t) => t > now - windowMs)
+function liveTimes(key: string, windowMs: number, now: number): number[] {
+  return (hits.get(key)?.times ?? []).filter((t) => t > now - windowMs)
+}
+
+/**
+ * Drops expired hits, each by its own bucket's window. If that is not enough,
+ * evicts the buckets with the FEWEST live hits first (oldest last hit breaks a
+ * tie): a flood of one-hit junk keys must never push out a locked account,
+ * which by definition holds the most.
+ */
+function prune(now: number): void {
+  for (const [key, bucket] of hits) {
+    const live = bucket.times.filter((t) => t > now - bucket.windowMs)
     if (live.length === 0) hits.delete(key)
-    else hits.set(key, live)
+    else bucket.times = live
   }
   if (hits.size <= MAX_KEYS) return
-  for (const key of [...hits.keys()].slice(0, hits.size - MAX_KEYS)) hits.delete(key)
+  const lastHit = (bucket: Bucket) => bucket.times.at(-1) ?? 0
+  const byWeight = [...hits].sort(
+    ([, a], [, b]) => a.times.length - b.times.length || lastHit(a) - lastHit(b),
+  )
+  for (const [key] of byWeight.slice(0, hits.size - EVICT_TO)) hits.delete(key)
+}
+
+function store(key: string, windowMs: number, times: number[], now: number): void {
+  hits.set(key, { windowMs, times })
+  if (hits.size > MAX_KEYS) prune(now)
 }
 
 /**
@@ -32,14 +57,13 @@ export function allowRequest(
   windowMs: number,
   now: number = Date.now(),
 ): boolean {
-  const live = (hits.get(key) ?? []).filter((t) => t > now - windowMs)
+  const live = liveTimes(key, windowMs, now)
   if (live.length >= limit) {
-    hits.set(key, live)
+    hits.set(key, { windowMs, times: live })
     return false
   }
   live.push(now)
-  hits.set(key, live)
-  if (hits.size > MAX_KEYS) prune(now, windowMs)
+  store(key, windowMs, live, now)
   return true
 }
 
@@ -54,21 +78,20 @@ export function isRateLimited(
   windowMs: number,
   now: number = Date.now(),
 ): boolean {
-  return (hits.get(key) ?? []).filter((t) => t > now - windowMs).length >= limit
+  return liveTimes(key, windowMs, now).length >= limit
 }
 
 /** Records one hit; returns how many are live in the window, this one included. */
 export function recordHit(key: string, windowMs: number, now: number = Date.now()): number {
-  const live = (hits.get(key) ?? []).filter((t) => t > now - windowMs)
+  const live = liveTimes(key, windowMs, now)
   live.push(now)
-  hits.set(key, live)
-  if (hits.size > MAX_KEYS) prune(now, windowMs)
+  store(key, windowMs, live, now)
   return live.length
 }
 
 /** Takes back one hit recorded at `at` by {@link recordHit} — a reservation that turned out not to count. */
 export function releaseHit(key: string, at: number): void {
-  const times = hits.get(key)
+  const times = hits.get(key)?.times
   const index = times?.indexOf(at) ?? -1
   if (!times || index === -1) return
   times.splice(index, 1)

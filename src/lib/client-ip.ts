@@ -1,53 +1,19 @@
 import { headers } from 'next/headers'
 
 /**
- * The caller's address for rate limiting: the first hop of `x-forwarded-for`,
- * which Railway's proxy sets. Unknown clients share one bucket — a limiter
- * that fails that way is stricter, never looser.
+ * The caller's address for rate limiting: `x-real-ip`, which Railway's edge
+ * overwrites on every request. Measured on production 2026-10-10 (Flux
+ * 3thglb6): a forged `X-Forwarded-For` never reached the app, and `x-real-ip`
+ * held the real client. Cloudflare is DNS-only, so nothing sits in front of the
+ * edge — turning its proxy on would change this and needs a new measurement.
+ * Unknown clients share one bucket — a limiter that fails that way is
+ * stricter, never looser.
  */
-export function ipFromForwardedFor(value: string | null | undefined): string {
-  return value?.split(',')[0]?.trim() || 'unknown'
+export function clientIpFrom(headers: Pick<Headers, 'get'>): string {
+  return headers.get('x-real-ip')?.trim() || 'unknown'
 }
 
-/** {@link ipFromForwardedFor} for code running inside a request (actions, pages). */
+/** {@link clientIpFrom} for code running inside a request (actions, pages). */
 export async function clientIp(): Promise<string> {
-  return ipFromForwardedFor((await headers()).get('x-forwarded-for'))
-}
-
-/**
- * The raw headers that could name the client, verbatim. Diagnostic only
- * (Flux 3thglb6): we do not yet know whether the Railway edge — or a Cloudflare
- * proxy in front of it — overwrites a client-sent `x-forwarded-for` or appends
- * to it. Logged when a login lock engages so one deliberate test on production
- * shows which header carries the real address; remove or keep once decided.
- */
-export type IpEvidence = {
-  forwardedFor: string | null
-  realIp: string | null
-  cfConnectingIp: string | null
-}
-
-export function ipEvidenceFrom(headers: Headers): IpEvidence {
-  return {
-    forwardedFor: headers.get('x-forwarded-for'),
-    realIp: headers.get('x-real-ip'),
-    cfConnectingIp: headers.get('cf-connecting-ip'),
-  }
-}
-
-const EVIDENCE_VALUE_MAX = 200
-
-/** Every value is client-controlled, so CR/LF are dropped (no forged log
- *  lines) and each is capped; `-` marks a header that was not sent at all. */
-function evidenceValue(value: string | null): string {
-  if (value === null) return '-'
-  return value.replace(/[\r\n]/g, '').slice(0, EVIDENCE_VALUE_MAX)
-}
-
-export function formatIpEvidence(evidence: IpEvidence | undefined): string {
-  return [
-    `x-forwarded-for=${evidenceValue(evidence?.forwardedFor ?? null)}`,
-    `x-real-ip=${evidenceValue(evidence?.realIp ?? null)}`,
-    `cf-connecting-ip=${evidenceValue(evidence?.cfConnectingIp ?? null)}`,
-  ].join(' ')
+  return clientIpFrom(await headers())
 }

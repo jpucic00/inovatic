@@ -15,7 +15,7 @@ vi.mock('@/lib/email', () => ({
 // so the limiter never bleeds across cases.
 let currentIp = '203.0.113.1'
 vi.mock('next/headers', () => ({
-  headers: async () => new Map([['x-forwarded-for', currentIp]]),
+  headers: async () => new Map([['x-real-ip', currentIp]]),
 }))
 
 import { submitStemEducationInquiry } from '@/actions/stem-education'
