@@ -37,6 +37,7 @@ function group(overrides: Partial<Group> & Pick<Group, 'id' | 'name'>): Group {
     maxStudents: 12,
     enrollmentStart: null,
     enrollmentEnd: null,
+    openInquiryCount: 0,
     courseId: 'c-slr1',
     locationId: 'l-1',
     course: { id: 'c-slr1', title: 'Svijet LEGO robotike 1', level: 'SLR_1', kind: 'STANDARD' },
@@ -44,7 +45,6 @@ function group(overrides: Partial<Group> & Pick<Group, 'id' | 'name'>): Group {
     _count: {
       enrollments: 5,
       preferredInquiries: 0,
-      assignedInquiries: 0,
       materials: 0,
       studentComments: 0,
       galleryImages: 0,

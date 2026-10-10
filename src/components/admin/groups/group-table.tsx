@@ -34,6 +34,8 @@ type Group = {
   maxStudents: number
   enrollmentStart: Date | null
   enrollmentEnd: Date | null
+  /** Status-NEW upiti pointing here — the only upiti that block a delete. */
+  openInquiryCount: number
   courseId: string
   locationId: string
   course: { id: string; title: string; level: string | null; kind: ProgramKind }
@@ -41,7 +43,6 @@ type Group = {
   _count: {
     enrollments: number
     preferredInquiries: number
-    assignedInquiries: number
     materials: number
     studentComments: number
     galleryImages: number
@@ -51,8 +52,7 @@ type Group = {
 function isGroupDeletable(group: Group): boolean {
   return (
     group._count.enrollments === 0 &&
-    group._count.preferredInquiries === 0 &&
-    group._count.assignedInquiries === 0 &&
+    group.openInquiryCount === 0 &&
     group._count.materials === 0 &&
     group._count.studentComments === 0 &&
     group._count.galleryImages === 0

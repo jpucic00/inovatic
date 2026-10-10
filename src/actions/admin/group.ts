@@ -12,6 +12,12 @@ import { computeSchoolYear } from '@/lib/school-year'
 import { isRadionica } from '@/lib/program-kind'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
+import {
+  lockGroupsForDelete,
+  openGroupInquiryWhere,
+  openInquiriesPhrase,
+  tallyOpenInquiries,
+} from '@/lib/group-delete'
 
 type GroupFilters = {
   courseId?: string
@@ -53,7 +59,6 @@ export async function getGroups(filters: GroupFilters = {}) {
         select: {
           enrollments: true,
           preferredInquiries: true,
-          assignedInquiries: true,
           materials: true,
           studentComments: true,
           galleryImages: true,
@@ -61,6 +66,15 @@ export async function getGroups(filters: GroupFilters = {}) {
       },
     },
   })
+
+  // Only unresolved upiti block a delete, and _count cannot filter one
+  // relation two ways (the Upiti column wants them all).
+  const openInquiries = tallyOpenInquiries(
+    await db.inquiry.findMany({
+      where: openGroupInquiryWhere(groups.map((g) => g.id)),
+      select: { scheduledGroupId: true, assignedGroupId: true },
+    }),
+  )
 
   // The signup window now lives per (course, schoolYear); flatten this year's
   // window onto each group row so the table badge shows the inherited window.
@@ -71,6 +85,7 @@ export async function getGroups(filters: GroupFilters = {}) {
       enrollmentStart: win?.enrollmentStart ?? null,
       enrollmentEnd: win?.enrollmentEnd ?? null,
       teacherIds: g.teacherAssignments.map((a) => a.userId),
+      openInquiryCount: openInquiries.get(g.id) ?? 0,
     }
   })
 }
@@ -385,63 +400,77 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
   await assertGroupInCity(id, city)
 
   try {
-    const group = await db.scheduledGroup.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: {
-            enrollments: true,
-            assignedInquiries: true,
-            preferredInquiries: true,
-            materials: true,
-            studentComments: true,
-            studentAssessments: true,
-            galleryImages: true,
-            teacherAttendances: true,
+    // Lock first, then count: an enrollment or upit landing between the check
+    // and the delete would otherwise slip past every blocker below.
+    const refused = await db.$transaction(async (tx): Promise<AdminActionResult | null> => {
+      await lockGroupsForDelete(tx, [id])
+
+      const group = await tx.scheduledGroup.findUnique({
+        where: { id },
+        include: {
+          _count: {
+            select: {
+              enrollments: true,
+              materials: true,
+              studentComments: true,
+              studentAssessments: true,
+              galleryImages: true,
+              teacherAttendances: true,
+            },
           },
         },
-      },
-    })
+      })
 
-    if (!group) return { success: false, error: 'Grupa nije pronađena.' }
+      if (!group) return { success: false, error: 'Grupa nije pronađena.' }
 
-    const blocked = archivedYearError(group.schoolYear)
-    if (blocked) return blocked
+      const blocked = archivedYearError(group.schoolYear)
+      if (blocked) return blocked
 
-    if (group._count.enrollments > 0) {
-      return { success: false, error: 'Grupa ima upisane polaznike i ne može se obrisati.' }
-    }
-    if (group._count.assignedInquiries > 0 || group._count.preferredInquiries > 0) {
-      return { success: false, error: 'Grupa ima povezane upite i ne može se obrisati.' }
-    }
-    if (group._count.materials > 0) {
-      return { success: false, error: 'Grupa ima materijale i ne može se obrisati.' }
-    }
-    if (group._count.studentComments > 0) {
-      return { success: false, error: 'Grupa ima komentare i ne može se obrisati.' }
-    }
-    if (group._count.studentAssessments > 0) {
-      return { success: false, error: 'Grupa ima ocjene i ne može se obrisati.' }
-    }
-    if (group._count.galleryImages > 0) {
-      return { success: false, error: 'Grupa ima slike u galeriji i ne može se obrisati.' }
-    }
-    // Reachable with an empty roster: bulkMarkSession books the teacher's hours
-    // even when no student is enrolled, and those hours are payout evidence.
-    if (group._count.teacherAttendances > 0) {
-      return {
-        success: false,
-        error: 'Grupa ima evidentirane sate rada nastavnika i ne može se obrisati.',
+      if (group._count.enrollments > 0) {
+        return { success: false, error: 'Grupa ima upisane polaznike i ne može se obrisati.' }
       }
-    }
+      // Resolved upiti do not block — the delete nulls their link (see
+      // src/lib/group-delete.ts). An unresolved one is still waiting on this group.
+      const openInquiries = await tx.inquiry.count({ where: openGroupInquiryWhere([id]) })
+      if (openInquiries > 0) {
+        return {
+          success: false,
+          error: `Grupa ima ${openInquiriesPhrase(openInquiries)} — odbijte ih ili kreirajte račun prije brisanja grupe.`,
+        }
+      }
+      if (group._count.materials > 0) {
+        return { success: false, error: 'Grupa ima materijale i ne može se obrisati.' }
+      }
+      if (group._count.studentComments > 0) {
+        return { success: false, error: 'Grupa ima komentare i ne može se obrisati.' }
+      }
+      if (group._count.studentAssessments > 0) {
+        return { success: false, error: 'Grupa ima ocjene i ne može se obrisati.' }
+      }
+      if (group._count.galleryImages > 0) {
+        return { success: false, error: 'Grupa ima slike u galeriji i ne može se obrisati.' }
+      }
+      // Reachable with an empty roster: bulkMarkSession books the teacher's hours
+      // even when no student is enrolled, and those hours are payout evidence.
+      if (group._count.teacherAttendances > 0) {
+        return {
+          success: false,
+          error: 'Grupa ima evidentirane sate rada nastavnika i ne može se obrisati.',
+        }
+      }
 
-    // Teacher assignments cascade-delete automatically
-    await db.scheduledGroup.delete({ where: { id } })
+      // Teacher assignments and waitlist entries cascade; resolved upiti are SET NULL.
+      await tx.scheduledGroup.delete({ where: { id } })
+      return null
+    })
+    if (refused) return refused
   } catch (err) {
     console.error('deleteGroup failed:', err)
     return { success: false, error: 'Greška pri brisanju grupe.' }
   }
 
   revalidatePath('/admin/grupe')
+  // Resolved upiti lost their Željeni termin row.
+  revalidatePath('/admin/upiti', 'layout')
   return { success: true }
 }

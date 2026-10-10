@@ -8,6 +8,12 @@ import type { CreateCourseInput, UpdateCourseInput } from '@/lib/validators/admi
 import type { AdminActionResult } from '@/lib/action-types'
 import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { archivedYearError } from '@/lib/school-year-guard'
+import {
+  lockGroupsForDelete,
+  openGroupInquiryWhere,
+  openInquiriesPhrase,
+  tallyOpenInquiries,
+} from '@/lib/group-delete'
 import { adminAction } from '@/lib/admin-action'
 import { isCompetition, isEditableCourse, isStandard } from '@/lib/program-kind'
 
@@ -171,11 +177,10 @@ export async function updateCourse(data: UpdateCourseInput): Promise<AdminAction
 }
 
 // Same blockers deleteGroup enforces — a group carrying any of these must be
-// emptied by hand before its radionica can go.
+// emptied by hand before its radionica can go. Unresolved upiti are checked
+// separately, under the group lock (src/lib/group-delete.ts).
 const GROUP_DELETE_BLOCKERS = [
   ['enrollments', 'upisane polaznike'],
-  ['assignedInquiries', 'povezane upite'],
-  ['preferredInquiries', 'povezane upite'],
   ['materials', 'materijale'],
   ['studentComments', 'komentare'],
   ['studentAssessments', 'ocjene'],
@@ -213,13 +218,12 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
         modules: { select: { _count: { select: { materials: true } } } },
         scheduledGroups: {
           select: {
+            id: true,
             name: true,
             schoolYear: true,
             _count: {
               select: {
                 enrollments: true,
-                assignedInquiries: true,
-                preferredInquiries: true,
                 materials: true,
                 studentComments: true,
                 studentAssessments: true,
@@ -264,10 +268,31 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
     // ScheduledGroup.course has no onDelete cascade — delete them in the same
     // transaction. Teacher assignments and material hides cascade off the
     // groups; modules and enrollment windows cascade off the course.
-    await db.$transaction([
-      db.scheduledGroup.deleteMany({ where: { courseId: id } }),
-      db.course.delete({ where: { id } }),
-    ])
+    const groupIds = course.scheduledGroups.map((g) => g.id)
+    const refused = await db.$transaction(async (tx): Promise<AdminActionResult | null> => {
+      await lockGroupsForDelete(tx, groupIds)
+
+      // Resolved upiti go along with their link nulled; an unresolved one is
+      // still waiting on a termin of this radionica.
+      const open = await tx.inquiry.findMany({
+        where: openGroupInquiryWhere(groupIds),
+        select: { scheduledGroupId: true, assignedGroupId: true },
+      })
+      const [blockingId, count] = [...tallyOpenInquiries(open)][0] ?? []
+      if (blockingId && count) {
+        const name = course.scheduledGroups.find((g) => g.id === blockingId)?.name
+        const label = name ? `Grupa "${name}"` : 'Grupa'
+        return {
+          success: false,
+          error: `${label} ima ${openInquiriesPhrase(count)} pa se radionica ne može obrisati — odbijte ih ili kreirajte račun.`,
+        }
+      }
+
+      await tx.scheduledGroup.deleteMany({ where: { courseId: id } })
+      await tx.course.delete({ where: { id } })
+      return null
+    })
+    if (refused) return refused
   } catch (err) {
     console.error('deleteCourse failed:', err)
     return { success: false, error: 'Greška pri brisanju programa.' }
