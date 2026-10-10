@@ -9,22 +9,43 @@ import { croatianPlural } from '@/lib/format'
 // survives and only loses its link — both Inquiry→ScheduledGroup FKs are
 // ON DELETE SET NULL, which is what clears `scheduledGroupId` /
 // `assignedGroupId` in the same statement that drops the group.
+//
+// "Points at" includes the lista čekanja: a waitlisted NEW upit lists the
+// groups the family CAN attend (`InquiryWaitlistGroup`, ON DELETE CASCADE), and
+// deleting one of them silently shortens what it is waiting for — down to
+// nothing, a state the waitlist form itself refuses.
 
 export function openGroupInquiryWhere(groupIds: string[]): Prisma.InquiryWhereInput {
   return {
     status: 'NEW',
-    OR: [{ scheduledGroupId: { in: groupIds } }, { assignedGroupId: { in: groupIds } }],
+    OR: [
+      { scheduledGroupId: { in: groupIds } },
+      { assignedGroupId: { in: groupIds } },
+      { waitlistGroups: { some: { scheduledGroupId: { in: groupIds } } } },
+    ],
   }
 }
 
+/** What `tallyOpenInquiries` reads off each row of `openGroupInquiryWhere`. */
+export const OPEN_INQUIRY_SELECT = {
+  scheduledGroupId: true,
+  assignedGroupId: true,
+  waitlistGroups: { select: { scheduledGroupId: true } },
+} as const satisfies Prisma.InquirySelect
+
 /** Per-group count of unresolved upiti, for the list's delete button. */
 export function tallyOpenInquiries(
-  rows: { scheduledGroupId: string | null; assignedGroupId: string | null }[],
+  rows: {
+    scheduledGroupId: string | null
+    assignedGroupId: string | null
+    waitlistGroups: { scheduledGroupId: string }[]
+  }[],
 ): Map<string, number> {
   const counts = new Map<string, number>()
   for (const row of rows) {
-    // A row naming the same group twice is still one upit.
-    for (const id of new Set([row.scheduledGroupId, row.assignedGroupId])) {
+    // A row naming the same group twice (or more) is still one upit.
+    const named = [row.scheduledGroupId, row.assignedGroupId, ...row.waitlistGroups.map((w) => w.scheduledGroupId)]
+    for (const id of new Set(named)) {
       if (id) counts.set(id, (counts.get(id) ?? 0) + 1)
     }
   }

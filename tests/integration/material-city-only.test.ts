@@ -211,6 +211,18 @@ describe('setMaterialCityOnly', () => {
     }
   })
 
+  it("answers another city's radionica material like a missing id", async () => {
+    const course = await fx.course({ kind: 'RADIONICA', city: 'SPLIT' })
+    const lesson = await createLesson({ courseId: course.id })
+    const m = await seedMaterial({ scope: 'LESSON', lessonId: lesson.id, uploadedById: splitAdminId })
+    asAdmin('SIBENIK')
+
+    const res = await setMaterialCityOnly({ materialId: m.id, reason: REASON })
+
+    expect(res).toEqual({ success: false, error: 'Materijal nije pronađen.' })
+    expect(await materialCity(m.id)).toEqual({ city: null, cityOnlyReason: null })
+  })
+
   it('the Šibenik admin can neither re-limit a Split-only row nor take it over', async () => {
     const p = await seedSharedProgram()
     const m = await lessonRow(p, { city: 'SPLIT', cityOnlyReason: REASON })
@@ -484,12 +496,52 @@ describe('download of a Split-only lesson material', () => {
     expect((await callDownload(splitOnlyId)).status).toBe(200)
   })
 
-  it('admins of BOTH cities get it — adminAllowed checks city only for GROUP rows', async () => {
+  it('admins of BOTH cities get it — a shared program is either admin\'s curriculum', async () => {
     asAdmin('SPLIT')
     expect((await callDownload(splitOnlyId)).status).toBe(200)
 
     asAdmin('SIBENIK')
     expect((await callDownload(splitOnlyId)).status).toBe(200)
+  })
+})
+
+describe("download of another city's radionica material", () => {
+  it('reads as missing for the other admin, like the radionica program page', async () => {
+    const radionica = await fx.course({ kind: 'RADIONICA', city: 'SPLIT' })
+    const lesson = await createLesson({ courseId: radionica.id, title: '1. lekcija' })
+    const file = 'https://res.cloudinary.com/dgc2tp4f8/raw/upload/v1/test/radionica.pdf'
+    const lessonFileId = (
+      await seedMaterial({
+        scope: 'LESSON',
+        lessonId: lesson.id,
+        audience: 'STUDENT',
+        type: MaterialType.DOCUMENT,
+        fileUrl: file,
+        externalUrl: null,
+        uploadedById: splitAdminId,
+        title: 'Radionica lekcija',
+      })
+    ).id
+    const programFileId = (
+      await seedMaterial({
+        scope: 'COURSE',
+        courseId: radionica.id,
+        audience: 'TEACHER',
+        type: MaterialType.DOCUMENT,
+        fileUrl: file,
+        externalUrl: null,
+        uploadedById: splitAdminId,
+        title: 'Radionica priprema',
+      })
+    ).id
+
+    asAdmin('SIBENIK')
+    expect((await callDownload(lessonFileId)).status).toBe(404)
+    expect((await callDownload(programFileId)).status).toBe(404)
+
+    asAdmin('SPLIT')
+    expect((await callDownload(lessonFileId)).status).toBe(200)
+    expect((await callDownload(programFileId)).status).toBe(200)
   })
 })
 

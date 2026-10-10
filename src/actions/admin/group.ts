@@ -14,6 +14,7 @@ import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { archivedYearError, archivedGroupError } from '@/lib/school-year-guard'
 import {
   lockGroupsForDelete,
+  OPEN_INQUIRY_SELECT,
   openGroupInquiryWhere,
   openInquiriesPhrase,
   tallyOpenInquiries,
@@ -72,7 +73,7 @@ export async function getGroups(filters: GroupFilters = {}) {
   const openInquiries = tallyOpenInquiries(
     await db.inquiry.findMany({
       where: openGroupInquiryWhere(groups.map((g) => g.id)),
-      select: { scheduledGroupId: true, assignedGroupId: true },
+      select: OPEN_INQUIRY_SELECT,
     }),
   )
 

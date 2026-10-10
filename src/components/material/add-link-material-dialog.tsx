@@ -39,7 +39,7 @@ const COPY: Record<
   ROBOCAMP: {
     trigger: 'RoboCamp',
     title: 'Dodaj RoboCamp vodič',
-    hint: 'Interaktivni vodič — poveznica mora biti sa elearning.robocamp.eu.',
+    hint: 'Interaktivni vodič — poveznica mora biti s elearning.robocamp.eu.',
     placeholder: 'https://elearning.robocamp.eu/…',
     icon: Gamepad2,
   },
@@ -54,8 +54,8 @@ function urlError(kind: LinkMaterialKind, url: string): string | null {
     return 'Unesite cijelu adresu, s https://.'
   }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return 'Unesite web adresu (https://…).'
-  if (kind === 'VIDEO' && !isAllowedExternalVideoUrl(url)) return 'Poveznica mora biti sa YouTube ili Vimeo.'
-  if (kind === 'ROBOCAMP' && !isRobocampUrl(url)) return 'Poveznica mora biti sa elearning.robocamp.eu.'
+  if (kind === 'VIDEO' && !isAllowedExternalVideoUrl(url)) return 'Poveznica mora biti s YouTubea ili Vimea.'
+  if (kind === 'ROBOCAMP' && !isRobocampUrl(url)) return 'Poveznica mora biti s elearning.robocamp.eu.'
   return null
 }
 

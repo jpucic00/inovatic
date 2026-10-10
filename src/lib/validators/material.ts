@@ -168,7 +168,7 @@ function validateRobocampPairing(
   } else if (!isRobocampUrl(val.externalUrl as string)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Poveznica mora biti sa elearning.robocamp.eu.',
+      message: 'Poveznica mora biti s elearning.robocamp.eu.',
       path: ['externalUrl'],
     })
   }
@@ -200,7 +200,7 @@ function validateVideoPairing(val: MaterialPairingInput, ctx: z.RefinementCtx) {
   } else if (hasExternal && !isAllowedExternalVideoUrl(val.externalUrl as string)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Poveznica mora biti sa YouTube ili Vimeo.',
+      message: 'Poveznica mora biti s YouTubea ili Vimea.',
       path: ['externalUrl'],
     })
   }

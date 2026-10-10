@@ -34,7 +34,9 @@ function prune(now: number): void {
     if (live.length === 0) hits.delete(key)
     else bucket.times = live
   }
-  if (hits.size <= MAX_KEYS) return
+  // EVICT_TO, not MAX_KEYS: an expiry pass that frees only a few keys would
+  // otherwise leave the map at the cap, and every new key would scan it again.
+  if (hits.size <= EVICT_TO) return
   const lastHit = (bucket: Bucket) => bucket.times.at(-1) ?? 0
   const byWeight = [...hits].sort(
     ([, a], [, b]) => a.times.length - b.times.length || lastHit(a) - lastHit(b),

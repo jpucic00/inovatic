@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
+import { zagrebDateKey } from '@/lib/attendance-window'
 import {
   createAdmin,
   createCourse,
@@ -14,7 +15,7 @@ import {
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
-const { getGroupGuidesForStaff } = await import('@/actions/teacher/materials')
+const { getGroupGuidesForStaff, getGroupUploadTargets } = await import('@/actions/teacher/materials')
 
 /**
  * The presenter's feed. What a teacher puts on the classroom wall has to be
@@ -178,5 +179,35 @@ describe('getGroupGuidesForStaff', () => {
     await expect(getGroupGuidesForStaff(group.id)).rejects.toMatchObject({
       digest: expect.stringMatching(/^NEXT_(NOT_FOUND|HTTP_ERROR_FALLBACK;404)$/),
     })
+  })
+})
+
+/**
+ * The materials tab is editable only for someone whose writes would succeed.
+ * A zamjena opens the group (to prepare) but canManageMaterial refuses every
+ * add/hide/move, so the tab must not offer them.
+ */
+describe('getGroupUploadTargets — canManage', () => {
+  it('true for the group teacher and a same-city admin, false for a zamjena', async () => {
+    const admin = await createAdmin({ city: 'SPLIT' })
+    const regular = await createTeacher({ city: 'SPLIT' })
+    const substitute = await createTeacher({ city: 'SPLIT' })
+    const course = await createCourse({ kind: 'RADIONICA', city: 'SPLIT' })
+    const group = await createGroup({ courseId: course.id, city: 'SPLIT' })
+    await createTeacherAssignment(regular.id, group.id)
+    const date = new Date(`${zagrebDateKey(new Date())}T00:00:00Z`)
+    date.setUTCDate(date.getUTCDate() + 2)
+    await db.sessionStaffChange.create({
+      data: { scheduledGroupId: group.id, sessionDate: date, userId: substitute.id, role: 'LEAD', createdById: admin.id },
+    })
+
+    mockSession({ id: regular.id, role: 'TEACHER', city: 'SPLIT' })
+    expect((await getGroupUploadTargets(group.id)).canManage).toBe(true)
+
+    mockSession({ id: admin.id, role: 'ADMIN', city: 'SPLIT' })
+    expect((await getGroupUploadTargets(group.id)).canManage).toBe(true)
+
+    mockSession({ id: substitute.id, role: 'TEACHER', city: 'SPLIT' })
+    expect((await getGroupUploadTargets(group.id)).canManage).toBe(false)
   })
 })

@@ -34,8 +34,8 @@ export function GuideLaunchStrip({
             Ova grupa nema interaktivni vodič
           </h2>
           <p className="mt-0.5 text-[13px] text-gray-500">
-            RoboCamp poveznica dodaje se na stranici programa — modulu ili cijelom programu —
-            pa je vide sve grupe kojima pripada.
+            RoboCamp vodič dodaje se u lekciju, među materijale za polaznike — na stranici
+            programa za sve grupe ili ovdje samo za ovu grupu.
           </p>
         </div>
       </section>

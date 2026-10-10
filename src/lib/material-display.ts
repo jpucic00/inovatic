@@ -51,14 +51,6 @@ export function displayKindOf(item: {
   return 'document'
 }
 
-/** Reading order of the flat "Dodatni materijali" list, and of its filters. */
-export const EXTRA_KIND_ORDER: MaterialDisplayKind[] = [
-  'video',
-  'presentation',
-  'document',
-  'link',
-]
-
 /** Where a material row points: its own URL, else the authorised download. */
 export function resolveHref(row: {
   id: string

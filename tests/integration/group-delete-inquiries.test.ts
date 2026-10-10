@@ -110,6 +110,59 @@ describe('deleteGroup — upiti', () => {
     expect(await deleteGroup(group.id)).toEqual({ success: true })
   })
 
+  it('a NEW upit naming the group only as its assigned group blocks', async () => {
+    await asAdmin()
+    const group = await fx.group({ schoolYear: SY })
+    const other = await fx.group({ schoolYear: SY })
+    await inquiry({ status: InquiryStatus.NEW, scheduledGroupId: other.id, assignedGroupId: group.id })
+
+    const res = await deleteGroup(group.id)
+
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toMatch(/1 neobrađeni upit/)
+    expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(1)
+  })
+
+  it('a waitlisted NEW upit blocks every group it waits for, not just its booked one', async () => {
+    await asAdmin()
+    const booked = await fx.group({ schoolYear: SY })
+    const canAttend = await fx.group({ schoolYear: SY })
+    const waiting = await inquiry({ status: InquiryStatus.NEW, scheduledGroupId: booked.id })
+    await db.inquiry.update({
+      where: { id: waiting.id },
+      data: { waitlistedAt: new Date(), waitlistGroups: { create: { scheduledGroupId: canAttend.id } } },
+    })
+
+    const res = await deleteGroup(canAttend.id)
+
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toMatch(/1 neobrađeni upit/)
+    expect(await db.scheduledGroup.count({ where: { id: canAttend.id } })).toBe(1)
+    expect(await db.inquiryWaitlistGroup.count({ where: { inquiryId: waiting.id } })).toBe(1)
+  })
+
+  it('a resolved waitlisted upit does not block — it keeps its place, minus that group', async () => {
+    await asAdmin()
+    const group = await fx.group({ schoolYear: SY })
+    const other = await fx.group({ schoolYear: SY })
+    const declined = await inquiry({ status: InquiryStatus.DECLINED, scheduledGroupId: other.id })
+    await db.inquiry.update({
+      where: { id: declined.id },
+      data: {
+        waitlistedAt: new Date(),
+        waitlistGroups: { create: [{ scheduledGroupId: group.id }, { scheduledGroupId: other.id }] },
+      },
+    })
+
+    expect(await deleteGroup(group.id)).toEqual({ success: true })
+    const after = await db.inquiry.findUniqueOrThrow({
+      where: { id: declined.id },
+      select: { waitlistedAt: true, waitlistGroups: { select: { scheduledGroupId: true } } },
+    })
+    expect(after.waitlistedAt).not.toBeNull()
+    expect(after.waitlistGroups).toEqual([{ scheduledGroupId: other.id }])
+  })
+
   it('still refuses a cross-city group', async () => {
     await asAdmin()
     const group = await fx.group({ schoolYear: SY, city: 'SIBENIK' })

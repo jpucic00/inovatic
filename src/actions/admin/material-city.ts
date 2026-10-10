@@ -63,7 +63,10 @@ async function loadCurriculumRow(materialId: string) {
 export async function setMaterialCityOnly(data: unknown): Promise<AdminActionResult> {
   return adminAction(cityOnlySchema, data, async ({ materialId, reason }, { city }) => {
     const row = await loadCurriculumRow(materialId)
-    if (!row) return { success: false, error: 'Materijal nije pronađen.' }
+    // Another city's radionica reads as missing, as it does on every other page.
+    if (!row || (row.courseCity && row.courseCity !== city)) {
+      return { success: false, error: 'Materijal nije pronađen.' }
+    }
     if (row.scope === 'GROUP') {
       return { success: false, error: 'Materijal grupe već vrijedi samo za tu grupu.' }
     }

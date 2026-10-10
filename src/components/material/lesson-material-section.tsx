@@ -108,6 +108,7 @@ const DEFAULT_STUDENT_REACH = 'u svim grupama ovog programa, u oba grada'
 
 /** "… u svim grupama ovog programa u Splitu" — for a city-limited selection. */
 const CITY_LOCATIVE: Record<City, string> = { SPLIT: 'u Splitu', SIBENIK: 'u Šibeniku' }
+const SAVE_FAILED = 'Spremanje nije uspjelo. Provjerite vezu i pokušajte ponovno.'
 
 let stagedCounter = 0
 const nextKey = () => `staged-${Date.now()}-${++stagedCounter}`
@@ -160,6 +161,14 @@ export function LessonMaterialSection({
   const patchItem = (key: string, patch: Partial<StagedMaterial>) =>
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)))
   const removeItem = (key: string) => setItems((prev) => prev.filter((item) => item.key !== key))
+  // An upload cannot be aborted, so X on an in-flight row only drops the
+  // placeholder. Remembering the key is what stops the finished upload from
+  // still being turned into a material nobody sees being published.
+  const cancelledKeys = useRef(new Set<string>())
+  const cancelItem = (key: string) => {
+    cancelledKeys.current.add(key)
+    removeItem(key)
+  }
 
   // ── Moving between audiences ──────────────────────────────────────────────
 
@@ -276,6 +285,7 @@ export function LessonMaterialSection({
     const uploaded = await uploadMaterialFile(file, classified.mimeType, (progress) =>
       patchItem(key, { progress }),
     )
+    if (cancelledKeys.current.delete(key)) return
     if (!uploaded.ok) {
       patchItem(key, { status: 'error', error: uploaded.error })
       return
@@ -296,7 +306,7 @@ export function LessonMaterialSection({
       type: classified.type,
       externalUrl: null,
       ...content,
-    })
+    }).catch(() => ({ success: false as const, error: SAVE_FAILED }))
     if (!res.success) {
       patchItem(key, { status: 'error', error: res.error })
       return
@@ -322,7 +332,10 @@ export function LessonMaterialSection({
       ])
       return true
     }
-    const res = await createRow(full)
+    const res = await createRow(full).catch(() => ({
+      success: false as const,
+      error: SAVE_FAILED,
+    }))
     if (!res.success) {
       toast.error(res.error)
       return false
@@ -408,7 +421,7 @@ export function LessonMaterialSection({
               item={item}
               editableTitle={add?.mode === 'stage'}
               onTitleChange={(title) => patchItem(item.key, { title })}
-              onRemove={() => removeItem(item.key)}
+              onRemove={() => cancelItem(item.key)}
             />
           ))}
         </ul>
@@ -627,7 +640,7 @@ function StagedRow({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
-          aria-label={`Upload: ${item.fileName ?? item.title}`}
+          aria-label={`Učitavanje: ${item.fileName ?? item.title}`}
         >
           <div className="h-full bg-cyan-500 transition-[width]" style={{ width: `${percent}%` }} />
         </div>
@@ -757,7 +770,7 @@ function AddArea({
           Odaberi datoteke
         </button>
         <p className="mt-2 text-xs text-gray-500">
-          <span className="hidden sm:inline">ili ih povucite ovamo · </span>
+          <span className="hidden sm:inline">ili ih povucite ovamo · </span>{' '}
           PDF, Word, PowerPoint, slike, video · do 50 MB po datoteci
         </p>
         <input

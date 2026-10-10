@@ -12,7 +12,7 @@ import {
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
 import { getGroupModuleArc } from '@/lib/group-module-arc'
 import { loadHolidayDateKeys } from '@/lib/holidays'
-import { displayKindOf, kindOf, EXTRA_KIND_ORDER } from '@/lib/material-display'
+import { kindOf } from '@/lib/material-display'
 import { staffDisplayNames } from '@/lib/session-staff'
 import { placeLessons } from '@/lib/lesson-schedule'
 import { resolveTrialDateForGroup } from '@/lib/trial-week'
@@ -117,26 +117,6 @@ export function interactiveGuides(view: GroupMaterialsView): InteractiveGuide[] 
         })),
     ),
   )
-}
-
-/**
- * Everything that is NOT an interactive guide, as ONE list ordered by kind.
- * Interim flattening for the portal's kind-filtered list until it renders
- * lessons itself.
- */
-export function flattenExtraMaterials(view: GroupMaterialsView): MaterialItem[] {
-  const all = view.modules.flatMap((section) =>
-    section.lessons.flatMap((lesson) => lesson.materials.filter((m) => kindOf(m) !== 'robocamp')),
-  )
-
-  return all.sort((a, b) => {
-    const byKind =
-      EXTRA_KIND_ORDER.indexOf(displayKindOf(a)) -
-      EXTRA_KIND_ORDER.indexOf(displayKindOf(b))
-    if (byKind !== 0) return byKind
-    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
-    return a.createdAt.getTime() - b.createdAt.getTime()
-  })
 }
 
 function toItem(m: Material): MaterialItem {

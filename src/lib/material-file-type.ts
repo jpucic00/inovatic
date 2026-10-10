@@ -105,7 +105,7 @@ export function classifyMaterialFile(file: {
 export function titleFromFileName(name: string): string {
   const trimmed = name.trim()
   const dot = trimmed.lastIndexOf('.')
-  const base = (dot > 0 ? trimmed.slice(0, dot) : trimmed).replace(/\s+/g, ' ').trim()
+  const base = (dot > 0 ? trimmed.slice(0, dot) : trimmed).replaceAll(/\s+/g, ' ').trim()
   const title = base.length >= 2 ? base : trimmed
   return title.slice(0, 200)
 }

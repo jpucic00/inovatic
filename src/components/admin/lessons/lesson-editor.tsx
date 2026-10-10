@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, Trash2 } from 'lucide-react'
@@ -53,6 +53,10 @@ export function LessonEditor({ context, initialSessionNumbers = [] }: Readonly<P
   const [studentStaged, setStudentStaged] = useState<StagedMaterial[]>([])
   const [isSaving, startSaving] = useTransition()
   const [isDeleting, startDeleting] = useTransition()
+  // Enter in the title submits the form, and a second Enter can land before the
+  // pending state re-renders (or after it ends, while the redirect is still on
+  // its way) — on an undated program that was a second identical lesson.
+  const creating = useRef(false)
 
   const titleValid = title.trim().length >= 2
   const dirty =
@@ -86,7 +90,8 @@ export function LessonEditor({ context, initialSessionNumbers = [] }: Readonly<P
   else if (allStaged.length > MAX_STAGED) blockReason = `Najviše ${MAX_STAGED} materijala odjednom — ostale dodajte nakon spremanja.`
 
   const saveNew = () => {
-    if (blockReason) return
+    if (blockReason || creating.current) return
+    creating.current = true
     startSaving(async () => {
       const res = await createLesson({
         courseId: course.id,
@@ -104,18 +109,19 @@ export function LessonEditor({ context, initialSessionNumbers = [] }: Readonly<P
           fileSize: m.fileSize,
           mimeType: m.mimeType,
         })),
-      })
+      }).catch(() => ({ success: false as const, error: 'Spremanje nije uspjelo. Provjerite vezu i pokušajte ponovno.' }))
       if (res.success) {
         toast.success('Lekcija spremljena.')
         router.replace(`${programHref}/lekcija/${res.lessonId}`)
       } else {
+        creating.current = false
         toast.error(res.error)
       }
     })
   }
 
   const saveExisting = () => {
-    if (isNew || !titleValid || !dirty) return
+    if (isNew || !titleValid || !dirty || isSaving) return
     startSaving(async () => {
       const res = await updateLesson({
         id: lesson.id,

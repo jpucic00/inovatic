@@ -10,6 +10,7 @@ import { getSelectedSchoolYear } from '@/lib/school-year-cookie'
 import { archivedYearError } from '@/lib/school-year-guard'
 import {
   lockGroupsForDelete,
+  OPEN_INQUIRY_SELECT,
   openGroupInquiryWhere,
   openInquiriesPhrase,
   tallyOpenInquiries,
@@ -280,7 +281,7 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
       // still waiting on a termin of this radionica.
       const open = await tx.inquiry.findMany({
         where: openGroupInquiryWhere(groupIds),
-        select: { scheduledGroupId: true, assignedGroupId: true },
+        select: OPEN_INQUIRY_SELECT,
       })
       const [blockingId, count] = [...tallyOpenInquiries(open)][0] ?? []
       if (blockingId && count) {
@@ -292,7 +293,9 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
         }
       }
 
-      await tx.scheduledGroup.deleteMany({ where: { courseId: id } })
+      // Only the groups read, locked and checked above: a termin added since
+      // then makes the course delete fail on its FK instead of going unchecked.
+      await tx.scheduledGroup.deleteMany({ where: { id: { in: groupIds } } })
       // Empty lessons go with the program (their sats cascade); Lesson.course is
       // Restrict so a forgotten one cannot be silently orphaned.
       await tx.lesson.deleteMany({ where: { courseId: id } })
@@ -306,6 +309,9 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
   }
 
   revalidatePath('/admin/programi')
+  // Resolved upiti of its termini lost their group link, like on deleteGroup.
+  revalidatePath('/admin/grupe')
+  revalidatePath('/admin/upiti', 'layout')
   return { success: true }
 }
 

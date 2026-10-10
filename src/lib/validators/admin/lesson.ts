@@ -12,7 +12,7 @@ const lessonFields = {
     .union([z.literal(''), z.string().trim().max(2000)])
     .optional()
     .nullable()
-    .transform((v) => (v ? v : null)),
+    .transform((v) => v || null),
   /** 0 = probni sat, 1–7 = the module's sats. Empty = undated. */
   sessionNumbers: z
     .array(z.number().int().min(0).max(7))

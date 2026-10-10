@@ -113,15 +113,6 @@ async function teacherReadAllowed(userId: string, materialId: string): Promise<b
   return materialVisibleInGroups(groups, materialId, 'STAFF')
 }
 
-/** GROUP materials are per-city; MODULE/COURSE curriculum stays shared. */
-async function adminAllowed(scheduledGroupId: string | null, city: City | undefined): Promise<boolean> {
-  if (!scheduledGroupId) return true
-  const group = await db.scheduledGroup.findUnique({
-    where: { id: scheduledGroupId },
-    select: { city: true },
-  })
-  return group !== null && group.city === city
-}
 
 export async function GET(
   _req: Request,
@@ -157,7 +148,11 @@ export async function GET(
   let allowed = false
 
   if (role === 'ADMIN') {
-    allowed = await adminAllowed(material.scheduledGroupId, session.user.city)
+    // The same answer the program and lesson pages give: shared curriculum for
+    // either city (a city-only row included — the other city sees it greyed),
+    // but a GROUP row or another city's radionica reads as missing.
+    const target = materialTarget(material)
+    allowed = target !== null && (await canManageMaterial(session, target))
   } else if (role === 'TEACHER') {
     // `canManageMaterial` answers per program, not per city: a Šibenik teacher
     // on SLR 1 would pass it for a Split-only SLR 1 file. The city-aware path

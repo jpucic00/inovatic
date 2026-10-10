@@ -27,7 +27,8 @@ export function SatPicker({ selected, onChange, isFirstModule, taken, satDates, 
 
   const toggle = (n: number) => {
     const next = selected.includes(n) ? selected.filter((x) => x !== n) : [...selected, n]
-    onChange(next.sort((a, b) => a - b))
+    next.sort((a, b) => a - b)
+    onChange(next)
   }
 
   return (

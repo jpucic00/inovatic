@@ -140,10 +140,10 @@ erDiagram
         string childSchool "nullable"
         string childGrade "nullable"
         string courseId FK "nullable"
-        string scheduledGroupId FK "nullable - preferred group"
+        string scheduledGroupId FK "nullable - preferred group; SET NULL on group delete - a NEW upit blocks deleteGroup and deleteCourse"
         boolean noSuitableTermin "default false - parent's none-of-the-termini-work answer; mutually exclusive with scheduledGroupId; COMPETITION signup link only"
         PaymentOption paymentOption "nullable - the parent's 'kako planirate placati' answer on /prijava; SLR only and dropped server-side on any other kind. Advisory: the binding choice is the one re-recorded on the Enrollment once an account exists"
-        string assignedGroupId FK "nullable - final group"
+        string assignedGroupId FK "nullable - final group; SET NULL on group delete - a NEW upit blocks deleteGroup and deleteCourse"
         string studentId FK "nullable"
         string message "nullable"
         string referralSource "nullable"
@@ -227,12 +227,32 @@ erDiagram
         datetime paidAt "nullable - admin per-module paid mark; the module is owed once its startDate is within paymentDueCutoff(now), 7 days ahead"
     }
 
+    Lesson {
+        string id PK
+        string courseId FK "Restrict"
+        string moduleId FK "nullable - composite FK moduleId+courseId to CourseModule id+courseId; null exactly for a radionica"
+        string title
+        string description "nullable"
+        int sortOrder "default 0 - orders UNDATED lessons; dated ones order by their first sat"
+    }
+
+    LessonSession {
+        string id PK
+        string lessonId FK "composite FK lessonId+moduleId to Lesson id+moduleId - Cascade"
+        string moduleId "denormalized from the lesson; unique with sessionNumber - one lesson per sat"
+        int sessionNumber "CHECK 0 to 7 - 1 to 7 are the module's sats, 0 is the probni sat on a standard program's first module"
+    }
+
     Material {
         string id PK
-        MaterialScope scope "MODULE - COURSE - GROUP"
+        MaterialScope scope "LESSON - GROUP - MODULE - COURSE; shape enforced by Material_v2_shape_check"
+        MaterialAudience audience "STUDENT - TEACHER, no default; MODULE and COURSE rows are TEACHER only; ROBOCAMP is STUDENT only"
+        string lessonId FK "nullable - set on every LESSON and GROUP row; Restrict, so a lesson holding materials cannot be deleted"
         string scheduledGroupId FK "nullable - set for GROUP scope"
-        string courseId FK "nullable - set for COURSE scope"
-        string moduleId FK "nullable - set for MODULE scope"
+        string courseId FK "nullable - set for COURSE scope - teacher-only whole program"
+        string moduleId FK "nullable - set for MODULE scope - teacher-only whole module"
+        City city "nullable - null is both cities, the norm; set only by Samo za grad, never on GROUP"
+        string cityOnlyReason "nullable - db.Text; required iff city is set - Material_city_only_check"
         string title
         string description "nullable"
         MaterialType type "DOCUMENT - PRESENTATION - VIDEO - LINK - ROBOCAMP"
@@ -406,18 +426,22 @@ erDiagram
     Location ||--o{ ScheduledGroup : "hosts"
 
     CourseModule ||--o{ ModuleSchedule : "year instances"
-    CourseModule ||--o{ Material : "MODULE scope content"
+    CourseModule ||--o{ Material : "MODULE scope - teacher-only"
+    CourseModule |o--o{ Lesson : "module lessons - composite FK, null for radionica"
+    Course ||--o{ Lesson : "program lessons - Restrict"
+    Lesson ||--o{ LessonSession : "sats held - Cascade"
+    Lesson |o--o{ Material : "LESSON and GROUP scope - Restrict"
     CourseModule ||--o{ GalleryImage : "module gallery"
 
     ScheduledGroup ||--o{ TeacherAssignment : "assigned teachers"
     ScheduledGroup ||--o{ Enrollment : "students enrolled"
-    ScheduledGroup ||--o{ Material : "GROUP scope materials"
+    ScheduledGroup ||--o{ Material : "GROUP scope - the group's own lesson additions"
     ScheduledGroup ||--o{ MaterialGroupHide : "hides materials"
     ScheduledGroup ||--o{ GalleryImage : "gallery photos"
     ScheduledGroup ||--o{ StudentComment : "group notes"
     ScheduledGroup ||--o{ StudentAssessment : "report cards"
 
-    Course ||--o{ Material : "COURSE scope materials"
+    Course ||--o{ Material : "COURSE scope - teacher-only"
     Material ||--o{ MaterialGroupHide : "hidden in groups"
 
     User ||--o{ TeacherAssignment : "teaches"
@@ -485,7 +509,8 @@ erDiagram
 | SkillLevel | `POCETNO`, `U_RAZVOJU`, `OSTVARENO` — the three report-card skill grades |
 | RecommendationKind | `COURSE`, `COMPETITION_PREP`, `COMPETITION_PROGRAM`, `COMPETITION_FLL`, `COMPETITION_WRO` — `COURSE` pairs with `recommendedCourseId`; the rest are the `RECOMMENDATION_SPECIALS` tracks (the per-team FLL/WRO values let a mentor recommend the *team* a child should join, which no catalog entry can express) |
 | MaterialType | `DOCUMENT`, `PRESENTATION`, `VIDEO`, `LINK`, `ROBOCAMP` |
-| MaterialScope | `MODULE`, `COURSE`, `GROUP` |
+| MaterialScope | `LESSON`, `GROUP`, `MODULE`, `COURSE` — Materijali v2 (2026-10-10): everything a child can see sits in a lesson (`LESSON` = curriculum, `GROUP` = one group's own addition, which carries a `lessonId` too); `MODULE`/`COURSE` survive only as teacher-only "every class of this module / program" rows. `LESSON` was added in its own migration (`20261010120000_materials_v2_enums`) because Postgres refuses to use a value added in the same transaction. See [material-scope.md](material-scope.md) |
+| MaterialAudience | `STUDENT`, `TEACHER` — who a material is for. `STUDENT` = the portal (parent account with a chosen child, the classroom account) and staff; `TEACHER` = staff only, never a portal payload or a portal download. **No `@default`** — a forgotten audience is a tsc error, never a silent publication to parents |
 | PaymentOption | `PO_MODULU`, `CIJELA_GODINA` — how a family settles an SLR program. **STANDARD only**, gated by `offersPaymentOption` (which is `hasDatedModules`): a radionica settles by the akontacija + ostatak its confirmation e-mail spells out, and COMPETITION is billed monthly through `EnrollmentMonth`, so neither has a choice to record. **Null means "nije odabrano" and is never backfilled.** Decoupled from the paid marks on purpose — this is intent, `fullYearPaidAt` / `ModuleEnrollment.paidAt` are what happened, and choosing `CIJELA_GODINA` must never tick a paid mark |
 | EmailCampaignKind | `CUSTOM`, `REENROLLMENT`, `EVALUATION`, `CREDENTIALS`, `SCHEDULE`, `SCHOOL_CALENDAR` — REENROLLMENT sends are idempotent per `(city, targetCourseId, targetSchoolYear)`; CUSTOM is deliberately repeatable; EVALUATION mails report cards with one recipient row per **child** (not per inbox) and never sets `sentKey`, so a corrected card stays re-sendable. **CREDENTIALS** is, since 2026-09-29, one row per **parent account** with siblings merged, and mails a one-time `SETUP` password link rather than a password — the token is issued only after the run has claimed the row. Neither inquiry acceptance nor manual creation mails anything. Radionica groups are deliberately NOT excluded from it: a workshop child's family gets a real portal login too. **SCHEDULE** ("Slanje rasporeda") is one mail per parent **inbox** with siblings merged — the row's `studentIds` holds every child on the address, each listed with all their groups in the source year — repeatable, no `sentKey`. **SCHOOL_CALENDAR** mails the city's "Raspored radionica" PDF for the source year, rendered **once** at campaign creation and stored as the campaign's own `EmailAttachment` (so a resume and the `[Kopija]` carry identical bytes); one mail per inbox, **standard groups only**, repeatable, no `sentKey` |
 | EmailRecipientStatus | `PENDING`, `SENT`, `FAILED`, `ALREADY_SENT`, `SKIPPED` — every intended recipient is written as `PENDING` upfront, so the detail view lists the whole cohort immediately and a resumed send knows exactly who is still owed a mail |
@@ -515,8 +540,11 @@ erDiagram
 | TrialWeek | **No relations at all.** A standalone `(schoolYear, city)` row like the `SchoolYear` registry — nothing is stored per group, because a calendar week contains exactly one occurrence of each weekday, so `computeTrialSession` (`src/lib/session-dates.ts`) derives the date from the group's existing `dayOfWeek`. An **ABSENT row is the "no probni sat this year" state**, the same doctrine as `CourseGradeRule`, which also means the feature is dark until an admin sets a week on `/admin/skolska-godina`. Read through `resolveTrialDateForGroup` (`src/lib/trial-week.ts`), always keyed on the GROUP'S own `schoolYear` — never `computeSchoolYear()`, the trap `getCourseGradeRules` documents. STANDARD only (`hasDatedModules`): a radionica is a one-off trial of its own and the competitive program is invitation-only. |
 | ReleaseAnnouncement | **No relations and no `city`** — a release belongs to the application, not to an office, so its e-mail goes to every ADMIN in both tenants and sends from the association address rather than a city inbox. Written only by the announcer at server start (`src/lib/release-announce.ts`, wired through `src/instrumentation.ts`); there is no route, no action and no admin button. It stores **no copy of the notes** — those live in `src/lib/releases.ts`, so the code is the record and this table is only the receipt, and a wording fix later can never disagree with what was actually sent. Claim-before-send, the same ordering as `EmailCampaignRecipient.sentKey` and for the same reason. |
 | Enrollment → EnrollmentMonth | One payable month of a monthly-billed (COMPETITION) enrollment (`onDelete: Cascade`). Written up front by `ensureEnrollment` → `createSeasonMonths` from the **join month** through season end — a child joining in January never owes the autumn. A month becomes owed once `periodStart <= now`, so the 1st-of-month flip needs no cron. `upsertCourseSeason` re-syncs rows on a date edit (`syncSeasonMonths`, same transaction) and never deletes a paid month; `fullYearPaidAt` still works as the pay-upfront override. |
-| Material.scope → MODULE / COURSE / GROUP | Discriminated union - exactly one FK populated per scope |
-| Material → MaterialGroupHide → ScheduledGroup | Per-group visibility override for MODULE/COURSE-scoped materials |
+| Course → Lesson → CourseModule | Program → module → **lesson** → material. A lesson belongs to a program and (except on a radionica) one of its modules; the composite FK `(moduleId, courseId) → CourseModule(id, courseId)` keeps it in its own program. Admin-only, shared by both cities, **not year-scoped** (`src/actions/admin/lessons.ts`, placement rules `lessonPlacementError` in `src/lib/lesson-rules.ts`). A radionica lesson has no module and no sats; a natjecanje lesson has a module but no sats |
+| Lesson → LessonSession | Which sat **numbers** of its module a lesson holds (1–7, 0 = probni sat on the first module of a standard program) — **never dates**. `@@unique([moduleId, sessionNumber])` + the composite FK `(lessonId, moduleId) → Lesson(id, moduleId)` make "one lesson per sat" a DB fact. Dates are resolved per group at read time by `placeLessons` (`src/lib/lesson-schedule.ts`) against the group's own module arc |
+| Material.scope / audience | Shape enforced by `Material_v2_shape_check`: `LESSON` = `lessonId` only; `GROUP` = `lessonId` + `scheduledGroupId`; `MODULE` = `moduleId` + `TEACHER`; `COURSE` = `courseId` + `TEACHER`. `Material_robocamp_student_check` keeps RoboCamp guides `STUDENT`. A `GROUP` row's lesson must belong to its group's program — checked in `validateScopeConsistency` (`src/actions/material/crud.ts`), since the DB cannot. Every visibility read goes through `buildEffectiveMaterialsWhere({ …, viewer, city })` (`src/lib/material-query.ts`): the `STUDENT` viewer adds `audience: STUDENT` and drops `MODULE`/`COURSE` |
+| Material.city | null = both cities. Set only through "Samo za <grad>…" with a required `cityOnlyReason` (`Material_city_only_check`), only on `LESSON`/`MODULE`/`COURSE` rows of a shared program; `materialCityWhere` drops the other city's city-only rows for every viewer |
+| Material → MaterialGroupHide → ScheduledGroup | Per-group visibility override for inherited `LESSON`/`MODULE`/`COURSE` rows — a `GROUP` row cannot be hidden (`setMaterialHidden`), it is edited or deleted instead. Cascades from both sides |
 | ScheduledGroup → GalleryImage → CourseModule | Images scoped to group; `moduleId` required for programs with modules (a natjecanje for COMPETITION), null for radionice |
 | Enrollment → Attendance | One attendance record per session date per enrollment. Session dates are derived, not stored. |
 | User → Article | Author relation for news articles |
@@ -553,6 +581,9 @@ erDiagram
 | ModuleEnrollment | `(enrollmentId, moduleScheduleId)` |
 | TeacherAssignment | `(userId, scheduledGroupId)` |
 | MaterialGroupHide | `(materialId, scheduledGroupId)` |
+| CourseModule | `(id, courseId)` — backstop target for the `Lesson(moduleId, courseId)` composite FK |
+| Lesson | `(id, moduleId)` — backstop target for the `LessonSession(lessonId, moduleId)` composite FK |
+| LessonSession | `(moduleId, sessionNumber)` — one lesson per sat of a module |
 | Attendance | `(enrollmentId, sessionDate)` |
 | TeacherAttendance | `(userId, scheduledGroupId, sessionDate)` |
 | SessionStaffChange | `(scheduledGroupId, sessionDate, userId)` — one change per person per termin |
@@ -576,7 +607,9 @@ erDiagram
 | TrialWeek | `schoolYear` |
 | SchoolYearHoliday | `schoolYear` |
 | EnrollmentMonth | `periodStart` |
-| Material | `(scope, moduleId)`, `(scope, courseId)`, `(scope, scheduledGroupId)` |
+| Material | `lessonId`, `(scope, moduleId)`, `(scope, courseId)`, `(scope, scheduledGroupId)` |
+| Lesson | `courseId`, `moduleId` |
+| LessonSession | `lessonId` |
 | GalleryImage | `(scheduledGroupId, moduleId, sortOrder)` |
 | StudentAssessment | `groupId` |
 | Attendance | `sessionDate` |
@@ -600,7 +633,7 @@ Split and Šibenik run as fully separated tenants inside one app. "City" is the 
 
 `ReleaseAnnouncement` is the one model with **no city at all, not even transitively**.
 
-**Deliberately shared (no city):** the `SchoolYear` label registry, the `Tag` taxonomy, `CourseModule` templates, and MODULE/COURSE-scoped `Material` rows (one curriculum for both cities). GROUP-scoped materials are per-group, hence per-city.
+**Deliberately shared (no city):** the `SchoolYear` label registry, the `Tag` taxonomy, `CourseModule` templates, `Lesson`/`LessonSession` (one curriculum for both cities; a radionica's lessons follow the radionica's city), and curriculum `Material` rows (`LESSON`/`MODULE`/`COURSE`). The one exception is `Material.city`: nullable, null = both cities, and set only by an admin's deliberate "Samo za <grad>…" step with a required `cityOnlyReason` — the other city still sees the row greyed with the reason, so drift is visible. GROUP-scoped materials carry no city of their own; they are per-group, hence per-city.
 
 **No `@default` on any city column** — a create that forgets to stamp `city` is a compile/DB error, never a silent SPLIT mis-stamp. Scoping is session-driven: `session.user.city` is a JWT claim (re-checked against the DB every 60s), and admin/teacher/student queries filter by it server-side. There is no city switcher and no super-admin.
 
@@ -651,9 +684,12 @@ But each `ScheduledGroup` runs on its own `dayOfWeek`, and `SchoolYearHoliday` r
 | Start / end dates (course-wide reference) | `ModuleSchedule` | Yes — new row per `schoolYear` |
 | Per-group first/last session | *Derived* — `getGroupModuleArc` | N/A — computed on every read |
 | Roster (which students took this module) | `ModuleEnrollment → ModuleSchedule` | Yes — scoped to a single year |
-| MODULE-scoped material | `Material.moduleId → CourseModule` | No — inherited forward, shared by all cohorts |
-| COURSE-scoped material | `Material.courseId → Course` | No — applies program-wide (standard and radionice) |
-| GROUP-scoped material | `Material.scheduledGroupId → ScheduledGroup` | Yes — specific to one cohort/group |
+| Lesson + its sat numbers | `Lesson` + `LessonSession → CourseModule` | No — reused every year; bound to sat numbers, never dates |
+| Lesson dates and the current lesson | *Derived* — `placeLessons` over the group's arc | N/A — computed per group on every read |
+| LESSON-scoped material | `Material.lessonId → Lesson` | No — inherited forward, shared by all cohorts and both cities |
+| MODULE-scoped material (teacher-only) | `Material.moduleId → CourseModule` | No — every class of this module |
+| COURSE-scoped material (teacher-only) | `Material.courseId → Course` | No — every class of this program |
+| GROUP-scoped material | `Material.scheduledGroupId → ScheduledGroup` + `lessonId` | Yes — specific to one cohort/group |
 | Student feedback | `StudentComment` (notes) + `StudentAssessment` (report card, unique per `studentId+groupId`) | Group-scoped — no template link since 2026-07 (MODULE_REVIEW removed) |
 
 ### Unique constraint

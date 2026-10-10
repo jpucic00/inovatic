@@ -438,7 +438,7 @@ export async function getLessonEditorContext(
         courseId: true,
         sessions: { select: { sessionNumber: true } },
       },
-    }).then((l) => (l && l.courseId === course.id ? l : null))
+    }).then((l) => (l?.courseId === course.id ? l : null))
     if (!lessonRow) notFound()
     moduleId = lessonRow.moduleId
   } else {

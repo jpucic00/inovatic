@@ -291,7 +291,7 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
                 className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
               />
               <p className="mt-1.5 text-xs text-gray-500">
-                Interaktivni vodič — poveznica mora biti sa elearning.robocamp.eu.
+                Interaktivni vodič — poveznica mora biti s elearning.robocamp.eu.
               </p>
             </Field>
           )}

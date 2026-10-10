@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { assertTeacherOwnsGroup } from '@/lib/teacher-guard'
+import { canManageMaterial } from '@/lib/material-access'
 import {
   buildGroupMaterialsView,
   buildGroupShell,
@@ -93,13 +94,14 @@ async function getStaffGroupMaterials(groupId: string): Promise<StaffMaterialRow
 }
 
 /**
- * Data needed by the per-group materials page to render the upload dialog:
- * the list of modules the teacher can attach MODULE-scope uploads to.
- * For radionice, this returns an empty list and callers should offer COURSE
- * scope instead.
+ * The group's program, for the per-group materials tab. `canManage` says
+ * whether the caller may add, hide or move this group's materials — the same
+ * `canManageMaterial` answer every write gives. A substitute (zamjena) opens
+ * the group but holds no TeacherAssignment, so they read it and nothing more;
+ * offering them drop zones only to refuse each upload afterwards was the bug.
  */
 export async function getGroupUploadTargets(groupId: string) {
-  await assertTeacherOwnsGroup(groupId)
+  const { session } = await assertTeacherOwnsGroup(groupId)
 
   const group = await db.scheduledGroup.findUniqueOrThrow({
     where: { id: groupId },
@@ -117,6 +119,7 @@ export async function getGroupUploadTargets(groupId: string) {
     courseTitle: group.course.title,
     kind: group.course.kind,
     modules: group.course.modules,
+    canManage: await canManageMaterial(session, { scope: 'GROUP', scheduledGroupId: groupId }),
   }
 }
 

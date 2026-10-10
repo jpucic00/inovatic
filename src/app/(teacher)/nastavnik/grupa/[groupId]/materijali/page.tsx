@@ -29,15 +29,15 @@ export default async function TeacherGroupMaterijaliPage({
       <div className="mb-4">
         <h2 className="text-base font-semibold text-gray-900">Materijali po lekcijama</h2>
         <p className="mt-0.5 text-sm text-gray-500">
-          Lekcije i programske materijale postavlja administracija na stranici programa. Ovdje
-          dodajete materijale samo za ovu grupu, a programski materijal koji grupi ne treba možete
-          sakriti.
+          {targets.canManage
+            ? 'Lekcije i programske materijale postavlja administracija na stranici programa. Ovdje dodajete materijale samo za ovu grupu, a programski materijal koji grupi ne treba možete sakriti.'
+            : 'Kao zamjena materijale grupe možete pregledati i preuzeti; dodaju ih i uređuju nastavnici grupe.'}
         </p>
       </div>
 
       <GroupLessons
         data={lessons}
-        editable
+        editable={targets.canManage}
         competition={isCompetition(targets.kind)}
       />
     </div>

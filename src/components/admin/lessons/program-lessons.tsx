@@ -44,7 +44,8 @@ function newLessonHref(courseId: string, moduleId: string | null, sat?: number):
   if (moduleId) params.set('modul', moduleId)
   if (sat !== undefined) params.set('sat', String(sat))
   const query = params.toString()
-  return `/admin/programi/${courseId}/lekcija/nova${query ? `?${query}` : ''}`
+  const suffix = query ? `?${query}` : ''
+  return `/admin/programi/${courseId}/lekcija/nova${suffix}`
 }
 
 function satLabel(n: number): string {

@@ -4,12 +4,23 @@ import { openInquiriesPhrase, tallyOpenInquiries } from '@/lib/group-delete'
 describe('tallyOpenInquiries', () => {
   it('counts each upit once per group it names', () => {
     const counts = tallyOpenInquiries([
-      { scheduledGroupId: 'a', assignedGroupId: null },
-      { scheduledGroupId: 'a', assignedGroupId: 'a' },
-      { scheduledGroupId: 'a', assignedGroupId: 'b' },
-      { scheduledGroupId: null, assignedGroupId: null },
+      { scheduledGroupId: 'a', assignedGroupId: null, waitlistGroups: [] },
+      { scheduledGroupId: 'a', assignedGroupId: 'a', waitlistGroups: [] },
+      { scheduledGroupId: 'a', assignedGroupId: 'b', waitlistGroups: [] },
+      { scheduledGroupId: null, assignedGroupId: null, waitlistGroups: [] },
     ])
     expect(Object.fromEntries(counts)).toEqual({ a: 3, b: 1 })
+  })
+
+  it('counts a waitlisted upit against every group it waits for, once each', () => {
+    const counts = tallyOpenInquiries([
+      {
+        scheduledGroupId: 'a',
+        assignedGroupId: null,
+        waitlistGroups: [{ scheduledGroupId: 'a' }, { scheduledGroupId: 'c' }],
+      },
+    ])
+    expect(Object.fromEntries(counts)).toEqual({ a: 1, c: 1 })
   })
 })
 

@@ -26,8 +26,8 @@ type ModuleGroup = {
 function groupByModule(guides: StaffGuide[]): ModuleGroup[] {
   const groups: ModuleGroup[] = []
   guides.forEach((guide, index) => {
-    const last = groups[groups.length - 1]
-    if (last && last.moduleTitle === guide.moduleTitle) last.entries.push({ guide, index })
+    const last = groups.at(-1)
+    if (last?.moduleTitle === guide.moduleTitle) last.entries.push({ guide, index })
     else groups.push({ moduleTitle: guide.moduleTitle, entries: [{ guide, index }] })
   })
   return groups
