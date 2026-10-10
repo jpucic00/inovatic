@@ -6,6 +6,7 @@ import {
   createAdmin,
   createEnrollment,
   createEnrollmentWindow,
+  createLesson,
   createMaterial,
   createModule,
   createStudent,
@@ -61,6 +62,54 @@ describe('deleteCourse — delete-integrity guard (P3)', () => {
     expect(res.success).toBe(false)
     if (!res.success) expect(res.error).toMatch(/materijale/i)
     expect(await db.course.count({ where: { id: course.id } })).toBe(1)
+  })
+
+  // Materijali v2: a lesson material carries no courseId — it is counted
+  // through the lesson, and an empty lesson goes with the program.
+  it('blocks deleting a radionica whose lesson still holds a material', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
+    const lesson = await createLesson({ courseId: course.id })
+    await createMaterial({ scope: MaterialScope.LESSON, lessonId: lesson.id })
+
+    const res = await deleteCourse(course.id)
+
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toMatch(/materijale/i)
+    expect(await db.course.count({ where: { id: course.id } })).toBe(1)
+    expect(await db.lesson.count({ where: { id: lesson.id } })).toBe(1)
+  })
+
+  it('blocks deleting a radionica whose group material sits in its lesson', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
+    const group = await fx.group({ courseId: course.id, schoolYear: '2026/2027' })
+    const lesson = await createLesson({ courseId: course.id })
+    await createMaterial({ scope: MaterialScope.GROUP, scheduledGroupId: group.id, lessonId: lesson.id })
+
+    const res = await deleteCourse(course.id)
+
+    expect(res.success).toBe(false)
+    expect(await db.course.count({ where: { id: course.id } })).toBe(1)
+    expect(await db.lesson.count({ where: { id: lesson.id } })).toBe(1)
+  })
+
+  it('deletes a radionica with an empty lesson, and the lesson with it', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const course = await fx.course({ kind: 'RADIONICA', schoolYear: '2026/2027' })
+    const lesson = await createLesson({ courseId: course.id, title: '1. lekcija' })
+
+    const res = await deleteCourse(course.id)
+
+    expect(res).toEqual({ success: true })
+    expect(await db.course.count({ where: { id: course.id } })).toBe(0)
+    expect(await db.lesson.count({ where: { id: lesson.id } })).toBe(0)
   })
 
   it('refuses to delete a standard SLR program regardless of materials', async () => {

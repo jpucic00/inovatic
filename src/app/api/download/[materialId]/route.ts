@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { MIME_TO_EXT, sanitiseFilename } from '@/lib/cloudinary-url'
 import { canManageMaterial, materialTarget } from '@/lib/material-access'
-import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
+import { buildEffectiveMaterialsWhere, type MaterialViewer } from '@/lib/material-query'
 import { activeEnrollmentWhere } from '@/lib/enrollment-activity'
 import { classroomGroupWhere } from '@/lib/classroom-access'
 import { teacherGroupAccessWhere } from '@/lib/teacher-guard'
@@ -13,18 +13,25 @@ export const runtime = 'nodejs'
 
 type VisibilityGroup = {
   id: string
+  city: City
   course: { id: string; modules: { id: string }[] }
 }
 
 const VISIBILITY_GROUP_SELECT = {
   id: true,
+  city: true,
   course: { select: { id: true, modules: { select: { id: true } } } },
 } as const
 
-/** Whether the material is effectively visible in at least one of `groups`. */
+/**
+ * Whether the material is effectively visible to `viewer` in at least one of
+ * `groups`. The STUDENT viewer never matches a TEACHER-audience row — that is
+ * what keeps a teacher's preparation out of a parent's or the classroom's hands.
+ */
 async function materialVisibleInGroups(
   groups: VisibilityGroup[],
   materialId: string,
+  viewer: MaterialViewer,
 ): Promise<boolean> {
   if (groups.length === 0) return false
 
@@ -33,6 +40,8 @@ async function materialVisibleInGroups(
       scheduledGroupId: g.id,
       courseId: g.course.id,
       moduleIds: g.course.modules.map((m) => m.id),
+      viewer,
+      city: g.city,
     }),
   )
 
@@ -72,6 +81,7 @@ async function studentAllowed(
   return materialVisibleInGroups(
     enrollments.map((e) => e.scheduledGroup),
     materialId,
+    'STUDENT',
   )
 }
 
@@ -85,7 +95,7 @@ async function classroomAllowed(city: City, materialId: string): Promise<boolean
     where: classroomGroupWhere(city),
     select: VISIBILITY_GROUP_SELECT,
   })
-  return materialVisibleInGroups(groups, materialId)
+  return materialVisibleInGroups(groups, materialId, 'STUDENT')
 }
 
 /**
@@ -100,7 +110,7 @@ async function teacherReadAllowed(userId: string, materialId: string): Promise<b
     where: teacherGroupAccessWhere(userId),
     select: VISIBILITY_GROUP_SELECT,
   })
-  return materialVisibleInGroups(groups, materialId)
+  return materialVisibleInGroups(groups, materialId, 'STAFF')
 }
 
 /** GROUP materials are per-city; MODULE/COURSE curriculum stays shared. */
@@ -134,6 +144,8 @@ export async function GET(
       moduleId: true,
       courseId: true,
       scheduledGroupId: true,
+      lessonId: true,
+      city: true,
     },
   })
 
@@ -147,9 +159,13 @@ export async function GET(
   if (role === 'ADMIN') {
     allowed = await adminAllowed(material.scheduledGroupId, session.user.city)
   } else if (role === 'TEACHER') {
+    // `canManageMaterial` answers per program, not per city: a Šibenik teacher
+    // on SLR 1 would pass it for a Split-only SLR 1 file. The city-aware path
+    // (`teacherReadAllowed`, through the groups they can open) still decides.
     const target = materialTarget(material)
+    const otherCityOnly = material.city !== null && material.city !== session.user.city
     allowed =
-      (target !== null && (await canManageMaterial(session, target))) ||
+      (!otherCityOnly && target !== null && (await canManageMaterial(session, target))) ||
       (await teacherReadAllowed(session.user.id, materialId))
   } else if (role === 'CLASSROOM') {
     // `city` is typed but may be undefined on a legacy token kept alive through a

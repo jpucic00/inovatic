@@ -8,9 +8,10 @@ import {
   createTeacher,
   assignTeacherToGroup,
   createStudentInGroup,
-  addLinkMaterial,
-  addMaterialOnProgramPage,
-  getCourseIdForGroup,
+  addGroupLinkMaterial,
+  groupLessonTarget,
+  openLesson,
+  seedLesson,
   croatianDateRegex,
   type TeacherData,
   type StudentData,
@@ -47,6 +48,7 @@ const STUDENT: StudentData = {
   parentPhone: '0914445555',
 }
 
+const LESSON_TITLE = `E2E lekcija ${RUN_ID}`
 const COURSE_MATERIAL = `E2E program material ${RUN_ID}`
 const GROUP_MATERIAL = `E2E grupa material ${RUN_ID}`
 const REVIEW_TEXT = `E2E recenzija ${RUN_ID} — odličan napredak.`
@@ -77,18 +79,15 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     const t = await createTeacher(page, TEACHER)
     await assignTeacherToGroup(page, t.teacherId, groupId)
     const s = await createStudentInGroup(page, groupId, STUDENT)
-    // Program curriculum is admin-owned and lives on the program detail page.
-    // Seed a program-wide (COURSE) material — always visible to kids regardless
-    // of the active module — so the teacher flow can hide it and the student
-    // can see/lose it deterministically.
-    const courseId = await getCourseIdForGroup(page, groupId)
-    await addMaterialOnProgramPage(
-      page,
-      courseId,
-      'Materijali za cijeli program',
-      COURSE_MATERIAL,
-      'https://example.com/e2e/program',
-    )
+    // Program curriculum is admin-owned: a lesson on the module this group is
+    // on today, holding one kids' link, so the teacher flow can hide it and the
+    // student can see/lose it. Seeded directly — the lesson editor itself is
+    // covered by 24-materials.
+    await seedLesson({
+      target: await groupLessonTarget(groupId),
+      title: LESSON_TITLE,
+      studentLinks: [{ title: COURSE_MATERIAL, url: 'https://example.com/e2e/program' }],
+    })
     seeded = {
       teacher: { email: TEACHER.email, password: t.password, teacherId: t.teacherId },
       studentId: s.studentId,
@@ -108,18 +107,15 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
 
     await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
-    // Teacher may only add GROUP materials; the program-wide material was seeded
-    // by admin in beforeAll and appears here as inherited (read-only) curriculum.
-    await addLinkMaterial(
-      page,
-      /Dodaj samo u ovu grupu/,
-      GROUP_MATERIAL,
-      'https://example.com/e2e/group',
-    )
-    // Titles can render in both the manage list and the student preview —
-    // assert the first match to avoid strict-mode tripping on the duplicate.
-    await expect(page.getByText(COURSE_MATERIAL).first()).toBeVisible()
-    await expect(page.getByText(GROUP_MATERIAL).first()).toBeVisible()
+    // Teacher may only add GROUP materials, into an existing lesson; the
+    // curriculum material was seeded in beforeAll and appears here read-only.
+    await addGroupLinkMaterial(page, LESSON_TITLE, 'STUDENT', {
+      title: GROUP_MATERIAL,
+      url: 'https://example.com/e2e/group',
+    })
+    const lesson = await openLesson(page, LESSON_TITLE)
+    await expect(lesson.getByText(COURSE_MATERIAL)).toBeVisible()
+    await expect(lesson.getByText(GROUP_MATERIAL)).toBeVisible()
 
     await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/dolazak`)
     const dateInput = page.locator('input[type="date"]')
@@ -184,10 +180,12 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await loginWithEmail(page, seeded.studentLogin.email, seeded.studentLogin.password)
     await page.waitForURL(/\/portal/, { timeout: 30000 })
 
-    // Titles can render in both the manage list and the student preview —
-    // assert the first match to avoid strict-mode tripping on the duplicate.
-    await expect(page.getByText(COURSE_MATERIAL).first()).toBeVisible()
-    await expect(page.getByText(GROUP_MATERIAL).first()).toBeVisible()
+    // One enrollment: /portal forwards to the group, whose lessons are an
+    // accordion — open this one rather than relying on which starts open.
+    await page.waitForURL(new RegExp(`/portal/grupa/${seeded.groupId}`), { timeout: 30000 })
+    const lesson = await openLesson(page, LESSON_TITLE)
+    await expect(lesson.getByText(COURSE_MATERIAL)).toBeVisible()
+    await expect(lesson.getByText(GROUP_MATERIAL)).toBeVisible()
 
     for (const path of ['/portal', `/portal/grupa/${seeded.groupId}`, '/portal/profil']) {
       // Portal-path walks hit the App Router prefetch race (ERR_ABORTED);
@@ -202,21 +200,23 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     }
   })
 
-  test('teacher hides program-wide material → student loses it (GROUP material stays)', async ({ page }) => {
+  test('teacher hides the curriculum material → student loses it (GROUP material stays)', async ({ page }) => {
     test.setTimeout(120000)
     if (!seeded) throw new Error('not seeded')
     await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
     await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
     await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
 
-    const row = page.locator('li', { has: page.getByText(COURSE_MATERIAL) })
+    const staffLesson = await openLesson(page, LESSON_TITLE)
+    const row = staffLesson.locator('li').filter({ hasText: COURSE_MATERIAL })
     await row.getByRole('button', { name: 'Sakrij u ovoj grupi' }).click()
-    await expect(row.getByText('Sakriveno u grupi')).toBeVisible({ timeout: 5000 })
+    await expect(row.getByText('Sakriveno u grupi')).toBeVisible({ timeout: 10000 })
 
     await loginWithEmail(page, seeded.studentLogin.email, seeded.studentLogin.password)
     await page.waitForURL(/\/portal/, { timeout: 30000 })
-    await page.goto(`${BASE}/portal/grupa/${seeded.groupId}`)
+    await gotoPortalPath(page, `/portal/grupa/${seeded.groupId}`)
+    const lesson = await openLesson(page, LESSON_TITLE)
+    await expect(lesson.getByText(GROUP_MATERIAL)).toBeVisible()
     await expect(page.getByText(COURSE_MATERIAL)).toHaveCount(0)
-    await expect(page.getByText(GROUP_MATERIAL)).toBeVisible()
   })
 })

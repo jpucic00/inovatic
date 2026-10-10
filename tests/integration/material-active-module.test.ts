@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { mockChildSession, mockSession } from './setup'
+import { mockChildSession } from './setup'
 import { computeSchoolYear } from '@/lib/school-year'
-import type { GroupMaterialsView, KindBuckets } from '@/lib/group-materials-view'
+import type { GroupMaterialsView } from '@/lib/group-materials-view'
 import {
   createAdmin,
   createStudent,
@@ -10,6 +10,7 @@ import {
   createModule,
   createGroup,
   createEnrollment,
+  createLesson,
   createMaterial as seedMaterial,
 } from './helpers/factory'
 
@@ -27,21 +28,18 @@ function mondayWeeksAgo(weeks: number): Date {
   return d
 }
 
-function bucketTitles(b: KindBuckets): string[] {
-  return [...b.robocamp, ...b.videos, ...b.docs, ...b.links].map((m) => m.title)
-}
-
 function allVisibleTitles(view: GroupMaterialsView): string[] {
   return [
-    ...view.moduleSections.flatMap((s) => bucketTitles(s.buckets)),
-    ...bucketTitles(view.programMaterials),
-    ...bucketTitles(view.groupMaterials),
-    ...bucketTitles(view.radionicaMaterials),
+    ...view.modules.flatMap((s) => [
+      ...s.lessons.flatMap((l) => l.materials.map((m) => m.title)),
+      ...s.teacherMaterials.map((m) => m.title),
+    ]),
+    ...view.programTeacherMaterials.map((m) => m.title),
   ]
 }
 
 describe('kids see only the active module for their group', () => {
-  it('hides non-active module materials; keeps active module + program-wide + group', async () => {
+  it('hides non-active module lessons; keeps the active module whole + its group material', async () => {
     const schoolYear = computeSchoolYear()
     const admin = await createAdmin()
     const student = await createStudent()
@@ -61,22 +59,36 @@ describe('kids see only the active module for their group', () => {
     const group = await createGroup({ courseId: course.id, dayOfWeek: 'Ponedjeljak' })
     await createEnrollment(student.id, group.id)
 
-    await seedMaterial({ scope: 'MODULE', moduleId: m1.id, type: 'LINK', uploadedById: admin.id, title: 'M1 material' })
-    await seedMaterial({ scope: 'MODULE', moduleId: m2.id, type: 'LINK', uploadedById: admin.id, title: 'M2 material' })
-    await seedMaterial({ scope: 'COURSE', courseId: course.id, type: 'LINK', uploadedById: admin.id, title: 'Program material' })
-    await seedMaterial({ scope: 'GROUP', scheduledGroupId: group.id, type: 'LINK', uploadedById: admin.id, title: 'Group material' })
+    const l1 = await createLesson({ courseId: course.id, moduleId: m1.id, sessionNumbers: [1] })
+    const l2a = await createLesson({ courseId: course.id, moduleId: m2.id, sessionNumbers: [1] })
+    // A later lesson of the active module: the portal gets the module WHOLE,
+    // not just the lesson that is current today.
+    const l2b = await createLesson({ courseId: course.id, moduleId: m2.id, sessionNumbers: [7] })
+    const lesson = (lessonId: string, title: string) =>
+      seedMaterial({ scope: 'LESSON', lessonId, audience: 'STUDENT', uploadedById: admin.id, title })
+    await lesson(l1.id, 'M1 material')
+    await lesson(l2a.id, 'M2 material')
+    await lesson(l2b.id, 'M2 later material')
+    await seedMaterial({ scope: 'MODULE', moduleId: m2.id, uploadedById: admin.id, title: 'M2 teacher-only' })
+    await seedMaterial({ scope: 'COURSE', courseId: course.id, uploadedById: admin.id, title: 'Program material' })
+    await seedMaterial({ scope: 'GROUP', scheduledGroupId: group.id, lessonId: l2a.id, audience: 'STUDENT', uploadedById: admin.id, title: 'Group material' })
+    await seedMaterial({ scope: 'GROUP', scheduledGroupId: group.id, lessonId: l1.id, audience: 'STUDENT', uploadedById: admin.id, title: 'Group M1 material' })
 
     mockChildSession(student.id)
     const view = await getEffectiveMaterialsForStudent(group.id)
 
     expect(view.activeModuleId).toBe(m2.id)
-    expect(view.moduleSections.map((s) => s.moduleId)).toEqual([m2.id])
+    expect(view.modules.map((s) => s.moduleId)).toEqual([m2.id])
+    expect(view.modules[0].lessons.map((l) => l.id)).toEqual([l2a.id, l2b.id])
 
     const titles = allVisibleTitles(view)
     expect(titles).toContain('M2 material') // active module
-    expect(titles).toContain('Program material') // COURSE (whole-program) stays
-    expect(titles).toContain('Group material') // GROUP stays
+    expect(titles).toContain('M2 later material') // the whole active module
+    expect(titles).toContain('Group material') // GROUP in an active-module lesson
     expect(titles).not.toContain('M1 material') // non-active module hidden
+    expect(titles).not.toContain('Group M1 material') // …and its group additions with it
+    expect(titles).not.toContain('Program material') // teacher-only, never the portal
+    expect(titles).not.toContain('M2 teacher-only')
   })
 
   it('two groups of the same course on different weekdays can show different active modules', async () => {
@@ -102,7 +114,7 @@ describe('kids see only the active module for their group', () => {
     await createEnrollment(studentMon.id, groupMon.id)
     await createEnrollment(studentTue.id, groupTue.id)
 
-    await seedMaterial({ scope: 'MODULE', moduleId: m1.id, type: 'LINK', uploadedById: admin.id, title: 'M1 material' })
+    await seedMaterial({ scope: 'LESSON', moduleId: m1.id, audience: 'STUDENT', uploadedById: admin.id, title: 'M1 material' })
 
     mockChildSession(studentMon.id)
     const monView = await getEffectiveMaterialsForStudent(groupMon.id)

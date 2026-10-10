@@ -24,6 +24,12 @@ interface Props {
   type: MaterialType
   fileUrl: string | null
   fileSize: number | null
+  /**
+   * One line naming where the change lands — e.g. "Promjena vrijedi u oba
+   * grada." on shared curriculum, so an admin fixing a typo for Split knows
+   * Šibenik gets the fix too.
+   */
+  cityNotice?: string | null
 }
 
 type UploadResponse = {
@@ -63,6 +69,7 @@ export function EditMaterialDialog({
   type,
   fileUrl,
   fileSize,
+  cityNotice = null,
 }: Readonly<Props>) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -154,8 +161,9 @@ export function EditMaterialDialog({
       }}
     >
       <DialogTrigger asChild>
+        {/* 44px tap target on a phone, compact from `sm` up. */}
         <button
-          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-cyan-700 rounded hover:bg-gray-50 transition-colors"
+          className="inline-flex min-h-11 min-w-11 justify-center sm:min-h-8 sm:min-w-8 items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-cyan-700 rounded hover:bg-gray-50 transition-colors"
           aria-label="Uredi materijal"
         >
           <Pencil className="w-3.5 h-3.5" />
@@ -164,6 +172,7 @@ export function EditMaterialDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Uredi materijal</DialogTitle>
+          {cityNotice ? <p className="text-xs text-gray-500">{cityNotice}</p> : null}
         </DialogHeader>
         <div className="space-y-4">
           <div>

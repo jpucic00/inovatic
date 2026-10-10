@@ -26,14 +26,14 @@ describe('Teacher soft-delete', () => {
     // for Material and an authorId for StudentComment.
     const author = teacher.id
 
-    // Material requires a group or course or module; just use scope = COURSE
-    // with a freshly-created course.
+    // A teacher-only whole-program (COURSE) row needs nothing but a course.
     const course = await db.course.create({
       data: { slug: `c-${Date.now()}`, title: 'X', description: 'X', ageMin: 6, ageMax: 14 },
     })
     const material = await db.material.create({
       data: {
         scope: 'COURSE',
+        audience: 'TEACHER',
         courseId: course.id,
         title: 'M',
         type: 'LINK',

@@ -1,10 +1,21 @@
 import { test, expect, type Page } from '@playwright/test'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
-import { loginWithEmail, openLoginForm, BASE, addLinkMaterial, markSession, croatianDateRegex, expectNotFoundPage } from '../helpers/phase3'
+import {
+  loginWithEmail,
+  openLoginForm,
+  BASE,
+  addGroupLinkMaterial,
+  groupLessonTarget,
+  openLesson,
+  seedLesson,
+  markSession,
+  croatianDateRegex,
+  expectNotFoundPage,
+} from '../helpers/phase3'
 import { clickUntilVisible, submitUntilUrl } from '../helpers/hydration'
 import { fillInquiryStep1, selectPaymentOptionIfShown } from '../helpers/prijava'
-import { newRunId } from '../helpers/cleanup'
+import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 import { grantParentLogin } from '../helpers/seed'
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -32,6 +43,7 @@ const RUN_ID = newRunId()
 const CY = computeSchoolYear() // the journey runs in the CURRENT year — the portal only shows current-year enrollments
 
 const GROUP_NAME = `Trokut Junior ${RUN_ID}`
+const LESSON_TITLE = `Šibenik lekcija ${RUN_ID}`
 const MATERIAL_TITLE = `Šibenik upute ${RUN_ID}`
 // The plan start must be derived from today, not hardcoded: the public form only
 // shows a standard group while some module is still *about to* start, so a fixed
@@ -98,6 +110,8 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await wipeSibenikTenant()
+  // The lesson lives on the SHARED SLR 1 curriculum, outside the tenant wipe.
+  await cleanupRunFixtures(RUN_ID)
 })
 
 test('Šibenik journey — plan → group → window → upisi → accept → attendance → portal', async ({ page }) => {
@@ -210,8 +224,14 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
     // link back to /admin (plain teachers never see it).
     await expect(page.getByRole('link', { name: 'Administracija' })).toBeVisible()
 
+    // Lessons are shared curriculum (both cities); a group adds its own
+    // material into one. Seed a lesson on the module this group is on today.
+    await seedLesson({ target: await groupLessonTarget(groupId), title: LESSON_TITLE })
     await page.goto(`${BASE}/nastavnik/grupa/${groupId}/materijali`)
-    await addLinkMaterial(page, /Dodaj samo u ovu grupu/, MATERIAL_TITLE, 'https://example.com/sibenik-upute')
+    await addGroupLinkMaterial(page, LESSON_TITLE, 'STUDENT', {
+      title: MATERIAL_TITLE,
+      url: 'https://example.com/sibenik-upute',
+    })
   })
 
   await test.step('post-login panel choice — dual-role admin picks the teacher panel', async () => {
@@ -329,7 +349,8 @@ test('Šibenik journey — plan → group → window → upisi → accept → at
 
     // Single enrollment → direct landing on the group's materials.
     await expect(page.getByText(/Robotike 1/).first()).toBeVisible({ timeout: 15000 })
-    await expect(page.getByText(MATERIAL_TITLE).first()).toBeVisible()
+    const lesson = await openLesson(page, LESSON_TITLE)
+    await expect(lesson.getByText(MATERIAL_TITLE)).toBeVisible()
 
     // A Split group is a 404 for a Šibenik student — indistinguishable from
     // a nonexistent id.

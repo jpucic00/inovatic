@@ -1,35 +1,37 @@
-import { getStaffGroupMaterials } from '@/actions/teacher/materials'
-import { UploadMaterialDialog } from '@/components/material/upload-dialog'
-import { StaffMaterialList } from '@/components/material/staff-material-list'
+import { getGroupUploadTargets, getStaffGroupLessons } from '@/actions/teacher/materials'
+import { isCompetition } from '@/lib/program-kind'
+import { GroupLessons } from '@/components/teacher/group-lessons/group-lessons'
 
 /**
- * Admin group-detail materials panel: add/edit/delete this group's own (GROUP)
- * materials, and hide/show inherited program (MODULE/COURSE) materials for this
- * group. Inherited materials are edited on the program page, not here.
+ * Admin group-detail materials: the same lesson-by-lesson view the teacher
+ * has, so both sides talk about the same screen. The group's own materials
+ * are added, edited and moved here; curriculum rows are only hidden here and
+ * edited on the program page. An archived year is read-only.
  */
 export async function GroupMaterialsPanel({
   groupId,
   editable,
 }: Readonly<{ groupId: string; editable: boolean }>) {
-  const rows = await getStaffGroupMaterials(groupId)
+  const [lessons, targets] = await Promise.all([
+    getStaffGroupLessons(groupId),
+    getGroupUploadTargets(groupId),
+  ])
 
   return (
-    <div className="bg-white rounded-xl border p-6 mt-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
+    <section className="mt-6 rounded-xl border bg-white p-4 sm:p-6">
+      <div className="mb-4">
         <h2 className="text-sm font-semibold text-gray-700">Materijali</h2>
-        {editable && (
-          <UploadMaterialDialog
-            target={{ scope: 'GROUP', scheduledGroupId: groupId }}
-            label="Dodaj"
-            scopeLabel="Vidljivo samo u ovoj grupi."
-          />
-        )}
+        <p className="mt-0.5 text-xs text-gray-500">
+          {editable
+            ? 'Lekcije i programski materijali uređuju se na stranici programa. Ovdje se dodaju materijali samo za ovu grupu, a programski se mogu sakriti u njoj.'
+            : 'Arhivirana školska godina — materijali su prikazani kakvi su bili.'}
+        </p>
       </div>
-      <StaffMaterialList
-        rows={rows}
-        inGroupId={groupId}
-        emptyLabel="Još nema materijala za ovu grupu."
+      <GroupLessons
+        data={lessons}
+        editable={editable}
+        competition={isCompetition(targets.kind)}
       />
-    </div>
+    </section>
   )
 }

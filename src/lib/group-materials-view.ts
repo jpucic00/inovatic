@@ -1,20 +1,30 @@
 import { cache } from 'react'
 import { notFound } from 'next/navigation'
-import type { Material, MaterialType, ProgramKind } from '@prisma/client'
+import type { City, Material, MaterialAudience, MaterialType, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
-import { isRadionica, showsAllModules } from '@/lib/program-kind'
+import { hasDatedModules, isRadionica, showsAllModules } from '@/lib/program-kind'
 import { computeSchoolYear } from '@/lib/school-year'
-import { buildEffectiveMaterialsWhere } from '@/lib/material-query'
+import {
+  buildEffectiveMaterialsWhere,
+  visibleLessonWhere,
+  type MaterialViewer,
+} from '@/lib/material-query'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
+import { getGroupModuleArc } from '@/lib/group-module-arc'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { displayKindOf, kindOf, EXTRA_KIND_ORDER } from '@/lib/material-display'
 import { staffDisplayNames } from '@/lib/session-staff'
+import { placeLessons } from '@/lib/lesson-schedule'
+import { resolveTrialDateForGroup } from '@/lib/trial-week'
+import { zagrebDateKey } from '@/lib/attendance-window'
+import { fromDateKey } from '@/lib/session-dates'
 
 export type MaterialItem = {
   id: string
   title: string
   description: string | null
   type: MaterialType
+  audience: MaterialAudience
   fileUrl: string | null
   externalUrl: string | null
   fileSize: number | null
@@ -23,22 +33,34 @@ export type MaterialItem = {
   createdAt: Date
 }
 
-export type KindBuckets = {
-  robocamp: MaterialItem[]
-  videos: MaterialItem[]
-  docs: MaterialItem[]
-  links: MaterialItem[]
+export type LessonView = {
+  id: string
+  title: string
+  description: string | null
+  /** Sorted; empty for an undated lesson (radionica, natjecanje, sats not picked). */
+  sessionNumbers: number[]
+  /** First of the lesson's sats on THIS group's calendar; null when undated. */
+  firstDate: Date | null
+  isCurrent: boolean
+  /** Ordered by sortOrder, then createdAt. Audience-filtered for the viewer. */
+  materials: MaterialItem[]
 }
 
-export type ModuleMaterialGroup = {
-  moduleId: string
-  title: string
+export type ModuleLessonsView = {
+  /** null for a radionica — its lessons sit directly under the program. */
+  moduleId: string | null
+  title: string | null
   sortOrder: number
+  /** The module this group is working through now (standard programs only). */
   isActive: boolean
-  buckets: KindBuckets
+  currentLessonId: string | null
+  lessons: LessonView[]
+  /** Teacher-only "every class of this module" rows. Always empty for STUDENT. */
+  teacherMaterials: MaterialItem[]
 }
 
 export type GroupMaterialsView = {
+  viewer: MaterialViewer
   group: {
     id: string
     name: string | null
@@ -50,74 +72,62 @@ export type GroupMaterialsView = {
     teacherNames: string[]
   }
   /**
-   * Per-module sections. Standard programs get exactly one (the module the
-   * group is working on now); COMPETITION programs get one per natjecanje, all
-   * of them, all year. Empty for radionice.
+   * Lesson sections. STUDENT: a standard group gets exactly one — the module it
+   * is working through now, whole, with every lesson; a natjecanje group gets
+   * every module; a radionica one module-less section. STAFF: every module.
    */
-  moduleSections: ModuleMaterialGroup[]
-  /** COURSE-scoped materials ("for the whole program"). Empty for radionice. */
-  programMaterials: KindBuckets
-  /** GROUP-scoped materials (this group's own extras). */
-  groupMaterials: KindBuckets
-  /** Radionice flat bucket (COURSE + GROUP); empty for standard programs. */
-  radionicaMaterials: KindBuckets
-  /** Convenience: id of the module the student is likely working on now. */
+  modules: ModuleLessonsView[]
+  /** Teacher-only "every class of this program" rows. Always empty for STUDENT. */
+  programTeacherMaterials: MaterialItem[]
+  /** Convenience: id of the module the group is working on now. */
   activeModuleId: string | null
-}
-
-function emptyBuckets(): KindBuckets {
-  return { robocamp: [], videos: [], docs: [], links: [] }
 }
 
 type InteractiveGuide = {
   item: MaterialItem
   /** Which module the guide belongs to, when the program has modules. */
   moduleTitle: string | null
+  lessonId: string
+  lessonTitle: string
+  /**
+   * The guide sits in the lesson that is current for this group ON ITS
+   * CALENDAR. An undated lesson (radionica, natjecanje) is "current" only
+   * because it comes first, so it never carries this — otherwise every
+   * natjecanje's first guide would claim to be today's.
+   */
+  inCurrentLesson: boolean
 }
 
 /**
- * Every RoboCamp guide a group can see, each carrying its module's title.
- *
- * Deliberately gathers from ALL buckets, not just the module ones. A guide
- * attached at COURSE or GROUP scope is still a guide — and since the guide
- * section is the only place a RoboCamp row is rendered now, anything missed
- * here disappears from the page entirely rather than merely being demoted.
- * That is exactly what the old `featuredRobocamp` (module-scope only) would
- * have done to a programme-wide guide.
+ * Every RoboCamp guide in view, each carrying its module and lesson title.
+ * RoboCamp guides are STUDENT-only by rule, so this is the same list for staff
+ * and for the portal.
  */
 export function interactiveGuides(view: GroupMaterialsView): InteractiveGuide[] {
-  const guides: InteractiveGuide[] = view.moduleSections.flatMap((section) =>
-    section.buckets.robocamp.map((item) => ({ item, moduleTitle: section.title })),
+  return view.modules.flatMap((section) =>
+    section.lessons.flatMap((lesson) =>
+      lesson.materials
+        .filter((item) => kindOf(item) === 'robocamp')
+        .map((item) => ({
+          item,
+          moduleTitle: section.title,
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          inCurrentLesson: lesson.isCurrent && lesson.firstDate !== null,
+        })),
+    ),
   )
-  for (const bucket of [
-    view.programMaterials,
-    view.groupMaterials,
-    view.radionicaMaterials,
-  ]) {
-    for (const item of bucket.robocamp) guides.push({ item, moduleTitle: null })
-  }
-  return guides
 }
 
 /**
- * Everything that is NOT an interactive guide, as ONE list.
- *
- * Where a material came from — this module, the whole program, or the group's
- * own extras — is deliberately dropped here. To a child that distinction means
- * nothing; what they need is to find the thing and know what kind it is, so the
- * list is ordered by kind instead and each row is labelled with its own. Staff
- * keep the scope: `StaffMaterialList` still groups and labels by it, because
- * for a teacher it decides whether a row can be edited, only hidden, or
- * neither.
+ * Everything that is NOT an interactive guide, as ONE list ordered by kind.
+ * Interim flattening for the portal's kind-filtered list until it renders
+ * lessons itself.
  */
 export function flattenExtraMaterials(view: GroupMaterialsView): MaterialItem[] {
-  const buckets: KindBuckets[] = [
-    ...view.moduleSections.map((s) => s.buckets),
-    view.programMaterials,
-    view.groupMaterials,
-    view.radionicaMaterials,
-  ]
-  const all = buckets.flatMap((b) => [...b.videos, ...b.docs, ...b.links])
+  const all = view.modules.flatMap((section) =>
+    section.lessons.flatMap((lesson) => lesson.materials.filter((m) => kindOf(m) !== 'robocamp')),
+  )
 
   return all.sort((a, b) => {
     const byKind =
@@ -129,23 +139,13 @@ export function flattenExtraMaterials(view: GroupMaterialsView): MaterialItem[] 
   })
 }
 
-function toItem(m: {
-  id: string
-  title: string
-  description: string | null
-  type: MaterialType
-  fileUrl: string | null
-  externalUrl: string | null
-  fileSize: number | null
-  mimeType: string | null
-  sortOrder: number
-  createdAt: Date
-}): MaterialItem {
+function toItem(m: Material): MaterialItem {
   return {
     id: m.id,
     title: m.title,
     description: m.description,
     type: m.type,
+    audience: m.audience,
     fileUrl: m.fileUrl,
     externalUrl: m.externalUrl,
     fileSize: m.fileSize,
@@ -153,52 +153,6 @@ function toItem(m: {
     sortOrder: m.sortOrder,
     createdAt: m.createdAt,
   }
-}
-
-type MaterialPartition = {
-  moduleBuckets: Map<string, KindBuckets>
-  programMaterials: KindBuckets
-  groupMaterials: KindBuckets
-  radionicaMaterials: KindBuckets
-}
-
-/**
- * Sort every material into its display bucket: MODULE-scoped rows group by
- * moduleId; on a radionica everything else folds into one flat bucket; on a
- * program with modules COURSE-scoped rows go to the program bucket and the rest
- * to the group bucket.
- */
-function partitionMaterials(
-  materials: Material[],
-  kind: ProgramKind,
-): MaterialPartition {
-  const moduleBuckets = new Map<string, KindBuckets>()
-  const programMaterials = emptyBuckets()
-  const groupMaterials = emptyBuckets()
-  const radionicaMaterials = emptyBuckets()
-
-  for (const m of materials) {
-    const item = toItem(m)
-    const bucketKind = kindOf(m)
-
-    if (m.scope === 'MODULE' && m.moduleId) {
-      let bucket = moduleBuckets.get(m.moduleId)
-      if (!bucket) {
-        bucket = emptyBuckets()
-        moduleBuckets.set(m.moduleId, bucket)
-      }
-      bucket[bucketKind].push(item)
-    } else if (isRadionica(kind)) {
-      // Radionica: COURSE + GROUP both fold into one flat bucket (no modules).
-      radionicaMaterials[bucketKind].push(item)
-    } else if (m.scope === 'COURSE') {
-      programMaterials[bucketKind].push(item)
-    } else {
-      groupMaterials[bucketKind].push(item)
-    }
-  }
-
-  return { moduleBuckets, programMaterials, groupMaterials, radionicaMaterials }
 }
 
 export type GroupShell = {
@@ -209,8 +163,13 @@ export type GroupShell = {
   modules: { id: string; title: string; sortOrder: number }[]
   /** The module this group is working through now — null for COMPETITION. */
   activeModule: { id: string; title: string; sortOrder: number } | null
-  /** Modules whose materials this group may see at all. */
+  /** Modules whose lessons the PORTAL may see (staff see every module). */
   visibleModuleIds: string[]
+  /** Each standard module's 7 sats on this group's own arc, by module id. */
+  moduleSessionDates: Map<string, Date[]>
+  /** The group's own school year (what its trial week is keyed on). */
+  groupSchoolYear: string
+  city: City
   schoolYear: string
 }
 
@@ -275,6 +234,28 @@ export const buildGroupShell = cache(async function buildGroupShell(
   if (allModules) visibleModuleIds = group.course.modules.map((m) => m.id)
   else if (activeModule) visibleModuleIds = [activeModule.id]
 
+  // Where each module's seven sats fall for THIS group — what a lesson's sat
+  // numbers are resolved against. Same inputs as the active-module pick above.
+  const moduleSessionDates = new Map<string, Date[]>()
+  if (hasDatedModules(kind)) {
+    const arc = getGroupModuleArc({
+      dayOfWeek: group.dayOfWeek,
+      modules: group.course.modules.map((m) => {
+        const schedule = m.schedules.find((sc) => sc.city === group.city) ?? null
+        return {
+          id: m.id,
+          title: m.title,
+          sortOrder: m.sortOrder,
+          schedule: schedule
+            ? { id: schedule.id, startDate: schedule.startDate, endDate: schedule.endDate }
+            : null,
+        }
+      }),
+      holidayDates,
+    })
+    for (const entry of arc) moduleSessionDates.set(entry.moduleId, entry.sessionDates)
+  }
+
   return {
     group: {
       id: group.id,
@@ -310,62 +291,136 @@ export const buildGroupShell = cache(async function buildGroupShell(
         }
       : null,
     visibleModuleIds,
+    moduleSessionDates,
+    groupSchoolYear: group.schoolYear,
+    city: group.city,
     schoolYear,
   }
 })
 
 /**
- * Loads a group and computes the effective, kind-partitioned material view a
- * student sees — respecting per-group hides. Does NOT authorize the caller;
- * the caller (student enrollment gate, or staff ownership gate) must do that
- * first. Throws notFound() if the group does not exist.
+ * Loads a group and computes its lesson-structured material view for `viewer`
+ * — respecting per-group hides, and for STUDENT dropping every TEACHER row.
+ * Does NOT authorize the caller; the caller (portal gate, or staff ownership
+ * gate) must do that first, and must pass STAFF only for a staff caller. Throws
+ * notFound() if the group does not exist.
  */
-export async function buildGroupMaterialsView(groupId: string): Promise<GroupMaterialsView> {
+export async function buildGroupMaterialsView(
+  groupId: string,
+  viewer: MaterialViewer,
+): Promise<GroupMaterialsView> {
   const shell = await buildGroupShell(groupId)
-  const { kind, activeModule, visibleModuleIds, modules } = shell
-  const allModules = showsAllModules(kind)
+  const { kind, activeModule, modules } = shell
 
-  const materials = await db.material.findMany({
-    where: buildEffectiveMaterialsWhere({
-      scheduledGroupId: shell.group.id,
-      courseId: shell.courseId,
-      moduleIds: visibleModuleIds,
-    }),
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-  })
+  // The portal sees the module the group is on now (natjecanje: all of them);
+  // staff see every module of the program.
+  const moduleIds = viewer === 'STAFF' ? modules.map((m) => m.id) : shell.visibleModuleIds
 
-  const { moduleBuckets, programMaterials, groupMaterials, radionicaMaterials } =
-    partitionMaterials(materials, kind)
-
-  let moduleSections: ModuleMaterialGroup[] = []
-  if (allModules) {
-    // Every natjecanje, in sortOrder. None is "active" — the season runs them
-    // all in parallel — so the UI must not highlight one over the others.
-    moduleSections = modules.map((m) => ({
-      moduleId: m.id,
-      title: m.title,
-      sortOrder: m.sortOrder,
-      isActive: false,
-      buckets: moduleBuckets.get(m.id) ?? emptyBuckets(),
-    }))
-  } else if (activeModule) {
-    moduleSections = [
-      {
-        moduleId: activeModule.id,
-        title: activeModule.title,
-        sortOrder: activeModule.sortOrder,
-        isActive: true,
-        buckets: moduleBuckets.get(activeModule.id) ?? emptyBuckets(),
+  const [lessons, materials] = await Promise.all([
+    db.lesson.findMany({
+      where: visibleLessonWhere(shell.courseId, moduleIds),
+      select: {
+        id: true,
+        moduleId: true,
+        title: true,
+        description: true,
+        sortOrder: true,
+        createdAt: true,
+        sessions: { select: { sessionNumber: true } },
       },
-    ]
+    }),
+    db.material.findMany({
+      where: buildEffectiveMaterialsWhere({
+        scheduledGroupId: shell.group.id,
+        courseId: shell.courseId,
+        moduleIds,
+        viewer,
+        city: shell.city,
+      }),
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    }),
+  ])
+
+  const byLesson = new Map<string, MaterialItem[]>()
+  const byModule = new Map<string, MaterialItem[]>()
+  const programTeacherMaterials: MaterialItem[] = []
+  for (const m of materials) {
+    const item = toItem(m)
+    if (m.lessonId) pushTo(byLesson, m.lessonId, item)
+    else if (m.scope === 'MODULE' && m.moduleId) pushTo(byModule, m.moduleId, item)
+    else if (m.scope === 'COURSE') programTeacherMaterials.push(item)
   }
+
+  // The probni sat (sat 0) exists only before a standard program's first module.
+  const firstModuleId = modules[0]?.id ?? null
+  const needsTrial =
+    hasDatedModules(kind) &&
+    firstModuleId !== null &&
+    moduleIds.includes(firstModuleId) &&
+    lessons.some((l) => l.moduleId === firstModuleId && l.sessions.some((s) => s.sessionNumber === 0))
+  const trialDate = needsTrial
+    ? await resolveTrialDateForGroup({
+        dayOfWeek: shell.group.dayOfWeek,
+        schoolYear: shell.groupSchoolYear,
+        city: shell.city,
+        course: { kind },
+      })
+    : null
+
+  const today = fromDateKey(zagrebDateKey(new Date()))
+
+  const sectionFor = (
+    moduleId: string | null,
+    title: string | null,
+    sortOrder: number,
+  ): ModuleLessonsView => {
+    const own = lessons.filter((l) => l.moduleId === moduleId)
+    const sessionDates =
+      moduleId !== null && hasDatedModules(kind)
+        ? (shell.moduleSessionDates.get(moduleId) ?? null)
+        : null
+    const placement = placeLessons({
+      lessons: own.map((l) => ({ ...l, sessionNumbers: l.sessions.map((s) => s.sessionNumber) })),
+      sessionDates,
+      trialDate: moduleId === firstModuleId ? trialDate : null,
+      today,
+    })
+    return {
+      moduleId,
+      title,
+      sortOrder,
+      isActive: moduleId !== null && moduleId === activeModule?.id,
+      currentLessonId: placement.currentLessonId,
+      lessons: placement.lessons.map((l) => ({
+        id: l.id,
+        title: l.title,
+        description: l.description,
+        sessionNumbers: l.sessionNumbers,
+        firstDate: l.firstDate,
+        isCurrent: l.id === placement.currentLessonId,
+        materials: byLesson.get(l.id) ?? [],
+      })),
+      teacherMaterials: moduleId === null ? [] : (byModule.get(moduleId) ?? []),
+    }
+  }
+
+  const sections: ModuleLessonsView[] = isRadionica(kind)
+    ? [sectionFor(null, null, 0)]
+    : modules
+        .filter((m) => moduleIds.includes(m.id))
+        .map((m) => sectionFor(m.id, m.title, m.sortOrder))
 
   return {
+    viewer,
     group: shell.group,
-    moduleSections,
-    programMaterials,
-    groupMaterials,
-    radionicaMaterials,
+    modules: sections,
+    programTeacherMaterials,
     activeModuleId: activeModule?.id ?? null,
   }
+}
+
+function pushTo<K>(map: Map<K, MaterialItem[]>, key: K, item: MaterialItem) {
+  const list = map.get(key)
+  if (list) list.push(item)
+  else map.set(key, [item])
 }

@@ -28,6 +28,7 @@ import {
   createEnrollment,
   createEnrollmentWindow,
   createGroup,
+  createLesson,
   createMaterial,
   createModule,
   createModuleSchedule,
@@ -89,9 +90,11 @@ afterAll(async () => {
         { scheduledGroup: { courseId: { in: createdCourseIds } } },
         { module: { courseId: { in: createdCourseIds } } },
         { courseId: { in: createdCourseIds } },
+        { lesson: { courseId: { in: createdCourseIds } } },
       ],
     },
   })
+  await db.lesson.deleteMany({ where: { courseId: { in: createdCourseIds } } })
   await db.courseEnrollmentWindow.deleteMany({ where: { courseId: { in: createdCourseIds } } })
   await db.moduleSchedule.deleteMany({ where: { module: { courseId: { in: createdCourseIds } } } })
   await db.scheduledGroup.deleteMany({ where: { courseId: { in: createdCourseIds } } })
@@ -260,12 +263,16 @@ describe('attendance — ADMIN pass-through is tenant-bound', () => {
 describe('material writes — GROUP is tenant-bound, MODULE curriculum stays shared', () => {
   it('createMaterial: a Šibenik admin cannot attach a GROUP material to a Split group', async () => {
     const splitGroup = await createGroup({ city: 'SPLIT', schoolYear: YEAR })
+    createdCourseIds.push(splitGroup.courseId)
+    const lesson = await createLesson({ courseId: splitGroup.courseId })
     const sibAdmin = await createAdmin({ city: 'SIBENIK' })
     mockSession({ id: sibAdmin.id, role: 'ADMIN', city: 'SIBENIK' })
 
     const result = await createMaterialAction({
       scope: 'GROUP',
       scheduledGroupId: splitGroup.id,
+      lessonId: lesson.id,
+      audience: 'STUDENT',
       title: 'Upute za grupu',
       type: 'LINK',
       externalUrl: 'https://example.com/upute',
@@ -361,14 +368,20 @@ describe('GET /api/download — GROUP downloads are tenant-bound, curriculum sha
       moduleId: moduleRow.id,
       ...asDoc,
     })
+    const lessonMaterial = await createMaterial({
+      scope: 'LESSON',
+      moduleId: moduleRow.id,
+      ...asDoc,
+    })
 
     const sibAdmin = await createAdmin({ city: 'SIBENIK' })
     mockSession({ id: sibAdmin.id, role: 'ADMIN', city: 'SIBENIK' })
 
     expect((await callDownload(splitGroupMaterial.id)).status).toBe(404)
     expect((await callDownload(sibGroupMaterial.id)).status).toBe(200)
-    // MODULE/COURSE curriculum is deliberately shared across cities.
+    // LESSON/MODULE/COURSE curriculum is deliberately shared across cities.
     expect((await callDownload(moduleMaterial.id)).status).toBe(200)
+    expect((await callDownload(lessonMaterial.id)).status).toBe(200)
 
     const splitAdmin = await createAdmin({ city: 'SPLIT' })
     mockSession({ id: splitAdmin.id, role: 'ADMIN', city: 'SPLIT' })

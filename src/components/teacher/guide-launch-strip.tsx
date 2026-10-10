@@ -6,6 +6,9 @@ import type { StaffGuide } from '@/actions/teacher/materials'
 /**
  * The one lesson-time action on the Materijali tab.
  *
+ * Names the guide the presenter will open on — the current lesson's, when the
+ * group has one — so the teacher knows what goes on the wall before clicking.
+ *
  * With no guide it becomes a quiet explanation rather than a disabled button:
  * a radionica or a module nobody has attached a RoboCamp link to has nothing to
  * present, and offering a button that cannot work is worse than saying so.
@@ -14,7 +17,9 @@ export function GuideLaunchStrip({
   groupId,
   guides,
 }: Readonly<{ groupId: string; guides: StaffGuide[] }>) {
-  const first = guides[0]
+  // Mirrors the presenter's opening pick, so the strip never names one guide
+  // and the projector shows another.
+  const first = guides.find((g) => g.inCurrentLesson) ?? guides[0]
 
   if (!first) {
     return (
@@ -49,6 +54,14 @@ export function GuideLaunchStrip({
           Interaktivni vodič{first.moduleTitle ? ` · ${first.moduleTitle}` : ''}
         </p>
         <h2 className="text-lg font-bold text-gray-900">{first.title}</h2>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-gray-600">
+          <span>Lekcija: {first.lessonTitle}</span>
+          {first.inCurrentLesson ? (
+            <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+              Trenutna
+            </span>
+          ) : null}
+        </p>
         {guides.length > 1 ? (
           <p className="mt-0.5 text-[13px] text-gray-600">
             + još {guides.length - 1} u prezentaciji

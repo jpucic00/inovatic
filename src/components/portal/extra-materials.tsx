@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown } from 'lucide-react'
 import { VideoEmbed } from '@/components/material/video-embed'
@@ -10,22 +10,8 @@ import {
   MaterialKindTile,
   materialMetaLabel,
 } from '@/components/material/material-kind'
-import {
-  displayKindOf,
-  resolveHref,
-  EXTRA_KIND_ORDER,
-  type MaterialDisplayKind,
-} from '@/lib/material-display'
+import { displayKindOf, resolveHref, type MaterialDisplayKind } from '@/lib/material-display'
 import type { MaterialItem } from '@/lib/group-materials-view'
-
-/** Plural forms — the chips name a set, the captions name one thing. */
-const FILTER_LABEL: Record<MaterialDisplayKind, string> = {
-  robocamp: 'Vodiči',
-  video: 'Videi',
-  presentation: 'Prezentacije',
-  document: 'Dokumenti',
-  link: 'Poveznice',
-}
 
 function CardShell({
   kind,
@@ -141,70 +127,21 @@ function MaterialCard({ item }: Readonly<{ item: MaterialItem }>) {
 }
 
 /**
- * Everything that is not the interactive guide, in ONE list.
+ * A lesson's materials other than its interactive guide, as kind-labelled cards
+ * in the order the author put them.
  *
- * Filtered by KIND, never by where the material came from: a child looking for
- * the worksheet does not know or care whether it was attached to the module,
- * the programme or their own group. The chips are also the answer to "what kind
- * of thing is this" — the question the scope headings never answered.
+ * This used to be ONE flat "Dodatni materijali" list for the whole group, with
+ * kind filter chips to make a long pile searchable. The lesson structure took
+ * that job over: a lesson holds a handful of things, so the chips would mostly
+ * say "all of them", and sorting by kind would undo the order the mentor chose
+ * for the lesson. Each card still says what kind of thing it opens.
  */
-export function ExtraMaterials({ items }: Readonly<{ items: MaterialItem[] }>) {
-  const [filter, setFilter] = useState<MaterialDisplayKind | 'all'>('all')
-
-  const counts = useMemo(() => {
-    const map = new Map<MaterialDisplayKind, number>()
-    for (const item of items) {
-      const kind = displayKindOf(item)
-      map.set(kind, (map.get(kind) ?? 0) + 1)
-    }
-    return map
-  }, [items])
-
-  const present = EXTRA_KIND_ORDER.filter((kind) => (counts.get(kind) ?? 0) > 0)
-  const shown = filter === 'all' ? items : items.filter((i) => displayKindOf(i) === filter)
-
+export function MaterialCards({ items }: Readonly<{ items: MaterialItem[] }>) {
   return (
-    <section>
-      <div className="mb-3.5 flex items-baseline justify-between gap-4">
-        <h2 className="text-lg font-semibold text-gray-900">Dodatni materijali</h2>
-        <span className="text-[13px] text-gray-400">
-          {shown.length} od {items.length} materijala
-        </span>
-      </div>
-
-      {/* One kind present means the chips would only ever say "all of them". */}
-      {present.length > 1 ? (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {(['all', ...present] as const).map((key) => {
-            const isActive = key === filter
-            const label = key === 'all' ? 'Sve' : FILTER_LABEL[key]
-            const count = key === 'all' ? items.length : (counts.get(key) ?? 0)
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFilter(key)}
-                aria-pressed={isActive}
-                className={[
-                  'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors',
-                  isActive
-                    ? 'border-cyan-600 bg-cyan-600 text-white'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-cyan-300',
-                ].join(' ')}
-              >
-                {label}
-                <span className={isActive ? 'text-white/75' : 'text-gray-400'}>{count}</span>
-              </button>
-            )
-          })}
-        </div>
-      ) : null}
-
-      <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-        {shown.map((item) => (
-          <MaterialCard key={item.id} item={item} />
-        ))}
-      </div>
-    </section>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((item) => (
+        <MaterialCard key={item.id} item={item} />
+      ))}
+    </div>
   )
 }

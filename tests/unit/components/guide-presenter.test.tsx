@@ -13,15 +13,21 @@ vi.mock('@/components/material/robocamp-embed', () => ({
   ),
 }))
 
-function guide(n: number): StaffGuide {
+function guide(n: number, overrides: Partial<StaffGuide> = {}): StaffGuide {
   return {
     id: `g${n}`,
     title: `Vodič ${n}`,
     description: null,
     externalUrl: `https://elearning.robocamp.eu/course/${n}`,
     moduleTitle: null,
+    lessonId: `l${n}`,
+    lessonTitle: `Lekcija ${n}`,
+    inCurrentLesson: false,
+    ...overrides,
   }
 }
+
+const embedTitle = () => screen.getByTestId('embed').textContent
 
 const BACK = '/nastavnik/grupa/g-1/materijali'
 
@@ -67,24 +73,80 @@ describe('GuidePresenter — leaving', () => {
   })
 })
 
-describe('GuidePresenter — guide switcher', () => {
-  it('renders no switcher for a single guide', () => {
-    render(<GuidePresenter guides={[guide(1)]} groupLabel="SLR 2" backHref={BACK} />)
+describe('GuidePresenter — opening guide', () => {
+  it('opens on the guide of the current lesson, not the first one', () => {
+    render(
+      <GuidePresenter
+        guides={[guide(1), guide(2, { inCurrentLesson: true }), guide(3)]}
+        groupLabel="SLR 2"
+        backHref={BACK}
+      />,
+    )
 
-    expect(screen.queryByRole('button', { name: /Sljedeći vodič/ })).toBeNull()
+    expect(embedTitle()).toBe('Vodič 2')
+    // The bar names the lesson, so the teacher sees which one is on the wall.
+    expect(screen.getByText(/SLR 2 · Lekcija 2/)).toBeTruthy()
   })
 
-  it('cycles through the guides and wraps around', () => {
+  it('falls back to the first guide when no lesson is current yet', () => {
+    render(<GuidePresenter guides={[guide(1), guide(2)]} groupLabel="SLR 2" backHref={BACK} />)
+
+    expect(embedTitle()).toBe('Vodič 1')
+  })
+})
+
+describe('GuidePresenter — guide picker', () => {
+  it('renders no picker for a single guide', () => {
+    render(<GuidePresenter guides={[guide(1)]} groupLabel="SLR 2" backHref={BACK} />)
+
+    expect(screen.queryByRole('combobox')).toBeNull()
+  })
+
+  it('labels every option by lesson and marks the current lesson', () => {
     render(
-      <GuidePresenter guides={[guide(1), guide(2)]} groupLabel="FLL" backHref={BACK} />,
+      <GuidePresenter
+        guides={[guide(1), guide(2, { inCurrentLesson: true })]}
+        groupLabel="SLR 2"
+        backHref={BACK}
+      />,
     )
-    expect(screen.getAllByText('Vodič 1').length).toBeGreaterThan(0)
 
-    const next = screen.getByRole('button', { name: /Sljedeći vodič/ })
-    fireEvent.click(next)
-    expect(screen.getAllByText('Vodič 2').length).toBeGreaterThan(0)
+    const options = screen.getAllByRole('option').map((o) => o.textContent)
+    expect(options).toEqual(['Lekcija 1 · Vodič 1', 'Lekcija 2 · Vodič 2 (trenutna lekcija)'])
+    // A single module needs no group headings.
+    expect(document.querySelector('optgroup')).toBeNull()
+  })
 
-    fireEvent.click(next)
-    expect(screen.getAllByText('Vodič 1').length).toBeGreaterThan(0)
+  it('switches the embedded guide when another one is picked', () => {
+    render(<GuidePresenter guides={[guide(1), guide(2)]} groupLabel="SLR 2" backHref={BACK} />)
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Odaberi vodič' }), {
+      target: { value: '1' },
+    })
+
+    expect(embedTitle()).toBe('Vodič 2')
+  })
+
+  it('groups the options per natjecanje when the guides span several modules', () => {
+    render(
+      <GuidePresenter
+        guides={[
+          guide(1, { moduleTitle: 'FLL' }),
+          guide(2, { moduleTitle: 'FLL' }),
+          guide(3, { moduleTitle: 'WRO' }),
+        ]}
+        groupLabel="Natjecateljski program"
+        backHref={BACK}
+      />,
+    )
+
+    const groups = [...document.querySelectorAll('optgroup')].map((g) => ({
+      label: g.getAttribute('label'),
+      count: g.querySelectorAll('option').length,
+    }))
+    expect(groups).toEqual([
+      { label: 'FLL', count: 2 },
+      { label: 'WRO', count: 1 },
+    ])
   })
 })

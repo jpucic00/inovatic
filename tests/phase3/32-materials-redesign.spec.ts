@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import {
@@ -8,7 +8,12 @@ import {
   loginWithEmail,
   pickStandardGroupId,
   getGroupCourseTitle,
-  addLinkMaterial,
+  groupLessonTarget,
+  createLessonOnProgramPage,
+  seedLesson,
+  openLesson,
+  addTeacherProgramMaterial,
+  type LessonTarget,
   type TeacherData,
   type StudentData,
 } from '../helpers/phase3'
@@ -46,7 +51,11 @@ const STUDENT: StudentData = {
 }
 
 const PROGRAM_LINK_TITLE = `Program-wide LINK ${RUN_ID}`
+const LESSON_A = `Lekcija s vodičem A ${RUN_ID}`
+const LESSON_B = `Lekcija s vodičem B ${RUN_ID}`
 const ROBOCAMP_TITLE = `RoboCamp vodič ${RUN_ID}`
+const ROBOCAMP_B_TITLE = `RoboCamp vodič B ${RUN_ID}`
+const KIDS_LINK_TITLE = `Radni list ${RUN_ID}`
 
 type Seeded = {
   teacher: { email: string; password: string }
@@ -54,24 +63,14 @@ type Seeded = {
   groupId: string
   courseId: string
   courseTitle: string
+  target: LessonTarget
 }
 let seeded: Seeded | null = null
-
-/** Adds a ROBOCAMP material via the first "Dodaj" dialog on the current page. */
-async function addRobocampMaterial(page: Page, title: string, url: string) {
-  await page.getByRole('button', { name: /^Dodaj$/ }).first().click()
-  const dialog = page.locator('[role="dialog"]')
-  await dialog.locator('#material-title').fill(title)
-  await dialog.locator('label', { hasText: 'RoboCamp' }).click()
-  await dialog.locator('#material-external-url').fill(url)
-  await dialog.getByRole('button', { name: 'Spremi' }).click()
-  await expect(dialog).toBeHidden({ timeout: 10000 })
-  await expect(page.getByText(title)).toBeVisible({ timeout: 15000 })
-}
+let lessonAId = ''
 
 test.describe.configure({ mode: 'serial' })
 
-test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids page', () => {
+test.describe('Phase 3 — Materials redesign: lessons, RoboCamp in the lesson, presenter', () => {
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(240000)
     const page = await browser.newPage()
@@ -98,45 +97,82 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
       groupId,
       courseId,
       courseTitle,
+      target: await groupLessonTarget(groupId),
     }
     await page.close()
   })
 
-  test('admin adds program-wide (COURSE) + RoboCamp materials on the program detail page', async ({
+  test('admin adds a teacher-only program material and RoboCamp guides inside lessons', async ({
     page,
   }) => {
     if (!seeded) throw new Error('not seeded')
-    test.setTimeout(120000)
+    test.setTimeout(180000)
     await loginAsAdmin(page)
-    await page.goto(`${BASE}/admin/programi/${seeded.courseId}`)
 
-    // The first "Dodaj" on the page is the "Materijali za cijeli program" (COURSE) one.
-    await addLinkMaterial(page, /^Dodaj$/, PROGRAM_LINK_TITLE, 'https://example.com/program-wide')
-    await addRobocampMaterial(page, ROBOCAMP_TITLE, 'https://elearning.robocamp.eu/course/e2e')
+    // The one material outside a lesson: teacher-only preparation for the
+    // whole program. The portal never sees it.
+    await addTeacherProgramMaterial(
+      page,
+      seeded.courseId,
+      PROGRAM_LINK_TITLE,
+      'https://example.com/program-wide',
+    )
 
-    await expect(page.getByText(PROGRAM_LINK_TITLE)).toBeVisible()
-    await expect(page.getByText(ROBOCAMP_TITLE)).toBeVisible()
+    // A RoboCamp guide is a kids' material in a lesson — the editor offers it
+    // only in the polaznici section.
+    lessonAId = await createLessonOnProgramPage(page, {
+      target: seeded.target,
+      title: LESSON_A,
+      studentLinks: [
+        { title: ROBOCAMP_TITLE, url: 'https://elearning.robocamp.eu/course/e2e', type: 'ROBOCAMP' },
+        { title: KIDS_LINK_TITLE, url: 'https://example.com/radni-list' },
+      ],
+    })
+    const section = (heading: string) =>
+      page.locator('section').filter({ has: page.getByRole('heading', { level: 2, name: heading }) })
+    await expect(section('Materijali za polaznike').getByText(ROBOCAMP_TITLE)).toBeVisible()
+    await expect(section('Materijali za polaznike').getByRole('button', { name: 'RoboCamp', exact: true })).toBeVisible()
+    await expect(section('Materijali za nastavnike').getByRole('button', { name: 'RoboCamp', exact: true })).toHaveCount(0)
+
+    // A second lesson with its own guide, so the presenter has a choice.
+    await seedLesson({
+      target: seeded.target,
+      title: LESSON_B,
+      studentLinks: [
+        { title: ROBOCAMP_B_TITLE, url: 'https://elearning.robocamp.eu/course/e2e-b', type: 'ROBOCAMP' },
+      ],
+    })
   })
 
-  test('student sees the RoboCamp guide up front and the rest in one flat list', async ({
+  test('student finds the RoboCamp guide inside its lesson, with no kind filter and no scope headings', async ({
     page,
   }) => {
-    if (!seeded) throw new Error('not seeded')
+    if (!seeded || !lessonAId) throw new Error('not seeded')
     await loginWithEmail(page, seeded.student.email, seeded.student.password)
     await page.waitForURL(/\/portal/, { timeout: 30000 })
     await page.goto(`${BASE}/portal/grupa/${seeded.groupId}`)
 
-    // The guide gets its own card above everything else. This one is attached
-    // at COURSE scope, which the old featured-set (module scope only) dropped.
-    await expect(page.getByText('Interaktivni vodič').first()).toBeVisible()
-    await expect(page.getByText(ROBOCAMP_TITLE)).toBeVisible()
+    // The module the group is on today heads the lessons.
+    await expect(page.getByText('Trenutni modul')).toBeVisible()
+    await expect(
+      page.getByRole('heading', { level: 2, name: seeded.target.moduleTitle!, exact: true }),
+    ).toBeVisible()
 
-    // Everything else is one list. Where a material came from is no longer
-    // shown to a child, so the old scope headings must be gone.
-    await expect(page.getByRole('heading', { name: 'Dodatni materijali' })).toBeVisible()
-    await expect(page.getByText(PROGRAM_LINK_TITLE)).toBeVisible()
+    const lesson = await openLesson(page, LESSON_A)
+    await expect(lesson.getByText('Interaktivni vodič').first()).toBeVisible()
+    await expect(lesson.getByText(ROBOCAMP_TITLE)).toBeVisible()
+    await expect(lesson.getByText(KIDS_LINK_TITLE)).toBeVisible()
+
+    // The kind-filter chips are gone — lessons replaced them.
+    for (const chip of ['Sve', 'Videi', 'Dokumenti', 'Poveznice']) {
+      await expect(page.getByRole('button', { name: chip, exact: true })).toHaveCount(0)
+    }
+    // Where a material came from is never shown to a child.
     await expect(page.getByRole('heading', { name: 'Za cijeli program' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Materijali grupe' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Dodatni materijali' })).toHaveCount(0)
+    // Teacher-only preparation never reaches the portal payload.
+    expect(await page.content()).not.toContain(PROGRAM_LINK_TITLE)
   })
 
   test('the three panels are tabs on one group page', async ({ page }) => {
@@ -172,12 +208,29 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
     // The student-preview mode is gone; the list is the whole tab.
     await expect(page.getByRole('button', { name: 'Pregled (učenik)' })).toHaveCount(0)
 
+    // Staff also see the teacher-only program material here.
+    await expect(page.getByText(PROGRAM_LINK_TITLE)).toBeVisible()
+
     const present = page.getByRole('link', { name: 'Prezentiraj interaktivni vodič' })
     await expect(present).toBeVisible()
     await present.click()
     await page.waitForURL(/\/nastavnik\/prezentacija\//, { timeout: 30000 })
 
     await expect(page.getByRole('button', { name: /Izađi/ })).toBeVisible()
+
+    // 2+ guides: a lesson-labelled picker (it replaced "Sljedeći vodič").
+    const picker = page.getByLabel('Odaberi vodič')
+    await expect(picker).toBeVisible()
+    await expect(page.getByRole('button', { name: /Sljedeći vodič/ })).toHaveCount(0)
+    for (const [lessonTitle, guideTitle] of [
+      [LESSON_B, ROBOCAMP_B_TITLE],
+      [LESSON_A, ROBOCAMP_TITLE],
+    ]) {
+      const option = picker.locator('option', { hasText: `${lessonTitle} · ${guideTitle}` })
+      await picker.selectOption((await option.getAttribute('value'))!)
+      // The bar names the guide on the wall.
+      await expect(page.locator('p', { hasText: guideTitle }).first()).toBeVisible()
+    }
     // Nothing on a projected screen may change a material — that absence is
     // the whole reason presenting is a separate surface.
     await expect(page.getByRole('button', { name: /Obriši|Uredi/ })).toHaveCount(0)
@@ -192,8 +245,8 @@ test.describe('Phase 3 — Materials redesign: program hub + RoboCamp-first kids
   }) => {
     // A teacher bookmarks the presentation; the guide is later deleted or
     // hidden. The route's guides.length === 0 branch must notFound() cleanly.
-    // A FRESH radionica inherits no COURSE/MODULE materials from anywhere, so
-    // its group is guide-less by construction.
+    // A FRESH radionica has no lessons, and a guide only ever lives in a
+    // lesson, so its group is guide-less by construction.
     const year = computeSchoolYear()
     const location = await db.location.create({
       data: { city: 'SPLIT', name: `Loc prez404 ${RUN_ID}`, address: `Adresa ${RUN_ID}` },

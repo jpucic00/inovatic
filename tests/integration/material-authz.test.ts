@@ -10,8 +10,10 @@ import {
   createGroup,
   createEnrollment,
   createTeacherAssignment,
+  createLesson,
   createMaterial as seedMaterial,
 } from './helpers/factory'
+import { buildGroupMaterialsView, type GroupMaterialsView } from '@/lib/group-materials-view'
 
 // The CRUD actions call revalidatePath on success; next/cache is a no-op
 // outside a request scope, so stub it so the action body runs to completion.
@@ -22,10 +24,12 @@ const { createMaterial, updateMaterial, deleteMaterial, setMaterialHidden } = aw
 )
 const { getEffectiveMaterialsForStudent } = await import('@/actions/student/materials')
 
-function linkInputGroup(scheduledGroupId: string, title = 'Grupa link') {
+function linkInputGroup(scheduledGroupId: string, lessonId: string, title = 'Grupa link') {
   return {
     scope: 'GROUP' as const,
     scheduledGroupId,
+    lessonId,
+    audience: 'STUDENT' as const,
     title,
     type: 'LINK' as const,
     fileUrl: null,
@@ -42,15 +46,18 @@ describe('createMaterial — teacher is GROUP-only', () => {
     const teacher = await createTeacher()
     const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id })
+    const lesson = await createLesson({ courseId: course.id })
     await createTeacherAssignment(teacher.id, group.id)
     mockSession({ id: teacher.id, role: 'TEACHER' })
 
-    const res = await createMaterial(linkInputGroup(group.id))
+    const res = await createMaterial(linkInputGroup(group.id, lesson.id))
     expect(res.success).toBe(true)
 
     const rows = await db.material.findMany({ where: { scheduledGroupId: group.id } })
     expect(rows).toHaveLength(1)
     expect(rows[0].uploadedById).toBe(teacher.id)
+    expect(rows[0].lessonId).toBe(lesson.id)
+    expect(rows[0].audience).toBe('STUDENT')
   })
 
   it('rejects a teacher creating a MODULE material', async () => {
@@ -104,10 +111,11 @@ describe('createMaterial — teacher is GROUP-only', () => {
     const teacher = await createTeacher()
     const course = await createCourse({ kind: 'STANDARD' })
     const group = await createGroup({ courseId: course.id })
+    const lesson = await createLesson({ courseId: course.id })
     // teacher NOT assigned to this group
     mockSession({ id: teacher.id, role: 'TEACHER' })
 
-    const res = await createMaterial(linkInputGroup(group.id))
+    const res = await createMaterial(linkInputGroup(group.id, lesson.id))
     expect(res.success).toBe(false)
   })
 })
@@ -132,6 +140,10 @@ describe('createMaterial — admin authority over the curriculum', () => {
       sortOrder: 0,
     })
     expect(res.success).toBe(true)
+    // A whole-module row is teacher-only by definition — the action stamps it.
+    const row = await db.material.findFirstOrThrow({ where: { moduleId: courseModule.id } })
+    expect(row.audience).toBe('TEACHER')
+    expect(row.lessonId).toBeNull()
   })
 
   it('lets an admin add a COURSE (whole-program) material on a STANDARD program', async () => {
@@ -154,17 +166,20 @@ describe('createMaterial — admin authority over the curriculum', () => {
     expect(res.success).toBe(true)
     const rows = await db.material.findMany({ where: { courseId: course.id, scope: 'COURSE' } })
     expect(rows).toHaveLength(1)
+    expect(rows[0].audience).toBe('TEACHER')
   })
 
-  it('accepts a ROBOCAMP material with an elearning.robocamp.eu URL', async () => {
+  it('accepts a ROBOCAMP lesson material with an elearning.robocamp.eu URL', async () => {
     const admin = await createAdmin()
     const course = await createCourse({ kind: 'STANDARD' })
     const courseModule = await createModule(course.id)
+    const lesson = await createLesson({ courseId: course.id, moduleId: courseModule.id, sessionNumbers: [1] })
     mockSession({ id: admin.id, role: 'ADMIN' })
 
     const res = await createMaterial({
-      scope: 'MODULE',
-      moduleId: courseModule.id,
+      scope: 'LESSON',
+      lessonId: lesson.id,
+      audience: 'STUDENT',
       title: 'RoboCamp vodič',
       type: 'ROBOCAMP',
       fileUrl: null,
@@ -175,8 +190,9 @@ describe('createMaterial — admin authority over the curriculum', () => {
       sortOrder: 0,
     })
     expect(res.success).toBe(true)
-    const row = await db.material.findFirst({ where: { moduleId: courseModule.id } })
+    const row = await db.material.findFirst({ where: { lessonId: lesson.id } })
     expect(row?.type).toBe('ROBOCAMP')
+    expect(row?.audience).toBe('STUDENT')
   })
 })
 
@@ -253,29 +269,38 @@ describe('updateMaterial / deleteMaterial — teacher ownership', () => {
   })
 })
 
-describe('COURSE-on-standard visibility, propagation and per-group hide', () => {
-  it('shows a whole-program material in every group and respects per-group hide', async () => {
+function viewIds(view: GroupMaterialsView): string[] {
+  return [
+    ...view.modules.flatMap((sec) => [
+      ...sec.lessons.flatMap((l) => l.materials.map((m) => m.id)),
+      ...sec.teacherMaterials.map((m) => m.id),
+    ]),
+    ...view.programTeacherMaterials.map((m) => m.id),
+  ]
+}
+
+describe('lesson material propagation and per-group hide', () => {
+  it('shows a program lesson material in every group and respects per-group hide', async () => {
     const admin = await createAdmin()
     const student = await createStudent()
-    const course = await createCourse({ kind: 'STANDARD' })
-    await createModule(course.id)
+    // Natjecateljski program: every module is in view, so no arc is needed.
+    const course = await createCourse({ kind: 'COMPETITION' })
+    const courseModule = await createModule(course.id)
     const groupA = await createGroup({ courseId: course.id })
     const groupB = await createGroup({ courseId: course.id })
     await createEnrollment(student.id, groupA.id)
     await createEnrollment(student.id, groupB.id)
 
     const mat = await seedMaterial({
-      scope: 'COURSE',
-      courseId: course.id,
-      type: 'LINK',
+      scope: 'LESSON',
+      moduleId: courseModule.id,
+      audience: 'STUDENT',
       uploadedById: admin.id,
     })
 
     mockChildSession(student.id)
-    const viewA1 = await getEffectiveMaterialsForStudent(groupA.id)
-    const viewB1 = await getEffectiveMaterialsForStudent(groupB.id)
-    expect(viewA1.programMaterials.links.some((m) => m.id === mat.id)).toBe(true)
-    expect(viewB1.programMaterials.links.some((m) => m.id === mat.id)).toBe(true)
+    expect(viewIds(await getEffectiveMaterialsForStudent(groupA.id))).toContain(mat.id)
+    expect(viewIds(await getEffectiveMaterialsForStudent(groupB.id))).toContain(mat.id)
 
     // Hide it in group A only.
     mockSession({ id: admin.id, role: 'ADMIN' })
@@ -283,9 +308,24 @@ describe('COURSE-on-standard visibility, propagation and per-group hide', () => 
     expect(hideRes.success).toBe(true)
 
     mockChildSession(student.id)
-    const viewA2 = await getEffectiveMaterialsForStudent(groupA.id)
-    const viewB2 = await getEffectiveMaterialsForStudent(groupB.id)
-    expect(viewA2.programMaterials.links.some((m) => m.id === mat.id)).toBe(false)
-    expect(viewB2.programMaterials.links.some((m) => m.id === mat.id)).toBe(true)
+    expect(viewIds(await getEffectiveMaterialsForStudent(groupA.id))).not.toContain(mat.id)
+    expect(viewIds(await getEffectiveMaterialsForStudent(groupB.id))).toContain(mat.id)
+  })
+
+  it('keeps a whole-program (COURSE) row out of the portal but in the staff view', async () => {
+    const admin = await createAdmin()
+    const student = await createStudent()
+    const course = await createCourse({ kind: 'COMPETITION' })
+    await createModule(course.id)
+    const group = await createGroup({ courseId: course.id })
+    await createEnrollment(student.id, group.id)
+    const mat = await seedMaterial({ scope: 'COURSE', courseId: course.id, uploadedById: admin.id })
+    expect(mat.audience).toBe('TEACHER')
+
+    mockChildSession(student.id)
+    expect(viewIds(await getEffectiveMaterialsForStudent(group.id))).not.toContain(mat.id)
+
+    const staff = await buildGroupMaterialsView(group.id, 'STAFF')
+    expect(staff.programTeacherMaterials.map((m) => m.id)).toEqual([mat.id])
   })
 })

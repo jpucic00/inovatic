@@ -20,6 +20,7 @@ import {
   createCourseSeason,
   createEnrollment,
   createEnrollmentWindow,
+  createLesson,
   createMaterial,
   createModule,
   createStudent,
@@ -770,7 +771,7 @@ describe('the competition report card grades a different practical rubric', () =
 // ─── Materials are never narrowed for a competition group ────────────────────
 
 describe('materials view shows every natjecanje at once', () => {
-  it('emits all module sections with their MODULE materials, none marked active', async () => {
+  it('emits every module with its lessons to the portal, none marked active', async () => {
     const course = await competitionCourse()
     const group = await fx.group({
       courseId: course.id,
@@ -784,10 +785,12 @@ describe('materials view shows every natjecanje at once', () => {
     })
     const teacher = await createTeacher()
     for (const m of modules) {
+      // A natjecanje lesson has a module but no sats.
+      const lesson = await createLesson({ courseId: course.id, moduleId: m.id, title: `Lekcija ${m.title}` })
       await createMaterial({
-        scope: 'MODULE',
-        courseId: course.id,
-        moduleId: m.id,
+        scope: 'LESSON',
+        lessonId: lesson.id,
+        audience: 'STUDENT',
         title: `Materijal ${m.title}`,
         uploadedById: teacher.id,
       })
@@ -799,20 +802,28 @@ describe('materials view shows every natjecanje at once', () => {
       uploadedById: teacher.id,
     })
 
-    const view = await buildGroupMaterialsView(group.id)
+    const view = await buildGroupMaterialsView(group.id, 'STUDENT')
 
     // Which natjecanje a team attends lives in the group NAME, not the data —
     // so the view must never narrow to one "active" module for COMPETITION.
     expect(view.activeModuleId).toBeNull()
-    expect(view.moduleSections.map((s) => s.title)).toEqual([
+    expect(view.modules.map((s) => s.title)).toEqual([
       'World Robot Olympiad',
       'Pripreme za natjecanja',
     ])
-    expect(view.moduleSections.every((s) => s.isActive === false)).toBe(true)
-    // Every section still carries its own MODULE material.
-    for (const section of view.moduleSections) {
-      expect(section.buckets.links.map((i) => i.title)).toEqual([`Materijal ${section.title}`])
+    expect(view.modules.every((s) => s.isActive === false)).toBe(true)
+    // Every section still carries its own lesson material; an undated lesson is
+    // current by default so something is always open.
+    for (const section of view.modules) {
+      expect(section.lessons.map((l) => l.title)).toEqual([`Lekcija ${section.title}`])
+      expect(section.lessons[0].isCurrent).toBe(true)
+      expect(section.lessons[0].sessionNumbers).toEqual([])
+      expect(section.lessons[0].materials.map((i) => i.title)).toEqual([`Materijal ${section.title}`])
     }
-    expect(view.programMaterials.links.map((i) => i.title)).toEqual(['Za cijeli program'])
+    // The whole-program row is teacher-only: absent from the portal…
+    expect(view.programTeacherMaterials).toEqual([])
+    // …and present for staff.
+    const staff = await buildGroupMaterialsView(group.id, 'STAFF')
+    expect(staff.programTeacherMaterials.map((i) => i.title)).toEqual(['Za cijeli program'])
   })
 })

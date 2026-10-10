@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest'
+import { describe, expect, it, vi, afterAll, beforeAll, beforeEach } from 'vitest'
 import type { Mock } from 'vitest'
 import { db } from '@/lib/db'
 import { mockSession } from './setup'
@@ -34,6 +34,18 @@ beforeEach(() => {
 })
 
 const SY = '2026/2027'
+
+// The two Monday holidays below are CURRENT-year SPLIT rows — the key every
+// other file plans module arcs under. Left behind, they slow every later Monday
+// group by two weeks (student-dashboard-active-module failed on that whenever
+// its "fast" weekday came out as a Monday). Scoped to exactly these rows.
+const MONDAY_HOLIDAYS = [new Date(Date.UTC(2026, 8, 21)), new Date(Date.UTC(2026, 9, 5))]
+
+afterAll(async () => {
+  await db.schoolYearHoliday.deleteMany({
+    where: { schoolYear: SY, city: 'SPLIT', date: { in: MONDAY_HOLIDAYS } },
+  })
+})
 
 // Module windows mirror the planner output for a 2026-09-01 kickoff with no
 // holidays — Mon as the slowest weekday by convention so its 7th session
@@ -96,10 +108,8 @@ describe('per-group active module — capacity diverges by weekday + holidays', 
 
     // Two Mon holidays inside M1 — slow Mon arc down 2 weeks.
     await db.schoolYearHoliday.createMany({
-      data: [
-        { city: 'SPLIT', schoolYear: SY, date: new Date(Date.UTC(2026, 8, 21)) }, // Mon 21.09
-        { city: 'SPLIT', schoolYear: SY, date: new Date(Date.UTC(2026, 9, 5)) }, // Mon 05.10
-      ],
+      // Mon 21.09 and Mon 05.10
+      data: MONDAY_HOLIDAYS.map((date) => ({ city: 'SPLIT' as const, schoolYear: SY, date })),
     })
 
     // Enroll students into specific modules so the capacity count differs by

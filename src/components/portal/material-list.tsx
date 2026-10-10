@@ -1,26 +1,25 @@
 import { BookOpen } from 'lucide-react'
-import {
-  flattenExtraMaterials,
-  interactiveGuides,
-  type GroupMaterialsView,
-} from '@/lib/group-materials-view'
-import { InteractiveGuide } from './interactive-guide'
-import { ExtraMaterials } from './extra-materials'
+import type { GroupMaterialsView } from '@/lib/group-materials-view'
+import { LessonAccordion } from './lesson-accordion'
 
 /**
- * The Materijali panel: the interactive guide, then everything else.
+ * The Materijali panel: the group's material, structured module → lesson.
  *
- * The old per-scope sections ("Za cijeli program", "Materijali grupe", one per
- * module) are gone. Where a material lives is an authoring concern; a child
- * needs to find the thing and know what kind it is, which is what the flat
- * kind-filtered list below gives them. The scope survives on the staff side,
- * where it decides what a teacher may do with a row.
+ * What a section is depends on the program, and the server already decided it:
+ * a standard group gets the one module it is working through now (whole, every
+ * lesson), a natjecanje group one section per natjecanje, a radionica a single
+ * section with no module at all. Other modules of a standard program stay out
+ * of the payload, so they cannot leak here.
+ *
+ * A section without lessons is dropped rather than shown empty — in practice
+ * that is a natjecanje nobody has prepared yet, and a heading with nothing
+ * under it reads as a broken page to a child. Only when no section has a
+ * lesson does the panel fall back to the "not published yet" state.
  */
 export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
-  const guides = interactiveGuides(view)
-  const extras = flattenExtraMaterials(view)
+  const sections = view.modules.filter((section) => section.lessons.length > 0)
 
-  if (guides.length === 0 && extras.length === 0) {
+  if (sections.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-gray-300 bg-white p-11 text-center">
         <span className="mb-3.5 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
@@ -37,15 +36,24 @@ export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
   }
 
   return (
-    <div className="space-y-7">
-      {guides.map((guide) => (
-        <InteractiveGuide
-          key={guide.item.id}
-          item={guide.item}
-          moduleTitle={guide.moduleTitle}
-        />
+    <div className="space-y-8">
+      {sections.map((section) => (
+        <section key={section.moduleId ?? 'program'} aria-label={section.title ?? 'Lekcije'}>
+          {section.title ? (
+            <div className="mb-3">
+              {/* Only a standard program has ONE module it is "on"; naming it
+                  tells a parent why the other modules are not listed. */}
+              {section.isActive ? (
+                <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-700">
+                  Trenutni modul
+                </p>
+              ) : null}
+              <h2 className="text-lg font-semibold text-gray-900">{section.title}</h2>
+            </div>
+          ) : null}
+          <LessonAccordion lessons={section.lessons} currentLessonId={section.currentLessonId} />
+        </section>
       ))}
-      {extras.length > 0 ? <ExtraMaterials items={extras} /> : null}
     </div>
   )
 }

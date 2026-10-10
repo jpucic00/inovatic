@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireTeacher } from '@/lib/auth-guard'
 import type { AdminActionResult } from '@/lib/action-types'
@@ -11,7 +10,8 @@ import {
   type UpdateMaterialInput,
 } from '@/lib/validators/material'
 import { destroyCloudinaryMaterialUrls } from '@/lib/cloudinary-cleanup'
-import { isRadionica } from '@/lib/program-kind'
+import { revalidateMaterialPaths } from '@/lib/material-revalidate'
+import { otherCityOnlyError } from '@/lib/material-city'
 import {
   canManageMaterial,
   materialTarget,
@@ -23,28 +23,32 @@ import {
 async function validateScopeConsistency(
   data: CreateMaterialInput,
 ): Promise<AdminActionResult | null> {
-  if (data.scope === 'MODULE') {
-    const mod = await db.courseModule.findUnique({
-      where: { id: data.moduleId },
-      select: { course: { select: { kind: true } } },
-    })
-    if (!mod) return { success: false, error: 'Modul nije pronađen.' }
-    if (isRadionica(mod.course.kind)) {
-      return { success: false, error: 'Radionica nema module — koristite COURSE razinu.' }
+  if (data.scope === 'LESSON') {
+    const lesson = await db.lesson.findUnique({ where: { id: data.lessonId }, select: { id: true } })
+    if (!lesson) return { success: false, error: 'Lekcija nije pronađena.' }
+  } else if (data.scope === 'GROUP') {
+    // A group's own material sits in one of ITS program's lessons — the DB cannot
+    // check that across tables, so this is the one place it is enforced.
+    const [group, lesson] = await Promise.all([
+      db.scheduledGroup.findUnique({ where: { id: data.scheduledGroupId }, select: { courseId: true } }),
+      db.lesson.findUnique({ where: { id: data.lessonId }, select: { courseId: true } }),
+    ])
+    if (!group) return { success: false, error: 'Grupa nije pronađena.' }
+    if (lesson?.courseId !== group.courseId) {
+      return { success: false, error: 'Lekcija ne pripada programu ove grupe.' }
     }
-  } else if (data.scope === 'COURSE') {
-    // COURSE = "whole program" materials. Valid on both standard programs
-    // (visible across every module) and radionice (their only material level).
-    const course = await db.course.findUnique({
-      where: { id: data.courseId },
-      select: { id: true },
-    })
+  } else if (data.scope === 'MODULE') {
+    const mod = await db.courseModule.findUnique({ where: { id: data.moduleId }, select: { id: true } })
+    if (!mod) return { success: false, error: 'Modul nije pronađen.' }
+  } else {
+    const course = await db.course.findUnique({ where: { id: data.courseId }, select: { id: true } })
     if (!course) return { success: false, error: 'Program nije pronađen.' }
   }
   return null
 }
 
 function scopeToTarget(data: CreateMaterialInput): CanManageTarget {
+  if (data.scope === 'LESSON') return { scope: 'LESSON', lessonId: data.lessonId }
   if (data.scope === 'MODULE') return { scope: 'MODULE', moduleId: data.moduleId }
   if (data.scope === 'COURSE') return { scope: 'COURSE', courseId: data.courseId }
   return { scope: 'GROUP', scheduledGroupId: data.scheduledGroupId }
@@ -68,7 +72,7 @@ export async function createMaterial(
   const data = parsed.data
 
   // Teachers may only add GROUP-level materials to their own groups. Program
-  // curriculum (MODULE/COURSE) is admin-owned.
+  // curriculum (LESSON, and the teacher-only MODULE/COURSE rows) is admin-owned.
   if (session.user.role === 'TEACHER' && data.scope !== 'GROUP') {
     return { success: false, error: 'Nastavnici mogu dodavati materijale samo na razini grupe.' }
   }
@@ -86,6 +90,9 @@ export async function createMaterial(
     await db.material.create({
       data: {
         scope: data.scope,
+        // Whole-module / whole-program rows are teacher-only by definition.
+        audience: data.scope === 'LESSON' || data.scope === 'GROUP' ? data.audience : 'TEACHER',
+        lessonId: data.scope === 'LESSON' || data.scope === 'GROUP' ? data.lessonId : null,
         moduleId: data.scope === 'MODULE' ? data.moduleId : null,
         courseId: data.scope === 'COURSE' ? data.courseId : null,
         scheduledGroupId: data.scope === 'GROUP' ? data.scheduledGroupId : null,
@@ -130,14 +137,20 @@ export async function updateMaterial(
     where: { id: data.id },
     select: {
       scope: true,
+      audience: true,
       moduleId: true,
       courseId: true,
       scheduledGroupId: true,
+      lessonId: true,
       fileUrl: true,
       uploadedById: true,
+      city: true,
     },
   })
   if (!existing) return { success: false, error: 'Materijal nije pronađen.' }
+  if (data.type === 'ROBOCAMP' && existing.audience !== 'STUDENT') {
+    return { success: false, error: 'RoboCamp vodič je materijal za polaznike.' }
+  }
 
   const target = materialTarget(existing)
   if (!target) return { success: false, error: 'Materijal ima neispravnu razinu.' }
@@ -145,6 +158,8 @@ export async function updateMaterial(
   if (!(await canManageMaterial(session, target))) {
     return { success: false, error: 'Nemate dopuštenje za uređivanje ovog materijala.' }
   }
+  const otherCity = otherCityOnlyError(existing.city, session.user.city)
+  if (otherCity) return otherCity
   // Teachers may only edit materials they uploaded (mirrors comment ownership).
   if (session.user.role === 'TEACHER' && existing.uploadedById !== session.user.id) {
     return { success: false, error: 'Možete uređivati samo materijale koje ste sami dodali.' }
@@ -196,8 +211,10 @@ export async function deleteMaterial(id: string): Promise<AdminActionResult> {
       moduleId: true,
       courseId: true,
       scheduledGroupId: true,
+      lessonId: true,
       fileUrl: true,
       uploadedById: true,
+      city: true,
     },
   })
   if (!existing) return { success: false, error: 'Materijal nije pronađen.' }
@@ -207,6 +224,8 @@ export async function deleteMaterial(id: string): Promise<AdminActionResult> {
   if (!(await canManageMaterial(session, target))) {
     return { success: false, error: 'Nemate dopuštenje za brisanje ovog materijala.' }
   }
+  const otherCity = otherCityOnlyError(existing.city, session.user.city)
+  if (otherCity) return otherCity
   // Teachers may only delete materials they uploaded — never admin curriculum.
   if (session.user.role === 'TEACHER' && existing.uploadedById !== session.user.id) {
     return { success: false, error: 'Možete brisati samo materijale koje ste sami dodali.' }
@@ -227,7 +246,7 @@ export async function deleteMaterial(id: string): Promise<AdminActionResult> {
   }
 }
 
-// ─── Hide / un-hide MODULE/COURSE material from a specific group ────────────
+// ─── Hide / un-hide a program material in a specific group ─────────────────
 
 export async function setMaterialHidden(
   materialId: string,
@@ -249,8 +268,9 @@ export async function setMaterialHidden(
   })
   if (!material) return { success: false, error: 'Materijal nije pronađen.' }
 
-  // Only MODULE/COURSE materials can be per-group hidden. GROUP materials
-  // belong to that group already — editing/deleting them is the right tool.
+  // Only program materials (LESSON/MODULE/COURSE) can be per-group hidden. GROUP
+  // materials belong to that group already — editing/deleting them is the right
+  // tool.
   if (material.scope === 'GROUP') {
     return { success: false, error: 'GROUP materijal se ne može sakriti — obrišite ga ili uredite.' }
   }
@@ -281,15 +301,4 @@ export async function setMaterialHidden(
     console.error('setMaterialHidden failed:', err)
     return { success: false, error: 'Greška pri ažuriranju vidljivosti.' }
   }
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function revalidateMaterialPaths() {
-  revalidatePath('/admin/programi', 'layout')
-  revalidatePath('/admin/grupe', 'layout')
-  revalidatePath('/nastavnik/materijali')
-  revalidatePath('/nastavnik/grupa', 'layout')
-  revalidatePath('/portal/grupa', 'layout')
-  revalidatePath('/portal')
 }

@@ -21,10 +21,12 @@ import { formatBytes } from '@/lib/material-display'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
+// Materijali v2: the program page's teacher-only "every class of this module /
+// program" rows. Lesson and group materials are added through
+// `<LessonMaterialSection>`.
 type Target =
   | { scope: 'MODULE'; moduleId: string }
   | { scope: 'COURSE'; courseId: string }
-  | { scope: 'GROUP'; scheduledGroupId: string }
 
 interface UploadMaterialDialogProps {
   target: Target
@@ -68,6 +70,9 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
 
   const needsFileUpload = type === 'DOCUMENT' || type === 'PRESENTATION' || (type === 'VIDEO' && videoMode === 'upload')
   const needsExternalUrl = type === 'LINK' || type === 'ROBOCAMP' || (type === 'VIDEO' && videoMode === 'url')
+
+  // Both targets are teacher-only, and RoboCamp guides are for the children only.
+  const typeOptions = TYPE_OPTIONS.filter((o) => o.value !== 'ROBOCAMP')
 
   const canSubmit = (() => {
     if (title.trim().length < 2) return false
@@ -131,14 +136,10 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
       sortOrder: 0,
     }
 
-    let input
-    if (target.scope === 'MODULE') {
-      input = { ...common, scope: 'MODULE' as const, moduleId: target.moduleId }
-    } else if (target.scope === 'COURSE') {
-      input = { ...common, scope: 'COURSE' as const, courseId: target.courseId }
-    } else {
-      input = { ...common, scope: 'GROUP' as const, scheduledGroupId: target.scheduledGroupId }
-    }
+    const input =
+      target.scope === 'MODULE'
+        ? { ...common, scope: 'MODULE' as const, moduleId: target.moduleId }
+        : { ...common, scope: 'COURSE' as const, courseId: target.courseId }
 
     startTransition(async () => {
       const res = await createMaterial(input)
@@ -200,7 +201,7 @@ export function UploadMaterialDialog({ target, label, scopeLabel }: Readonly<Upl
 
           <Field label="Tip">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {TYPE_OPTIONS.map((opt) => (
+              {typeOptions.map((opt) => (
                 <label
                   key={opt.value}
                   className={[

@@ -216,6 +216,9 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
         city: true,
         _count: { select: { materials: true } },
         modules: { select: { _count: { select: { materials: true } } } },
+        // Lesson materials carry no courseId — they are counted through the
+        // lesson (Materijali v2).
+        lessons: { select: { _count: { select: { materials: true } } } },
         scheduledGroups: {
           select: {
             id: true,
@@ -257,7 +260,8 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
     }
 
     const moduleMaterialCount = course.modules.reduce((sum, m) => sum + m._count.materials, 0)
-    if (course._count.materials + moduleMaterialCount > 0) {
+    const lessonMaterialCount = course.lessons.reduce((sum, l) => sum + l._count.materials, 0)
+    if (course._count.materials + moduleMaterialCount + lessonMaterialCount > 0) {
       return { success: false, error: 'Program ima materijale koji se moraju obrisati prije brisanja programa.' }
     }
 
@@ -289,6 +293,9 @@ export async function deleteCourse(id: string): Promise<AdminActionResult> {
       }
 
       await tx.scheduledGroup.deleteMany({ where: { courseId: id } })
+      // Empty lessons go with the program (their sats cascade); Lesson.course is
+      // Restrict so a forgotten one cannot be silently orphaned.
+      await tx.lesson.deleteMany({ where: { courseId: id } })
       await tx.course.delete({ where: { id } })
       return null
     })

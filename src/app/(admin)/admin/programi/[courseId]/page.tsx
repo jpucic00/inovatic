@@ -21,6 +21,8 @@ import { CourseFormDialog } from '@/components/admin/courses/course-form-dialog'
 import { UploadMaterialDialog } from '@/components/material/upload-dialog'
 import { StaffMaterialList } from '@/components/material/staff-material-list'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
+import { ProgramLessons } from '@/components/admin/lessons/program-lessons'
+import { CityOnlySummary } from '@/components/admin/lessons/city-only-summary'
 
 export const metadata: Metadata = { title: 'Admin – Program' }
 
@@ -33,11 +35,23 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
   const { courseId } = await params
 
   const detail = await getProgramDetail(courseId)
-  const { course, season, gradeRule, moduleDates, courseMaterials, moduleSections, selectedYear } =
-    detail
+  const {
+    course,
+    season,
+    gradeRule,
+    moduleDates,
+    programTeacherMaterials,
+    lessonModules,
+    selectedYear,
+    viewerCity,
+    cityOnlyCounts,
+  } = detail
   const competition = isCompetition(course.kind)
   const radionica = isRadionica(course.kind)
   const editable = !isArchivedYear(selectedYear)
+  // "Samo za <grad>" exists only for a shared program's curriculum — a radionica
+  // already belongs to one city as a whole.
+  const cityControls = radionica ? null : { viewerCity }
 
   // What the copied link actually is. A radionica's link is its own public page
   // — it has no /prijava entry, so the grade/termin wording below would be wrong.
@@ -74,9 +88,20 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
 
   // The COURSE-scope hint names what the scope ignores: modules for standard
   // programs, natjecanja for the competitive one, nothing for radionice.
-  let materialsScopeSuffix = '.'
+  let programScopeSuffix = '.'
   if (hasModules(course.kind)) {
-    materialsScopeSuffix = competition ? ', bez obzira na natjecanje.' : ', bez obzira na modul.'
+    programScopeSuffix = competition ? ', bez obzira na natjecanje.' : ', bez obzira na modul.'
+  }
+
+  // Lessons are curriculum: shared by both cities and every school year, so the
+  // sidebar year only colours the sample dates, never which lessons exist.
+  let lessonsHint = 'Zajedničke za oba grada i sve školske godine.'
+  if (hasDatedModules(course.kind)) {
+    lessonsHint = `Lekcija se veže uz sat modula, ne uz datum — datumi su primjer za ${selectedYear}. ${lessonsHint}`
+  } else if (radionica) {
+    lessonsHint = 'Radionica nema module ni numerirane sate — lekcije se redaju redom kojim su dodane.'
+  } else if (competition) {
+    lessonsHint = `Lekcije po natjecanju, bez numeriranih termina. ${lessonsHint}`
   }
 
   return (
@@ -204,51 +229,39 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
       )}
 
       <section className="mb-10">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-              Materijali za cijeli program
+              Za nastavnike — cijeli program
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              Vidljivo u svim grupama ovog programa
-              {materialsScopeSuffix}
+              Priprema koja vrijedi za cijeli program{programScopeSuffix} Polaznici je ne vide.
             </p>
           </div>
           <UploadMaterialDialog
             target={{ scope: 'COURSE', courseId: course.id }}
             label="Dodaj"
-            scopeLabel="Vidljivo u svim grupama ovog programa."
+            scopeLabel="Samo za nastavnike, u svim grupama ovog programa."
           />
         </div>
         <StaffMaterialList
-          rows={courseMaterials}
-          emptyLabel="Još nema materijala za cijeli program."
+          rows={programTeacherMaterials}
+          cityControls={cityControls}
+          emptyLabel="Još nema materijala za nastavnike na razini programa."
         />
       </section>
 
-      {hasModules(course.kind) &&
-        moduleSections.map((section) => (
-          <section key={section.module.id} className="mb-10">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                {section.module.title}
-              </h2>
-              <UploadMaterialDialog
-                target={{ scope: 'MODULE', moduleId: section.module.id }}
-                label="Dodaj"
-                scopeLabel={
-                  competition
-                    ? `Vidljivo svim grupama natjecateljskog programa, pod „${section.module.title}".`
-                    : `Vidljivo svim grupama na modulu „${section.module.title}".`
-                }
-              />
-            </div>
-            <StaffMaterialList
-              rows={section.materials}
-              emptyLabel="Još nema materijala za ovaj modul."
-            />
-          </section>
-        ))}
+      <section className="mb-10">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Lekcije</h2>
+        <p className="text-xs text-gray-400 mt-0.5 mb-3">{lessonsHint}</p>
+        <CityOnlySummary counts={cityOnlyCounts} viewerCity={viewerCity} />
+        <ProgramLessons
+          courseId={course.id}
+          modules={lessonModules}
+          competition={competition}
+          cityControls={cityControls}
+        />
+      </section>
     </div>
   )
 }

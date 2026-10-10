@@ -1,19 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import type { MaterialType } from '@prisma/client'
+import type { MaterialAudience, MaterialType } from '@prisma/client'
 import {
   flattenExtraMaterials,
   interactiveGuides,
   type GroupMaterialsView,
+  type LessonView,
+  type MaterialItem,
+  type ModuleLessonsView,
 } from '@/lib/group-materials-view'
 
 let seq = 0
-function item(title: string, type: MaterialType, sortOrder = 0, externalUrl: string | null = null) {
+function item(
+  title: string,
+  type: MaterialType,
+  sortOrder = 0,
+  externalUrl: string | null = null,
+  audience: MaterialAudience = 'STUDENT',
+): MaterialItem {
   seq += 1
   return {
     id: `m${seq}`,
     title,
     description: null,
     type,
+    audience,
     fileUrl: null,
     externalUrl,
     fileSize: null,
@@ -23,10 +33,39 @@ function item(title: string, type: MaterialType, sortOrder = 0, externalUrl: str
   }
 }
 
-const empty = () => ({ robocamp: [], videos: [], docs: [], links: [] })
+function lesson(title: string, materials: MaterialItem[]): LessonView {
+  seq += 1
+  return {
+    id: `l${seq}`,
+    title,
+    description: null,
+    sessionNumbers: [],
+    firstDate: null,
+    isCurrent: false,
+    materials,
+  }
+}
+
+function section(
+  moduleId: string | null,
+  title: string | null,
+  lessons: LessonView[],
+  teacherMaterials: MaterialItem[] = [],
+): ModuleLessonsView {
+  return {
+    moduleId,
+    title,
+    sortOrder: 1,
+    isActive: false,
+    currentLessonId: null,
+    lessons,
+    teacherMaterials,
+  }
+}
 
 function view(partial: Partial<GroupMaterialsView>): GroupMaterialsView {
   return {
+    viewer: 'STUDENT',
     group: {
       id: 'g1',
       name: null,
@@ -37,77 +76,84 @@ function view(partial: Partial<GroupMaterialsView>): GroupMaterialsView {
       location: { name: 'Velebitska 32' },
       teacherNames: [],
     },
-    moduleSections: [],
-    programMaterials: empty(),
-    groupMaterials: empty(),
-    radionicaMaterials: empty(),
+    modules: [],
+    programTeacherMaterials: [],
     activeModuleId: null,
     ...partial,
   }
 }
 
 describe('interactiveGuides', () => {
-  it('labels a module-scoped guide with its module', () => {
-    const guide = item('Semafor', 'ROBOCAMP')
+  it('labels a guide with its module and its lesson', () => {
     const guides = interactiveGuides(
       view({
-        moduleSections: [
-          { moduleId: 'mod1', title: 'Prometni sustavi 2.0', sortOrder: 1, isActive: true, buckets: { ...empty(), robocamp: [guide] } },
+        modules: [
+          section('mod1', 'Prometni sustavi 2.0', [lesson('Semafor', [item('Semafor vodič', 'ROBOCAMP')])]),
         ],
       }),
     )
     expect(guides).toHaveLength(1)
+    expect(guides[0].item.title).toBe('Semafor vodič')
     expect(guides[0].moduleTitle).toBe('Prometni sustavi 2.0')
+    expect(guides[0].lessonTitle).toBe('Semafor')
   })
 
-  it('keeps programme- and group-scoped guides, which the old featured set dropped', () => {
+  it('collects guides from every lesson of a module, in lesson order', () => {
     const guides = interactiveGuides(
       view({
-        programMaterials: { ...empty(), robocamp: [item('Za cijeli program', 'ROBOCAMP')] },
-        groupMaterials: { ...empty(), robocamp: [item('Samo ova grupa', 'ROBOCAMP')] },
+        modules: [
+          section('mod1', 'Modul', [
+            lesson('Prva', [item('A', 'ROBOCAMP'), item('Radni list', 'DOCUMENT')]),
+            lesson('Druga', [item('B', 'ROBOCAMP')]),
+          ]),
+        ],
       }),
     )
-    expect(guides.map((g) => g.item.title)).toEqual(['Za cijeli program', 'Samo ova grupa'])
-    // Nothing outside a module can name one, and inventing a label would lie.
-    expect(guides.every((g) => g.moduleTitle === null)).toBe(true)
+    expect(guides.map((g) => [g.item.title, g.lessonTitle])).toEqual([
+      ['A', 'Prva'],
+      ['B', 'Druga'],
+    ])
   })
 
-  it('finds a radionica guide, which has no module to belong to', () => {
+  it('finds a radionica guide, whose section has no module title', () => {
     const guides = interactiveGuides(
-      view({ radionicaMaterials: { ...empty(), robocamp: [item('Vodič', 'ROBOCAMP')] } }),
+      view({ modules: [section(null, null, [lesson('Uvod', [item('Vodič', 'ROBOCAMP')])])] }),
     )
     expect(guides).toHaveLength(1)
     expect(guides[0].moduleTitle).toBeNull()
+    expect(guides[0].lessonTitle).toBe('Uvod')
   })
 
   it('returns every natjecanje guide for a competition group', () => {
     const guides = interactiveGuides(
       view({
-        moduleSections: [
-          { moduleId: 'a', title: 'FLL', sortOrder: 1, isActive: false, buckets: { ...empty(), robocamp: [item('FLL vodič', 'ROBOCAMP')] } },
-          { moduleId: 'b', title: 'WRO', sortOrder: 2, isActive: false, buckets: { ...empty(), robocamp: [item('WRO vodič', 'ROBOCAMP')] } },
+        modules: [
+          section('a', 'FLL', [lesson('FLL sat', [item('FLL vodič', 'ROBOCAMP')])]),
+          section('b', 'WRO', [lesson('WRO sat', [item('WRO vodič', 'ROBOCAMP')])]),
         ],
       }),
     )
     expect(guides.map((g) => g.moduleTitle)).toEqual(['FLL', 'WRO'])
   })
+
+  it('recognises an un-backfilled RoboCamp row by its URL', () => {
+    const legacy = item('Stari redak', 'VIDEO', 0, 'https://elearning.robocamp.eu/course/1')
+    const guides = interactiveGuides(view({ modules: [section('m', 'M', [lesson('L', [legacy])])] }))
+    expect(guides.map((g) => g.item.title)).toEqual(['Stari redak'])
+  })
 })
 
 describe('flattenExtraMaterials', () => {
-  it('merges every scope into one list and never repeats a guide', () => {
+  it('merges every lesson of every module into one list and never repeats a guide', () => {
     const extras = flattenExtraMaterials(
       view({
-        moduleSections: [
-          {
-            moduleId: 'mod1',
-            title: 'Modul',
-            sortOrder: 1,
-            isActive: true,
-            buckets: { robocamp: [item('Vodič', 'ROBOCAMP')], videos: [item('Snimka', 'VIDEO')], docs: [], links: [] },
-          },
+        modules: [
+          section('mod1', 'Modul 1', [
+            lesson('Prva', [item('Vodič', 'ROBOCAMP'), item('Snimka', 'VIDEO')]),
+            lesson('Druga', [item('Popis dijelova', 'DOCUMENT')]),
+          ]),
+          section('mod2', 'Modul 2', [lesson('Treća', [item('Scratch', 'LINK')])]),
         ],
-        programMaterials: { ...empty(), docs: [item('Popis dijelova', 'DOCUMENT')] },
-        groupMaterials: { ...empty(), links: [item('Scratch', 'LINK')] },
       }),
     )
     expect(extras.map((m) => m.title)).toEqual(['Snimka', 'Popis dijelova', 'Scratch'])
@@ -116,34 +162,58 @@ describe('flattenExtraMaterials', () => {
   it('orders by kind first — video, prezentacija, dokument, poveznica', () => {
     const extras = flattenExtraMaterials(
       view({
-        programMaterials: {
-          ...empty(),
-          links: [item('L', 'LINK')],
-          docs: [item('D', 'DOCUMENT'), item('P', 'PRESENTATION')],
-          videos: [item('V', 'VIDEO')],
-        },
+        modules: [
+          section('mod1', 'Modul', [
+            lesson('Prva', [item('L', 'LINK'), item('D', 'DOCUMENT')]),
+            lesson('Druga', [item('P', 'PRESENTATION'), item('V', 'VIDEO')]),
+          ]),
+        ],
       }),
     )
     expect(extras.map((m) => m.title)).toEqual(['V', 'P', 'D', 'L'])
   })
 
-  it('falls back to sortOrder inside one kind', () => {
+  it('falls back to sortOrder inside one kind, across lessons', () => {
     const extras = flattenExtraMaterials(
       view({
-        programMaterials: { ...empty(), docs: [item('drugi', 'DOCUMENT', 2), item('prvi', 'DOCUMENT', 1)] },
+        modules: [
+          section('mod1', 'Modul', [
+            lesson('Prva', [item('drugi', 'DOCUMENT', 2)]),
+            lesson('Druga', [item('prvi', 'DOCUMENT', 1)]),
+          ]),
+        ],
       }),
     )
     expect(extras.map((m) => m.title)).toEqual(['prvi', 'drugi'])
   })
 
   it('leaves guides out entirely — they render in their own section', () => {
-    // Mirrors how partitionMaterials buckets: an un-backfilled row whose URL is
-    // RoboCamp lands in `robocamp`, not `videos`, so it must reach the guide
-    // section and never appear a second time among the extras.
+    // An un-backfilled row whose URL is RoboCamp classifies as a guide, so it
+    // must reach the guide section and never appear a second time among extras.
     const legacy = item('Stari redak', 'VIDEO', 0, 'https://elearning.robocamp.eu/course/1')
-    const v = view({ programMaterials: { ...empty(), robocamp: [legacy] } })
+    const v = view({ modules: [section('mod1', 'Modul', [lesson('L', [legacy])])] })
 
     expect(interactiveGuides(v).map((g) => g.item.title)).toEqual(['Stari redak'])
     expect(flattenExtraMaterials(v)).toEqual([])
+  })
+
+  it('reads lessons only — teacher-only module and program rows stay out', () => {
+    const v = view({
+      viewer: 'STAFF',
+      modules: [
+        section(
+          'mod1',
+          'Modul',
+          [lesson('L', [item('Radni list', 'DOCUMENT')])],
+          [item('Priprema za modul', 'DOCUMENT', 0, null, 'TEACHER')],
+        ),
+      ],
+      programTeacherMaterials: [item('Kurikulum', 'DOCUMENT', 0, null, 'TEACHER')],
+    })
+    expect(flattenExtraMaterials(v).map((m) => m.title)).toEqual(['Radni list'])
+  })
+
+  it('returns an empty list for a view with no lessons', () => {
+    expect(flattenExtraMaterials(view({ modules: [section('mod1', 'Modul', [])] }))).toEqual([])
   })
 })

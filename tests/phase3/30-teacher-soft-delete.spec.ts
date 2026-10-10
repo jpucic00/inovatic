@@ -4,7 +4,9 @@ import {
   loginAsAdmin,
   loginWithEmail,
   collectGroupIds,
-  addLinkMaterial,
+  addGroupLinkMaterial,
+  groupLessonTarget,
+  seedLesson,
   type TeacherData,
   type StudentData,
 } from '../helpers/phase3'
@@ -55,6 +57,7 @@ const STUDENT: StudentData = {
   parentPhone: '0916660099',
 }
 
+const LESSON_TITLE = `Soft-delete lekcija ${RUN_ID}`
 const MATERIAL_TITLE = `Soft-delete materijal ${RUN_ID}`
 const COMMENT_TEXT = `Soft-delete komentar ${RUN_ID} — provjera povijesti.`
 
@@ -74,6 +77,8 @@ test.describe('Soft-delete teachers — DOM-dependent', () => {
     const t = await seedTeacher(TEACHER)
     await seedTeacherAssignment(t.teacherId, groupId)
     const s = await seedStudentInGroup(groupId, STUDENT)
+    // A teacher adds group materials into an existing lesson only.
+    await seedLesson({ target: await groupLessonTarget(groupId), title: LESSON_TITLE })
 
     seeded = {
       teacher: {
@@ -100,12 +105,10 @@ test.describe('Soft-delete teachers — DOM-dependent', () => {
     await page.waitForURL(/\/nastavnik/, { timeout: 30000 })
 
     await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
-    await addLinkMaterial(
-      page,
-      /Dodaj samo u ovu grupu/,
-      MATERIAL_TITLE,
-      'https://example.com/soft-delete',
-    )
+    await addGroupLinkMaterial(page, LESSON_TITLE, 'TEACHER', {
+      title: MATERIAL_TITLE,
+      url: 'https://example.com/soft-delete',
+    })
 
     await page.goto(`${BASE}/nastavnik/ucenik/${seeded.studentId}`)
     await page.waitForLoadState('domcontentloaded')

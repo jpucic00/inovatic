@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { MaterialType, MaterialScope } from '@prisma/client'
+import type { City, MaterialAudience, MaterialType, MaterialScope } from '@prisma/client'
 import { displayKindOf, formatBytes, resolveHref } from '@/lib/material-display'
 import {
   MATERIAL_KIND_LABEL,
@@ -9,6 +9,8 @@ import {
 import { EditMaterialDialog } from './edit-material-dialog'
 import { DeleteMaterialButton } from './delete-material-button'
 import { HideInGroupToggle } from './hide-in-group-toggle'
+import { CityOnlyNote, cityEditNotice, offersCityChoice, type MaterialCityControls } from './city-only-note'
+import { MaterialCityAction } from './city-only-dialog'
 
 export type StaffMaterialRow = {
   id: string
@@ -16,6 +18,7 @@ export type StaffMaterialRow = {
   description: string | null
   type: MaterialType
   scope: MaterialScope
+  audience: MaterialAudience
   fileUrl: string | null
   externalUrl: string | null
   fileSize: number | null
@@ -23,6 +26,16 @@ export type StaffMaterialRow = {
   sortOrder: number
   moduleId?: string | null
   moduleTitle?: string | null
+  lessonId?: string | null
+  lessonTitle?: string | null
+  /** null/undefined = both cities; set = limited to that city ("Samo Split"). */
+  city?: City | null
+  cityOnlyReason?: string | null
+  /**
+   * Admin views only: the row is limited to the OTHER city. Shown greyed with
+   * its reason so the drift is visible, and never editable from this city.
+   */
+  otherCityOnly?: boolean
   courseTitle?: string | null
   groupName?: string | null
   hiddenInThisGroup?: boolean
@@ -43,15 +56,18 @@ interface Props {
   /** When set, rows will show a hide-in-group toggle for MODULE/COURSE items. */
   inGroupId?: string | null
   emptyLabel?: string
+  /** Admin views of a shared program: offers "Samo za <grad>…" per row. */
+  cityControls?: MaterialCityControls | null
 }
 
 const SCOPE_LABEL: Record<MaterialScope, string> = {
-  MODULE: 'Modul',
-  COURSE: 'Cijeli program',
+  LESSON: 'Lekcija',
+  MODULE: 'Nastavnici · cijeli modul',
+  COURSE: 'Nastavnici · cijeli program',
   GROUP: 'Grupa',
 }
 
-export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Props>) {
+export function StaffMaterialList({ rows, inGroupId, emptyLabel, cityControls = null }: Readonly<Props>) {
   if (rows.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center">
@@ -72,6 +88,9 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
 
         const isDimmed = row.hiddenInThisGroup === true
         const kind = displayKindOf(row)
+        // The other city's "Samo <grad>" row: visible so the drift is, never ours to change.
+        const foreign = row.otherCityOnly === true
+        const cityChoice = offersCityChoice(row, cityControls)
 
         return (
           <li
@@ -84,57 +103,72 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
             {/* Same tile the kids' list uses, so both sides read one vocabulary.
                 The scope beside it does NOT cross over: to a teacher it decides
                 whether this row can be edited, only hidden, or neither. */}
-            <MaterialKindTile kind={kind} />
+            <span className={foreign ? 'flex shrink-0 opacity-50' : 'flex shrink-0'}>
+              <MaterialKindTile kind={kind} />
+            </span>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                {href ? (
-                  <Link
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-semibold text-gray-900 hover:text-cyan-700 hover:underline truncate"
+              <div className={foreign ? 'opacity-50' : undefined}>
+                <div className="flex items-center gap-2">
+                  {href ? (
+                    <Link
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-semibold text-gray-900 hover:text-cyan-700 hover:underline truncate"
+                    >
+                      {row.title}
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-semibold text-gray-900 truncate">{row.title}</span>
+                  )}
+                </div>
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wide ${MATERIAL_KIND_LABEL_CLASS[kind]}`}
                   >
-                    {row.title}
-                  </Link>
-                ) : (
-                  <span className="text-sm font-semibold text-gray-900 truncate">{row.title}</span>
-                )}
-              </div>
-              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                <span
-                  className={`text-[10px] font-bold uppercase tracking-wide ${MATERIAL_KIND_LABEL_CLASS[kind]}`}
-                >
-                  {MATERIAL_KIND_LABEL[kind]}
-                </span>
-                <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide rounded bg-gray-100 px-1.5 py-0.5">
-                  {SCOPE_LABEL[row.scope]}
-                  {scopeDetail ? ` · ${scopeDetail}` : ''}
-                </span>
-                {row.hiddenInThisGroup ? (
-                  <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                    Sakriveno u grupi
+                    {MATERIAL_KIND_LABEL[kind]}
                   </span>
-                ) : null}
-                {size ? <span className="text-xs text-gray-500">{size}</span> : null}
-              </div>
-              {row.description ? (
-                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{row.description}</p>
-              ) : null}
-              {row.uploadedBy ? (
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Dodao: {row.uploadedBy}
-                  {row.uploadedByDeleted ? (
-                    <span className="ml-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
-                      Bivši nastavnik
+                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide rounded bg-gray-100 px-1.5 py-0.5">
+                    {SCOPE_LABEL[row.scope]}
+                    {scopeDetail ? ` · ${scopeDetail}` : ''}
+                  </span>
+                  {row.hiddenInThisGroup ? (
+                    <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                      Sakriveno u grupi
                     </span>
                   ) : null}
-                </p>
+                  {size ? <span className="text-xs text-gray-500">{size}</span> : null}
+                </div>
+                {row.description ? (
+                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{row.description}</p>
+                ) : null}
+                {row.uploadedBy ? (
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Dodao: {row.uploadedBy}
+                    {row.uploadedByDeleted ? (
+                      <span className="ml-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
+                        Bivši nastavnik
+                      </span>
+                    ) : null}
+                  </p>
+                ) : null}
+              </div>
+              <CityOnlyNote city={row.city} reason={row.cityOnlyReason} />
+              {cityChoice && cityControls ? (
+                <div className="mt-1.5 -ml-2.5">
+                  <MaterialCityAction
+                    materialId={row.id}
+                    title={row.title}
+                    city={row.city}
+                    viewerCity={cityControls.viewerCity}
+                  />
+                </div>
               ) : null}
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-              {inGroupId && (row.scope === 'MODULE' || row.scope === 'COURSE') ? (
+              {inGroupId && !foreign && (row.scope === 'MODULE' || row.scope === 'COURSE') ? (
                 <HideInGroupToggle
                   materialId={row.id}
                   scheduledGroupId={inGroupId}
@@ -142,7 +176,7 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
                 />
               ) : null}
               {/* `canEdit` is three-state: `undefined` means unrestricted (admin). */}
-              {row.canEdit === false ? null : (
+              {row.canEdit === false || foreign ? null : (
                 <>
                   <EditMaterialDialog
                     id={row.id}
@@ -152,6 +186,7 @@ export function StaffMaterialList({ rows, inGroupId, emptyLabel }: Readonly<Prop
                     type={row.type}
                     fileUrl={row.fileUrl}
                     fileSize={row.fileSize}
+                    cityNotice={cityEditNotice(row, cityControls)}
                   />
                   <DeleteMaterialButton id={row.id} title={row.title} />
                 </>

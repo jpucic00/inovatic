@@ -12,11 +12,14 @@
 // fixture).
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { v2 as cloudinarySdk } from 'cloudinary'
 import { db } from '@/lib/db'
+import { computeSchoolYear } from '@/lib/school-year'
+import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
+import { loadHolidayDateKeys } from '@/lib/holidays'
 import { grantLogin, grantParentLogin, uniqueParentEmail } from './seed'
 
 export const BASE = 'http://localhost:3000'
@@ -349,66 +352,294 @@ export async function createStudentNoEnrollment(
   return { studentId: created.id, ...(await grantParentLogin(created.id)) }
 }
 
-export async function addLinkMaterial(
-  page: Page,
-  buttonLabelRegex: RegExp,
-  title: string,
-  url: string,
-) {
-  await page.getByRole('button', { name: buttonLabelRegex }).first().click()
-  const dialog = page.locator('[role="dialog"]')
-  await dialog.locator('#material-title').fill(title)
-  await dialog.locator('label', { hasText: 'Poveznica' }).click()
-  await dialog.locator('#material-external-url').fill(url)
-  await dialog.getByRole('button', { name: 'Spremi' }).click()
-  await expect(dialog).toBeHidden({ timeout: 10000 })
-  // The merged Materijali tab can render the title in both the manage list (link)
-  // and the student preview (span), so the text may resolve to >1 node — assert
-  // the first match is visible rather than tripping strict-mode on the duplicate.
-  await expect(page.getByText(title).first()).toBeVisible({ timeout: 15000 })
-}
+// ─── Materijali v2: lessons ─────────────────────────────────────────────────
+//
+// Every material a child can see sits in a LESSON of the program (program →
+// module → lesson → material), with an audience: STUDENT (portal) or TEACHER
+// (staff only). The helpers below either drive the real lesson editor and the
+// group's lesson view, or seed a lesson straight into the database for specs
+// that only need one to exist.
+//
+// Determinism: a lesson binds to SAT NUMBERS, and which lesson is "current"
+// (open by default) depends on the group's weekday arc and today's date — and
+// `(moduleId, sessionNumber)` is unique across the shared curriculum, so a
+// fixture taking sat 1 could collide with dev data or another run. Fixture
+// lessons therefore take NO sat by default, live on the group's ACTIVE module
+// (the one the portal shows), and every assertion opens the lesson first with
+// `openLesson` instead of relying on what starts expanded.
 
-/** Resolves the courseId for a group by following its card on /admin/programi. */
-export async function getCourseIdForGroup(page: Page, groupId: string): Promise<string> {
-  const title = await getGroupCourseTitle(page, groupId)
-  await page.goto(`${BASE}/admin/programi`)
-  const href = await page
-    .locator('a[href^="/admin/programi/"]', { hasText: title })
-    .first()
-    .getAttribute('href')
-  const m = href?.match(/\/admin\/programi\/([^/?#]+)/)
-  if (!m) throw new Error(`No program detail link for course "${title}"`)
-  return m[1]
+type FixtureLink = { title: string; url: string; type?: 'LINK' | 'VIDEO' | 'ROBOCAMP' }
+
+export type LessonTarget = {
+  courseId: string
+  /** null for a radionica — its lessons hang directly off the program. */
+  moduleId: string | null
+  moduleTitle: string | null
 }
 
 /**
- * Adds a LINK material on the admin program detail page, in the section whose
- * heading matches `sectionHeading` ("Materijali za cijeli program" for COURSE,
- * or a module title for MODULE). Program/module materials are admin-only and
- * live here, not on the group tab.
+ * Where a lesson must live for this group's portal to show it: the module the
+ * group is working through today (standard), the first natjecanje (all are
+ * shown at once), or the program itself (radionica). Mirrors `buildGroupShell`,
+ * whose active-module pick is per group and per calendar day.
  */
-export async function addMaterialOnProgramPage(
+export async function groupLessonTarget(groupId: string): Promise<LessonTarget> {
+  const schoolYear = computeSchoolYear()
+  const group = await db.scheduledGroup.findUniqueOrThrow({
+    where: { id: groupId },
+    select: {
+      city: true,
+      dayOfWeek: true,
+      course: {
+        select: {
+          id: true,
+          kind: true,
+          modules: {
+            orderBy: { sortOrder: 'asc' },
+            include: { schedules: { where: { schoolYear } } },
+          },
+        },
+      },
+    },
+  })
+  const { course } = group
+  if (course.kind === 'RADIONICA' || course.modules.length === 0) {
+    return { courseId: course.id, moduleId: null, moduleTitle: null }
+  }
+  const active =
+    getCurrentActiveModuleForGroup({
+      dayOfWeek: group.dayOfWeek,
+      modules: course.modules,
+      schoolYear,
+      city: group.city,
+      kind: course.kind,
+      holidayDates: await loadHolidayDateKeys(schoolYear, group.city),
+    }) ?? course.modules[0]
+  return { courseId: course.id, moduleId: active.id, moduleTitle: active.title }
+}
+
+async function adminUserId(): Promise<string> {
+  const admin = await db.user.findUniqueOrThrow({ where: { email: ADMIN_EMAIL }, select: { id: true } })
+  return admin.id
+}
+
+/**
+ * Fast path: a curriculum lesson with LINK-type materials, straight into the
+ * database. For specs that need a lesson to exist (a teacher adds a group
+ * material into it, a portal reads it) but are not about the lesson editor.
+ * Put the run id in `title` — `cleanupRunFixtures` sweeps lessons by title.
+ */
+export async function seedLesson(input: {
+  target: LessonTarget
+  title: string
+  sessionNumbers?: number[]
+  studentLinks?: FixtureLink[]
+  teacherLinks?: FixtureLink[]
+}): Promise<{ lessonId: string; materialIds: Record<string, string> }> {
+  const uploadedById = await adminUserId()
+  const { courseId, moduleId } = input.target
+  const lesson = await db.lesson.create({
+    data: { courseId, moduleId, title: input.title },
+    select: { id: true },
+  })
+  if (input.sessionNumbers?.length) {
+    if (!moduleId) throw new Error('seedLesson: only a module lesson can hold sats')
+    await db.lessonSession.createMany({
+      data: input.sessionNumbers.map((sessionNumber) => ({
+        lessonId: lesson.id,
+        moduleId,
+        sessionNumber,
+      })),
+    })
+  }
+  const materialIds: Record<string, string> = {}
+  const rows = [
+    ...(input.studentLinks ?? []).map((l) => ({ ...l, audience: 'STUDENT' as const })),
+    ...(input.teacherLinks ?? []).map((l) => ({ ...l, audience: 'TEACHER' as const })),
+  ]
+  for (const row of rows) {
+    const m = await db.material.create({
+      data: {
+        scope: 'LESSON',
+        audience: row.audience,
+        lessonId: lesson.id,
+        title: row.title,
+        type: row.type ?? 'LINK',
+        externalUrl: row.url,
+        uploadedById,
+      },
+      select: { id: true },
+    })
+    materialIds[row.title] = m.id
+  }
+  return { lessonId: lesson.id, materialIds }
+}
+
+/**
+ * Re-fill a controlled input until React holds the value. A fill that lands
+ * before hydration is wiped when the input re-renders — see loginWithEmail.
+ */
+async function fillControlled(page: Page, selector: string, value: string): Promise<void> {
+  const input = page.locator(selector)
+  await expect(async () => {
+    await input.fill(value)
+    await page.waitForTimeout(150)
+    await expect(input).toHaveValue(value, { timeout: 500 })
+  }).toPass({ timeout: 20000 })
+}
+
+/** Open a URL dialog (Poveznica / Video poveznica / RoboCamp) inside `scope` and add one link. */
+async function addLinkInSection(
+  page: Page,
+  scope: Locator,
+  link: FixtureLink,
+): Promise<void> {
+  const kind = link.type ?? 'LINK'
+  const trigger = { LINK: 'Poveznica', VIDEO: 'Video poveznica', ROBOCAMP: 'RoboCamp' }[kind]
+  const dialog = page.getByRole('dialog')
+  // The trigger is a Radix DialogTrigger: a click before hydration does nothing.
+  await expect(async () => {
+    if (!(await dialog.isVisible())) {
+      await scope.getByRole('button', { name: trigger, exact: true }).click({ timeout: 2000 })
+    }
+    await expect(dialog).toBeVisible({ timeout: 2000 })
+  }).toPass({ timeout: 20000 })
+  await dialog.locator(`#link-material-title-${kind}`).fill(link.title)
+  await dialog.locator(`#link-material-url-${kind}`).fill(link.url)
+  await dialog.getByRole('button', { name: 'Dodaj', exact: true }).click()
+  await expect(dialog).toBeHidden({ timeout: 15000 })
+}
+
+/**
+ * Creates a lesson through the real admin editor: program page → the module's
+ * "Nova lekcija" → title, optional sats, URL materials into the two sections →
+ * "Spremi lekciju". Returns the new lesson's id (from the editor URL it lands on).
+ */
+export async function createLessonOnProgramPage(
+  page: Page,
+  input: {
+    target: LessonTarget
+    title: string
+    sats?: number[]
+    studentLinks?: FixtureLink[]
+    teacherLinks?: FixtureLink[]
+  },
+): Promise<string> {
+  const { courseId, moduleId } = input.target
+  await page.goto(`${BASE}/admin/programi/${courseId}`)
+  // The module card's own "Nova lekcija" (no `sat=`): free-sat rows link to the
+  // same route with `&sat=N`, so the exact href picks this module's button.
+  const href = `/admin/programi/${courseId}/lekcija/nova${moduleId ? `?modul=${moduleId}` : ''}`
+  await page.locator(`a[href="${href}"]`).first().click()
+  await page.waitForURL(/\/lekcija\/nova/, { timeout: 30000 })
+  await expect(page.getByRole('heading', { level: 1, name: 'Nova lekcija' })).toBeVisible()
+
+  await fillControlled(page, '#lesson-title', input.title)
+
+  for (const sat of input.sats ?? []) {
+    const label = sat === 0 ? /^Probni sat/ : new RegExp(`^${sat}\\. sat`)
+    const chip = page.getByRole('button', { name: label })
+    await chip.click()
+    await expect(chip).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  const section = (heading: string) =>
+    page.locator('section').filter({ has: page.getByRole('heading', { level: 2, name: heading }) })
+  for (const link of input.teacherLinks ?? []) {
+    await addLinkInSection(page, section('Materijali za nastavnike'), link)
+  }
+  for (const link of input.studentLinks ?? []) {
+    await addLinkInSection(page, section('Materijali za polaznike'), link)
+  }
+
+  await page.getByRole('button', { name: 'Spremi lekciju' }).click()
+  await page.waitForURL(/\/lekcija\/(?!nova)[a-z0-9]+$/, { timeout: 30000 })
+  const lessonId = /\/lekcija\/([a-z0-9]+)$/.exec(page.url())![1]
+  await expect(page.getByRole('heading', { level: 1, name: input.title })).toBeVisible()
+  return lessonId
+}
+
+/**
+ * Open one lesson of a lesson accordion — the portal's, or the staff group
+ * view's (`/nastavnik/grupa/<id>/materijali`, `/admin/grupe/<id>`). The staff
+ * view also folds whole modules, so any folded module is opened first. Returns
+ * the lesson's `<li>` for scoping assertions.
+ *
+ * Retries the click: a tap before hydration is swallowed, and checking
+ * `aria-expanded` first means a lesson the page already opened (the current
+ * one) is never toggled shut.
+ */
+export async function openLesson(page: Page, lessonTitle: string): Promise<Locator> {
+  const folded = page.locator('button[aria-controls^="modul-"][aria-expanded="false"]')
+  await expect(async () => {
+    const n = await folded.count()
+    for (let i = 0; i < n; i++) await folded.first().click({ timeout: 2000 })
+    await expect(folded).toHaveCount(0, { timeout: 1000 })
+  }).toPass({ timeout: 20000 })
+
+  const heading = page.getByRole('heading', { level: 3, name: lessonTitle })
+  await expect(heading).toBeVisible({ timeout: 15000 })
+  const toggle = heading.getByRole('button')
+  await expect(async () => {
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click({ timeout: 2000 })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 })
+  }).toPass({ timeout: 20000 })
+  return page.locator('li').filter({ has: heading })
+}
+
+/**
+ * On a group's staff lesson view: adds a URL material that belongs to THIS
+ * group only (scope GROUP) into an existing lesson, under "Za polaznike" or
+ * "Za nastavnike".
+ */
+export async function addGroupLinkMaterial(
+  page: Page,
+  lessonTitle: string,
+  audience: 'STUDENT' | 'TEACHER',
+  link: FixtureLink,
+): Promise<Locator> {
+  const lesson = await openLesson(page, lessonTitle)
+  const section = lesson.locator('section').filter({
+    has: page.getByRole('heading', {
+      level: 4,
+      name: audience === 'STUDENT' ? 'Za polaznike' : 'Za nastavnike',
+      exact: true,
+    }),
+  })
+  await addLinkInSection(page, section, link)
+  const row = section.locator('li').filter({ hasText: link.title })
+  await expect(row).toBeVisible({ timeout: 15000 })
+  return row
+}
+
+/**
+ * Adds a teacher-only whole-program (COURSE) LINK through the program page's
+ * "Za nastavnike — cijeli program" section — the one material outside a lesson
+ * that survives Materijali v2, and never reaches the portal.
+ */
+export async function addTeacherProgramMaterial(
   page: Page,
   courseId: string,
-  sectionHeading: string | RegExp,
   title: string,
   url: string,
-) {
+): Promise<void> {
   await page.goto(`${BASE}/admin/programi/${courseId}`)
   const section = page.locator('section').filter({
-    has: page.getByRole('heading', { name: sectionHeading }),
+    has: page.getByRole('heading', { level: 2, name: 'Za nastavnike — cijeli program' }),
   })
-  await section.getByRole('button', { name: 'Dodaj' }).first().click()
-  const dialog = page.locator('[role="dialog"]')
+  const dialog = page.getByRole('dialog')
+  await expect(async () => {
+    if (!(await dialog.isVisible())) {
+      await section.getByRole('button', { name: 'Dodaj', exact: true }).click({ timeout: 2000 })
+    }
+    await expect(dialog).toBeVisible({ timeout: 2000 })
+  }).toPass({ timeout: 20000 })
   await dialog.locator('#material-title').fill(title)
   await dialog.locator('label', { hasText: 'Poveznica' }).click()
   await dialog.locator('#material-external-url').fill(url)
   await dialog.getByRole('button', { name: 'Spremi' }).click()
-  await expect(dialog).toBeHidden({ timeout: 10000 })
-  // The merged Materijali tab can render the title in both the manage list (link)
-  // and the student preview (span), so the text may resolve to >1 node — assert
-  // the first match is visible rather than tripping strict-mode on the duplicate.
-  await expect(page.getByText(title).first()).toBeVisible({ timeout: 15000 })
+  await expect(dialog).toBeHidden({ timeout: 15000 })
+  await expect(section.getByText(title)).toBeVisible({ timeout: 15000 })
 }
 
 let cloudinaryConfigured = false

@@ -33,7 +33,8 @@ export function DeleteMaterialButton({ id, title }: Readonly<Props>) {
     <button
       onClick={handleClick}
       disabled={isPending}
-      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-red-700 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+      // 44px tap target on a phone, compact from `sm` up.
+      className="inline-flex min-h-11 min-w-11 justify-center sm:min-h-8 sm:min-w-8 items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-red-700 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
       aria-label="Obriši materijal"
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}

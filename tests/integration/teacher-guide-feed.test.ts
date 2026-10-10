@@ -5,6 +5,7 @@ import {
   createAdmin,
   createCourse,
   createGroup,
+  createLesson,
   createMaterial as seedMaterial,
   createModule,
   createTeacher,
@@ -28,8 +29,9 @@ describe('getGroupGuidesForStaff', () => {
     const group = await createGroup({ courseId: course.id, city: 'SPLIT' })
     await createTeacherAssignment(teacher.id, group.id)
 
+    // A radionica's lessons sit directly under the program.
     const visible = await seedMaterial({
-      scope: 'COURSE',
+      scope: 'LESSON',
       courseId: course.id,
       title: 'Vodič koji se prikazuje',
       type: 'ROBOCAMP',
@@ -37,8 +39,8 @@ describe('getGroupGuidesForStaff', () => {
       uploadedById: admin.id,
     })
     const hidden = await seedMaterial({
-      scope: 'COURSE',
-      courseId: course.id,
+      scope: 'LESSON',
+      lessonId: visible.lessonId as string,
       title: 'Vodič sakriven u grupi',
       type: 'ROBOCAMP',
       externalUrl: 'https://elearning.robocamp.eu/course/2',
@@ -54,7 +56,40 @@ describe('getGroupGuidesForStaff', () => {
     expect(feed.guides.map((g) => g.id)).toEqual([visible.id])
   })
 
-  it('includes a guide attached to the whole programme, not only to a module', async () => {
+  it("includes the program's lesson guide and the group's own guide, in every lesson", async () => {
+    const admin = await createAdmin()
+    const teacher = await createTeacher({ city: 'SPLIT' })
+    const course = await createCourse({ kind: 'RADIONICA', city: 'SPLIT' })
+    const group = await createGroup({ courseId: course.id, city: 'SPLIT' })
+    await createTeacherAssignment(teacher.id, group.id)
+    const first = await createLesson({ courseId: course.id, sortOrder: 1 })
+    const second = await createLesson({ courseId: course.id, sortOrder: 2 })
+
+    await seedMaterial({
+      scope: 'LESSON',
+      lessonId: first.id,
+      title: 'Programski vodič',
+      type: 'ROBOCAMP',
+      externalUrl: 'https://elearning.robocamp.eu/course/3',
+      uploadedById: admin.id,
+    })
+    await seedMaterial({
+      scope: 'GROUP',
+      scheduledGroupId: group.id,
+      lessonId: second.id,
+      title: 'Vodič grupe',
+      type: 'ROBOCAMP',
+      externalUrl: 'https://elearning.robocamp.eu/course/5',
+      uploadedById: teacher.id,
+    })
+
+    mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
+    const feed = await getGroupGuidesForStaff(group.id)
+
+    expect(feed.guides.map((g) => g.title)).toEqual(['Programski vodič', 'Vodič grupe'])
+  })
+
+  it('never puts a teacher-only row on the wall, even one carrying a RoboCamp URL', async () => {
     const admin = await createAdmin()
     const teacher = await createTeacher({ city: 'SPLIT' })
     const course = await createCourse({ kind: 'RADIONICA', city: 'SPLIT' })
@@ -62,18 +97,19 @@ describe('getGroupGuidesForStaff', () => {
     await createTeacherAssignment(teacher.id, group.id)
 
     await seedMaterial({
-      scope: 'COURSE',
-      courseId: course.id,
-      title: 'Programski vodič',
-      type: 'ROBOCAMP',
-      externalUrl: 'https://elearning.robocamp.eu/course/3',
+      scope: 'GROUP',
+      scheduledGroupId: group.id,
+      audience: 'TEACHER',
+      title: 'Priprema s RoboCamp poveznicom',
+      type: 'LINK',
+      externalUrl: 'https://elearning.robocamp.eu/course/6',
       uploadedById: admin.id,
     })
 
     mockSession({ id: teacher.id, role: 'TEACHER', city: 'SPLIT' })
     const feed = await getGroupGuidesForStaff(group.id)
 
-    expect(feed.guides.map((g) => g.title)).toEqual(['Programski vodič'])
+    expect(feed.guides).toEqual([])
   })
 
   it('treats an un-backfilled LINK row with a RoboCamp URL as a guide', async () => {

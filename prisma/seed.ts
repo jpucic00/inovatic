@@ -1727,6 +1727,9 @@ async function main() {
   await prisma.tag.deleteMany()
   await prisma.article.deleteMany()
   await prisma.material.deleteMany()
+  // Lesson → Course and Lesson → CourseModule are RESTRICT; its sats
+  // (LessonSession) cascade. Materials point at lessons, so they go first.
+  await prisma.lesson.deleteMany()
   await prisma.enrollment.deleteMany()
   await prisma.inquiry.deleteMany()
   await prisma.teacherAssignment.deleteMany()

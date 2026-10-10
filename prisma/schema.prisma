@@ -136,10 +136,26 @@ enum MaterialType {
   ROBOCAMP
 }
 
+/// Where a material hangs (Materijali v2, 2026-10-10). Every material a child
+/// can see sits in a lesson: LESSON = curriculum lesson material shared by every
+/// group of the program, GROUP = one group's own addition to a lesson (it has a
+/// lessonId too). MODULE and COURSE survive ONLY as teacher-only "for every
+/// class of this module / program" material — the one exception to "everything
+/// is in a lesson", enforced by the Material_v2_shape_check constraint.
 enum MaterialScope {
   MODULE
   COURSE
   GROUP
+  LESSON
+}
+
+/// Who a material is for. STUDENT = the portal (parent account with a chosen
+/// child, the classroom account) and staff; TEACHER = staff only, never a
+/// portal payload or a portal download. Deliberately no @default: forgetting it
+/// must be a tsc error, never a silent publication to parents.
+enum MaterialAudience {
+  STUDENT
+  TEACHER
 }
 
 enum EmailCampaignKind {
@@ -310,6 +326,7 @@ model Course {
   enrollmentWindows CourseEnrollmentWindow[]
   seasons           CourseSeason[]
   gradeRules        CourseGradeRule[]
+  lessons           Lesson[]
 
   recommendedInAssessments StudentAssessment[]
   emailCampaignsAsTarget   EmailCampaign[]     @relation("EmailCampaignTarget")
@@ -433,6 +450,57 @@ model CourseModule {
   schedules     ModuleSchedule[]
   materials     Material[]
   galleryImages GalleryImage[]
+  lessons       Lesson[]
+
+  // Target of Lesson's composite FK — a lesson's module must belong to the
+  // lesson's own course.
+  @@unique([id, courseId])
+}
+
+/// A lesson of a program (Materijali v2, 2026-10-10). Bound to termin NUMBERS
+/// inside its module (LessonSession), never to calendar dates: a module's dates
+/// differ per weekday group, per city and per year, and move when a holiday is
+/// added, while the lesson is the same everywhere. Shared by both cities.
+///
+/// `moduleId` is null exactly for a radionica (no modules — lessons sit directly
+/// under the program). A natjecanje lesson has a module but no sessions
+/// (undated). Only admins create lessons; teachers add group materials into them.
+model Lesson {
+  id          String   @id @default(cuid())
+  courseId    String
+  moduleId    String?
+  title       String
+  description String?  @db.Text
+  /// Order among UNDATED lessons (radionica, natjecanje, a standard lesson whose
+  /// sats are not picked yet). Dated lessons order by their first sat.
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course    Course          @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  module    CourseModule?   @relation(fields: [moduleId, courseId], references: [id, courseId], onDelete: Restrict)
+  sessions  LessonSession[]
+  materials Material[]
+
+  @@unique([id, moduleId])
+  @@index([courseId])
+  @@index([moduleId])
+}
+
+/// One termin slot of a module held by a lesson: 1–7 = the module's Nth sat on
+/// each group's own arc, 0 = the probni sat (first module of a standard program
+/// only). `moduleId` is denormalized from the lesson through a composite FK so
+/// the DB itself guarantees one lesson per (module, sat).
+model LessonSession {
+  id            String @id @default(cuid())
+  lessonId      String
+  moduleId      String
+  sessionNumber Int
+
+  lesson Lesson @relation(fields: [lessonId, moduleId], references: [id, moduleId], onDelete: Cascade)
+
+  @@unique([moduleId, sessionNumber])
+  @@index([lessonId])
 }
 
 model ModuleSchedule {
@@ -724,11 +792,21 @@ model ModuleEnrollment {
 }
 
 model Material {
-  id               String        @id @default(cuid())
+  id               String           @id @default(cuid())
   scope            MaterialScope
+  audience         MaterialAudience
   scheduledGroupId String?
   courseId         String?
   moduleId         String?
+  /// Set on every LESSON and GROUP material; null only on the teacher-only
+  /// whole-module / whole-program rows. Restrict: a lesson that still has
+  /// materials cannot be deleted.
+  lessonId         String?
+  /// null = both cities (the default and the norm — one curriculum). Set only
+  /// by the deliberate "Samo za moj grad" step, always with `cityOnlyReason`
+  /// (Material_city_only_check), and never on a GROUP row.
+  city             City?
+  cityOnlyReason   String?          @db.Text
   title            String
   description      String?       @db.Text
   type             MaterialType
@@ -744,9 +822,11 @@ model Material {
   scheduledGroup ScheduledGroup?     @relation(fields: [scheduledGroupId], references: [id], onDelete: Restrict)
   course         Course?             @relation(fields: [courseId], references: [id], onDelete: Restrict)
   module         CourseModule?       @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  lesson         Lesson?             @relation(fields: [lessonId], references: [id], onDelete: Restrict)
   uploadedBy     User                @relation(fields: [uploadedById], references: [id])
   hiddenInGroups MaterialGroupHide[]
 
+  @@index([lessonId])
   @@index([scope, moduleId])
   @@index([scope, courseId])
   @@index([scope, scheduledGroupId])

@@ -43,7 +43,9 @@ async function asClassroom(city: 'SPLIT' | 'SIBENIK' = 'SPLIT') {
 
 describe('shell + materials through the classroom login', () => {
   it('opens a current-year group of its city, with no enrollment anywhere', async () => {
-    const course = await createCourse({ kind: 'STANDARD' })
+    // A radionica: its lessons sit directly under the program, so the group's
+    // own material is in view without having to pace a module arc.
+    const course = await createCourse({ kind: 'RADIONICA', city: 'SPLIT' })
     const group = await createGroup({ courseId: course.id, schoolYear: CY, city: 'SPLIT' })
     const material = await createMaterial({ scope: 'GROUP', scheduledGroupId: group.id, title: 'Učionica-vidi' })
     await asClassroom('SPLIT')
@@ -52,7 +54,8 @@ describe('shell + materials through the classroom login', () => {
     expect(shell.group.id).toBe(group.id)
 
     const view = await getEffectiveMaterialsForStudent(group.id)
-    expect(view.groupMaterials.links.map((m) => m.id)).toContain(material.id)
+    const ids = view.modules.flatMap((s) => s.lessons.flatMap((l) => l.materials.map((m) => m.id)))
+    expect(ids).toContain(material.id)
   })
 
   it('404s on a group of the other city', async () => {

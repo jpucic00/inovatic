@@ -58,7 +58,8 @@ export async function deleteGroupsAndDependents(groupIds: string[]): Promise<voi
  *
  * The RESTRICT edges are what makes the order load-bearing:
  * TeacherAttendance → ScheduledGroup (payout evidence), Material/comments →
- * group, Enrollment → group, group → Course, group → Location. Everything else
+ * group, Material → Lesson → Course, Enrollment → group, group → Course,
+ * group → Location. Everything else
  * cascades or nulls.
  */
 export async function cleanupRunFixtures(runId: string): Promise<void> {
@@ -74,6 +75,24 @@ export async function cleanupRunFixtures(runId: string): Promise<void> {
     const groupIds = groups.map((g) => g.id)
 
     await deleteGroupsAndDependents(groupIds)
+
+    // Lessons a spec added to a SHARED program (the standard curriculum the
+    // fixture groups run on), identified by the run id in their title. The
+    // course sweep below never reaches them — the course carries no run id —
+    // and Material → Lesson is RESTRICT, so every material in them goes first,
+    // whoever uploaded it (a GROUP row of the shared fixture group included).
+    // Same for a run-titled material outside any run lesson — e.g. a teacher-only
+    // whole-program (COURSE) row the admin added to a shared program.
+    await db.material.deleteMany({ where: { title: like } })
+    const runLessons = await db.lesson.findMany({
+      where: { title: like },
+      select: { id: true },
+    })
+    if (runLessons.length > 0) {
+      const lessonIds = { in: runLessons.map((l) => l.id) }
+      await db.material.deleteMany({ where: { lessonId: lessonIds } })
+      await db.lesson.deleteMany({ where: { id: lessonIds } })
+    }
 
     // Upiti a spec typed itself, identified by the run id in the e-mail or the
     // child's surname; a submitted form leaves one even when no group was picked.
@@ -93,9 +112,15 @@ export async function cleanupRunFixtures(runId: string): Promise<void> {
       })
       await db.material.deleteMany({
         where: {
-          OR: [{ courseId: courseIds }, { moduleId: { in: modules.map((m) => m.id) } }],
+          OR: [
+            { courseId: courseIds },
+            { moduleId: { in: modules.map((m) => m.id) } },
+            { lesson: { courseId: courseIds } },
+          ],
         },
       })
+      // Lesson → Course / CourseModule is RESTRICT; its sats cascade.
+      await db.lesson.deleteMany({ where: { courseId: courseIds } })
       // Modules, module schedules, seasons and enrollment windows cascade.
       await db.course.deleteMany({ where: { id: courseIds } })
     }

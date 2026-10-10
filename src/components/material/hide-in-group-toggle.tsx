@@ -39,7 +39,8 @@ export function HideInGroupToggle({ materialId, scheduledGroupId, hidden }: Read
       onClick={handleClick}
       disabled={isPending}
       className={[
-        'inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors disabled:opacity-50',
+        // 44px tap target on a phone, compact from `sm` up.
+        'inline-flex min-h-11 min-w-11 justify-center sm:min-h-8 sm:min-w-8 items-center gap-1 px-2 py-1 text-xs rounded transition-colors disabled:opacity-50',
         hidden
           ? 'text-gray-600 hover:text-cyan-700 hover:bg-cyan-50'
           : 'text-gray-600 hover:text-amber-700 hover:bg-amber-50',

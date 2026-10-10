@@ -16,8 +16,10 @@ import {
   type Enrollment,
   type Inquiry,
   InquiryStatus,
+  type Lesson,
   type Location,
   type Material,
+  type MaterialAudience,
   MaterialScope,
   MaterialType,
   type ModuleEnrollment,
@@ -489,33 +491,130 @@ export async function createTeacherAttendance(
   })
 }
 
+/**
+ * A lesson of a program (Materijali v2). `moduleId` null = a radionica's lesson
+ * directly under the program. `sessionNumbers` (0 = probni sat, 1–7 = the
+ * module's sats) needs a module — LessonSession is keyed (moduleId, sat), and
+ * the DB refuses two lessons on the same one.
+ */
+export async function createLesson(input: {
+  courseId: string
+  moduleId?: string | null
+  title?: string
+  sortOrder?: number
+  sessionNumbers?: number[]
+}): Promise<Lesson> {
+  const moduleId = input.moduleId ?? null
+  const sessionNumbers = input.sessionNumbers ?? []
+  if (sessionNumbers.length > 0 && moduleId === null) {
+    throw new Error('createLesson: sessionNumbers need a moduleId')
+  }
+  return db.lesson.create({
+    data: {
+      courseId: input.courseId,
+      moduleId,
+      title: input.title ?? `Lekcija ${uniq()}`,
+      sortOrder: input.sortOrder ?? 0,
+      // LessonSession.moduleId comes from the lesson through the composite FK.
+      ...(sessionNumbers.length > 0
+        ? { sessions: { create: sessionNumbers.map((sessionNumber) => ({ sessionNumber })) } }
+        : {}),
+    },
+  })
+}
+
 type CreateMaterialOverrides = {
+  /**
+   * Inferred when omitted: GROUP with `scheduledGroupId`, else LESSON with
+   * `lessonId`, else MODULE with `moduleId`, else COURSE with `courseId`, else a
+   * LESSON in a fresh program.
+   */
   scope?: MaterialScope
+  /** Defaults: TEACHER for MODULE/COURSE (the only legal value), else STUDENT. */
+  audience?: MaterialAudience
+  lessonId?: string
   scheduledGroupId?: string
+  /**
+   * For MODULE/COURSE the row's own FK. For LESSON/GROUP without a `lessonId`
+   * it only says WHERE the auto-created lesson goes (the row itself never
+   * carries them — Material_v2_shape_check).
+   */
   courseId?: string
   moduleId?: string
   title?: string
   type?: MaterialType
   fileUrl?: string | null
   externalUrl?: string | null
+  mimeType?: string | null
   uploadedById?: string
+  /**
+   * "Samo za moj grad" (Material_city_only_check): set both or neither — the DB
+   * refuses a city without its reason, and any city on a GROUP row.
+   */
+  city?: City | null
+  cityOnlyReason?: string | null
+}
+
+function inferScope(o: CreateMaterialOverrides): MaterialScope {
+  if (o.scope) return o.scope
+  if (o.scheduledGroupId) return MaterialScope.GROUP
+  if (o.lessonId) return MaterialScope.LESSON
+  if (o.moduleId) return MaterialScope.MODULE
+  if (o.courseId) return MaterialScope.COURSE
+  return MaterialScope.LESSON
+}
+
+/** The lesson a LESSON/GROUP row sits in when the caller named none. */
+async function defaultLessonId(o: CreateMaterialOverrides, scope: MaterialScope): Promise<string> {
+  if (o.lessonId) return o.lessonId
+  let courseId = o.courseId
+  if (!courseId && o.moduleId) {
+    courseId = (await db.courseModule.findUniqueOrThrow({ where: { id: o.moduleId } })).courseId
+  }
+  if (!courseId && scope === MaterialScope.GROUP && o.scheduledGroupId) {
+    courseId = (await db.scheduledGroup.findUniqueOrThrow({ where: { id: o.scheduledGroupId } }))
+      .courseId
+  }
+  courseId ??= (await createCourse()).id
+  // Mirror the lesson editor's rule: a program with modules places every lesson
+  // in one (the first, when none was named); only a radionica keeps them
+  // directly under the program.
+  let moduleId = o.moduleId ?? null
+  if (moduleId === null) {
+    const course = await db.course.findUniqueOrThrow({
+      where: { id: courseId },
+      select: { kind: true, modules: { orderBy: { sortOrder: 'asc' }, take: 1, select: { id: true } } },
+    })
+    if (course.kind !== 'RADIONICA') moduleId = course.modules[0]?.id ?? null
+  }
+  return (await createLesson({ courseId, moduleId })).id
 }
 
 export async function createMaterial(overrides: CreateMaterialOverrides = {}): Promise<Material> {
   const id = uniq()
-  const scope = overrides.scope ?? MaterialScope.GROUP
+  const scope = inferScope(overrides)
+  const type = overrides.type ?? MaterialType.LINK
+  const inLesson = scope === MaterialScope.LESSON || scope === MaterialScope.GROUP
+  const audience: MaterialAudience =
+    overrides.audience ?? (inLesson || type === MaterialType.ROBOCAMP ? 'STUDENT' : 'TEACHER')
   const uploadedById = overrides.uploadedById ?? (await createTeacher()).id
+  const lessonId = inLesson ? await defaultLessonId(overrides, scope) : null
   return db.material.create({
     data: {
       scope,
-      scheduledGroupId: overrides.scheduledGroupId ?? null,
-      courseId: overrides.courseId ?? null,
-      moduleId: overrides.moduleId ?? null,
+      audience,
+      lessonId,
+      scheduledGroupId: scope === MaterialScope.GROUP ? (overrides.scheduledGroupId ?? null) : null,
+      courseId: scope === MaterialScope.COURSE ? (overrides.courseId ?? null) : null,
+      moduleId: scope === MaterialScope.MODULE ? (overrides.moduleId ?? null) : null,
       title: overrides.title ?? `Materijal ${id}`,
-      type: overrides.type ?? MaterialType.LINK,
+      type,
       fileUrl: overrides.fileUrl ?? null,
       externalUrl: overrides.externalUrl ?? 'https://example.com/x',
+      mimeType: overrides.mimeType ?? null,
       uploadedById,
+      city: overrides.city ?? null,
+      cityOnlyReason: overrides.cityOnlyReason ?? null,
     },
   })
 }

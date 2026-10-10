@@ -10,6 +10,7 @@ import {
   createCourse,
   createEnrollment,
   createGroup,
+  createLesson,
   createMaterial,
   createModule,
   createStudent,
@@ -56,9 +57,12 @@ type Seeded = {
   groupAId: string
   groupBId: string
   materialGroupA: string
-  materialModule: string
+  materialLesson: string
   materialGroupB: string
   materialDiacritic: string
+  /** Teacher-only (audience TEACHER) rows: a group's own and a program lesson's. */
+  teacherGroupA: string
+  teacherLesson: string
 }
 let seeded: Seeded
 
@@ -71,6 +75,8 @@ beforeAll(async () => {
 
   const course = await createCourse({ kind: 'STANDARD' })
   const moduleRow = await createModule(course.id)
+  // Materijali v2: every material a child can open sits in a lesson.
+  const lesson = await createLesson({ courseId: course.id, moduleId: moduleRow.id, sessionNumbers: [1] })
 
   const groupA = await createGroup({ courseId: course.id })
   const groupB = await createGroup({ courseId: course.id })
@@ -81,16 +87,18 @@ beforeAll(async () => {
   const materialGroupA = await createMaterial({
     scope: 'GROUP',
     scheduledGroupId: groupA.id,
+    lessonId: lesson.id,
     title: 'Grupa-A-DL',
     type: MaterialType.DOCUMENT,
     fileUrl: 'https://res.cloudinary.com/dgc2tp4f8/raw/upload/v1/test/a.pdf',
     externalUrl: null,
     uploadedById: admin.id,
   })
-  const materialModule = await createMaterial({
-    scope: 'MODULE',
-    moduleId: moduleRow.id,
-    title: 'Modul-DL',
+  const materialLesson = await createMaterial({
+    scope: 'LESSON',
+    lessonId: lesson.id,
+    audience: 'STUDENT',
+    title: 'Lekcija-DL',
     type: MaterialType.DOCUMENT,
     fileUrl: 'https://res.cloudinary.com/dgc2tp4f8/raw/upload/v1/test/m.pdf',
     externalUrl: null,
@@ -99,6 +107,7 @@ beforeAll(async () => {
   const materialGroupB = await createMaterial({
     scope: 'GROUP',
     scheduledGroupId: groupB.id,
+    lessonId: lesson.id,
     title: 'Grupa-B-DL',
     type: MaterialType.DOCUMENT,
     fileUrl: 'https://res.cloudinary.com/dgc2tp4f8/raw/upload/v1/test/b.pdf',
@@ -108,6 +117,7 @@ beforeAll(async () => {
   const materialDiacritic = await createMaterial({
     scope: 'GROUP',
     scheduledGroupId: groupA.id,
+    lessonId: lesson.id,
     title: 'Čćžšđ-DL',
     type: MaterialType.DOCUMENT,
     fileUrl: 'https://res.cloudinary.com/dgc2tp4f8/raw/upload/v1/test/d.pdf',
@@ -115,10 +125,32 @@ beforeAll(async () => {
     uploadedById: admin.id,
   })
 
-  // Hide MODULE-scoped material in groupA so we can verify staff bypass it
+  const teacherGroupA = await createMaterial({
+    scope: 'GROUP',
+    scheduledGroupId: groupA.id,
+    lessonId: lesson.id,
+    audience: 'TEACHER',
+    title: 'Grupa-A-nastavnik-DL',
+    type: MaterialType.DOCUMENT,
+    fileUrl: 'https://res.cloudinary.com/dgc2tp4f8/raw/upload/v1/test/ta.pdf',
+    externalUrl: null,
+    uploadedById: admin.id,
+  })
+  const teacherLesson = await createMaterial({
+    scope: 'LESSON',
+    lessonId: lesson.id,
+    audience: 'TEACHER',
+    title: 'Lekcija-nastavnik-DL',
+    type: MaterialType.DOCUMENT,
+    fileUrl: 'https://res.cloudinary.com/dgc2tp4f8/raw/upload/v1/test/tl.pdf',
+    externalUrl: null,
+    uploadedById: admin.id,
+  })
+
+  // Hide the program LESSON material in groupA so we can verify staff bypass it
   // while students don't.
   await db.materialGroupHide.create({
-    data: { materialId: materialModule.id, scheduledGroupId: groupA.id },
+    data: { materialId: materialLesson.id, scheduledGroupId: groupA.id },
   })
 
   // Set mimeType so Content-Disposition extension logic kicks in.
@@ -137,9 +169,11 @@ beforeAll(async () => {
     groupAId: groupA.id,
     groupBId: groupB.id,
     materialGroupA: materialGroupA.id,
-    materialModule: materialModule.id,
+    materialLesson: materialLesson.id,
     materialGroupB: materialGroupB.id,
     materialDiacritic: materialDiacritic.id,
+    teacherGroupA: teacherGroupA.id,
+    teacherLesson: teacherLesson.id,
   }
 })
 
@@ -161,9 +195,9 @@ describe('GET /api/download/[materialId] — ADMIN', () => {
     expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename=/)
   })
 
-  it('ADMIN → MODULE-scope material despite group hide → 200', async () => {
+  it('ADMIN → LESSON material despite group hide → 200', async () => {
     mockSession({ id: seeded.admin.id, role: 'ADMIN' })
-    const res = await callDownload(seeded.materialModule)
+    const res = await callDownload(seeded.materialLesson)
     expect(res.status).toBe(200)
   })
 
@@ -191,9 +225,9 @@ describe('GET /api/download/[materialId] — TEACHER', () => {
     expect(res.status).toBe(200)
   })
 
-  it('TEACHER assigned to groupA → MODULE material (hidden in A) → 200 (hide is staff-bypassed)', async () => {
+  it('TEACHER assigned to groupA → LESSON material (hidden in A) → 200 (hide is staff-bypassed)', async () => {
     mockSession({ id: seeded.teacherAssigned.id, role: 'TEACHER' })
-    const res = await callDownload(seeded.materialModule)
+    const res = await callDownload(seeded.materialLesson)
     expect(res.status).toBe(200)
   })
 
@@ -251,10 +285,10 @@ describe('GET /api/download/[materialId] — TEACHER on a zamjena', () => {
     expect((await callDownload(seeded.materialGroupA)).status).toBe(200)
   })
 
-  it('an upcoming zamjena on groupA → MODULE material hidden in A → 404 (unlike the regular, the hide binds)', async () => {
+  it('an upcoming zamjena on groupA → LESSON material hidden in A → 404 (unlike the regular, the hide binds)', async () => {
     // Visible in groupB, which the substitute cannot open — so only A's hide decides.
     await substituteOn(seeded.groupAId, 3)
-    expect((await callDownload(seeded.materialModule)).status).toBe(404)
+    expect((await callDownload(seeded.materialLesson)).status).toBe(404)
   })
 
   it('an upcoming zamjena on groupA → COURSE material of its program → 200', async () => {
@@ -280,9 +314,9 @@ describe('GET /api/download/[materialId] — family session (picked child)', () 
     expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename=/)
   })
 
-  it('child enrolled in groupA → MODULE material (hidden in A) → 404 (hide blocks student)', async () => {
+  it('child enrolled in groupA → LESSON material (hidden in A) → 404 (hide blocks student)', async () => {
     mockChildSession(seeded.studentEnrolled.id)
-    const res = await callDownload(seeded.materialModule)
+    const res = await callDownload(seeded.materialLesson)
     expect(res.status).toBe(404)
   })
 
@@ -329,19 +363,19 @@ describe('GET /api/download/[materialId] — CLASSROOM', () => {
     expect(res.status).toBe(200)
   })
 
-  it('Split classroom → MODULE material hidden in A but visible in B → 200; hidden everywhere → 404', async () => {
+  it('Split classroom → LESSON material hidden in A but visible in B → 200; hidden everywhere → 404', async () => {
     const row = await classroomAccount('SPLIT')
     mockSession({ id: row.id, role: 'CLASSROOM', city: 'SPLIT' })
-    expect((await callDownload(seeded.materialModule)).status).toBe(200)
+    expect((await callDownload(seeded.materialLesson)).status).toBe(200)
 
     await db.materialGroupHide.create({
-      data: { materialId: seeded.materialModule, scheduledGroupId: seeded.groupBId },
+      data: { materialId: seeded.materialLesson, scheduledGroupId: seeded.groupBId },
     })
     try {
-      expect((await callDownload(seeded.materialModule)).status).toBe(404)
+      expect((await callDownload(seeded.materialLesson)).status).toBe(404)
     } finally {
       await db.materialGroupHide.deleteMany({
-        where: { materialId: seeded.materialModule, scheduledGroupId: seeded.groupBId },
+        where: { materialId: seeded.materialLesson, scheduledGroupId: seeded.groupBId },
       })
     }
   })
@@ -360,5 +394,70 @@ describe('GET /api/download/[materialId] — CLASSROOM', () => {
     mockSession({ id: row.id, role: 'CLASSROOM', city: null })
     const res = await callDownload(seeded.materialGroupA)
     expect(res.status).toBe(404)
+  })
+})
+
+// Materijali v2: a TEACHER-audience row is the staff room. The portal branches
+// (a parent's picked child, the classroom login) run the STUDENT viewer and must
+// 404 it even in their own group; staff run STAFF and may read it.
+describe('GET /api/download/[materialId] — teacher-only (audience TEACHER) materials', () => {
+  it('a parent whose child is in groupA → 404 for the TEACHER group and lesson rows, 200 for a STUDENT one', async () => {
+    mockChildSession(seeded.studentEnrolled.id)
+    expect((await callDownload(seeded.teacherGroupA)).status).toBe(404)
+    expect((await callDownload(seeded.teacherLesson)).status).toBe(404)
+    expect((await callDownload(seeded.materialGroupA)).status).toBe(200)
+  })
+
+  it('the Split classroom → 404 for the TEACHER rows, 200 for a STUDENT one', async () => {
+    const row = await classroomAccount('SPLIT')
+    mockSession({ id: row.id, role: 'CLASSROOM', city: 'SPLIT' })
+    expect((await callDownload(seeded.teacherGroupA)).status).toBe(404)
+    expect((await callDownload(seeded.teacherLesson)).status).toBe(404)
+    expect((await callDownload(seeded.materialGroupA)).status).toBe(200)
+  })
+
+  it('the teacher assigned to groupA reads both TEACHER rows', async () => {
+    mockSession({ id: seeded.teacherAssigned.id, role: 'TEACHER' })
+    expect((await callDownload(seeded.teacherGroupA)).status).toBe(200)
+    expect((await callDownload(seeded.teacherLesson)).status).toBe(200)
+  })
+
+  it('a same-city admin reads both TEACHER rows', async () => {
+    mockSession({ id: seeded.admin.id, role: 'ADMIN', city: 'SPLIT' })
+    expect((await callDownload(seeded.teacherGroupA)).status).toBe(200)
+    expect((await callDownload(seeded.teacherLesson)).status).toBe(200)
+  })
+
+  it('a staff member viewing their own child does not lose the staff read', async () => {
+    mockSession({
+      id: seeded.teacherAssigned.id,
+      role: 'TEACHER',
+      studentId: seeded.studentEnrolled.id,
+    })
+    expect((await callDownload(seeded.teacherGroupA)).status).toBe(200)
+  })
+
+  it('a teacher with no assignment → 404 for the TEACHER rows', async () => {
+    mockSession({ id: seeded.teacherUnassigned.id, role: 'TEACHER' })
+    expect((await callDownload(seeded.teacherGroupA)).status).toBe(404)
+    expect((await callDownload(seeded.teacherLesson)).status).toBe(404)
+  })
+
+  it('an upcoming zamjena on groupA reads the TEACHER group row (prepares with it)', async () => {
+    const teacher = await createTeacher()
+    const today = zagrebDateKey(new Date())
+    const date = new Date(`${today}T00:00:00Z`)
+    date.setUTCDate(date.getUTCDate() + 3)
+    await db.sessionStaffChange.create({
+      data: {
+        scheduledGroupId: seeded.groupAId,
+        sessionDate: date,
+        userId: teacher.id,
+        role: 'LEAD',
+        createdById: seeded.admin.id,
+      },
+    })
+    mockSession({ id: teacher.id, role: 'TEACHER' })
+    expect((await callDownload(seeded.teacherGroupA)).status).toBe(200)
   })
 })

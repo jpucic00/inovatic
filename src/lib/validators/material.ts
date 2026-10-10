@@ -20,6 +20,25 @@ const commonCreate = {
 }
 
 // ─── Scope variants (discriminated union) ────────────────────────────────────
+//
+// Materijali v2 (2026-10-10): every material a child can see sits in a lesson.
+// LESSON = curriculum lesson material (admin), GROUP = one group's own addition
+// to a lesson (teacher or admin) — both name their audience. MODULE and COURSE
+// survive only as teacher-only "every class of this module / program" rows, so
+// they carry no audience field: the action stamps TEACHER.
+
+const audience = z.enum(['STUDENT', 'TEACHER'], {
+  errorMap: () => ({ message: 'Odaberite za koga je materijal.' }),
+})
+
+const lessonVariant = z
+  .object({
+    scope: z.literal('LESSON'),
+    lessonId: z.string().min(1, 'Odaberite lekciju'),
+    audience,
+    ...commonCreate,
+  })
+  .strict()
 
 const moduleVariant = z
   .object({
@@ -41,17 +60,43 @@ const groupVariant = z
   .object({
     scope: z.literal('GROUP'),
     scheduledGroupId: z.string().min(1, 'Odaberite grupu'),
+    lessonId: z.string().min(1, 'Odaberite lekciju'),
+    audience,
     ...commonCreate,
   })
   .strict()
 
 export const createMaterialSchema = z
-  .discriminatedUnion('scope', [moduleVariant, courseVariant, groupVariant])
-  .superRefine((val, ctx) => validateTypeUrlPairing(val, ctx))
+  .discriminatedUnion('scope', [lessonVariant, moduleVariant, courseVariant, groupVariant])
+  .superRefine((val, ctx) => {
+    validateTypeUrlPairing(val, ctx)
+    validateRobocampAudience(
+      { type: val.type, audience: 'audience' in val ? val.audience : 'TEACHER' },
+      ctx,
+    )
+  })
 
-// Update is the same three scope variants, but with `id` required and most
-// fields optional. Keeping it as a partial-like pattern is simpler than a full
-// discriminatedUnion here because scope + FK cannot change after creation.
+/**
+ * RoboCamp guides are for the children (owner decision 2026-10-10) — never a
+ * teacher-only row, so never a whole-module / whole-program one either. The DB
+ * enforces the same rule (Material_robocamp_student_check).
+ */
+export function validateRobocampAudience(
+  val: { type: MaterialPairingInput['type']; audience: 'STUDENT' | 'TEACHER' },
+  ctx: z.RefinementCtx,
+) {
+  if (val.type === 'ROBOCAMP' && val.audience !== 'STUDENT') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'RoboCamp vodič je materijal za polaznike.',
+      path: ['type'],
+    })
+  }
+}
+
+// Update edits the content only; scope, lesson and audience are not editable
+// here (moving a material is its own action). The RoboCamp-audience rule is
+// re-checked in the action against the stored audience.
 export const updateMaterialSchema = z
   .object({
     id: z.string().min(1),
@@ -205,7 +250,7 @@ function validateUploadPairing(
   }
 }
 
-function validateTypeUrlPairing(val: MaterialPairingInput, ctx: z.RefinementCtx) {
+export function validateTypeUrlPairing(val: MaterialPairingInput, ctx: z.RefinementCtx) {
   const hasFile = nonEmpty(val.fileUrl)
   const hasExternal = nonEmpty(val.externalUrl)
 

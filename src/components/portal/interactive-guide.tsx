@@ -12,8 +12,8 @@ import type { MaterialItem } from '@/lib/group-materials-view'
  *
  * Collapsed by default. The embed renders at the exercise's native 1330px stage
  * scaled to the container, which is ~760px tall on a laptop — inlined open, it
- * pushed every worksheet and link below the fold, which is the failure the flat
- * "Dodatni materijali" list exists to fix. One click opens it in place.
+ * pushed every worksheet and link of the lesson below the fold. One click opens
+ * it in place.
  *
  * On a phone it is not embedded at all: 1330px scaled into ~358px is a 27%
  * render nobody can work in, so the button opens the real thing in a new tab.
@@ -21,8 +21,15 @@ import type { MaterialItem } from '@/lib/group-materials-view'
 export function InteractiveGuide({
   item,
   moduleTitle,
-}: Readonly<{ item: MaterialItem; moduleTitle: string | null }>) {
+  headingLevel = 2,
+}: Readonly<{
+  item: MaterialItem
+  moduleTitle: string | null
+  /** Inside a lesson panel the guide sits under the module and lesson headings. */
+  headingLevel?: 2 | 3 | 4
+}>) {
   const [open, setOpen] = useState(false)
+  const Heading = `h${headingLevel}` as const
   const proxied = item.externalUrl ? toProxyUrl(item.externalUrl) : null
 
   return (
@@ -38,7 +45,7 @@ export function InteractiveGuide({
             <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-700">
               Interaktivni vodič{moduleTitle ? ` · ${moduleTitle}` : ''}
             </p>
-            <h2 className="text-base font-bold text-gray-900 sm:text-lg">{item.title}</h2>
+            <Heading className="text-base font-bold text-gray-900 sm:text-lg">{item.title}</Heading>
             {item.description ? (
               <p className="mt-1 text-sm text-gray-600">{item.description}</p>
             ) : null}

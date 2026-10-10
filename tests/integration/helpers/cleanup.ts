@@ -19,8 +19,9 @@
  * The RESTRICT edges below are the whole reason order matters (everything else
  * in this graph is CASCADE or SET NULL and needs no explicit delete):
  *
- *   Course         ← Material.courseId, ScheduledGroup.courseId
- *   CourseModule   ← Material.moduleId
+ *   Course         ← Material.courseId, ScheduledGroup.courseId, Lesson.courseId
+ *   CourseModule   ← Material.moduleId, Lesson(moduleId, courseId)
+ *   Lesson         ← Material.lessonId (its LessonSession rows cascade)
  *   ScheduledGroup ← Enrollment, Material.scheduledGroupId,
  *                    StudentComment.groupId, StudentAssessment.groupId,
  *                    TeacherAttendance.scheduledGroupId
@@ -43,7 +44,9 @@ async function deleteGroupsDeep(groupIds: string[]): Promise<void> {
 }
 
 /**
- * Courses plus their groups and their COURSE-/MODULE-scoped materials. Modules,
+ * Courses plus their groups, their lessons and every material in them or on
+ * them (COURSE / MODULE / LESSON — and a GROUP row of another program that was
+ * put in one of these lessons, which only a raw insert can do). Modules,
  * module schedules and enrollment windows cascade with the course; inquiries,
  * report-card recommendations and email campaigns pointing at it are SET NULL.
  */
@@ -61,9 +64,14 @@ async function deleteCoursesDeep(courseIds: string[]): Promise<void> {
   })
   await db.material.deleteMany({
     where: {
-      OR: [{ courseId: ids }, { moduleId: { in: modules.map((m) => m.id) } }],
+      OR: [
+        { courseId: ids },
+        { moduleId: { in: modules.map((m) => m.id) } },
+        { lesson: { courseId: ids } },
+      ],
     },
   })
+  await db.lesson.deleteMany({ where: { courseId: ids } })
   await db.course.deleteMany({ where: { id: ids } })
 }
 
@@ -86,6 +94,7 @@ async function deleteLocationsDeep(locationIds: string[]): Promise<void> {
  */
 export async function wipePlanningTables(): Promise<void> {
   await db.material.deleteMany({})
+  await db.lesson.deleteMany({})
   await db.studentComment.deleteMany({})
   await db.studentAssessment.deleteMany({})
   await db.teacherAttendance.deleteMany({})

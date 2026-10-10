@@ -2,10 +2,36 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ExternalLink, Gamepad2, Maximize2, Minimize2, X } from 'lucide-react'
+import { ExternalLink, Gamepad2, Maximize2, Minimize2, X } from 'lucide-react'
 import { RobocampEmbed } from '@/components/material/robocamp-embed'
 import { toProxyUrl } from '@/lib/robocamp-proxy'
 import type { StaffGuide } from '@/actions/teacher/materials'
+
+/** "Lekcija · Vodič", with the current lesson said out loud. */
+function guideOptionLabel(guide: StaffGuide): string {
+  const label = `${guide.lessonTitle} · ${guide.title}`
+  return guide.inCurrentLesson ? `${label} (trenutna lekcija)` : label
+}
+
+/**
+ * The picker's options, grouped by module only when the guides span more than
+ * one — a COMPETITION group (every natjecanje live at once). A standard group
+ * sees a single module, where the group heading would only repeat itself.
+ */
+type ModuleGroup = {
+  moduleTitle: string | null
+  entries: { guide: StaffGuide; index: number }[]
+}
+
+function groupByModule(guides: StaffGuide[]): ModuleGroup[] {
+  const groups: ModuleGroup[] = []
+  guides.forEach((guide, index) => {
+    const last = groups[groups.length - 1]
+    if (last && last.moduleTitle === guide.moduleTitle) last.entries.push({ guide, index })
+    else groups.push({ moduleTitle: guide.moduleTitle, entries: [{ guide, index }] })
+  })
+  return groups
+}
 
 const BAR_BUTTON =
   'inline-flex h-9.5 items-center gap-1.5 rounded-lg border border-gray-200 px-3.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100'
@@ -28,11 +54,14 @@ export function GuidePresenter({
 }: Readonly<{ guides: StaffGuide[]; groupLabel: string; backHref: string }>) {
   const router = useRouter()
   const rootRef = useRef<HTMLDivElement>(null)
-  const [index, setIndex] = useState(0)
+  // Opens on the lesson the group is on now; before the module's first lesson
+  // starts nothing is current, and the first guide is the sensible start.
+  const [index, setIndex] = useState(() => Math.max(0, guides.findIndex((g) => g.inCurrentLesson)))
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [canFullscreen, setCanFullscreen] = useState(false)
 
   const current = guides[index]
+  const moduleGroups = groupByModule(guides)
 
   const leave = useCallback(() => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined)
@@ -75,27 +104,40 @@ export function GuidePresenter({
               {current?.title ?? 'Interaktivni vodič'}
             </p>
             <p className="truncate text-xs text-gray-500">
-              {groupLabel}
-              {current?.moduleTitle ? ` · ${current.moduleTitle}` : ''}
+              {[groupLabel, current?.moduleTitle, current?.lessonTitle].filter(Boolean).join(' · ')}
             </p>
           </div>
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-2">
-          {/* Only a COMPETITION group routinely has more than one guide live at
-              once; a standard module has exactly the one it is paced to. */}
+          {/* A standard module usually has a guide per lesson, a COMPETITION
+              group one per natjecanje — a picker that names the lesson beats
+              cycling blind through titles in front of the class. */}
           {guides.length > 1 ? (
-            <button
-              type="button"
-              onClick={() => setIndex((i) => (i + 1) % guides.length)}
-              className={BAR_BUTTON}
-            >
-              <span className="text-[11px] font-semibold text-gray-400">
-                {index + 1}/{guides.length}
-              </span>
-              Sljedeći vodič
-              <ChevronDown className="h-4 w-4 text-gray-400" />
-            </button>
+            <label className="flex items-center">
+              <span className="sr-only">Odaberi vodič</span>
+              <select
+                value={index}
+                onChange={(e) => setIndex(Number(e.target.value))}
+                className="h-9.5 max-w-[22rem] rounded-lg border border-gray-200 bg-white px-3 text-[13px] font-medium text-gray-700 hover:bg-gray-50"
+              >
+                {moduleGroups.length > 1
+                  ? moduleGroups.map((group) => (
+                      <optgroup key={group.entries[0].guide.id} label={group.moduleTitle ?? 'Program'}>
+                        {group.entries.map(({ guide, index: i }) => (
+                          <option key={guide.id} value={i}>
+                            {guideOptionLabel(guide)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  : guides.map((guide, i) => (
+                      <option key={guide.id} value={i}>
+                        {guideOptionLabel(guide)}
+                      </option>
+                    ))}
+              </select>
+            </label>
           ) : null}
           {proxied ? (
             <a href={proxied} target="_blank" rel="noopener noreferrer" className={BAR_BUTTON}>

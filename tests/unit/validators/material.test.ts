@@ -14,7 +14,62 @@ const baseFields = {
 }
 
 describe('createMaterialSchema — discriminated union by scope', () => {
-  it('accepts a MODULE-scoped DOCUMENT with fileUrl', () => {
+  it('accepts a LESSON DOCUMENT for the children', () => {
+    const result = createMaterialSchema.parse({
+      ...baseFields,
+      scope: 'LESSON',
+      lessonId: 'l1',
+      audience: 'STUDENT',
+      type: 'DOCUMENT',
+      fileUrl: 'https://example.com/file.pdf',
+      externalUrl: null,
+    })
+    expect(result.scope).toBe('LESSON')
+    if (result.scope === 'LESSON') expect(result.audience).toBe('STUDENT')
+  })
+
+  it('accepts a teacher-only LESSON LINK', () => {
+    const result = createMaterialSchema.parse({
+      ...baseFields,
+      scope: 'LESSON',
+      lessonId: 'l1',
+      audience: 'TEACHER',
+      type: 'LINK',
+      fileUrl: null,
+      externalUrl: 'https://wikipedia.org',
+    })
+    if (result.scope === 'LESSON') expect(result.audience).toBe('TEACHER')
+  })
+
+  it('accepts a GROUP VIDEO with fileUrl (Cloudinary) inside a lesson', () => {
+    const result = createMaterialSchema.parse({
+      ...baseFields,
+      scope: 'GROUP',
+      scheduledGroupId: 'g1',
+      lessonId: 'l1',
+      audience: 'STUDENT',
+      type: 'VIDEO',
+      fileUrl: 'https://res.cloudinary.com/x/video/upload/v1/x.mp4',
+      externalUrl: null,
+    })
+    expect(result.scope).toBe('GROUP')
+  })
+
+  it('accepts a GROUP VIDEO with YouTube externalUrl', () => {
+    const result = createMaterialSchema.parse({
+      ...baseFields,
+      scope: 'GROUP',
+      scheduledGroupId: 'g1',
+      lessonId: 'l1',
+      audience: 'TEACHER',
+      type: 'VIDEO',
+      fileUrl: null,
+      externalUrl: 'https://www.youtube.com/watch?v=abc',
+    })
+    expect(result.scope).toBe('GROUP')
+  })
+
+  it('accepts a whole-module (MODULE) DOCUMENT — no audience field, the action stamps TEACHER', () => {
     const result = createMaterialSchema.parse({
       ...baseFields,
       scope: 'MODULE',
@@ -24,9 +79,10 @@ describe('createMaterialSchema — discriminated union by scope', () => {
       externalUrl: null,
     })
     expect(result.scope).toBe('MODULE')
+    expect('audience' in result).toBe(false)
   })
 
-  it('accepts a COURSE-scoped LINK with externalUrl', () => {
+  it('accepts a whole-program (COURSE) LINK', () => {
     const result = createMaterialSchema.parse({
       ...baseFields,
       scope: 'COURSE',
@@ -38,28 +94,90 @@ describe('createMaterialSchema — discriminated union by scope', () => {
     expect(result.scope).toBe('COURSE')
   })
 
-  it('accepts a GROUP-scoped VIDEO with fileUrl (Cloudinary)', () => {
-    const result = createMaterialSchema.parse({
+  it('rejects LESSON without lessonId', () => {
+    const result = createMaterialSchema.safeParse({
       ...baseFields,
-      scope: 'GROUP',
-      scheduledGroupId: 'g1',
-      type: 'VIDEO',
-      fileUrl: 'https://res.cloudinary.com/x/video/upload/v1/x.mp4',
-      externalUrl: null,
+      scope: 'LESSON',
+      audience: 'STUDENT',
+      type: 'LINK',
+      externalUrl: 'https://wikipedia.org',
     })
-    expect(result.scope).toBe('GROUP')
+    expect(result.success).toBe(false)
   })
 
-  it('accepts a GROUP-scoped VIDEO with YouTube externalUrl', () => {
-    const result = createMaterialSchema.parse({
+  it('rejects LESSON without an audience — publishing to parents is never a default', () => {
+    const result = createMaterialSchema.safeParse({
+      ...baseFields,
+      scope: 'LESSON',
+      lessonId: 'l1',
+      type: 'LINK',
+      externalUrl: 'https://wikipedia.org',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes('audience'))).toBe(true)
+    }
+  })
+
+  it('rejects GROUP without lessonId', () => {
+    const result = createMaterialSchema.safeParse({
       ...baseFields,
       scope: 'GROUP',
       scheduledGroupId: 'g1',
-      type: 'VIDEO',
-      fileUrl: null,
-      externalUrl: 'https://www.youtube.com/watch?v=abc',
+      audience: 'STUDENT',
+      type: 'LINK',
+      externalUrl: 'https://wikipedia.org',
     })
-    expect(result.scope).toBe('GROUP')
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects GROUP without an audience', () => {
+    const result = createMaterialSchema.safeParse({
+      ...baseFields,
+      scope: 'GROUP',
+      scheduledGroupId: 'g1',
+      lessonId: 'l1',
+      type: 'LINK',
+      externalUrl: 'https://wikipedia.org',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an audience on a MODULE row (strict — whole-module rows are teacher-only)', () => {
+    const result = createMaterialSchema.safeParse({
+      ...baseFields,
+      scope: 'MODULE',
+      moduleId: 'm1',
+      audience: 'STUDENT',
+      type: 'LINK',
+      externalUrl: 'https://wikipedia.org',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an audience on a COURSE row', () => {
+    const result = createMaterialSchema.safeParse({
+      ...baseFields,
+      scope: 'COURSE',
+      courseId: 'c1',
+      audience: 'STUDENT',
+      type: 'LINK',
+      externalUrl: 'https://wikipedia.org',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a LESSON row carrying a moduleId (strict)', () => {
+    const result = createMaterialSchema.safeParse({
+      ...baseFields,
+      scope: 'LESSON',
+      lessonId: 'l1',
+      moduleId: 'm1',
+      audience: 'STUDENT',
+      type: 'LINK',
+      externalUrl: 'https://wikipedia.org',
+    })
+    expect(result.success).toBe(false)
   })
 
   it('rejects MODULE without moduleId', () => {
@@ -96,7 +214,12 @@ describe('createMaterialSchema — discriminated union by scope', () => {
 })
 
 describe('createMaterialSchema — type/URL pairing rules', () => {
-  const moduleBase = { ...baseFields, scope: 'MODULE' as const, moduleId: 'm1' }
+  const moduleBase = {
+    ...baseFields,
+    scope: 'LESSON' as const,
+    lessonId: 'l1',
+    audience: 'STUDENT' as const,
+  }
 
   it('rejects DOCUMENT without fileUrl', () => {
     const result = createMaterialSchema.safeParse({
@@ -189,7 +312,12 @@ describe('createMaterialSchema — type/URL pairing rules', () => {
 })
 
 describe('createMaterialSchema — ROBOCAMP type', () => {
-  const moduleBase = { ...baseFields, scope: 'MODULE' as const, moduleId: 'm1' }
+  const moduleBase = {
+    ...baseFields,
+    scope: 'LESSON' as const,
+    lessonId: 'l1',
+    audience: 'STUDENT' as const,
+  }
 
   it('accepts ROBOCAMP with an elearning.robocamp.eu externalUrl', () => {
     const result = createMaterialSchema.parse({
@@ -252,6 +380,55 @@ describe('createMaterialSchema — ROBOCAMP type', () => {
   })
 })
 
+describe('createMaterialSchema — a RoboCamp guide is for the children', () => {
+  const guide = {
+    ...baseFields,
+    type: 'ROBOCAMP' as const,
+    fileUrl: null,
+    externalUrl: 'https://elearning.robocamp.eu/course/123',
+  }
+  const audienceIssue = (r: ReturnType<typeof createMaterialSchema.safeParse>) =>
+    !r.success && r.error.issues.some((i) => i.message === 'RoboCamp vodič je materijal za polaznike.')
+
+  it('accepts a STUDENT RoboCamp guide in a group', () => {
+    const r = createMaterialSchema.safeParse({
+      ...guide,
+      scope: 'GROUP',
+      scheduledGroupId: 'g1',
+      lessonId: 'l1',
+      audience: 'STUDENT',
+    })
+    expect(r.success).toBe(true)
+  })
+
+  it('rejects a teacher-only LESSON RoboCamp guide', () => {
+    const r = createMaterialSchema.safeParse({ ...guide, scope: 'LESSON', lessonId: 'l1', audience: 'TEACHER' })
+    expect(r.success).toBe(false)
+    expect(audienceIssue(r)).toBe(true)
+  })
+
+  it('rejects a teacher-only GROUP RoboCamp guide', () => {
+    const r = createMaterialSchema.safeParse({
+      ...guide,
+      scope: 'GROUP',
+      scheduledGroupId: 'g1',
+      lessonId: 'l1',
+      audience: 'TEACHER',
+    })
+    expect(audienceIssue(r)).toBe(true)
+  })
+
+  it('rejects a RoboCamp guide as a whole-module row (those are teacher-only)', () => {
+    const r = createMaterialSchema.safeParse({ ...guide, scope: 'MODULE', moduleId: 'm1' })
+    expect(audienceIssue(r)).toBe(true)
+  })
+
+  it('rejects a RoboCamp guide as a whole-program row', () => {
+    const r = createMaterialSchema.safeParse({ ...guide, scope: 'COURSE', courseId: 'c1' })
+    expect(audienceIssue(r)).toBe(true)
+  })
+})
+
 describe('updateMaterialSchema', () => {
   it('accepts an id-only update (no type → skip pairing check)', () => {
     const result = updateMaterialSchema.parse({ id: 'm1' })
@@ -269,6 +446,15 @@ describe('updateMaterialSchema', () => {
 
   it('rejects unknown fields (strict)', () => {
     const result = updateMaterialSchema.safeParse({ id: 'm1', bogus: 1 })
+    expect(result.success).toBe(false)
+  })
+
+  it.each([
+    ['scope', 'LESSON'],
+    ['audience', 'STUDENT'],
+    ['lessonId', 'l2'],
+  ])('rejects %s — moving or re-publishing a material is not an edit', (field, value) => {
+    const result = updateMaterialSchema.safeParse({ id: 'm1', [field]: value })
     expect(result.success).toBe(false)
   })
 })

@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
 import {
-  getStaffGroupMaterials,
-  getGroupUploadTargets,
   getGroupGuidesForStaff,
+  getGroupUploadTargets,
+  getStaffGroupLessons,
 } from '@/actions/teacher/materials'
-import { MaterialFilterTabs } from '@/components/material/material-filter-tabs'
-import { UploadMaterialDialog } from '@/components/material/upload-dialog'
+import { isCompetition } from '@/lib/program-kind'
 import { GuideLaunchStrip } from '@/components/teacher/guide-launch-strip'
+import { GroupLessons } from '@/components/teacher/group-lessons/group-lessons'
 
 export const metadata: Metadata = { title: 'Materijali grupe' }
 
@@ -14,10 +14,10 @@ export default async function TeacherGroupMaterijaliPage({
   params,
 }: Readonly<{ params: Promise<{ groupId: string }> }>) {
   const { groupId } = await params
-  const [rows, targets, guideFeed] = await Promise.all([
-    getStaffGroupMaterials(groupId),
-    getGroupUploadTargets(groupId),
+  const [lessons, guideFeed, targets] = await Promise.all([
+    getStaffGroupLessons(groupId),
     getGroupGuidesForStaff(groupId),
+    getGroupUploadTargets(groupId),
   ])
 
   return (
@@ -26,30 +26,19 @@ export default async function TeacherGroupMaterijaliPage({
         <GuideLaunchStrip groupId={groupId} guides={guideFeed.guides} />
       </div>
 
-      <section className="mb-6 rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Dodaj novi materijal</h2>
-            <p className="mt-0.5 text-xs text-gray-500">
-              Ovdje dodajete materijale samo za ovu grupu. Programski materijali (za modul ili
-              cijeli program) uređuju se na stranici programa.
-            </p>
-          </div>
-          <div className="flex flex-shrink-0 flex-wrap gap-2">
-            <UploadMaterialDialog
-              target={{ scope: 'GROUP', scheduledGroupId: targets.groupId }}
-              label="Dodaj samo u ovu grupu"
-              scopeLabel={`Materijal je vidljiv samo u grupi "${targets.groupName ?? targets.courseTitle}".`}
-            />
-          </div>
-        </div>
-      </section>
+      <div className="mb-4">
+        <h2 className="text-base font-semibold text-gray-900">Materijali po lekcijama</h2>
+        <p className="mt-0.5 text-sm text-gray-500">
+          Lekcije i programske materijale postavlja administracija na stranici programa. Ovdje
+          dodajete materijale samo za ovu grupu, a programski materijal koji grupi ne treba možete
+          sakriti.
+        </p>
+      </div>
 
-      <MaterialFilterTabs
-        rows={rows}
-        modules={targets.modules}
-        inGroupId={targets.groupId}
-        kind={targets.kind}
+      <GroupLessons
+        data={lessons}
+        editable
+        competition={isCompetition(targets.kind)}
       />
     </div>
   )

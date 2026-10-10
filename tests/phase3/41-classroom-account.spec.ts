@@ -15,6 +15,9 @@ import {
   loginWithEmail,
   getGroupCourseTitle,
   gotoPortalPath,
+  groupLessonTarget,
+  openLesson,
+  seedLesson,
 } from '../helpers/phase3'
 import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 
@@ -30,6 +33,10 @@ const TEACHER = {
   email: `ucionica.nastavnik.${RUN_ID}@test.com`,
   phone: '0915555555',
 }
+
+const LESSON_TITLE = `Lekcija u učionici ${RUN_ID}`
+const KIDS_LINK = { title: `Upute za djecu ${RUN_ID}`, url: 'https://example.com/upute' }
+const TEACHER_LINK = { title: `Priprema nastavnika ${RUN_ID}`, url: 'https://example.com/priprema' }
 
 let teacherPassword = ''
 let classroom: { username: string; password: string } | null = null
@@ -48,6 +55,14 @@ test.describe('Račun za učionicu', () => {
     ;[groupId] = collectGroupIds(page, 1)
     courseTitle = await getGroupCourseTitle(page, groupId)
     await page.close()
+    // One lesson with a kids' link and a teacher-only link: the classroom
+    // computer is a portal viewer, so it must get exactly the first.
+    await seedLesson({
+      target: await groupLessonTarget(groupId),
+      title: LESSON_TITLE,
+      studentLinks: [KIDS_LINK],
+      teacherLinks: [TEACHER_LINK],
+    })
   })
 
   test('a teacher reads the classroom login on /nastavnik', async ({ page }) => {
@@ -82,6 +97,17 @@ test.describe('Račun za učionicu', () => {
     // The tab strip a child gets is absent: no Galerija, no Evaluacija.
     await expect(page.getByRole('link', { name: 'Galerija' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'Evaluacija' })).toHaveCount(0)
+  })
+
+  test('the classroom sees a lesson\'s kids\' materials and never the teacher\'s', async ({ page }) => {
+    test.skip(!classroom, 'credentials not read')
+    await loginWithEmail(page, classroom!.username, classroom!.password)
+    await gotoPortalPath(page, `/portal/grupa/${groupId}`)
+
+    const lesson = await openLesson(page, LESSON_TITLE)
+    await expect(lesson.getByText(KIDS_LINK.title)).toBeVisible()
+    await expect(page.getByText(TEACHER_LINK.title)).toHaveCount(0)
+    expect(await page.content()).not.toContain(TEACHER_LINK.title)
   })
 
   test('gallery, evaluation and profile by URL bounce back to the program list', async ({ page }) => {
