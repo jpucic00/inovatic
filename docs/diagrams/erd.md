@@ -194,7 +194,7 @@ erDiagram
         string userId FK "Cascade"
         string tokenHash UK "SHA-256 of the token - the plaintext only lives in the mailed /postavi-lozinku#token link"
         PasswordTokenPurpose purpose "SETUP 7 days - RESET 48 h"
-        datetime expiresAt
+        datetime expiresAt "set to now by expireOtherPasswordTokens once a newer link's mail was confirmed sent - never at mint, never for links minted after it; expired not deleted, rows feed the send limit"
         datetime usedAt "nullable - one use only"
         string createdById FK "nullable - staff who sent it; null for the system rollout or campaign; SetNull"
     }

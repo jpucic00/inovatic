@@ -72,20 +72,35 @@ export async function expireLivePasswordTokens(userId: string, tx: Tx = db): Pro
 }
 
 /**
- * Kills every unused link of the account EXCEPT `keepTokenId` — called once the
- * mail carrying `keepTokenId` was confirmed sent, so the account is never left
- * without a link that reached it. A send that failed calls nothing: the earlier
- * links keep working, and the new one is left as it is, since a "failed" send
- * may still have been delivered.
+ * Kills every unused link of the account minted no later than `keepTokenId` —
+ * called once the mail carrying `keepTokenId` was confirmed sent, so the account
+ * is never left without a link that reached it. A send that failed calls
+ * nothing: the earlier links keep working, and the new one is left as it is,
+ * since a "failed" send may still have been delivered.
+ *
+ * NEWER links are spared: two overlapping sends (two staff on sibling profiles,
+ * a profile send during the CREDENTIALS campaign) would otherwise each expire
+ * the other's link after both mails went out, leaving the family two dead ones.
  */
 export async function expireOtherPasswordTokens(
   userId: string,
   keepTokenId: string,
   tx: Tx = db,
 ): Promise<void> {
+  const kept = await tx.passwordToken.findUnique({
+    where: { id: keepTokenId },
+    select: { createdAt: true },
+  })
+  if (!kept) return
   const now = new Date()
   await tx.passwordToken.updateMany({
-    where: { userId, id: { not: keepTokenId }, usedAt: null, expiresAt: { gt: now } },
+    where: {
+      userId,
+      id: { not: keepTokenId },
+      createdAt: { lte: kept.createdAt },
+      usedAt: null,
+      expiresAt: { gt: now },
+    },
     data: { expiresAt: now },
   })
 }

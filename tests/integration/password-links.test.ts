@@ -127,6 +127,28 @@ describe('a link', () => {
     ).toBe(1)
   })
 
+  // Two sends to one login overlap (two staff on sibling profiles, a profile
+  // send during the campaign): both mails go out, then each cleanup runs. Each
+  // used to expire the other's link, leaving the family two dead ones.
+  it('keeps the newer link live when two sends overlap, in either finishing order', async () => {
+    for (const order of ['older-first', 'newer-first'] as const) {
+      const parent = await createParent()
+      const older = await issuePasswordToken({ userId: parent.id, purpose: 'SETUP', createdById: null })
+      const newer = await issuePasswordToken({ userId: parent.id, purpose: 'SETUP', createdById: null })
+      // Two mints can share a millisecond; pin the order the test is about.
+      await db.passwordToken.update({
+        where: { id: older.tokenId },
+        data: { createdAt: new Date(Date.now() - 1000) },
+      })
+
+      const cleanups = order === 'older-first' ? [older, newer] : [newer, older]
+      for (const sent of cleanups) await expireOtherPasswordTokens(parent.id, sent.tokenId)
+
+      expect((await inspectPasswordToken(newer.token)).ok, order).toBe(true)
+      expect(await inspectPasswordToken(older.token), order).toEqual({ ok: false, reason: 'EXPIRED' })
+    }
+  })
+
   it('takes every other live link down with it when redeemed', async () => {
     const parent = await createParent()
     const other = await issuePasswordToken({ userId: parent.id, purpose: 'SETUP', createdById: null })
