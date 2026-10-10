@@ -18,6 +18,8 @@ import { isArchivedYear } from '@/lib/school-year'
 import { ArchivedYearBanner } from '@/components/admin/archived-year-banner'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 import { hasDatedModules, isRadionica } from '@/lib/program-kind'
+import { groupRosterStatus } from '@/lib/group-roster-status'
+import { GroupRosterBadges } from '@/components/admin/groups/group-roster-row'
 
 export const metadata: Metadata = { title: 'Admin – Detalji grupe' }
 
@@ -58,6 +60,12 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
   const assignableTeachers = allTeachers.filter((t) => !assignedUserIds.has(t.id))
 
   const enrolledCount = group.enrollments.length
+
+  const now = new Date()
+  const enrollments = group.enrollments.map((e) => ({
+    ...e,
+    status: groupRosterStatus({ ...e, scheduledGroup: { course: { kind: group.course.kind } } }, now),
+  }))
 
   // A substitute is listed only until their termin is over — the same window
   // in which they can open the group.
@@ -156,7 +164,7 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
                 endDate: schedule?.endDate ?? null,
               }
             })}
-            enrollments={group.enrollments}
+            enrollments={enrollments}
             maxStudents={group.maxStudents}
             editable={editable}
             dayOfWeek={group.dayOfWeek}
@@ -171,11 +179,11 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
               Polaznici ({enrolledCount})
             </h2>
           </div>
-          {group.enrollments.length === 0 ? (
+          {enrollments.length === 0 ? (
             <p className="text-sm text-gray-400 italic">Nema upisanih polaznika.</p>
           ) : (
             <div className="divide-y">
-              {group.enrollments.map((enrollment) => (
+              {enrollments.map((enrollment) => (
                 <div key={enrollment.id} className="py-3 flex items-center justify-between">
                   <div>
                     <Link
@@ -185,6 +193,7 @@ export default async function GroupDetailPage({ params }: Readonly<PageProps>) {
                       {enrollment.user.firstName} {enrollment.user.lastName}
                     </Link>
                     <p className="text-xs text-gray-500">{enrollment.user.email}</p>
+                    <GroupRosterBadges status={enrollment.status} />
                   </div>
                 </div>
               ))}

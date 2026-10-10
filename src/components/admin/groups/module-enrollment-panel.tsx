@@ -15,7 +15,9 @@ import {
 } from '@/lib/group-module-arc'
 import { formatDate } from '@/lib/format'
 import { tabClass } from '@/lib/ui-classes'
+import type { GroupRosterStatus } from '@/lib/group-roster-status'
 import Link from 'next/link'
+import { GroupRosterBadges } from './group-roster-row'
 
 type ModuleInfo = {
   id: string
@@ -38,6 +40,7 @@ type EnrollmentInfo = {
   id: string
   user: { id: string; firstName: string; lastName: string; email: string }
   moduleEnrollments: ModuleEnrollmentInfo[]
+  status: GroupRosterStatus
 }
 
 interface ModuleEnrollmentPanelProps {
@@ -195,14 +198,17 @@ function ModuleTab({
               : false
 
             return (
-              <div key={enrollment.id} className="py-2.5 flex items-center justify-between">
-                <Link
-                  href={`/admin/ucenici/${enrollment.user.id}`}
-                  className="text-sm font-medium text-gray-900 hover:text-cyan-600 transition-colors"
-                >
-                  {enrollment.user.firstName} {enrollment.user.lastName}
-                </Link>
-                <div className="flex items-center gap-1.5">
+              <div key={enrollment.id} className="py-2.5 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <Link
+                    href={`/admin/ucenici/${enrollment.user.id}`}
+                    className="text-sm font-medium text-gray-900 hover:text-cyan-600 transition-colors"
+                  >
+                    {enrollment.user.firstName} {enrollment.user.lastName}
+                  </Link>
+                  <GroupRosterBadges status={enrollment.status} />
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
                   {editable && nextModuleScheduleId && !hasNextModule && (
                     <button
                       onClick={() => handleAddToNextModule(enrollment.id)}
@@ -238,10 +244,13 @@ function ModuleTab({
           </summary>
           <div className="mt-2 divide-y">
             {notInModule.map((enrollment) => (
-              <div key={enrollment.id} className="py-2 flex items-center justify-between">
-                <span className="text-sm text-gray-500">
-                  {enrollment.user.firstName} {enrollment.user.lastName}
-                </span>
+              <div key={enrollment.id} className="py-2 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="text-sm text-gray-500">
+                    {enrollment.user.firstName} {enrollment.user.lastName}
+                  </span>
+                  <GroupRosterBadges status={enrollment.status} />
+                </div>
                 <button
                   onClick={() => {
                     startTransition(async () => {

@@ -134,11 +134,14 @@ export async function getGroupDetail(id: string) {
               moduleSchedule: {
                 select: {
                   id: true,
+                  startDate: true,
                   module: { select: { id: true, title: true, sortOrder: true } },
                 },
               },
             },
           },
+          // Plaćanje for a competition enrollment is read off its months.
+          enrollmentMonths: { select: { paidAt: true, periodStart: true } },
         },
         orderBy: { createdAt: 'asc' },
       },
