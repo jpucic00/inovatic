@@ -30,7 +30,7 @@ export default async function TeacherGroupMaterijaliPage({
         <h2 className="text-base font-semibold text-gray-900">Materijali po lekcijama</h2>
         <p className="mt-0.5 text-sm text-gray-500">
           {targets.canManage
-            ? 'Lekcije i programske materijale postavlja administracija na stranici programa. Ovdje dodajete materijale samo za ovu grupu, a programski materijal koji grupi ne treba možete sakriti.'
+            ? 'Lekcije i programske materijale postavlja administracija na stranici programa. Ovdje dodajete materijale samo za ovu grupu.'
             : 'Kao zamjena materijale grupe možete pregledati i preuzeti; dodaju ih i uređuju nastavnici grupe.'}
         </p>
       </div>

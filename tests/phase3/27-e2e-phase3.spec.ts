@@ -9,6 +9,8 @@ import {
   assignTeacherToGroup,
   createStudentInGroup,
   addGroupLinkMaterial,
+  lessonAudienceSection,
+  materialCard,
   groupLessonTarget,
   openLesson,
   seedLesson,
@@ -200,7 +202,9 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     }
   })
 
-  test('teacher hides the curriculum material → student loses it (GROUP material stays)', async ({ page }) => {
+  // Hiding a curriculum material in one group has no UI any more (owner,
+  // 2026-10-10): the group's own material is what a teacher takes back.
+  test('teacher deletes the GROUP material → student loses it (curriculum material stays)', async ({ page }) => {
     test.setTimeout(120000)
     if (!seeded) throw new Error('not seeded')
     await loginWithEmail(page, seeded.teacher.email, seeded.teacher.password)
@@ -208,15 +212,21 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     await page.goto(`${BASE}/nastavnik/grupa/${seeded.groupId}/materijali`)
 
     const staffLesson = await openLesson(page, LESSON_TITLE)
-    const row = staffLesson.locator('li').filter({ hasText: COURSE_MATERIAL })
-    await row.getByRole('button', { name: 'Sakrij u ovoj grupi' }).click()
-    await expect(row.getByText('Sakriveno u grupi')).toBeVisible({ timeout: 10000 })
+    const kids = lessonAudienceSection(page, staffLesson, 'STUDENT')
+    // No delete control on the curriculum card — it belongs to the program page.
+    await expect(materialCard(kids, COURSE_MATERIAL)).toBeVisible()
+    await expect(materialCard(kids, COURSE_MATERIAL).getByRole('button', { name: 'Obriši materijal' })).toHaveCount(0)
+
+    const card = materialCard(kids, GROUP_MATERIAL)
+    page.once('dialog', (d) => d.accept())
+    await card.getByRole('button', { name: 'Obriši materijal' }).click()
+    await expect(card).toBeHidden({ timeout: 10000 })
 
     await loginWithEmail(page, seeded.studentLogin.email, seeded.studentLogin.password)
     await page.waitForURL(/\/portal/, { timeout: 30000 })
     await gotoPortalPath(page, `/portal/grupa/${seeded.groupId}`)
     const lesson = await openLesson(page, LESSON_TITLE)
-    await expect(lesson.getByText(GROUP_MATERIAL)).toBeVisible()
-    await expect(page.getByText(COURSE_MATERIAL)).toHaveCount(0)
+    await expect(lesson.getByText(COURSE_MATERIAL)).toBeVisible()
+    await expect(page.getByText(GROUP_MATERIAL)).toHaveCount(0)
   })
 })

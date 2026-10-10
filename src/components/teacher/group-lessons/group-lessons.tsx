@@ -1,23 +1,28 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import type {
   StaffGroupLessons,
   StaffLesson,
   StaffLessonModule,
 } from '@/actions/teacher/materials'
 import type { StaffMaterialRow } from '@/components/material/staff-material-list'
-import { LessonMaterialSection } from '@/components/material/lesson-material-section'
+import type { MaterialItem } from '@/lib/group-materials-view'
+import { InteractiveGuide } from '@/components/portal/interactive-guide'
+import { MaterialCards } from '@/components/portal/extra-materials'
+import { DeleteMaterialButton } from '@/components/material/delete-material-button'
 import { formatLessonSessions } from '@/lib/lesson-schedule'
+import { kindOf } from '@/lib/material-display'
 import { croatianPlural } from '@/lib/format'
 import { moduleKey, resolveLessonFocus } from './lesson-focus'
+import { AddGroupMaterialDialog } from './add-group-material-dialog'
 
 interface Props {
   data: StaffGroupLessons
   /**
-   * False on an archived school year: no adding, moving, editing or hiding —
-   * the rows are shown exactly as they were.
+   * False on an archived school year or for a substitute: the materials can be
+   * read and downloaded, nothing can be added.
    */
   editable: boolean
   /** Natjecateljski program: its modules are natjecanja. */
@@ -35,19 +40,19 @@ function dayMonth(date: Date): string {
   return `${dd}.${mm}.`
 }
 
-/** "Moving into the polaznici" reaches this group's families only. */
-const GROUP_STUDENT_REACH = 'u ovoj grupi'
-
 /**
- * A group's Materijali for staff, laid out the way the class runs: module by
- * module, lesson by lesson, each lesson with what the teacher prepares and
- * what the children open.
+ * A group's Materijali for staff, as a tree: module → lesson → materials, laid
+ * out the way the class runs (owner, 2026-10-10).
  *
- * Curriculum rows come from the program page and are read-only here apart from
- * the hide toggle; the group's own rows (`canEdit`) can be edited, deleted and
- * moved. Everything is collapsible and only the lessons being taught or
- * prepared start open (`resolveLessonFocus`) — a whole year of lessons, each
- * with two drop zones, is far too long to scroll on a phone.
+ * It is a READING page — teachers come here to open, download and present, so
+ * every material is a card (the same ones the portal shows) and the
+ * interactive guide is embedded. The lesson being taught stands apart: it is
+ * always open and cannot be folded away. Every other lesson and module opens
+ * on a tap. Adding goes through the "Dodaj materijal" modal, which asks for the
+ * lesson; the one other control is a delete button beside a material THIS
+ * GROUP added (`canEdit` — the uploader, or an admin of the group's city), so a
+ * wrong upload can be taken back. Curriculum materials have none (owner,
+ * 2026-10-10).
  */
 export function GroupLessons({ data, editable, competition = false }: Readonly<Props>) {
   const focus = resolveLessonFocus(data.modules)
@@ -62,20 +67,27 @@ export function GroupLessons({ data, editable, competition = false }: Readonly<P
       return next
     })
 
-  // An archived year shows its rows as they were: nothing editable, no toggles.
-  const view = (rows: StaffMaterialRow[]) => (editable ? rows : rows.map((r) => ({ ...r, canEdit: false })))
-  const inGroupId = editable ? data.groupId : null
   const noLessons = data.modules.every((m) => m.lessons.length === 0)
 
   return (
     <div className="space-y-4">
+      {editable && !noLessons ? (
+        <div>
+          <AddGroupMaterialDialog
+            groupId={data.groupId}
+            modules={data.modules}
+            defaultLessonId={focus.currentLessonId ?? focus.nextLessonId}
+            competition={competition}
+          />
+        </div>
+      ) : null}
+
       {data.programTeacherRows.length > 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <WideTeacherRows
-            label="Za nastavnike — cijeli program"
-            hint="Priprema za svaki sat ovog programa. Vide je samo nastavnici."
-            rows={view(data.programTeacherRows)}
-            inGroupId={inGroupId}
+          <ReadingSection
+            heading="Za nastavnike — cijeli program"
+            rows={data.programTeacherRows}
+            headingLevel={3}
           />
         </div>
       ) : null}
@@ -86,7 +98,7 @@ export function GroupLessons({ data, editable, competition = false }: Readonly<P
         </p>
       ) : (
         data.modules.map((m) => (
-          <ModuleCard
+          <ModuleNode
             key={moduleKey(m)}
             module={m}
             open={m.moduleId === null || openModules.has(moduleKey(m))}
@@ -94,51 +106,60 @@ export function GroupLessons({ data, editable, competition = false }: Readonly<P
             competition={competition}
           >
             {m.lessons.length === 0 ? (
-              <p className="px-4 py-5 text-sm text-gray-500">
+              <p className="py-3 pl-2 text-sm text-gray-500">
                 {competition ? 'Ovo natjecanje još nema lekcija.' : 'Ovaj modul još nema lekcija.'}
               </p>
             ) : (
-              <ul className="divide-y divide-gray-200">
-                {m.lessons.map((lesson) => (
-                  <LessonItem
-                    key={lesson.id}
-                    lesson={lesson}
-                    current={lesson.id === focus.currentLessonId}
-                    next={lesson.id === focus.nextLessonId}
-                    open={openLessons.has(lesson.id)}
-                    onToggle={() => toggle(setOpenLessons, lesson.id)}
-                  >
-                    <LessonSections
-                      groupId={data.groupId}
+              <ul className="space-y-1">
+                {m.lessons.map((lesson) => {
+                  const current = lesson.id === focus.currentLessonId
+                  return (
+                    <LessonNode
+                      key={lesson.id}
                       lesson={lesson}
-                      siblings={m.lessons}
-                      editable={editable}
-                      inGroupId={inGroupId}
-                      view={view}
-                    />
-                  </LessonItem>
-                ))}
+                      current={current}
+                      next={lesson.id === focus.nextLessonId}
+                      open={current || openLessons.has(lesson.id)}
+                      onToggle={() => toggle(setOpenLessons, lesson.id)}
+                    >
+                      {lesson.description ? (
+                        <p className="text-sm text-gray-600">{lesson.description}</p>
+                      ) : null}
+                      <ReadingSection
+                        heading="Za nastavnike"
+                        rows={lesson.teacherRows}
+                        emptyLabel="Nema materijala za nastavnike."
+                        canDelete={editable}
+                      />
+                      <ReadingSection
+                        heading="Za polaznike"
+                        rows={lesson.studentRows}
+                        emptyLabel="Nema materijala za polaznike."
+                        moduleTitle={m.title}
+                        canDelete={editable}
+                      />
+                    </LessonNode>
+                  )
+                })}
               </ul>
             )}
 
             {m.moduleId !== null && m.teacherRows.length > 0 ? (
-              <div className="border-t border-gray-200 bg-gray-50/60 px-4 py-4">
-                <WideTeacherRows
-                  label={`Za nastavnike — cijel${competition ? 'o natjecanje' : 'i modul'}`}
-                  hint={`Priprema za svaki sat ${competition ? 'ovog natjecanja' : 'ovog modula'}. Vide je samo nastavnici.`}
-                  rows={view(m.teacherRows)}
-                  inGroupId={inGroupId}
+              <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                <ReadingSection
+                  heading={`Za nastavnike — cijel${competition ? 'o natjecanje' : 'i modul'}`}
+                  rows={m.teacherRows}
                 />
               </div>
             ) : null}
-          </ModuleCard>
+          </ModuleNode>
         ))
       )}
     </div>
   )
 }
 
-function ModuleCard({
+function ModuleNode({
   module,
   open,
   onToggle,
@@ -151,9 +172,9 @@ function ModuleCard({
   competition: boolean
   children: ReactNode
 }>) {
-  // A radionica has one list and nothing to fold: no header at all.
+  // A radionica has one list and nothing to fold: no module node at all.
   if (module.moduleId === null) {
-    return <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">{children}</div>
+    return <div className="rounded-xl border border-gray-200 bg-white p-3">{children}</div>
   }
 
   const panelId = `modul-${module.moduleId}`
@@ -169,7 +190,7 @@ function ModuleCard({
   return (
     <section
       className={[
-        'overflow-hidden rounded-xl border bg-white',
+        'rounded-xl border bg-white',
         module.isActive ? 'border-cyan-300' : 'border-gray-200',
       ].join(' ')}
     >
@@ -179,7 +200,7 @@ function ModuleCard({
           onClick={onToggle}
           aria-expanded={open}
           aria-controls={panelId}
-          className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-600"
+          className="flex min-h-14 w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-600"
         >
           <ChevronRight
             aria-hidden
@@ -198,16 +219,16 @@ function ModuleCard({
           </span>
         </button>
       </h2>
-      {/* Folded modules unmount their lessons: a year is four modules of seven
-          lessons, and nothing in a closed one needs to exist yet. */}
-      <div id={panelId} hidden={!open} className="border-t border-gray-200">
-        {open ? children : null}
+      {/* The lessons hang off the module like a tree: indented under its
+          chevron and joined by a guide line. Folded modules unmount them. */}
+      <div id={panelId} hidden={!open} className="pb-3 pl-6 pr-3 sm:pl-7">
+        {open ? <div className="border-l-2 border-gray-100 pl-2 sm:pl-3">{children}</div> : null}
       </div>
     </section>
   )
 }
 
-function LessonItem({
+function LessonNode({
   lesson,
   current,
   next,
@@ -222,152 +243,142 @@ function LessonItem({
   onToggle: () => void
   children: ReactNode
 }>) {
-  // Once opened a lesson stays mounted while folded, so a file still uploading
-  // into it is not dropped by a tap on its header.
-  const [mounted, setMounted] = useState(open)
-  if (open && !mounted) setMounted(true)
-
   const panelId = `lekcija-${lesson.id}`
-  const sats = lesson.sessionNumbers.length > 0 ? formatLessonSessions(lesson.sessionNumbers) : null
-  const date = lesson.firstDate ? dayMonth(lesson.firstDate) : null
-  const meta = [sats, date].filter(Boolean).join(' · ')
+  // Sats only, no date: a lesson spanning several sats has no single date
+  // (owner, 2026-10-10).
+  const sats = lesson.sessionNumbers.length > 0 ? formatLessonSessions(lesson.sessionNumbers) : ''
   const counts = `${lesson.teacherRows.length} za nast. · ${lesson.studentRows.length} za pol.`
 
-  let tint: string | undefined
-  if (current) tint = 'bg-cyan-50/50'
-  else if (next) tint = 'bg-amber-50/40'
+  const label = (
+    <span className="min-w-0 flex-1">
+      {sats || current || next ? (
+        <span className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {sats ? <span className="text-xs font-medium text-gray-500">{sats}</span> : null}
+          {current ? (
+            <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+              Trenutna lekcija
+            </span>
+          ) : null}
+          {next ? (
+            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+              Sljedeća lekcija
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+      <span className="block text-[15px] font-semibold leading-snug text-gray-900">{lesson.title}</span>
+      <span className="mt-0.5 block text-xs text-gray-500">{counts}</span>
+    </span>
+  )
 
+  // The lesson being taught is always open — it is what the teacher came for —
+  // so its heading is not a toggle, and it stands apart in its own card.
+  if (current) {
+    return (
+      <li className="my-2 rounded-lg border border-cyan-200 bg-cyan-50/40">
+        <h3 className="flex min-h-14 items-center gap-3 px-3 py-3">{label}</h3>
+        <div id={panelId} className="space-y-5 px-3 pb-4">
+          {children}
+        </div>
+      </li>
+    )
+  }
+
+  // The next lesson — what the teacher prepares — gets its own softer card so
+  // it reads at a glance, but stays closed and lighter than the cyan current
+  // lesson, which remains the focus of the page.
   return (
-    <li className={tint}>
+    <li className={next ? 'my-2 rounded-lg border border-amber-200 bg-amber-50/70' : undefined}>
       <h3>
         <button
           type="button"
           onClick={onToggle}
           aria-expanded={open}
           aria-controls={panelId}
-          className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-600"
+          className={[
+            'flex min-h-14 w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-600',
+            next ? 'hover:bg-amber-100/60' : 'hover:bg-gray-50',
+          ].join(' ')}
         >
-          <span className="min-w-0 flex-1">
-            {/* Badges ride on the meta line, so at 390px they never squeeze
-                the title into a narrow column. */}
-            {meta || current || next ? (
-              <span className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                {meta ? <span className="text-xs font-medium text-gray-500">{meta}</span> : null}
-                {current ? (
-                  <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
-                    Trenutna lekcija
-                  </span>
-                ) : null}
-                {next ? (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">
-                    Sljedeća
-                  </span>
-                ) : null}
-              </span>
-            ) : null}
-            <span className="block text-[15px] font-semibold leading-snug text-gray-900">{lesson.title}</span>
-            <span className="mt-0.5 block text-xs text-gray-500">{counts}</span>
-          </span>
-          <ChevronDown
+          <ChevronRight
             aria-hidden
-            className={`h-5 w-5 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+            className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-90' : ''}`}
           />
+          {label}
         </button>
       </h3>
-      <div id={panelId} hidden={!open} className="space-y-5 px-4 pb-5">
-        {mounted ? children : null}
+      <div id={panelId} hidden={!open} className="space-y-5 pb-4 pl-8 pr-2">
+        {open ? children : null}
       </div>
     </li>
   )
 }
 
-function LessonSections({
-  groupId,
-  lesson,
-  siblings,
-  editable,
-  inGroupId,
-  view,
-}: Readonly<{
-  groupId: string
-  lesson: StaffLesson
-  siblings: StaffLesson[]
-  editable: boolean
-  inGroupId: string | null
-  view: (rows: StaffMaterialRow[]) => StaffMaterialRow[]
-}>) {
-  const add = editable
-    ? ({ mode: 'create', target: { scope: 'GROUP', scheduledGroupId: groupId, lessonId: lesson.id } } as const)
-    : null
-  // The server moves a material only within its module, so only this module's
-  // other lessons are offered.
-  const moveLessonOptions = editable
-    ? siblings
-        .filter((l) => l.id !== lesson.id)
-        .map((l) => {
-          const sats = l.sessionNumbers.length > 0 ? formatLessonSessions(l.sessionNumbers) : null
-          // A lesson titled after its sat ("Probni sat") does not repeat it.
-          return { id: l.id, label: sats && sats !== l.title ? `${l.title} (${sats})` : l.title }
-        })
-    : []
-
-  return (
-    <>
-      {lesson.description ? <p className="text-sm text-gray-600">{lesson.description}</p> : null}
-      <LessonMaterialSection
-        audience="TEACHER"
-        heading="Za nastavnike"
-        hint="Priprema i ono što prezentirate — polaznici ih ne vide."
-        rows={view(lesson.teacherRows)}
-        emptyLabel="Nema materijala za nastavnike."
-        add={add}
-        canMoveAudience={editable}
-        moveLessonOptions={moveLessonOptions}
-        studentReach={GROUP_STUDENT_REACH}
-        inGroupId={inGroupId}
-        headingLevel={4}
-      />
-      <LessonMaterialSection
-        audience="STUDENT"
-        heading="Za polaznike"
-        hint="Vide ih djeca i roditelji ove grupe na portalu."
-        rows={view(lesson.studentRows)}
-        emptyLabel="Nema materijala za polaznike."
-        add={add}
-        canMoveAudience={editable}
-        moveLessonOptions={moveLessonOptions}
-        studentReach={GROUP_STUDENT_REACH}
-        inGroupId={inGroupId}
-        headingLevel={4}
-      />
-    </>
-  )
+function toItem(row: StaffMaterialRow): MaterialItem {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    type: row.type,
+    audience: row.audience,
+    fileUrl: row.fileUrl,
+    externalUrl: row.externalUrl,
+    fileSize: row.fileSize,
+    mimeType: row.mimeType,
+    sortOrder: row.sortOrder,
+    // Not read by the cards; the rows arrive already in author order.
+    createdAt: new Date(0),
+  }
 }
 
 /**
- * Whole-program / whole-module teacher rows: set on the program page, so
- * read-only here apart from the hide toggle. Rendered only when there are any.
+ * One audience of a lesson (or the whole-module / whole-program teacher rows):
+ * the same cards and interactive guide a child gets on the portal, so a teacher
+ * opens, downloads and presents exactly what the class sees. A material hidden
+ * in this group is not something the class has, so it is left out.
  */
-function WideTeacherRows({
-  label,
-  hint,
+function ReadingSection({
+  heading,
   rows,
-  inGroupId,
+  emptyLabel = null,
+  moduleTitle = null,
+  headingLevel = 4,
+  canDelete = false,
 }: Readonly<{
-  label: string
-  hint: string
+  heading: string
   rows: StaffMaterialRow[]
-  inGroupId: string | null
+  emptyLabel?: string | null
+  moduleTitle?: string | null
+  headingLevel?: 3 | 4
+  /** False on an archived year / for a substitute: nothing is deletable. */
+  canDelete?: boolean
 }>) {
+  const Heading = `h${headingLevel}` as const
+  const visible = rows.filter((r) => !r.hiddenInThisGroup)
+  const guides = visible.filter((r) => kindOf(r) === 'robocamp')
+  const others = visible.filter((r) => kindOf(r) !== 'robocamp').map(toItem)
+
+  // Only this group's own rows, and only the ones the viewer may delete
+  // (`canEdit` is server-computed: GROUP scope, own upload or admin of the city).
+  const deletable = new Set(
+    canDelete ? visible.filter((r) => r.scope === 'GROUP' && r.canEdit === true).map((r) => r.id) : [],
+  )
+  const deleteFor = (item: { id: string; title: string }) =>
+    deletable.has(item.id) ? <DeleteMaterialButton id={item.id} title={item.title} /> : null
+
   return (
-    <LessonMaterialSection
-      audience="TEACHER"
-      heading={label}
-      hint={hint}
-      rows={rows}
-      add={null}
-      inGroupId={inGroupId}
-      headingLevel={3}
-    />
+    <section className="space-y-3">
+      <Heading className="text-xs font-semibold uppercase tracking-wide text-gray-500">{heading}</Heading>
+      {visible.length === 0 && emptyLabel ? <p className="text-sm text-gray-500">{emptyLabel}</p> : null}
+      {guides.map((row) => (
+        <div key={row.id} className="flex items-start gap-1">
+          <div className="min-w-0 flex-1">
+            <InteractiveGuide item={toItem(row)} moduleTitle={moduleTitle} headingLevel={4} />
+          </div>
+          {deleteFor(row)}
+        </div>
+      ))}
+      {others.length > 0 ? <MaterialCards items={others} actionFor={deleteFor} /> : null}
+    </section>
   )
 }

@@ -90,11 +90,13 @@ describe('LessonAccordion — dated module', () => {
     expect(screen.queryByText('Radni list C')).toBeNull()
   })
 
-  it('labels each lesson with its sats and first date, and badges only the current one', () => {
+  it('labels each lesson with its sats but no date, and badges only the current one', () => {
     render(<LessonAccordion lessons={DATED()} currentLessonId="B" />)
 
-    expect(header('Lekcija A').textContent).toContain('1.–2. sat · 05.10.')
-    expect(header('Lekcija C').textContent).toContain('5.–7. sat · 02.11.')
+    expect(header('Lekcija A').textContent).toContain('1.–2. sat')
+    expect(header('Lekcija A').textContent).not.toContain('05.10.')
+    expect(header('Lekcija C').textContent).toContain('5.–7. sat')
+    expect(header('Lekcija C').textContent).not.toContain('02.11.')
     expect(screen.getAllByText('Trenutna lekcija')).toHaveLength(1)
     expect(header('Lekcija B').textContent).toContain('Trenutna lekcija')
   })

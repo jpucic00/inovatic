@@ -93,11 +93,6 @@ function ModuleLessonsCard({
                 courseId={courseId}
                 lesson={item.lesson}
                 dated={entry.dated}
-                dateLabel={
-                  item.lesson.sessionNumbers.length > 0
-                    ? satDateLabel(entry.satDates, item.lesson.sessionNumbers[0])
-                    : null
-                }
               />
             ) : (
               <li key={`free-${item.sessionNumber}`}>
@@ -157,8 +152,7 @@ function LessonRow({
   courseId,
   lesson,
   dated,
-  dateLabel,
-}: Readonly<{ courseId: string; lesson: ProgramLessonRow; dated: boolean; dateLabel: string | null }>) {
+}: Readonly<{ courseId: string; lesson: ProgramLessonRow; dated: boolean }>) {
   const counts = `${lesson.teacherCount} nast. · ${lesson.studentCount} pol.`
   let label: string | null = null
   if (lesson.sessionNumbers.length > 0) label = formatLessonSessions(lesson.sessionNumbers)
@@ -171,7 +165,10 @@ function LessonRow({
         href={`/admin/programi/${courseId}/lekcija/${lesson.id}`}
         className="flex min-h-11 items-center gap-3 px-4 py-2.5 hover:bg-gray-50"
       >
-        {label ? <SatColumn label={label} date={dateLabel} warn={lesson.sessionNumbers.length === 0} /> : null}
+        {/* No date on a lesson row: a lesson spanning several sats has no single
+            date, and its first sat's alone reads as the whole lesson's. Free sat
+            rows keep theirs — one sat, one (weekday-range) date. */}
+        {label ? <SatColumn label={label} date={null} warn={lesson.sessionNumbers.length === 0} /> : null}
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-gray-900">{lesson.title}</span>
           <span className="block text-xs text-gray-500 sm:hidden">{counts}</span>

@@ -23,7 +23,7 @@ export async function GroupMaterialsPanel({
         <h2 className="text-sm font-semibold text-gray-700">Materijali</h2>
         <p className="mt-0.5 text-xs text-gray-500">
           {editable
-            ? 'Lekcije i programski materijali uređuju se na stranici programa. Ovdje se dodaju materijali samo za ovu grupu, a programski se mogu sakriti u njoj.'
+            ? 'Lekcije i programski materijali uređuju se na stranici programa. Ovdje se dodaju materijali samo za ovu grupu.'
             : 'Arhivirana školska godina — materijali su prikazani kakvi su bili.'}
         </p>
       </div>

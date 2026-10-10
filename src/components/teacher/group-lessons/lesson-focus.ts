@@ -4,7 +4,7 @@ import type { StaffLessonModule } from '@/actions/teacher/materials'
 export const moduleKey = (m: Pick<StaffLessonModule, 'moduleId'>): string => m.moduleId ?? 'program'
 
 type LessonFocus = {
-  /** The lesson the group is on now — labelled "Trenutna lekcija". */
+  /** The lesson the group is on now — labelled "Trenutna lekcija", always open. */
   currentLessonId: string | null
   /** The next lesson to start — labelled "Sljedeća", what the teacher prepares. */
   nextLessonId: string | null
@@ -28,10 +28,11 @@ type LessonFocus = {
  *   is on a module's last lesson, what comes next is the first lesson of the
  *   following module.
  *
- * Only the modules holding one of those two are open, which keeps a page of
- * four modules × seven lessons down to what the teacher is preparing. A
- * program with no dates at all (natjecateljski: every natjecanje runs at once)
- * has nothing to focus on, so every module is open with its lessons closed.
+ * Only the CURRENT lesson starts open, and only its module (owner, 2026-10-10:
+ * the lesson being taught stands apart; "Sljedeća" is a badge, opened on a
+ * tap like any other lesson). A program with no dates at all (natjecateljski:
+ * every natjecanje runs at once) has nothing to focus on, so every module is
+ * open with its lessons closed.
  *
  * Pure function of props, so server and client render the same first state.
  */
@@ -50,14 +51,13 @@ export function resolveLessonFocus(modules: readonly StaffLessonModule[]): Lesso
     }
   }
 
-  const focusIds = [current?.id, next?.id].filter((id): id is string => id !== undefined)
   const openModuleKeys = new Set<string>()
   for (const m of modules) {
-    if (m.lessons.some((l) => focusIds.includes(l.id))) openModuleKeys.add(moduleKey(m))
+    if (current && m.lessons.some((l) => l.id === current.id)) openModuleKeys.add(moduleKey(m))
   }
   // An undated current lesson is still opened (it is the one to start with),
   // just not labelled.
-  const openLessonIds = new Set(focusIds)
+  const openLessonIds = new Set(current ? [current.id] : [])
 
   const anyDated = modules.some((m) => m.lessons.some((l) => l.firstDate !== null))
   if (!anyDated && openModuleKeys.size === 0) {

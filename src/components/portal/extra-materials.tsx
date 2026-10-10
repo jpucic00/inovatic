@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ChevronDown } from 'lucide-react'
 import { VideoEmbed } from '@/components/material/video-embed'
@@ -136,12 +136,31 @@ function MaterialCard({ item }: Readonly<{ item: MaterialItem }>) {
  * say "all of them", and sorting by kind would undo the order the mentor chose
  * for the lesson. Each card still says what kind of thing it opens.
  */
-export function MaterialCards({ items }: Readonly<{ items: MaterialItem[] }>) {
+export function MaterialCards({
+  items,
+  actionFor,
+}: Readonly<{
+  items: MaterialItem[]
+  /**
+   * Staff only: a control shown BESIDE a card (never inside it — the card is a
+   * link or a button itself). The portal passes nothing.
+   */
+  actionFor?: (item: MaterialItem) => ReactNode
+}>) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map((item) => (
-        <MaterialCard key={item.id} item={item} />
-      ))}
+      {items.map((item) => {
+        const action = actionFor?.(item)
+        if (!action) return <MaterialCard key={item.id} item={item} />
+        return (
+          <div key={item.id} className="flex items-start gap-1">
+            <div className="min-w-0 flex-1">
+              <MaterialCard item={item} />
+            </div>
+            {action}
+          </div>
+        )
+      })}
     </div>
   )
 }

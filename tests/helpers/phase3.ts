@@ -565,9 +565,11 @@ export async function createLessonOnProgramPage(
  * view also folds whole modules, so any folded module is opened first. Returns
  * the lesson's `<li>` for scoping assertions.
  *
- * Retries the click: a tap before hydration is swallowed, and checking
- * `aria-expanded` first means a lesson the page already opened (the current
- * one) is never toggled shut.
+ * On the staff view the CURRENT lesson is always open and its heading is not a
+ * button at all, so a heading without a toggle is already open. Otherwise the
+ * click is retried (a tap before hydration is swallowed), and checking
+ * `aria-expanded` first means a lesson the page already opened is never
+ * toggled shut.
  */
 export async function openLesson(page: Page, lessonTitle: string): Promise<Locator> {
   const folded = page.locator('button[aria-controls^="modul-"][aria-expanded="false"]')
@@ -580,17 +582,78 @@ export async function openLesson(page: Page, lessonTitle: string): Promise<Locat
   const heading = page.getByRole('heading', { level: 3, name: lessonTitle })
   await expect(heading).toBeVisible({ timeout: 15000 })
   const toggle = heading.getByRole('button')
-  await expect(async () => {
-    if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click({ timeout: 2000 })
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 })
-  }).toPass({ timeout: 20000 })
+  if ((await toggle.count()) > 0) {
+    await expect(async () => {
+      if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click({ timeout: 2000 })
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 })
+    }).toPass({ timeout: 20000 })
+  }
   return page.locator('li').filter({ has: heading })
 }
 
+/** One audience section ("Za nastavnike" / "Za polaznike") of an open staff lesson. */
+export function lessonAudienceSection(
+  page: Page,
+  lesson: Locator,
+  audience: 'STUDENT' | 'TEACHER',
+): Locator {
+  return lesson.locator('section').filter({
+    has: page.getByRole('heading', {
+      level: 4,
+      name: audience === 'STUDENT' ? 'Za polaznike' : 'Za nastavnike',
+      exact: true,
+    }),
+  })
+}
+
 /**
- * On a group's staff lesson view: adds a URL material that belongs to THIS
- * group only (scope GROUP) into an existing lesson, under "Za polaznike" or
- * "Za nastavnike".
+ * One material card in a card grid (portal or the staff tree). On the staff
+ * tree a deletable card is wrapped together with its "Obriši materijal"
+ * button, so the returned locator scopes that button too.
+ */
+export function materialCard(scope: Locator, title: string): Locator {
+  return scope.locator('.grid > *').filter({ hasText: title })
+}
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Opens a group tab's "Dodaj materijal" modal with the lesson and the audience
+ * picked (the audience has no default). Returns the dialog; the kind defaults
+ * to Datoteka.
+ */
+export async function openAddGroupMaterial(
+  page: Page,
+  lessonTitle: string,
+  audience: 'STUDENT' | 'TEACHER',
+): Promise<Locator> {
+  const dialog = page.getByRole('dialog')
+  // A Radix DialogTrigger: a click before hydration does nothing.
+  await expect(async () => {
+    if (!(await dialog.isVisible())) {
+      await page.getByRole('button', { name: 'Dodaj materijal' }).click({ timeout: 2000 })
+    }
+    await expect(dialog).toBeVisible({ timeout: 2000 })
+  }).toPass({ timeout: 20000 })
+  // An option reads "<title>" or "<title> (<sats>)" — match the title whole, so
+  // "Lekcija X" never picks "Radionica lekcija X".
+  const value = await dialog
+    .locator('#group-material-lesson option')
+    .filter({ hasText: new RegExp(`^${escapeRegExp(lessonTitle)}( \\(.*\\))?$`) })
+    .first()
+    .getAttribute('value')
+  await dialog.locator('#group-material-lesson').selectOption(value!)
+  const audienceLabel = audience === 'STUDENT' ? 'Za polaznike' : 'Za nastavnike'
+  await dialog.locator('label').filter({ hasText: audienceLabel }).click()
+  await expect(dialog.getByRole('radio', { name: new RegExp(audienceLabel) })).toBeChecked()
+  return dialog
+}
+
+/**
+ * On a group's Materijali tab: adds a URL material that belongs to THIS group
+ * only (scope GROUP) into an existing lesson, under "Za polaznike" or "Za
+ * nastavnike", through the "Dodaj materijal" modal. Returns the new card on
+ * the tab (wrapped with its delete button when the viewer may delete it).
  */
 export async function addGroupLinkMaterial(
   page: Page,
@@ -598,18 +661,21 @@ export async function addGroupLinkMaterial(
   audience: 'STUDENT' | 'TEACHER',
   link: FixtureLink,
 ): Promise<Locator> {
+  const dialog = await openAddGroupMaterial(page, lessonTitle, audience)
+  const kind = link.type ?? 'LINK'
+  const kindLabel = { LINK: 'Poveznica', VIDEO: 'Video poveznica', ROBOCAMP: 'RoboCamp' }[kind]
+  await dialog.locator('label').filter({ hasText: new RegExp(`^${kindLabel}$`) }).click()
+  await dialog.locator('#group-material-url').fill(link.url)
+  await dialog.locator('#group-material-title').fill(link.title)
+  const save = dialog.getByRole('button', { name: 'Spremi', exact: true })
+  await expect(save).toBeEnabled()
+  await save.click()
+  await expect(dialog).toBeHidden({ timeout: 15000 })
+
   const lesson = await openLesson(page, lessonTitle)
-  const section = lesson.locator('section').filter({
-    has: page.getByRole('heading', {
-      level: 4,
-      name: audience === 'STUDENT' ? 'Za polaznike' : 'Za nastavnike',
-      exact: true,
-    }),
-  })
-  await addLinkInSection(page, section, link)
-  const row = section.locator('li').filter({ hasText: link.title })
-  await expect(row).toBeVisible({ timeout: 15000 })
-  return row
+  const card = materialCard(lessonAudienceSection(page, lesson, audience), link.title)
+  await expect(card).toBeVisible({ timeout: 15000 })
+  return card
 }
 
 /**

@@ -82,9 +82,9 @@ function LessonItem({
   onToggle,
 }: Readonly<{ lesson: LessonView; open: boolean; onToggle: () => void }>) {
   const panelId = `lekcija-${lesson.id}`
-  const sats = lesson.sessionNumbers.length > 0 ? formatLessonSessions(lesson.sessionNumbers) : null
-  const date = lesson.firstDate ? formatDayMonth(lesson.firstDate) : null
-  const meta = [sats, date].filter(Boolean).join(' · ')
+  // Sats only, no date: a lesson spanning several sats has no single date, and
+  // its first sat's alone reads as the whole lesson's (owner, 2026-10-10).
+  const meta = lesson.sessionNumbers.length > 0 ? formatLessonSessions(lesson.sessionNumbers) : ''
   // "Trenutna" is a claim about the calendar. An undated lesson is current only
   // because it comes first, so it gets opened but not labelled.
   const showCurrent = lesson.isCurrent && lesson.firstDate !== null
