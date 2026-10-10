@@ -989,8 +989,9 @@ export async function getStudents(
   const andClauses: Prisma.UserWhereInput[] = []
   if (paymentStatus) andClauses.push(paymentStatusUserWhere(paymentStatus, referenceYear, now))
   if (returning) andClauses.push(returningStudentWhere(returning, referenceYear))
-  // "Sve privole dane": no form in scope may say Ne or be blank, so the filter
-  // agrees with the Privole column, which shows the strictest form.
+  // "Sve privole dane": no form in scope may say Ne or be blank. Without a
+  // group/program/module filter that agrees with the Privole column (strictest
+  // form of the year); with one, the stricter form wins inside that scope only.
   const consentStrict = consentStrictWhere(filters.consent, studentEnrollmentScope(filters))
   if (consentStrict) andClauses.push(consentStrict)
 
