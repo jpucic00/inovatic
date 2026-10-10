@@ -224,7 +224,15 @@ export function CreateAccountDialog({
   const submitLabel = parentLink ? 'Potvrdi i kreiraj' : 'Kreiraj račun i upiši'
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // Esc/×/outside while the create is in flight: a PARENT_LINK_CONFIRM
+        // answer would land in the closed dialog and be confirmed on reopen.
+        if (!next && isPending) return
+        handleOpenChange(next)
+      }}
+    >
       <DialogTrigger asChild>
         <button className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-colors">
           <UserPlus className="w-4 h-4" />

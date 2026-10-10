@@ -135,4 +135,23 @@ describe('CreateAccountDialog — potvrda roditeljskog računa', () => {
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2))
     expect(createMock).toHaveBeenLastCalledWith('inq-1', 'g-reserved', undefined, false)
   })
+
+  // Esc while the create is in flight used to close the dialog; the late
+  // PARENT_LINK_CONFIRM answer then filled the closed dialog, and reopening
+  // offered "Potvrdi i kreiraj" for a preview the admin never saw.
+  it('stays open on Esc while the create is pending', async () => {
+    let resolve: (v: Awaited<ReturnType<typeof createStudentFromInquiry>>) => void = () => {}
+    createMock.mockReturnValueOnce(new Promise((r) => { resolve = r }))
+    openDialog()
+    fireEvent.click(submitButton())
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1))
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    resolve({ success: false, error: 'Greška.' })
+    await waitFor(() => expect(submitButton()).not.toBeDisabled())
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
 })
