@@ -33,20 +33,20 @@ function CardShell({
         >
           {MATERIAL_KIND_LABEL[kind]}
         </span>
-        <span className="mt-0.5 block text-sm font-semibold leading-snug text-gray-900">
+        <span className="mt-0.5 block text-sm font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
           {title}
         </span>
         {description ? (
           <span className="mt-0.5 block line-clamp-1 text-xs text-gray-500">{description}</span>
         ) : null}
-        {meta ? <span className="mt-1 block text-xs text-gray-400">{meta}</span> : null}
+        {meta ? <span className="mt-1 block truncate text-xs text-gray-400">{meta}</span> : null}
       </span>
     </>
   )
 }
 
 const CARD_CLASS =
-  'flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left transition hover:border-cyan-400 hover:shadow-sm'
+  'flex min-w-0 items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left transition hover:border-cyan-400 hover:shadow-sm'
 
 /**
  * A video is the one row that plays rather than opens, so it expands in place
