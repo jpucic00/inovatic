@@ -98,8 +98,8 @@ function slrTable(page: Page) {
 const MODULE_TAB_TITLES = [
   /Zabavni sustavi/i,
   /Prometni sustavi/i,
-  /Industrijski sustavi/i,
-  /Svemirski sustavi/i,
+  /Sportski i igraći sustavi/i,
+  /Pametni sustavi/i,
 ]
 
 function moduleTabButton(page: Page, n: number) {
