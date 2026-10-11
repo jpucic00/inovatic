@@ -517,4 +517,43 @@ describe('current lesson follows the sat numbers on the group arc', () => {
     const firstDate = staff.modules.find((m) => m.moduleId === m1.id)?.lessons[0].firstDate
     expect(firstDate?.toISOString().slice(0, 10)).toBe('2031-10-06')
   })
+
+  it("skips holidays from the group's OWN year when dating a next-year group's sats", async () => {
+    // Own years so the holiday below cannot reach any other test's arc.
+    const ending = '2034/2035'
+    const next = '2035/2036'
+    const admin = await createAdmin()
+    const course = await fx.course({ kind: 'STANDARD' })
+    const m1 = await createModule(course.id, { title: 'Modul 1', sortOrder: 0 })
+    await createModuleSchedule(m1.id, {
+      schoolYear: ending,
+      city: 'SPLIT',
+      startDate: new Date('2034-10-01T00:00:00Z'),
+      endDate: new Date('2034-11-30T00:00:00Z'),
+    })
+    await createModuleSchedule(m1.id, {
+      schoolYear: next,
+      city: 'SPLIT',
+      startDate: new Date('2035-10-01T00:00:00Z'),
+      endDate: new Date('2035-11-30T00:00:00Z'),
+    })
+    const group = await fx.group({ courseId: course.id, dayOfWeek: 'Ponedjeljak', city: 'SPLIT', schoolYear: next })
+    const lesson = await createLesson({ courseId: course.id, moduleId: m1.id, title: '1. Puž', sessionNumbers: [1] })
+    await seedMaterial({ scope: 'LESSON', lessonId: lesson.id, audience: 'STUDENT', uploadedById: admin.id })
+    // 1 October 2035 is a Monday — the group's first sat, unless it is a holiday.
+    await db.schoolYear.upsert({ where: { label: next }, create: { label: next }, update: {} })
+    const holiday = await db.schoolYearHoliday.create({
+      data: { city: 'SPLIT', schoolYear: next, date: new Date(Date.UTC(2035, 9, 1)), name: 'Test' },
+    })
+
+    try {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2035-07-15T10:00:00Z') })
+      const staff = await buildGroupMaterialsView(group.id, 'STAFF')
+      const firstDate = staff.modules.find((m) => m.moduleId === m1.id)?.lessons[0].firstDate
+      // Read off today's year (2034/2035) the holiday would be missed and sat 1 stay on the 1st.
+      expect(firstDate?.toISOString().slice(0, 10)).toBe('2035-10-08')
+    } finally {
+      await db.schoolYearHoliday.delete({ where: { id: holiday.id } })
+    }
+  })
 })

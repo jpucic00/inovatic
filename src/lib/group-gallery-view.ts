@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import type { ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
-import { computeSchoolYear } from '@/lib/school-year'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 
@@ -39,8 +38,6 @@ export type GalleryView = {
 }
 
 export async function buildGroupGalleryView(groupId: string): Promise<GalleryView> {
-  const schoolYear = computeSchoolYear()
-
   const group = await db.scheduledGroup.findUnique({
     where: { id: groupId },
     select: {
@@ -48,6 +45,7 @@ export async function buildGroupGalleryView(groupId: string): Promise<GalleryVie
       name: true,
       dayOfWeek: true,
       city: true,
+      schoolYear: true,
       course: {
         select: {
           id: true,
@@ -60,7 +58,6 @@ export async function buildGroupGalleryView(groupId: string): Promise<GalleryVie
               title: true,
               sortOrder: true,
               schedules: {
-                where: { schoolYear },
                 select: { id: true, schoolYear: true, city: true, startDate: true, endDate: true },
               },
             },
@@ -87,6 +84,10 @@ export async function buildGroupGalleryView(groupId: string): Promise<GalleryVie
     },
   })
 
+  // The default tab follows the group's own year, never today's: through the
+  // summer today still names the year that is ending, and after 1 September a
+  // past group would be paced off the new year's module dates.
+  const schoolYear = group.schoolYear
   const holidayDates = await loadHolidayDateKeys(schoolYear, group.city)
   const activeModule = getCurrentActiveModuleForGroup({
     dayOfWeek: group.dayOfWeek,

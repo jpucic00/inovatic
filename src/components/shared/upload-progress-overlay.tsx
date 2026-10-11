@@ -18,15 +18,14 @@ export function UploadProgressOverlay({
 }>) {
   const percent = progress === null ? null : Math.round(progress * 100)
   return (
-    <div
-      role="status"
+    <output
       aria-live="polite"
       className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-lg bg-white/90 px-6 text-center"
     >
       <Loader2 className="h-7 w-7 animate-spin text-cyan-600" aria-hidden />
-      <p className="text-sm font-medium text-gray-800">
+      <span className="block text-sm font-medium text-gray-800">
         {percent === null ? label : `${label} ${percent} %`}
-      </p>
+      </span>
       {percent === null ? null : (
         <progress
           max={100}
@@ -35,7 +34,7 @@ export function UploadProgressOverlay({
           className="h-2 w-56 max-w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:bg-cyan-600 [&::-webkit-progress-bar]:bg-gray-100 [&::-webkit-progress-value]:bg-cyan-600"
         />
       )}
-      <p className="text-xs text-gray-500">{hint}</p>
-    </div>
+      <span className="block text-xs text-gray-500">{hint}</span>
+    </output>
   )
 }

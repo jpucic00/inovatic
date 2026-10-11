@@ -52,7 +52,9 @@ let stagedCounter = 0
  * one progress overlay and they are saved together. Uploading on drop left
  * Cloudinary files behind whenever the save failed or the page was left
  * mid-way; now a failed image is marked and a retry re-sends only what has not
- * gone through yet, and leaving the page while it runs asks first.
+ * gone through yet, and leaving the page while it runs asks first. Images that
+ * did upload before a failure are still left behind if the batch is then
+ * abandoned (Odustani, ×, leaving) — accepted, there is no discard.
  */
 export function GalleryUploadZone({ scheduledGroupId, moduleId, onBusyChange }: Readonly<Props>) {
   const router = useRouter()

@@ -113,7 +113,7 @@ describe('AddGroupMaterialDialog — a file is uploaded only on Spremi', () => {
     vi.mocked(toast.error).mockReset()
   })
 
-  it('picking a file uploads nothing — cancelling then leaves no Cloudinary file', () => {
+  it('picking a file uploads nothing — cancelling before Spremi sends nothing to Cloudinary', () => {
     pickPdf()
 
     expect(uploadMaterialFile).not.toHaveBeenCalled()
@@ -161,6 +161,46 @@ describe('AddGroupMaterialDialog — a file is uploaded only on Spremi', () => {
     await waitFor(() => expect(createMaterial).toHaveBeenCalledTimes(2))
 
     expect(uploadMaterialFile).toHaveBeenCalledTimes(1)
+  })
+
+  // The reuse is keyed on the picked File: a different file after a failed
+  // save must be uploaded, never saved under the first file's URL.
+  it('a different file picked after a failed save is uploaded and saved, not the first upload', async () => {
+    const second: UploadResult = {
+      ok: true,
+      file: { url: 'https://res.cloudinary.com/x/raw/upload/v1/drugi.pdf', bytes: 4096, mimeType: 'application/pdf' },
+    }
+    vi.mocked(createMaterial)
+      .mockResolvedValueOnce({ success: false, error: 'Greška.' } as Awaited<ReturnType<typeof createMaterial>>)
+      .mockResolvedValueOnce({ success: true } as Awaited<ReturnType<typeof createMaterial>>)
+    vi.mocked(uploadMaterialFile).mockResolvedValueOnce(UPLOADED).mockResolvedValueOnce(second)
+    pickPdf()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Spremi' }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Greška.'))
+    fireEvent.change(document.querySelector('#group-material-file') as HTMLInputElement, {
+      target: { files: [new File(['%PDF'], 'Drugi.pdf', { type: 'application/pdf' })] },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Spremi' }))
+    await waitFor(() => expect(createMaterial).toHaveBeenCalledTimes(2))
+
+    expect(uploadMaterialFile).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(uploadMaterialFile).mock.calls[1][0].name).toBe('Drugi.pdf')
+    expect(vi.mocked(createMaterial).mock.calls[1][0]).toMatchObject({ fileUrl: second.ok ? second.file.url : null })
+  })
+
+  it('while uploading, the close button is gone and the form is locked', async () => {
+    const upload = controlledUpload()
+    pickPdf()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Spremi' }))
+    await upload.progress(0.1)
+    expect(screen.queryByRole('button', { name: /close|zatvori/i })).toBeNull()
+    // The lock is the enclosing <fieldset disabled>, which the input inherits.
+    expect(screen.getByLabelText('Naslov').matches(':disabled')).toBe(true)
+
+    await upload.finish({ ok: false, error: 'Datoteka je prevelika.' })
+    await waitFor(() => expect(screen.getByLabelText('Naslov').matches(':disabled')).toBe(false))
   })
 
   it('a failed upload keeps the form and says why, without saving', async () => {

@@ -2,7 +2,7 @@
 project: inovatic
 stack: Next.js 15 + TypeScript + Tailwind v4 + shadcn/ui + Prisma + PostgreSQL (Neon) + Auth.js v5 + Cloudinary + Resend + React Email + Zod + BlockNote + Playwright
 default_branch: main
-last_validated: 2026-10-10T20:35:00+02:00
+last_validated: 2026-10-11T13:00:00+02:00
 created: 2026-05-11
 ---
 
@@ -170,6 +170,11 @@ Already excluded in `sonar-project.properties`:
 
 > Why certain capabilities are skipped, plus standing decisions the skill must respect.
 
+- **2026-10-11 — Cloudinary file left behind when an upload succeeded but its save failed, then the dialog/gallery batch was abandoned: accepted, do not re-flag.** Owner chose rewording the docs over a guarded discard action (validate 2026-10-11, finding 2). CLAUDE.md states the gap.
+- **2026-10-11 — Upload overlay announces every percent tick in its live region: accepted, do not re-flag** (validate 2026-10-11, finding 5).
+- **2026-10-11 — Gallery `beforeunload` relies on `preventDefault()` alone (no legacy `returnValue`): accepted, do not re-flag** (finding 6).
+- **2026-10-11 — Lesson-editor drop zone is a `<label>` wrapping the "Odaberi datoteke" `<button>`: accepted, do not re-flag.** Invalid label content but the input is aria-hidden and the label satisfies Sonar S6848 (finding 7).
+- **2026-10-11 — Switching gallery module tabs drops the staged (not yet uploaded) selection: accepted, do not re-flag.** Nothing reached Cloudinary (validate 2026-10-11, finding 3).
 - **2026-10-11 — No replay test for the one-time `20261010120100_materials_v2_lessons` data migration: declined, do not re-flag.** Owner: a one-time migration does not get a test (validate 2026-10-10, P1).
 - **2026-10-11 — Teacher Materijali tab stays editable (add/delete own GROUP rows) in an archived school year: accepted, do not re-flag.** Owner: fine (validate 2026-10-10 second pass, N12; pre-existing P7).
 - **2026-10-11 — A teacher's own (deletable) video on the group Materijali tab expands in its grid cell, not full width: accepted, do not re-flag.** Owner: fine (validate 2026-10-10 second pass, N4).
@@ -206,6 +211,7 @@ Already excluded in `sonar-project.properties`:
 - **2026-07-15 — Dev-DB module-schedule date rot recurs seasonally.** Public enrollment hides standard groups once every module window is past/started (`toActiveGroup` → no `nextEnrollingModule`), so spec 16's public-form tests fail after the seeded year's arc ends (last hit: `16:452`, previously `16:457` on 2026-07-09). Remedy (precedent 2026-06-11): shift `ModuleSchedule` rows for the active year+city forward until at least one module STARTS in the future — 2026-07-15 applied `+150 days` to `(2025/2026, SPLIT)` (16 rows). Check `curl 'localhost:3000/api/group-availability?city=SPLIT'` returns SLR courses before running phase2.
 
 ## Validation history
+- 2026-10-11 13:00 — scope `ae71c44..HEAD` (3 commits: deferred upload `9185395`, CLAUDE.md note, module rename migration `95f8d3d`) · 0 HIGH · lint/tsc/knip clean · unit+integration 3121→**3148/3148** · E2E 24/29/27/18 **37/37** · Sonar 9→8 (S6819 overlay → `<output>`; rest accepted S3776) · +27 tests (upload-rules, fake-XHR postFileWithProgress, dialog swap-after-failed-save + busy lock, own-year holiday), two mutation-verified · CLAUDE.md orphan claim reworded (owner) · **migration guard may fire on prod if `db:seed:programs` ever duplicated the old "Modul N – …" rows → read-only prod query run by the owner, all {1,2,3,4}; Flux `alkjc94` → done** · follow-up: `group-gallery-view` default tab paced off `group.schoolYear` (+2 mutation-verified integration tests) · program pages: platform + Materijali copy corrected; gallery-scope.md upload node updated; findings 5–7 accepted · reports/validate-2026-10-11-1300.md
 - 2026-10-10 20:35 — second pass on `ae71c44` (teacher materials read-only tree + Dodaj materijal modal, 14 files) · owner: report-only for code · 2 MEDIUM (modal save has no catch → error page; header counts include hidden rows) + 11 LOW reported · owner decisions: existing MaterialGroupHide rows stay hidden with no UI, admin loses GROUP edit/move — copy/docs corrected · unit+integration 3104 · E2E 24/27/30/32/41 29/29, 40 flaked twice during the other session's edits then passed alone · Sonar +1 S3776 · reports/validate-2026-10-10-2035.md
 - 2026-10-10 19:05 — 122 files (`origin/main..HEAD`, 7 commits: rate limit, group delete, roster badges, Materijali v2) on all 8 Verification tasks · **1 HIGH fixed** (X during an upload still published the file — create-mode addFile ran createRow after the placeholder was gone) + 4 MEDIUM (waitlist groups didn't block deleteGroup; admin downloaded another city's radionica files — pre-existing adminAllowed; substitutes got refused drop zones; Enter twice duplicated a lesson) + 5 LOW · Sonar 17→9 (7 S3776 + 2 a11y proposed), gate ERROR new_coverage 59.5 · +9 tests, 3 mutation-checked · unit 1901 · integration 1202 · E2E NOT re-run (another session editing src/ with its own dev server) · material-scope.md rewritten + erd.md, 8/8 mermaid parse · reports/validate-2026-10-10-1902.md
 - 2026-10-06 15:55 — 32 files (`b5f8792..HEAD`, 9 commits) on all 7 Verification tasks · 1 MEDIUM fixed (expireOtherPasswordTokens had no ordering: two overlapping sends to one account expired each other's link after both mails went out — now spares links minted after the kept one) + 1 LOW (Esc during pending create closed the dialog and the late PARENT_LINK_CONFIRM was confirmed on reopen) · Sonar 1→0 (S7781 replaceAll), gate ERROR new_coverage 57.7 · +2 tests, both mutation-checked · unit 1759 · integration 1098 · E2E 42/03/17/22 34/34 · diagrams accurate (2 optional notes) · /raspored proposal declined by owner · Flux 7/7 → done · reports/validate-2026-10-06-1540.md

@@ -64,7 +64,7 @@ const PLATFORM_FEATURES = [
     icon: FileText,
     title: 'Materijali',
     description:
-      'Upute za slaganje, prezentacije i video zapisi za svaki modul programa. Dostupni su cijelu godinu, pa dijete može ponoviti projekt i kod kuće.',
+      'Upute za slaganje, prezentacije i video zapisi za modul koji grupa trenutno radi, pa dijete može ponoviti projekt i kod kuće.',
   },
   {
     icon: Images,
@@ -87,9 +87,9 @@ function OnlinePlatformSection() {
         Online platforma za roditelje i polaznike
       </h2>
       <p className="mb-4 text-sm leading-[1.65] text-gray-600 md:mb-5 md:text-[15.5px] md:leading-[1.7]">
-        Nakon upisa svaki polaznik dobiva svoje pristupne podatke. Roditelji se
-        prijavljuju istim podacima i u svakom trenutku mogu pratiti što dijete
-        radi na radionicama.
+        Nakon upisa roditelj na svoju e-mail adresu dobiva poveznicu za
+        postavljanje lozinke. Jednom prijavom prati svu svoju djecu i u svakom
+        trenutku može vidjeti što dijete radi na radionicama.
       </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

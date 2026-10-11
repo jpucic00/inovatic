@@ -125,6 +125,8 @@ export function AddGroupMaterialDialog({
   // Picking only checks the file and keeps it in the browser. Uploading on pick
   // left a Cloudinary file behind every time the dialog was cancelled or the
   // file swapped; now the upload happens on Spremi, right before the save.
+  // An upload whose save then failed is still left behind if the dialog is
+  // closed or the file swapped afterwards — accepted, there is no discard.
   const pickFile = (picked: File) => {
     setFileError(null)
     setFile(null)

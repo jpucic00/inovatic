@@ -58,7 +58,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    U["GalleryUploadZone → POST /api/upload/gallery"] --> C["cloudinary.uploader.upload_stream(resource_type: 'image')"]
+    U["GalleryUploadZone — staged in the browser until 'Dodaj u galeriju' → POST /api/upload/gallery"] --> C["cloudinary.uploader.upload_stream(resource_type: 'image')"]
     C --> W["withWatermark(result.secure_url):<br/>splices l_branding:inovatic-watermark,o_60,w_0.28,fl_relative,g_south_east,x_20,y_20<br/>straight after /image/upload/"]
     C --> P["result.public_id — never transformed"]
     W --> A["addGalleryImages({ url, publicId, width, height })"]
