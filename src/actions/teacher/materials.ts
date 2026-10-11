@@ -19,9 +19,9 @@ import type { StaffMaterialRow } from '@/components/material/staff-material-list
 /**
  * Returns every material that applies to this group — its program's lesson
  * materials, its own group materials, and the teacher-only whole-module /
- * whole-program rows — including the hidden-in-this-group flag. Unlike the
- * portal query, staff see hidden materials (dimmed, with a toggle to re-show)
- * so they can manage them, and both audiences.
+ * whole-program rows — including the hidden-in-this-group flag, both
+ * audiences. Rows hidden through an older `MaterialGroupHide` keep the flag;
+ * the staff tree leaves them out (there is no hide/unhide UI any more).
  */
 async function getStaffGroupMaterials(groupId: string): Promise<StaffMaterialRow[]> {
   const { session, isAdmin } = await assertTeacherOwnsGroup(groupId)
@@ -95,7 +95,7 @@ async function getStaffGroupMaterials(groupId: string): Promise<StaffMaterialRow
 
 /**
  * The group's program, for the per-group materials tab. `canManage` says
- * whether the caller may add, hide or move this group's materials — the same
+ * whether the caller may add or delete this group's materials — the same
  * `canManageMaterial` answer every write gives. A substitute (zamjena) opens
  * the group but holds no TeacherAssignment, so they read it and nothing more;
  * offering them drop zones only to refuse each upload afterwards was the bug.
@@ -209,7 +209,7 @@ export type StaffGroupLessons = {
 /**
  * The group's Materijali tab for staff: every module's lessons placed on THIS
  * group's calendar (current + next marked), each with its teacher and kids'
- * materials — hidden ones included (dimmed, re-showable), which is why this is
+ * materials — both audiences and the teacher-only rows, which is why this is
  * built from `getStaffGroupMaterials` rather than the portal view.
  */
 export async function getStaffGroupLessons(groupId: string): Promise<StaffGroupLessons> {

@@ -1,6 +1,6 @@
 import { formatDate } from '@/lib/format'
 import { fromDateKey } from '@/lib/session-dates'
-import type { StudentAttendanceEnrollment } from '@/actions/admin/attendance'
+import type { StudentAttendanceEnrollment } from '@/lib/student-attendance'
 
 interface Props {
   enrollments: StudentAttendanceEnrollment[]

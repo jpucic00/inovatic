@@ -3,7 +3,7 @@
   "version": "1.7.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "email": "email dev --dir emails --port 3001",
     "build": "next build",
     "start": "next start",

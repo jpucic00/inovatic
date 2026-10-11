@@ -634,16 +634,12 @@ function StagedRow({
     const percent = Math.round(item.progress * 100)
     status = (
       <div className="mt-1.5 flex items-center gap-2">
-        <div
-          className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
+        <progress
+          max={100}
+          value={percent}
           aria-label={`Učitavanje: ${item.fileName ?? item.title}`}
-        >
-          <div className="h-full bg-cyan-500 transition-[width]" style={{ width: `${percent}%` }} />
-        </div>
+          className="h-1.5 flex-1 appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:bg-cyan-500 [&::-webkit-progress-bar]:bg-gray-100 [&::-webkit-progress-value]:bg-cyan-500"
+        />
         <span className="w-9 text-right text-xs tabular-nums text-gray-500">{percent}%</span>
       </div>
     )
@@ -729,20 +725,21 @@ function AddArea({
   onLink: (content: LinkMaterialContent) => Promise<boolean>
 }>) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const inputId = useId()
   const [dragging, setDragging] = useState(false)
 
-  const onDragOver = (e: DragEvent<HTMLDivElement>) => {
+  const onDragOver = (e: DragEvent<HTMLLabelElement>) => {
     if (!e.dataTransfer.types.includes('Files')) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'copy'
     setDragging(true)
   }
-  const onDragLeave = (e: DragEvent<HTMLDivElement>) => {
+  const onDragLeave = (e: DragEvent<HTMLLabelElement>) => {
     // Leaving into a child (the button, the text) is not leaving the zone.
     if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
     setDragging(false)
   }
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+  const onDrop = (e: DragEvent<HTMLLabelElement>) => {
     e.preventDefault()
     setDragging(false)
     if (e.dataTransfer.files.length > 0) onFiles(e.dataTransfer.files)
@@ -750,17 +747,21 @@ function AddArea({
 
   return (
     <div className="space-y-2">
-      <div
+      {/* A label for the file input, so the drop zone is a native control
+          (Sonar S6848) and a click anywhere on it opens the picker. The button
+          stays as the keyboard path; a click on it does not re-trigger the label. */}
+      <label
+        htmlFor={inputId}
         onDragOver={onDragOver}
         onDragEnter={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={[
-          'rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors',
+          'block cursor-pointer rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors',
           dragging ? 'border-cyan-500 bg-cyan-50' : 'border-gray-300 bg-white',
         ].join(' ')}
       >
-        {empty && emptyLabel ? <p className="mb-2 text-sm text-gray-500">{emptyLabel}</p> : null}
+        {empty && emptyLabel ? <span className="mb-2 block text-sm text-gray-500">{emptyLabel}</span> : null}
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -769,11 +770,12 @@ function AddArea({
           <Upload className="h-4 w-4" />
           Odaberi datoteke
         </button>
-        <p className="mt-2 text-xs text-gray-500">
+        <span className="mt-2 block text-xs text-gray-500">
           <span className="hidden sm:inline">ili ih povucite ovamo · </span>{' '}
           PDF, Word, PowerPoint, slike, video · do 50 MB po datoteci
-        </p>
+        </span>
         <input
+          id={inputId}
           ref={inputRef}
           type="file"
           multiple
@@ -787,7 +789,7 @@ function AddArea({
             e.target.value = ''
           }}
         />
-      </div>
+      </label>
       <div className="flex flex-wrap gap-2">
         <AddLinkMaterialDialog kind="LINK" onAdd={onLink} />
         <AddLinkMaterialDialog kind="VIDEO" onAdd={onLink} />

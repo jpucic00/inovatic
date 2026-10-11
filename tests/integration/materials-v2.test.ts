@@ -474,4 +474,47 @@ describe('current lesson follows the sat numbers on the group arc', () => {
     const later = await buildGroupMaterialsView(group.id, 'STUDENT')
     expect(later.modules[0].currentLessonId).toBe(sat3.id)
   })
+
+  it("paces a next-year group off its OWN year's dates, not the year today still names", async () => {
+    // Mid-July: today's date still names the ending year (2030/2031), while the
+    // group was created for the one starting in September.
+    const ending = '2030/2031'
+    const next = '2031/2032'
+    const admin = await createAdmin()
+    const course = await fx.course({ kind: 'STANDARD' })
+    const m1 = await createModule(course.id, { title: 'Modul 1', sortOrder: 0 })
+    const m2 = await createModule(course.id, { title: 'Modul 2', sortOrder: 1 })
+    const plan = async (moduleId: string, schoolYear: string, start: string, end: string) =>
+      createModuleSchedule(moduleId, {
+        schoolYear,
+        city: 'SPLIT',
+        startDate: new Date(`${start}T00:00:00Z`),
+        endDate: new Date(`${end}T00:00:00Z`),
+      })
+    await plan(m1.id, ending, '2030-10-01', '2030-11-30')
+    await plan(m2.id, ending, '2031-01-07', '2031-06-15')
+    await plan(m1.id, next, '2031-10-01', '2031-11-30')
+    await plan(m2.id, next, '2032-01-07', '2032-06-15')
+    const group = await fx.group({
+      courseId: course.id,
+      dayOfWeek: 'Ponedjeljak',
+      city: 'SPLIT',
+      schoolYear: next,
+    })
+    const lesson = await createLesson({ courseId: course.id, moduleId: m1.id, title: '1. Puž', sessionNumbers: [1] })
+    await seedMaterial({ scope: 'LESSON', lessonId: lesson.id, audience: 'STUDENT', uploadedById: admin.id })
+
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2031-07-15T10:00:00Z') })
+
+    // Last year's arc would put the group past module 2; its own year has not
+    // started, so the portal shows module 1, the one it is enrolling into.
+    const portal = await buildGroupMaterialsView(group.id, 'STUDENT')
+    expect(portal.activeModuleId).toBe(m1.id)
+    expect(portal.modules.map((m) => m.moduleId)).toEqual([m1.id])
+
+    // Sat 1 is dated on the group's own calendar: the first Monday of October 2031.
+    const staff = await buildGroupMaterialsView(group.id, 'STAFF')
+    const firstDate = staff.modules.find((m) => m.moduleId === m1.id)?.lessons[0].firstDate
+    expect(firstDate?.toISOString().slice(0, 10)).toBe('2031-10-06')
+  })
 })

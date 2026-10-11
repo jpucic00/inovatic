@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { X, Loader2, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import type { GalleryImageRow } from '@/actions/teacher/gallery'
+import type { GalleryImageRow } from '@/lib/group-gallery-view'
 import { removeGalleryImage } from '@/actions/gallery/crud'
 import { cloudinaryThumbUrl } from '@/lib/cloudinary-url'
 

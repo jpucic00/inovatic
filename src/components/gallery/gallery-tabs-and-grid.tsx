@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { GalleryView } from '@/actions/teacher/gallery'
+import type { GalleryView } from '@/lib/group-gallery-view'
 import { GalleryGrid } from './gallery-grid'
 import { GalleryUploadZone } from './gallery-upload-zone'
 import { GalleryLightbox } from './gallery-lightbox'
@@ -40,6 +40,9 @@ export function GalleryTabsAndGrid({ view, canManage }: Readonly<Props>) {
     initialTab,
   )
   const [lightboxIndex, setLightboxIndex] = useState(-1)
+  // Images upload into the tab they were picked on; switching tabs mid-upload
+  // would unmount the uploader and orphan what it already sent.
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     if (flatLayout) return
@@ -81,6 +84,7 @@ export function GalleryTabsAndGrid({ view, canManage }: Readonly<Props>) {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveModuleId(tab.id)}
+                disabled={uploading && !isActive}
                 className={`${tabClass(isActive)} sm:whitespace-normal sm:text-center sm:min-w-0`}
               >
                 {tab.label} ({count})
@@ -92,8 +96,10 @@ export function GalleryTabsAndGrid({ view, canManage }: Readonly<Props>) {
 
       {canUpload && (
         <GalleryUploadZone
+          key={uploadModuleId ?? 'all'}
           scheduledGroupId={view.group.id}
           moduleId={uploadModuleId}
+          onBusyChange={setUploading}
         />
       )}
 

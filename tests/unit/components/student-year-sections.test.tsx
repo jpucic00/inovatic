@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import type { getStudent } from '@/actions/admin/student'
-import type { StudentAttendanceEnrollment } from '@/actions/admin/attendance'
+import type { StudentAttendanceEnrollment } from '@/lib/student-attendance'
 import type {
   GradebookSection,
   GradebookYearTab,

@@ -10,19 +10,10 @@ import { GroupLessons } from '@/components/teacher/group-lessons/group-lessons'
 import { resolveLessonFocus } from '@/components/teacher/group-lessons/lesson-focus'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
+// The tree reaches two actions: the "Dodaj materijal" modal and the delete button.
 vi.mock('@/actions/material/crud', () => ({
   createMaterial: vi.fn(),
-  updateMaterial: vi.fn(),
   deleteMaterial: vi.fn(),
-  setMaterialHidden: vi.fn(),
-}))
-vi.mock('@/actions/material/move', () => ({
-  setMaterialsAudience: vi.fn(),
-  moveMaterialToLesson: vi.fn(),
-}))
-vi.mock('@/actions/admin/material-city', () => ({
-  setMaterialCityOnly: vi.fn(),
-  makeMaterialShared: vi.fn(),
 }))
 
 let seq = 0

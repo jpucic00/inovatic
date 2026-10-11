@@ -162,7 +162,7 @@ flowchart TD
 - **`visibleLessonWhere` never returns both kinds of lesson.** With modules in view it admits only those modules' lessons; only when there are none (a radionica) does it admit module-less lessons. A module-less lesson on a program *with* modules is not something the editor creates, and if raw data ever produced one it must not become downloadable while no page lists it.
 - **City.** A row limited to the other city does not exist for this group, for every viewer — portal, staff group view and downloads.
 
-> The presenter (`getGroupGuidesForStaff`, `src/actions/teacher/materials.ts`) deliberately builds the **STUDENT** view: what goes on the classroom wall is what the children themselves can open, hides included. The staff Materijali tab (`getStaffGroupLessons`) is built from its own staff query instead, because it must also list rows hidden in this group (dimmed, re-showable) — it applies the same scope union and the same `materialCityWhere(group.city)`, over every module of the program.
+> The presenter (`getGroupGuidesForStaff`, `src/actions/teacher/materials.ts`) deliberately builds the **STUDENT** view: what goes on the classroom wall is what the children themselves can open, hides included. The staff Materijali tab (`getStaffGroupLessons`) is built from its own staff query instead, because it must also list the teacher-only rows and both audiences — it applies the same scope union and the same `materialCityWhere(group.city)`, over every module of the program.
 
 ## Which modules are in view — and which lesson is current
 
@@ -196,7 +196,7 @@ flowchart TD
 
 ## Per-group hide
 
-`MaterialGroupHide (materialId, scheduledGroupId)` lets regular staff of one group hide an inherited program material from that group only (`setMaterialHidden`, `src/actions/material/crud.ts`). The caller must pass `canManageMaterial(session, { scope: 'GROUP', scheduledGroupId })` — a `TeacherAssignment` on the group, or an admin of its city. **Only `LESSON`, `MODULE` and `COURSE` rows can be hidden**; a `GROUP` row already belongs to the group, so it is edited or deleted instead. A hidden row drops out of `buildEffectiveMaterialsWhere` for every viewer of that group — portal, presenter and downloads — while the staff Materijali tab keeps listing it dimmed with a toggle.
+`MaterialGroupHide (materialId, scheduledGroupId)` hides an inherited program material from one group only (`setMaterialHidden`, `src/actions/material/crud.ts`). **Since 2026-10-10 no screen calls it** — the group Materijali tab is a read-only tree (owner decision): existing hide rows keep applying and are left out of the staff tree too, and only a DB edit restores one. The action and its guard remain. The caller must pass `canManageMaterial(session, { scope: 'GROUP', scheduledGroupId })` — a `TeacherAssignment` on the group, or an admin of its city. **Only `LESSON`, `MODULE` and `COURSE` rows can be hidden**; a `GROUP` row already belongs to the group, so it is edited or deleted instead. A hidden row drops out of `buildEffectiveMaterialsWhere` for every viewer of that group — portal, presenter and downloads — and the staff tree leaves it out as well.
 
 ## Downloads — `/api/download/[materialId]`
 

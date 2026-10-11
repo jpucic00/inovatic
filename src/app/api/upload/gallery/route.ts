@@ -4,16 +4,12 @@ import cloudinary from '@/lib/cloudinary'
 import type { UploadApiResponse, UploadApiErrorResponse } from 'cloudinary'
 import { mimeMatchesBytes } from '@/lib/mime-guard'
 import { withWatermark } from '@/lib/cloudinary-url'
+import { GALLERY_IMAGE_TYPES, GALLERY_MAX_BYTES } from '@/lib/gallery-upload-rules'
 
 export const runtime = 'nodejs'
 
-const MAX_BYTES = 10 * 1024 * 1024
-const ALLOWED_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-])
+const MAX_BYTES = GALLERY_MAX_BYTES
+const ALLOWED_TYPES = GALLERY_IMAGE_TYPES
 
 function folderFor(ownerUserId: string): string {
   const d = new Date()

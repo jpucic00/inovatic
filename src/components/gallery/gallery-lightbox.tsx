@@ -3,7 +3,7 @@
 import Lightbox from 'yet-another-react-lightbox'
 import Download from 'yet-another-react-lightbox/plugins/download'
 import 'yet-another-react-lightbox/styles.css'
-import type { GalleryImageRow } from '@/actions/teacher/gallery'
+import type { GalleryImageRow } from '@/lib/group-gallery-view'
 
 interface Props {
   images: GalleryImageRow[]

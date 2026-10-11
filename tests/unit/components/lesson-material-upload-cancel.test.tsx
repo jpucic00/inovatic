@@ -81,3 +81,42 @@ describe('LessonMaterialSection — a file removed while it uploads', () => {
     })
   })
 })
+
+describe('LessonMaterialSection — drop zone and upload progress', () => {
+  function renderEmpty() {
+    const { container } = render(
+      <LessonMaterialSection
+        audience="STUDENT"
+        heading="Materijali za polaznike"
+        rows={[]}
+        add={{ mode: 'create', target: { scope: 'LESSON', lessonId: 'l1' } }}
+      />,
+    )
+    return container.querySelector('input[type="file"]') as HTMLInputElement
+  }
+
+  it('is a label for the file input, and its button opens the picker exactly once', () => {
+    const input = renderEmpty()
+    expect(input.closest('label')?.htmlFor).toBe(input.id)
+
+    const clicks = vi.fn()
+    input.addEventListener('click', (e) => {
+      clicks()
+      e.preventDefault()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Odaberi datoteke/ }))
+    expect(clicks).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows upload progress in a native <progress>', async () => {
+    vi.mocked(uploadMaterialFile).mockImplementation((_file, _mimeType, onProgress) => {
+      onProgress(0.4)
+      return new Promise(() => undefined)
+    })
+    renderSection()
+
+    const bar = await screen.findByRole('progressbar', { name: /Učitavanje: popis\.pdf/ })
+    expect(bar.tagName).toBe('PROGRESS')
+    expect((bar as HTMLProgressElement).value).toBe(40)
+  })
+})

@@ -4,9 +4,10 @@ import { GroupLessons } from '@/components/teacher/group-lessons/group-lessons'
 
 /**
  * Admin group-detail materials: the same lesson-by-lesson view the teacher
- * has, so both sides talk about the same screen. The group's own materials
- * are added, edited and moved here; curriculum rows are only hidden here and
- * edited on the program page. An archived year is read-only.
+ * has, so both sides talk about the same screen: a reading tree where the
+ * group's own materials are added (modal) and deleted, and nothing is edited,
+ * moved or hidden (owner, 2026-10-10). Curriculum is edited on the program
+ * page. An archived year is read-only.
  */
 export async function GroupMaterialsPanel({
   groupId,

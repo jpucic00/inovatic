@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import path from 'node:path'
 import {
   BASE,
@@ -29,6 +29,18 @@ import { cleanupRunFixtures, newRunId } from '../helpers/cleanup'
 // Each merged test uses test.step() blocks; descriptive `expect(..., 'why')`
 // labels added.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+/**
+ * Picked images are only staged (thumbnails) — the upload starts on
+ * "Dodaj u galeriju". setInputFiles fires `change` itself; a second dispatched
+ * change would stage the same image twice.
+ */
+async function addStagedImages(page: Page) {
+  const add = page.getByRole('button', { name: /^Dodaj u galeriju/ })
+  await expect(add).toBeVisible({ timeout: 10000 })
+  await add.click()
+}
 
 const RUN_ID = newRunId()
 
@@ -132,9 +144,7 @@ test.describe('Phase 3 — Gallery', () => {
         { timeout: 60000 },
       )
       await fileInput.setInputFiles(SAMPLE_PNG)
-      await fileInput.evaluate((el) =>
-        el.dispatchEvent(new Event('change', { bubbles: true })),
-      )
+      await addStagedImages(page)
       const uploadResp = await uploadDone
       expect(uploadResp.status(), 'gallery upload route returned 200').toBe(200)
       await expect(
@@ -394,9 +404,7 @@ test.describe('Gallery — scope validation', () => {
         mimeType: 'image/png',
         buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
       })
-      await fileInput.evaluate((el) =>
-        el.dispatchEvent(new Event('change', { bubbles: true })),
-      )
+      await addStagedImages(page)
 
       await expect(
         page.getByText('Standardni program zahtijeva modul.'),
@@ -439,9 +447,7 @@ test.describe('Gallery — scope validation', () => {
         mimeType: 'image/png',
         buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
       })
-      await fileInput.evaluate((el) =>
-        el.dispatchEvent(new Event('change', { bubbles: true })),
-      )
+      await addStagedImages(page)
 
       await expect(
         page.getByText('Radionica nema module — galerija je grupna.'),
@@ -467,9 +473,7 @@ test.describe('Gallery — scope validation', () => {
         { timeout: 60000 },
       )
       await fileInput.setInputFiles(SAMPLE_PNG)
-      await fileInput.evaluate((el) =>
-        el.dispatchEvent(new Event('change', { bubbles: true })),
-      )
+      await addStagedImages(page)
       const uploadResp = await uploadDone
       expect(uploadResp.status(), 'radionica happy-path upload returns 200').toBe(200)
 

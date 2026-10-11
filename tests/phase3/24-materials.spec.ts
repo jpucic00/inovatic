@@ -391,6 +391,37 @@ test.describe('Phase 3 Step 13 — Materials (Materijali v2: lessons + audience)
     await expect(card).toBeHidden({ timeout: 10000 })
   })
 
+  // /admin/grupe/[id] renders the same tree and modal as the teacher tab; this
+  // is the one test that drives the admin path end to end.
+  test('admin adds a kids\' GROUP material from the group page; the portal shows it; admin deletes it', async ({
+    page,
+  }) => {
+    if (!seeded || !lessonId) throw new Error('not seeded')
+    test.setTimeout(120000)
+    await loginAsAdmin(page)
+    await page.goto(`${BASE}/admin/grupe/${seeded.groupId}`)
+
+    const title = `GROUP-admin ${RUN_ID}`
+    const card = await addGroupLinkMaterial(page, LESSON_TITLE, 'STUDENT', {
+      title,
+      url: 'https://example.com/admin-group',
+    })
+    // The admin may delete any GROUP row of their own city's group.
+    await expect(card.getByRole('button', { name: 'Obriši materijal' })).toBeVisible()
+
+    await asStudent(page, `/portal/grupa/${seeded.groupId}`)
+    const portalLesson = await openLesson(page, LESSON_TITLE)
+    await expect(portalLesson.getByText(title)).toBeVisible()
+
+    await loginAsAdmin(page)
+    await page.goto(`${BASE}/admin/grupe/${seeded.groupId}`)
+    const lesson = await openLesson(page, LESSON_TITLE)
+    const again = materialCard(lessonAudienceSection(page, lesson, 'STUDENT'), title)
+    page.once('dialog', (d) => d.accept())
+    await again.getByRole('button', { name: 'Obriši materijal' }).click()
+    await expect(again).toBeHidden({ timeout: 10000 })
+  })
+
   // ── I8: updateMaterial happy path with Cloudinary cleanup of old asset ────
 
   test('material files: teacher uploads one through the group modal; admin replaces one — old Cloudinary asset is destroyed', async ({
@@ -412,22 +443,29 @@ test.describe('Phase 3 Step 13 — Materials (Materijali v2: lessons + audience)
       const dialog = await openAddGroupMaterial(page, LESSON_TITLE, 'TEACHER')
       // Datoteka is the default kind.
       const fileInput = dialog.locator('#group-material-file')
-      const uploaded = page.waitForResponse(
-        (resp) => resp.url().includes('/api/upload/materials') && resp.request().method() === 'POST',
-        { timeout: 60000 },
-      )
+      // Picking only stages the file — nothing reaches Cloudinary before Spremi.
+      const uploads: string[] = []
+      page.on('request', (req) => {
+        if (req.url().includes('/api/upload/materials') && req.method() === 'POST') uploads.push(req.url())
+      })
       await fileInput.setInputFiles({
         name: `${GROUP_FILE}.txt`,
         mimeType: 'text/plain',
         buffer: Buffer.from('group file uploaded through the Dodaj materijal modal'),
       })
-      expect((await uploaded).status(), 'group upload route returned non-200').toBe(200)
       // The picked file names the material.
       await expect(dialog.locator('#group-material-title')).toHaveValue(GROUP_FILE)
+      expect(uploads, 'no upload before Spremi').toHaveLength(0)
       const save = dialog.getByRole('button', { name: 'Spremi', exact: true })
       await expect(save).toBeEnabled({ timeout: 15000 })
+      const uploaded = page.waitForResponse(
+        (resp) => resp.url().includes('/api/upload/materials') && resp.request().method() === 'POST',
+        { timeout: 60000 },
+      )
       await save.click()
-      await expect(dialog).toBeHidden({ timeout: 15000 })
+      expect((await uploaded).status(), 'group upload route returned non-200').toBe(200)
+      await expect(dialog).toBeHidden({ timeout: 30000 })
+      expect(uploads, 'exactly one upload, on Spremi').toHaveLength(1)
 
       const lesson = await openLesson(page, LESSON_TITLE)
       const card = materialCard(lessonAudienceSection(page, lesson, 'TEACHER'), GROUP_FILE)

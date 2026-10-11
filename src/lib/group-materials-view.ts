@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import type { City, Material, MaterialAudience, MaterialType, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
 import { hasDatedModules, isRadionica, showsAllModules } from '@/lib/program-kind'
-import { computeSchoolYear } from '@/lib/school-year'
 import {
   buildEffectiveMaterialsWhere,
   visibleLessonWhere,
@@ -150,7 +149,6 @@ export type GroupShell = {
   /** The group's own school year (what its trial week is keyed on). */
   groupSchoolYear: string
   city: City
-  schoolYear: string
 }
 
 /**
@@ -170,8 +168,6 @@ export type GroupShell = {
 export const buildGroupShell = cache(async function buildGroupShell(
   groupId: string,
 ): Promise<GroupShell> {
-  const schoolYear = computeSchoolYear()
-
   const group = await db.scheduledGroup.findUnique({
     where: { id: groupId },
     include: {
@@ -179,7 +175,7 @@ export const buildGroupShell = cache(async function buildGroupShell(
         include: {
           modules: {
             orderBy: { sortOrder: 'asc' },
-            include: { schedules: { where: { schoolYear } } },
+            include: { schedules: true },
           },
         },
       },
@@ -193,8 +189,11 @@ export const buildGroupShell = cache(async function buildGroupShell(
 
   const kind = group.course.kind
   const allModules = showsAllModules(kind)
-  // Pacing follows the group's own city: its holiday calendar and its city's
-  // module schedule rows (the resolver ignores the other city's schedules).
+  // Pacing follows the group's own year and city: its holiday calendar and its
+  // module schedule rows. Never today's year — through the summer that still
+  // names the year that is ending, and a next-year group would be paced off
+  // last year's module dates.
+  const schoolYear = group.schoolYear
   const holidayDates = await loadHolidayDateKeys(schoolYear, group.city)
   const activeModule = getCurrentActiveModuleForGroup({
     dayOfWeek: group.dayOfWeek,
@@ -221,7 +220,8 @@ export const buildGroupShell = cache(async function buildGroupShell(
     const arc = getGroupModuleArc({
       dayOfWeek: group.dayOfWeek,
       modules: group.course.modules.map((m) => {
-        const schedule = m.schedules.find((sc) => sc.city === group.city) ?? null
+        const schedule =
+          m.schedules.find((sc) => sc.city === group.city && sc.schoolYear === schoolYear) ?? null
         return {
           id: m.id,
           title: m.title,
@@ -274,7 +274,6 @@ export const buildGroupShell = cache(async function buildGroupShell(
     moduleSessionDates,
     groupSchoolYear: group.schoolYear,
     city: group.city,
-    schoolYear,
   }
 })
 

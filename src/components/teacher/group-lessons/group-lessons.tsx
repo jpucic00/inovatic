@@ -30,17 +30,6 @@ interface Props {
 }
 
 /**
- * `firstDate` is a UTC midnight naming a Europe/Zagreb day (`@db.Date`), so it
- * is read with UTC getters — a locale formatter prints the server's day on the
- * server and the browser's on the client, a hydration mismatch.
- */
-function dayMonth(date: Date): string {
-  const dd = String(date.getUTCDate()).padStart(2, '0')
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
-  return `${dd}.${mm}.`
-}
-
-/**
  * A group's Materijali for staff, as a tree: module → lesson → materials, laid
  * out the way the class runs (owner, 2026-10-10).
  *
@@ -179,13 +168,10 @@ function ModuleNode({
 
   const panelId = `modul-${module.moduleId}`
   const count = module.lessons.length
-  const start = module.lessons.find((l) => l.firstDate !== null)?.firstDate ?? null
-  const meta = [
-    `${count} ${croatianPlural(count, 'lekcija', 'lekcije', 'lekcija')}`,
-    start ? `od ${dayMonth(start)}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  // No date: the first lesson's first sat can be the probni sat, or a sat past
+  // the module's start when the early sats hold no lesson — the same misleading
+  // single date the lesson rows dropped (owner, 2026-10-11).
+  const meta = `${count} ${croatianPlural(count, 'lekcija', 'lekcije', 'lekcija')}`
 
   return (
     <section
@@ -255,12 +241,12 @@ function LessonNode({
         <span className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
           {sats ? <span className="text-xs font-medium text-gray-500">{sats}</span> : null}
           {current ? (
-            <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+            <span className="rounded-full bg-cyan-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
               Trenutna lekcija
             </span>
           ) : null}
           {next ? (
-            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+            <span className="rounded-full bg-amber-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
               Sljedeća lekcija
             </span>
           ) : null}

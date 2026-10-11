@@ -265,7 +265,7 @@ export function LessonEditor({ context, initialSessionNumbers = [] }: Readonly<P
         <p className="mb-6 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
           Grupe imaju još {context.groupMaterialCount}{' '}
           {croatianPlural(context.groupMaterialCount, 'vlastiti materijal', 'vlastita materijala', 'vlastitih materijala')}{' '}
-          u ovoj lekciji — uređuju se na stranici svake grupe.
+          u ovoj lekciji — vide se na stranici svake grupe.
         </p>
       ) : null}
 
