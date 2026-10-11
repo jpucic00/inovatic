@@ -124,6 +124,39 @@ export interface ReleaseNote {
  */
 export const RELEASES: readonly ReleaseNote[] = [
   {
+    version: '1.8.0',
+    date: '2026-10-11',
+    title: 'Nova verzija aplikacije.',
+    sections: [
+      {
+        area: 'Programi',
+        changes: [
+          'Materijali su raspoređeni po lekcijama unutar svakog modula, a svaki materijal je označen kao materijal za nastavnike ili materijal za polaznike. Roditelji vide samo materijale za polaznike.',
+          'Novi nazivi i opisi modula SLR 1–4 za 2026./2027.',
+        ],
+      },
+      {
+        area: 'Nastavnički panel',
+        changes: [
+          'Materijali grupe prikazani su po modulima i lekcijama. Trenutna lekcija je otvorena, a sljedeća je istaknuta. Novi materijal dodaje se gumbom „Dodaj materijal”.',
+        ],
+      },
+      {
+        area: 'Polaznički portal',
+        changes: [
+          'Prikazuje se cijeli trenutni modul, a današnja lekcija je otvorena.',
+        ],
+      },
+      {
+        area: 'Grupe',
+        changes: [
+          'Uz svakog polaznika prikazane su oznake plaćanja, ugovora i privole za fotografije.',
+          'Grupa se može obrisati kad na nju pokazuju samo već obrađeni upiti.',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-10-06',
     title: 'Nova verzija aplikacije.',
