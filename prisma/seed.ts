@@ -36,6 +36,10 @@ export const prisma = new PrismaClient()
 // place (clearing its tags/images first so re-adds never duplicate) instead
 // of a blind create. This is what lets `db:seed:articles` re-run against a
 // live/production database, touching only the articles it manages.
+// The articles migrated from the old WordPress site are the association's, so
+// they are signed by its president — never by the developer account.
+export const ARTICLE_AUTHOR_EMAIL = 'jozo.pivac@udruga-inovatic.hr'
+
 async function upsertArticleBySlug(args: { data: Prisma.ArticleUncheckedCreateInput }) {
   const { data } = args
   const existing = await prisma.article.findUnique({
@@ -1770,6 +1774,7 @@ async function main() {
     // Slavica is the sole Šibenik admin — and its only teacher (city epic).
     { email: 'slavica.jurcevic@udruga-inovatic.hr', firstName: 'Slavica', lastName: 'Jurčević', city: 'SIBENIK' },
   ]
+  let articleAuthorId: string | undefined
   for (const a of orgAdmins) {
     const created = await prisma.user.create({
       data: {
@@ -1782,7 +1787,9 @@ async function main() {
       },
     })
     console.log(`✅ Admin created: ${created.email}`)
+    if (a.email === ARTICLE_AUTHOR_EMAIL) articleAuthorId = created.id
   }
+  if (!articleAuthorId) throw new Error(`Article author ${ARTICLE_AUTHOR_EMAIL} was not seeded`)
 
   // ── Račun za učionicu ────────────────────────────────────────────────────────
   // In production these two rows come from the `classroom_accounts` migration
@@ -1893,7 +1900,7 @@ async function main() {
   console.log('✅ Tags created')
 
   await seedArticles({
-    authorId: admin.id,
+    authorId: articleAuthorId,
     tags: {
       natjecanja: tagNatjecanja,
       radionice: tagRadionice,

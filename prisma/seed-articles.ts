@@ -13,27 +13,18 @@
  * database (e.g. production), pass DATABASE_URL/DIRECT_URL inline — explicitly
  * set env vars win over dotenv.
  */
-import { UserRole } from '@prisma/client'
-import bcrypt from 'bcryptjs'
-import { prisma, seedArticles } from './seed'
+import { ARTICLE_AUTHOR_EMAIL, prisma, seedArticles } from './seed'
 
 async function main() {
   console.log('🌱 Seeding articles only (non-destructive)...')
 
-  // Author that owns the seeded articles: reuse if present, create only on a
-  // fresh DB. An existing user's password/profile is never overwritten.
-  const author = await prisma.user.upsert({
-    where: { email: 'jpucic00@gmail.com' },
-    update: {},
-    create: {
-      city: 'SPLIT',
-      email: 'jpucic00@gmail.com',
-      passwordHash: await bcrypt.hash('admin123', 12),
-      firstName: 'Josip',
-      lastName: 'Pučić',
-      role: UserRole.ADMIN,
-    },
+  // Author that owns the seeded articles. Looked up, never created: a missing
+  // account must stop the run rather than mint an admin with a known password.
+  const author = await prisma.user.findUnique({
+    where: { email: ARTICLE_AUTHOR_EMAIL },
+    select: { id: true },
   })
+  if (!author) throw new Error(`Article author ${ARTICLE_AUTHOR_EMAIL} not found`)
 
   // Tags referenced by the articles — upsert by unique slug; any other tags
   // already in the DB are left alone.
