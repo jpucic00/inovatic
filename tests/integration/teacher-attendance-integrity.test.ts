@@ -10,9 +10,13 @@
  *      `bulkMarkSession` books the teacher even with no students enrolled)
  *      passed every guard and took the payout evidence with it.
  *
- * The holiday cascade now removes both ledgers together; the delete paths now
- * refuse, backed by `onDelete: Restrict` so the database says no even if a
+ * The holiday cascade now removes both ledgers together; `deleteCourse`
+ * refuses, backed by `onDelete: Restrict` so the database says no even if a
  * future code path forgets the guard.
+ *
+ * `deleteGroup` is the one deliberate exception (owner, 2026-10-12): a group
+ * left empty after the probni sat is deleted together with its teacher hours,
+ * but only once every other blocker has passed.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { db } from '@/lib/db'
@@ -176,8 +180,8 @@ describe('holiday cascade — teacher hours go with the lesson', () => {
   })
 })
 
-describe('deleteGroup — booked hours are a blocker', () => {
-  it('refuses a group with teacher hours even when no student is enrolled', async () => {
+describe('deleteGroup — an empty group drops its teacher hours', () => {
+  it('deletes the hours and the group when nothing else blocks', async () => {
     const admin = await createAdmin()
     mockSession({ id: admin.id, role: 'ADMIN' })
 
@@ -185,8 +189,45 @@ describe('deleteGroup — booked hours are a blocker', () => {
     expect(await db.enrollment.count({ where: { scheduledGroupId: group.id } })).toBe(0)
 
     const res = await deleteGroup(group.id)
+    expect(res).toEqual({ success: true })
+
+    expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(0)
+    expect(await db.teacherAttendance.count({ where: { scheduledGroupId: group.id } })).toBe(0)
+  })
+
+  it('keeps the hours when an enrolled child still blocks the delete', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const { group } = await groupWithBookedHours()
+    const student = await createStudent()
+    await createEnrollment(student.id, group.id, { schoolYear: SY })
+
+    const res = await deleteGroup(group.id)
     expect(res.success).toBe(false)
-    if (!res.success) expect(res.error).toMatch(/sate rada nastavnika/i)
+    if (!res.success) expect(res.error).toMatch(/upisane polaznike/i)
+
+    expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(1)
+    expect(await db.teacherAttendance.count({ where: { scheduledGroupId: group.id } })).toBe(1)
+  })
+
+  it('keeps the hours when a later blocker (galerija) refuses the delete', async () => {
+    const admin = await createAdmin()
+    mockSession({ id: admin.id, role: 'ADMIN' })
+
+    const { teacher, group } = await groupWithBookedHours()
+    await db.galleryImage.create({
+      data: {
+        scheduledGroupId: group.id,
+        url: 'https://res.cloudinary.com/x/image/upload/a.jpg',
+        publicId: 'a',
+        uploadedById: teacher.id,
+      },
+    })
+
+    const res = await deleteGroup(group.id)
+    expect(res.success).toBe(false)
+    if (!res.success) expect(res.error).toMatch(/galeriji/i)
 
     expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(1)
     expect(await db.teacherAttendance.count({ where: { scheduledGroupId: group.id } })).toBe(1)
@@ -203,10 +244,11 @@ describe('deleteGroup — booked hours are a blocker', () => {
     expect(await db.scheduledGroup.count({ where: { id: group.id } })).toBe(0)
   })
 
-  it('the database refuses too — the FK is RESTRICT, not Cascade', async () => {
+  it('the database refuses a bare delete — the FK is RESTRICT, not Cascade', async () => {
     const { group } = await groupWithBookedHours()
 
-    // The backstop for any future path that skips the guard above.
+    // The backstop for any future path that deletes a group without deciding
+    // about its hours first.
     await expect(db.scheduledGroup.delete({ where: { id: group.id } })).rejects.toThrow()
     expect(await db.teacherAttendance.count({ where: { scheduledGroupId: group.id } })).toBe(1)
   })

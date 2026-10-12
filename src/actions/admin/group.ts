@@ -454,13 +454,14 @@ export async function deleteGroup(id: string): Promise<AdminActionResult> {
       if (group._count.galleryImages > 0) {
         return { success: false, error: 'Grupa ima slike u galeriji i ne može se obrisati.' }
       }
-      // Reachable with an empty roster: bulkMarkSession books the teacher's hours
-      // even when no student is enrolled, and those hours are payout evidence.
+      // Teacher hours are the one thing an empty group drops instead of refusing
+      // (owner, 2026-10-12): every September a group opened for sign-ups runs its
+      // probni sat, then its children drop out or are moved into another group,
+      // and the hour booked on that probni sat would otherwise make the leftover
+      // group undeletable forever. Reaching here means no enrollment survived.
+      // The FK is RESTRICT, so this explicit delete is the only path that does it.
       if (group._count.teacherAttendances > 0) {
-        return {
-          success: false,
-          error: 'Grupa ima evidentirane sate rada nastavnika i ne može se obrisati.',
-        }
+        await tx.teacherAttendance.deleteMany({ where: { scheduledGroupId: id } })
       }
 
       // Teacher assignments and waitlist entries cascade; resolved upiti are SET NULL.
