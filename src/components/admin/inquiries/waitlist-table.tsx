@@ -9,6 +9,8 @@ import { ReturningBadge } from '@/components/admin/returning-badge'
 import { formatChildName, formatDate } from '@/lib/format'
 import { GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
 import type { WaitlistGroupView } from '@/lib/waitlist'
+import type { ListSort } from '@/lib/list-sort'
+import type { WaitlistSortKey } from '@/lib/admin-list-sorts'
 
 type WaitlistRow = {
   id: string
@@ -33,7 +35,6 @@ const columns: ColumnDef<WaitlistRow>[] = [
     key: 'position',
     header: '#',
     sortable: true,
-    sortValue: (row) => row.waitlist?.position ?? 9999,
     cell: (row) => (
       <span className="text-sm font-semibold text-gray-900 tabular-nums">
         {row.waitlist?.position ?? '–'}
@@ -44,7 +45,6 @@ const columns: ColumnDef<WaitlistRow>[] = [
     key: 'waitlistedAt',
     header: 'Na listi od',
     sortable: true,
-    sortValue: (row) => row.waitlistedAt ?? 0,
     cell: (row) => (
       <span className="text-sm text-gray-600 whitespace-nowrap">
         {row.waitlistedAt ? formatDate(new Date(row.waitlistedAt)) : '–'}
@@ -55,7 +55,6 @@ const columns: ColumnDef<WaitlistRow>[] = [
     key: 'child',
     header: 'Dijete',
     sortable: true,
-    sortValue: (row) => formatChildName(row, ''),
     cell: (row) => (
       <div>
         <p className="text-sm text-gray-900">{formatChildName(row)}</p>
@@ -71,7 +70,6 @@ const columns: ColumnDef<WaitlistRow>[] = [
     key: 'parent',
     header: 'Roditelj',
     sortable: true,
-    sortValue: (row) => row.parentName,
     cell: (row) => (
       <div>
         <p className="text-sm text-gray-900">{row.parentName}</p>
@@ -85,7 +83,6 @@ const columns: ColumnDef<WaitlistRow>[] = [
     key: 'status',
     header: 'Status',
     sortable: true,
-    sortValue: (row) => row.status,
     cell: (row) => (
       <div className="flex flex-col items-start gap-1">
         <InquiryStatusBadge status={row.status} />
@@ -97,8 +94,6 @@ const columns: ColumnDef<WaitlistRow>[] = [
     key: 'groups',
     header: 'Prihvatljivi termini',
     sortable: true,
-    // Rows with a free acceptable group first — that is what the admin scans for.
-    sortValue: (row) => (row.waitlist?.hasFreeSpot ? 0 : 1),
     cell: (row) => {
       const groups = row.waitlist?.groups ?? []
       return (
@@ -153,14 +148,17 @@ const columns: ColumnDef<WaitlistRow>[] = [
 
 interface WaitlistTableProps {
   data: WaitlistRow[]
+  /** Applied by `getInquiries` across the whole list — see `WAITLIST_SORT_KEYS`. */
+  sort: ListSort<WaitlistSortKey> | undefined
 }
 
-export function WaitlistTable({ data }: Readonly<WaitlistTableProps>) {
+export function WaitlistTable({ data, sort }: Readonly<WaitlistTableProps>) {
   return (
     <DataTable
       columns={columns}
       data={data}
       getRowKey={(row) => row.id}
+      urlSort={{ current: sort }}
       emptyMessage="Lista čekanja je prazna."
     />
   )

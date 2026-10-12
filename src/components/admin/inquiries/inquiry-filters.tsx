@@ -1,12 +1,13 @@
 'use client'
 
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useTransition, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GRADE_VALUES, GRADE_LABELS } from '@/lib/inquiry-status'
 import { RETURNING_FILTER_LABELS } from '@/lib/returning-filter'
+import { DIR_PARAM, SORT_PARAM } from '@/lib/list-sort'
 
 const STATUSES = [
   { value: 'ALL', label: 'Sve' },
@@ -30,12 +31,18 @@ interface InquiryFiltersProps {
 export function InquiryFilters({ currentStatus, currentSearch, currentCourse, currentGrade, currentType, currentReturning, currentView, courses }: Readonly<InquiryFiltersProps>) {
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [, startTransition] = useTransition()
   const searchRef = useRef<HTMLInputElement>(null)
 
   const pushUrl = (params: { status?: string; search?: string; course?: string; grade?: string; type?: string; returning?: string }) => {
     const sp = new URLSearchParams()
     if (currentView) sp.set('view', currentView)
+    // A filter narrows the list; it does not change the order the admin chose.
+    for (const key of [SORT_PARAM, DIR_PARAM]) {
+      const value = searchParams.get(key)
+      if (value) sp.set(key, value)
+    }
     const s = params.status ?? currentStatus
     const q = params.search ?? currentSearch
     const c = params.course ?? currentCourse

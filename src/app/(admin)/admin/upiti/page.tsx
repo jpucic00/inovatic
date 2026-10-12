@@ -19,6 +19,8 @@ import {
   RETURNING_FILTER_LABELS,
   type ReturningFilter,
 } from '@/lib/returning-filter'
+import { parseListSort } from '@/lib/list-sort'
+import { INQUIRY_SORT_KEYS, WAITLIST_SORT_KEYS } from '@/lib/admin-list-sorts'
 
 export const metadata: Metadata = { title: 'Admin – Upiti' }
 
@@ -39,7 +41,7 @@ const STATUS_LABELS: Record<InquiryStatus, string> = {
 }
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; course?: string; grade?: string; type?: string; returning?: string; view?: string; page?: string }>
+  searchParams: Promise<{ status?: string; search?: string; course?: string; grade?: string; type?: string; returning?: string; view?: string; page?: string; sort?: string; dir?: string }>
 }
 
 export default async function InquiriesPage({ searchParams }: Readonly<PageProps>) {
@@ -47,8 +49,11 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
   const selectedYear = await getSelectedSchoolYear()
 
   const params = await searchParams
-  const { status, search, course, grade, type, returning, view, page: pageParam } = params
+  const { status, search, course, grade, type, returning, view, page: pageParam, sort, dir } = params
   const isWaitlistView = view === WAITLIST_VIEW
+  // Each tab has its own columns, so a key is only honoured on the tab it names.
+  const waitlistSort = isWaitlistView ? parseListSort(WAITLIST_SORT_KEYS, sort, dir) : undefined
+  const inquirySort = isWaitlistView ? undefined : parseListSort(INQUIRY_SORT_KEYS, sort, dir)
 
   const statusFilter =
     status && VALID_STATUSES.includes(status) ? (status as InquiryStatus) : undefined
@@ -72,6 +77,7 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
       type: typeFilter ?? 'ALL',
       returning: returningFilter,
       view: isWaitlistView ? 'WAITLIST' : 'ALL',
+      sort: waitlistSort ?? inquirySort,
       page: currentPage,
       pageSize: PAGE_SIZE,
     }),
@@ -121,7 +127,11 @@ export default async function InquiriesPage({ searchParams }: Readonly<PageProps
 
       <InquiryFilters currentStatus={currentStatus} currentSearch={currentSearch} currentCourse={currentCourse} currentGrade={currentGrade} currentType={currentType} currentReturning={returningFilter ?? ''} currentView={isWaitlistView ? WAITLIST_VIEW : undefined} courses={courses} />
 
-      {isWaitlistView ? <WaitlistTable data={inquiries} /> : <InquiryTable data={inquiries} />}
+      {isWaitlistView ? (
+        <WaitlistTable data={inquiries} sort={waitlistSort} />
+      ) : (
+        <InquiryTable data={inquiries} sort={inquirySort} />
+      )}
 
       <Pagination
         total={total}

@@ -60,6 +60,8 @@ import {
   type EnrollmentConsents,
 } from '@/lib/enrollment-consent'
 import { contractEnrollmentWhere, type ContractFilter } from '@/lib/contract-filter'
+import { sortRows, type ListSort } from '@/lib/list-sort'
+import { studentSortValue, type StudentSortKey } from '@/lib/admin-list-sorts'
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
 
@@ -919,6 +921,8 @@ type StudentFilters = {
   consent?: ConsentFilter
   /** "Ugovor potpisan" narrowing — same enrollment as `consent`, same reason. */
   contract?: ContractFilter
+  /** Column sort over the WHOLE filtered list; absent = newest first. */
+  sort?: ListSort<StudentSortKey>
   /**
    * Overrides the year that `isReturning` and the payment badge are resolved
    * against, for a caller that wants to ask about a year it is not narrowing to.
@@ -1013,49 +1017,63 @@ export async function getStudents(
     ...(andClauses.length > 0 ? { AND: andClauses } : {}),
   }
 
-  const [data, total] = await Promise.all([
-    db.user.findMany({
-      where,
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        username: true,
-        dateOfBirth: true,
-        createdAt: true,
-        enrollments: {
+  const select = {
+    id: true,
+    firstName: true,
+    lastName: true,
+    username: true,
+    dateOfBirth: true,
+    createdAt: true,
+    enrollments: {
+      include: {
+        scheduledGroup: {
           include: {
-            scheduledGroup: {
-              include: {
-                course: { select: { id: true, title: true, kind: true } },
-                location: { select: { name: true } },
-              },
-            },
-            moduleEnrollments: {
-              select: {
-                id: true,
-                paidAt: true,
-                moduleSchedule: { select: { startDate: true } },
-              },
-            },
-            enrollmentMonths: {
-              select: { paidAt: true, periodStart: true },
-            },
+            course: { select: { id: true, title: true, kind: true } },
+            location: { select: { name: true } },
           },
         },
+        moduleEnrollments: {
+          select: {
+            id: true,
+            paidAt: true,
+            moduleSchedule: { select: { startDate: true } },
+          },
+        },
+        enrollmentMonths: {
+          select: { paidAt: true, periodStart: true },
+        },
       },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    db.user.count({ where }),
-  ])
+    },
+  } satisfies Prisma.UserSelect
+  const orderBy: Prisma.UserOrderByWithRelationInput[] = [{ createdAt: 'desc' }, { id: 'desc' }]
+  const skip = (page - 1) * pageSize
 
-  const rows: StudentRow[] = data.map((u) => ({
-    ...u,
-    paymentStatus: computeStudentPaymentStatus(u.enrollments, referenceYear, now),
-    isReturning: isReturningStudent(u.enrollments, referenceYear),
-  })) as StudentRow[]
+  const toRows = (users: Prisma.UserGetPayload<{ select: typeof select }>[]) =>
+    users.map((u) => ({
+      ...u,
+      paymentStatus: computeStudentPaymentStatus(u.enrollments, referenceYear, now),
+      isReturning: isReturningStudent(u.enrollments, referenceYear),
+    })) as StudentRow[]
+
+  let rows: StudentRow[]
+  let total: number
+  if (filters.sort) {
+    // Plaćanje and Ponovni upis are computed per row, not columns, so a sorted
+    // list is resolved whole and paged afterwards — sorting one page of rows
+    // the database cut in creation order is the bug this replaces. A year's
+    // roster is a few hundred children, which is what makes that affordable.
+    const all = toRows(await db.user.findMany({ where, select, orderBy }))
+    const sorted = sortRows(all, filters.sort, studentSortValue)
+    rows = sorted.slice(skip, skip + pageSize)
+    total = all.length
+  } else {
+    const [data, count] = await Promise.all([
+      db.user.findMany({ where, select, orderBy, skip, take: pageSize }),
+      db.user.count({ where }),
+    ])
+    rows = toRows(data)
+    total = count
+  }
 
   return {
     data: rows,

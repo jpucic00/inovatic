@@ -1,7 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import {
+  compareSortValues,
+  nextListSort,
+  sortQueryFor,
+  type ListSort,
+  type SortDir,
+} from '@/lib/list-sort'
 import {
   Table,
   TableBody,
@@ -24,9 +33,14 @@ interface DataTableProps<TData> {
   data: TData[]
   emptyMessage?: string
   getRowKey: (row: TData) => string
+  /**
+   * For a paginated list: the sort lives in the URL (`?sort=&dir=`) and the
+   * server has already applied it across every page, so the headers become
+   * links and `data` is rendered in the order it arrives. Without it the table
+   * sorts `data` in place — correct only when `data` is the whole list.
+   */
+  urlSort?: { current: ListSort | undefined }
 }
-
-type SortDir = 'asc' | 'desc' | null
 
 function normalizeValue(val: unknown): string | number {
   if (typeof val === 'string') return val
@@ -35,47 +49,53 @@ function normalizeValue(val: unknown): string | number {
   return ''
 }
 
+function SortIcon({ dir }: Readonly<{ dir: SortDir | undefined }>) {
+  if (dir === 'asc') return <ChevronUp className="w-3 h-3" />
+  if (dir === 'desc') return <ChevronDown className="w-3 h-3" />
+  return <ChevronsUpDown className="w-3 h-3 opacity-40" />
+}
+
+function UrlSortLink({
+  columnKey,
+  current,
+  children,
+}: Readonly<{ columnKey: string; current: ListSort | undefined; children: React.ReactNode }>) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const qs = sortQueryFor(new URLSearchParams(searchParams.toString()), current, columnKey)
+  return (
+    <Link
+      href={qs ? `${pathname}?${qs}` : pathname}
+      scroll={false}
+      className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+    >
+      {children}
+    </Link>
+  )
+}
+
 export function DataTable<TData>({
   columns,
   data,
   emptyMessage = 'Nema podataka.',
   getRowKey,
+  urlSort,
 }: Readonly<DataTableProps<TData>>) {
-  const [sortKey, setSortKey] = useState<string | null>(null)
-  const [sortDir, setSortDir] = useState<SortDir>(null)
+  const [localSort, setLocalSort] = useState<ListSort | undefined>(undefined)
+  const activeSort = urlSort ? urlSort.current : localSort
 
-  const handleSort = (key: string) => {
-    if (sortKey !== key) {
-      setSortKey(key)
-      setSortDir('asc')
-    } else if (sortDir === 'asc') {
-      setSortDir('desc')
-    } else {
-      setSortKey(null)
-      setSortDir(null)
-    }
-  }
+  const sortValueOf = (col: ColumnDef<TData> | undefined, key: string, row: TData) =>
+    normalizeValue(col?.sortValue ? col.sortValue(row) : (row as Record<string, unknown>)[key])
 
   const sorted =
-    sortKey && sortDir
+    !urlSort && localSort
       ? [...data].sort((a, b) => {
-          const col = columns.find((c) => c.key === sortKey)
-          const av = col?.sortValue
-            ? col.sortValue(a)
-            : normalizeValue((a as Record<string, unknown>)[sortKey])
-          const bv = col?.sortValue
-            ? col.sortValue(b)
-            : normalizeValue((b as Record<string, unknown>)[sortKey])
-
-          let cmp: number
-          if (av instanceof Date && bv instanceof Date) {
-            cmp = av.getTime() - bv.getTime()
-          } else if (typeof av === 'number' && typeof bv === 'number') {
-            cmp = av - bv
-          } else {
-            cmp = String(av).localeCompare(String(bv), 'hr')
-          }
-          return sortDir === 'asc' ? cmp : -cmp
+          const col = columns.find((c) => c.key === localSort.key)
+          const cmp = compareSortValues(
+            sortValueOf(col, localSort.key, a),
+            sortValueOf(col, localSort.key, b),
+          )
+          return localSort.dir === 'asc' ? cmp : -cmp
         })
       : data
 
@@ -85,30 +105,36 @@ export function DataTable<TData>({
         <TableHeader>
           <TableRow className="bg-gray-50 hover:bg-gray-50">
             {columns.map((col) => {
-              let sortIcon: React.ReactNode
-              if (sortKey === col.key && sortDir === 'asc') {
-                sortIcon = <ChevronUp className="w-3 h-3" />
-              } else if (sortKey === col.key) {
-                sortIcon = <ChevronDown className="w-3 h-3" />
-              } else {
-                sortIcon = <ChevronsUpDown className="w-3 h-3 opacity-40" />
+              const dir = activeSort?.key === col.key ? activeSort.dir : undefined
+              let header: React.ReactNode = col.header
+              if (col.sortable && urlSort) {
+                header = (
+                  <UrlSortLink columnKey={col.key} current={urlSort.current}>
+                    {col.header}
+                    <SortIcon dir={dir} />
+                  </UrlSortLink>
+                )
+              } else if (col.sortable) {
+                header = (
+                  <button
+                    onClick={() => setLocalSort(nextListSort(localSort, col.key))}
+                    className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+                  >
+                    {col.header}
+                    <SortIcon dir={dir} />
+                  </button>
+                )
               }
+              let ariaSort: 'ascending' | 'descending' | undefined
+              if (dir === 'asc') ariaSort = 'ascending'
+              else if (dir === 'desc') ariaSort = 'descending'
               return (
                 <TableHead
                   key={col.key}
+                  aria-sort={ariaSort}
                   className="text-xs font-semibold text-gray-500"
                 >
-                  {col.sortable ? (
-                    <button
-                      onClick={() => handleSort(col.key)}
-                      className="flex items-center gap-1 hover:text-gray-900 transition-colors"
-                    >
-                      {col.header}
-                      {sortIcon}
-                    </button>
-                  ) : (
-                    col.header
-                  )}
+                  {header}
                 </TableHead>
               )
             })}

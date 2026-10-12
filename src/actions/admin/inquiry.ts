@@ -29,6 +29,15 @@ import { flagReturningInquiries } from '@/lib/returning-inquiry'
 import type { ReturningFilter } from '@/lib/returning-filter'
 import { isRadionica } from '@/lib/program-kind'
 import { unaccentSearchFilter } from '@/lib/unaccent-search'
+import { parseListSort, sortRows, type ListSort } from '@/lib/list-sort'
+import {
+  INQUIRY_SORT_KEYS,
+  WAITLIST_SORT_KEYS,
+  inquirySortValue,
+  waitlistSortValue,
+  type InquirySortKey,
+  type WaitlistSortKey,
+} from '@/lib/admin-list-sorts'
 
 type InquiryFilters = {
   status?: InquiryStatus | 'ALL'
@@ -39,6 +48,11 @@ type InquiryFilters = {
   returning?: ReturningFilter
   /** WAITLIST narrows to the lista čekanja, in queue order (oldest first). */
   view?: 'ALL' | 'WAITLIST'
+  /**
+   * Column sort over the WHOLE filtered list. Its key must belong to the view:
+   * a Lista čekanja key on the Svi upiti tab (or the reverse) sorts nothing.
+   */
+  sort?: ListSort<InquirySortKey> | ListSort<WaitlistSortKey>
   page?: number
   pageSize?: number
 }
@@ -135,15 +149,35 @@ export async function getInquiries(
     ? { AND: [where, { id: { in: await returningInquiryIds(where, returning) } }] }
     : where
 
+  const orderBy: Prisma.InquiryOrderByWithRelationInput[] = isWaitlistView
+    ? [{ waitlistedAt: 'asc' }, { id: 'asc' }]
+    : [{ createdAt: 'desc' }, { id: 'desc' }]
+  const skip = (page - 1) * pageSize
+  const waitlistSort = isWaitlistView ? asWaitlistSort(filters.sort) : undefined
+  const inquirySort = isWaitlistView ? undefined : asInquirySort(filters.sort)
+
+  // A sorted list is resolved whole and paged afterwards — sorting one page of
+  // rows the database cut in its default order is the bug this replaces.
+  if (waitlistSort) {
+    // Position and "Slobodno mjesto" are computed, so the whole queue is
+    // enriched first. It is the short list; the enrichment is one group query.
+    const all = await db.inquiry.findMany({ where: scopedWhere, orderBy })
+    const enrichedAll = await enrichWaitlistRows(all, city, schoolYear)
+    const pageRows = sortRows(enrichedAll, waitlistSort, waitlistSortValue).slice(skip, skip + pageSize)
+    const flagged = await flagReturningInquiries(pageRows)
+    const total = all.length
+    return { data: flagged, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
+  }
+  if (inquirySort) {
+    const all = await db.inquiry.findMany({ where: scopedWhere, orderBy })
+    const pageRows = sortRows(all, inquirySort, inquirySortValue).slice(skip, skip + pageSize)
+    const flagged = await flagReturningInquiries(pageRows)
+    const total = all.length
+    return { data: flagged, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
+  }
+
   const [data, total] = await Promise.all([
-    db.inquiry.findMany({
-      where: scopedWhere,
-      orderBy: isWaitlistView
-        ? [{ waitlistedAt: 'asc' }, { id: 'asc' }]
-        : { createdAt: 'desc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
+    db.inquiry.findMany({ where: scopedWhere, orderBy, skip, take: pageSize }),
     db.inquiry.count({ where: scopedWhere }),
   ])
 
@@ -152,6 +186,14 @@ export async function getInquiries(
     ? await enrichWaitlistRows(flagged, city, schoolYear)
     : flagged
   return { data: enriched, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
+}
+
+function asInquirySort(sort: InquiryFilters['sort']): ListSort<InquirySortKey> | undefined {
+  return sort ? parseListSort(INQUIRY_SORT_KEYS, sort.key, sort.dir) : undefined
+}
+
+function asWaitlistSort(sort: InquiryFilters['sort']): ListSort<WaitlistSortKey> | undefined {
+  return sort ? parseListSort(WAITLIST_SORT_KEYS, sort.key, sort.dir) : undefined
 }
 
 /**

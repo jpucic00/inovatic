@@ -6,7 +6,8 @@ import { formatDate } from '@/lib/format'
 import { DataTable, type ColumnDef } from '@/components/admin/data-table'
 import { PaymentStatusBadge } from '@/components/admin/students/payment-status-badge'
 import { ReturningBadge } from '@/components/admin/returning-badge'
-import { PAYMENT_STATUS_SORT_KEY } from '@/lib/payment-status'
+import type { ListSort } from '@/lib/list-sort'
+import type { StudentSortKey } from '@/lib/admin-list-sorts'
 import {
   CONSENT_KEYS,
   CONSENT_SHORT_LABELS,
@@ -65,7 +66,6 @@ const buildColumns = (schoolYear: string): ColumnDef<StudentRow>[] => [
     key: 'name',
     header: 'Ime i prezime',
     sortable: true,
-    sortValue: (row) => `${row.firstName} ${row.lastName}`,
     cell: (row) => (
       <Link
         href={`/admin/ucenici/${row.id}`}
@@ -79,7 +79,6 @@ const buildColumns = (schoolYear: string): ColumnDef<StudentRow>[] => [
     key: 'dateOfBirth',
     header: 'Datum rođenja',
     sortable: true,
-    sortValue: (row) => row.dateOfBirth ?? '',
     cell: (row) => {
       const iso = row.dateOfBirth
       if (!iso) return <span className="text-gray-400">—</span>
@@ -117,9 +116,6 @@ const buildColumns = (schoolYear: string): ColumnDef<StudentRow>[] => [
     key: 'returning',
     header: `Ponovni upis (${schoolYear})`,
     sortable: true,
-    // Descending puts the returning kids on top, which is the way this column
-    // gets read — the filter is for extracting them, the sort for spotting them.
-    sortValue: (row) => (row.isReturning ? 1 : 0),
     cell: (row) =>
       row.isReturning ? <ReturningBadge /> : <span className="text-gray-400">—</span>,
   },
@@ -130,7 +126,6 @@ const buildColumns = (schoolYear: string): ColumnDef<StudentRow>[] => [
     // deliberately not in it.
     header: `Plaćanje (${schoolYear})`,
     sortable: true,
-    sortValue: (row) => PAYMENT_STATUS_SORT_KEY[row.paymentStatus],
     cell: (row) => <PaymentStatusBadge status={row.paymentStatus} />,
   },
   {
@@ -142,7 +137,6 @@ const buildColumns = (schoolYear: string): ColumnDef<StudentRow>[] => [
     key: 'createdAt',
     header: 'Datum kreiranja',
     sortable: true,
-    sortValue: (row) => row.createdAt.getTime(),
     cell: (row) => formatDate(new Date(row.createdAt)),
   },
   {
@@ -166,14 +160,17 @@ interface StudentTableProps {
    * `isReturning` and `paymentStatus` were resolved against.
    */
   schoolYear: string
+  /** Applied by `getStudents` across the whole list — see `STUDENT_SORT_KEYS`. */
+  sort: ListSort<StudentSortKey> | undefined
 }
 
-export function StudentTable({ data, schoolYear }: Readonly<StudentTableProps>) {
+export function StudentTable({ data, schoolYear, sort }: Readonly<StudentTableProps>) {
   return (
     <DataTable
       data={data}
       columns={buildColumns(schoolYear)}
       getRowKey={(row) => row.id}
+      urlSort={{ current: sort }}
       // Names the year: an empty list here means "nobody is enrolled in this
       // year", which is an ordinary state for a year not yet filled in — and
       // reads as missing data unless it says which year it is talking about.

@@ -8,7 +8,9 @@ import { InquiryTypeBadge } from './inquiry-type-badge'
 import { ReturningBadge } from '@/components/admin/returning-badge'
 import { WaitlistBadge } from './waitlist-badge'
 import { formatChildName, formatDate } from '@/lib/format'
-import { GRADE_LABELS, GRADE_SORT_KEY, type Grade } from '@/lib/inquiry-status'
+import { GRADE_LABELS, type Grade } from '@/lib/inquiry-status'
+import type { ListSort } from '@/lib/list-sort'
+import type { InquirySortKey } from '@/lib/admin-list-sorts'
 
 // Minimal type matching what we pass from the server
 type InquiryRow = {
@@ -31,7 +33,6 @@ const columns: ColumnDef<InquiryRow>[] = [
     key: 'createdAt',
     header: 'Datum',
     sortable: true,
-    sortValue: (row) => row.createdAt,
     cell: (row) => (
       <span className="text-sm text-gray-600 whitespace-nowrap">
         {formatDate(new Date(row.createdAt))}
@@ -42,7 +43,6 @@ const columns: ColumnDef<InquiryRow>[] = [
     key: 'parentName',
     header: 'Roditelj',
     sortable: true,
-    sortValue: (row) => row.parentName,
     cell: (row) => (
       <div>
         <p className="text-sm font-medium text-gray-900">{row.parentName}</p>
@@ -54,7 +54,6 @@ const columns: ColumnDef<InquiryRow>[] = [
     key: 'childName',
     header: 'Dijete',
     sortable: true,
-    sortValue: (row) => (row.type === 'PARTY' ? 'zzz' : formatChildName(row, '')),
     cell: (row) => {
       if (row.type === 'PARTY') {
         return <span className="text-sm italic text-fuchsia-700">Proslava rođendana</span>
@@ -73,8 +72,6 @@ const columns: ColumnDef<InquiryRow>[] = [
     key: 'childGrade',
     header: 'Razred',
     sortable: true,
-    sortValue: (row) =>
-      row.childGrade ? (GRADE_SORT_KEY[row.childGrade as Grade] ?? 999) : 999,
     cell: (row) => (
       <span className="text-sm text-gray-700 whitespace-nowrap">
         {row.childGrade
@@ -87,7 +84,6 @@ const columns: ColumnDef<InquiryRow>[] = [
     key: 'status',
     header: 'Status',
     sortable: true,
-    sortValue: (row) => row.status,
     cell: (row) => (
       <div className="flex flex-col items-start gap-1">
         <InquiryStatusBadge status={row.status} />
@@ -114,14 +110,17 @@ const columns: ColumnDef<InquiryRow>[] = [
 
 interface InquiryTableProps {
   data: InquiryRow[]
+  /** Applied by `getInquiries` across the whole list — see `INQUIRY_SORT_KEYS`. */
+  sort: ListSort<InquirySortKey> | undefined
 }
 
-export function InquiryTable({ data }: Readonly<InquiryTableProps>) {
+export function InquiryTable({ data, sort }: Readonly<InquiryTableProps>) {
   return (
     <DataTable
       columns={columns}
       data={data}
       getRowKey={(row) => row.id}
+      urlSort={{ current: sort }}
       emptyMessage="Nema upita koji odgovaraju filteru."
     />
   )

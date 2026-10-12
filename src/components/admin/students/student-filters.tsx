@@ -8,6 +8,7 @@ import { RETURNING_FILTER_LABELS } from '@/lib/returning-filter'
 import { PAYMENT_FILTER_VALUES, PAYMENT_STATUS_LABELS } from '@/lib/payment-status'
 import { CONSENT_FILTER_LABELS, CONSENT_FILTER_VALUES } from '@/lib/enrollment-consent'
 import { CONTRACT_FILTER_LABELS, CONTRACT_FILTER_VALUES } from '@/lib/contract-filter'
+import { DIR_PARAM, SORT_PARAM } from '@/lib/list-sort'
 
 type CourseOption = { id: string; title: string }
 type GroupOption = { id: string; name: string | null; course: { title: string } }
@@ -55,6 +56,11 @@ export function StudentFilters({
     // Preserve scheduleId if present (coming from module link)
     const scheduleId = searchParams.get('scheduleId')
     if (scheduleId) sp.set('scheduleId', scheduleId)
+    // A filter narrows the list; it does not change the order the admin chose.
+    for (const key of [SORT_PARAM, DIR_PARAM]) {
+      const value = searchParams.get(key)
+      if (value) sp.set(key, value)
+    }
 
     const search = overrides.search ?? searchRef.current?.value ?? ''
     if (search) sp.set('search', search)

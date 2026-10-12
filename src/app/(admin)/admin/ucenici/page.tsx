@@ -33,6 +33,8 @@ import {
   parseContractFilter,
   type ContractFilter,
 } from '@/lib/contract-filter'
+import { DIR_PARAM, SORT_PARAM, parseListSort } from '@/lib/list-sort'
+import { STUDENT_SORT_KEYS } from '@/lib/admin-list-sorts'
 
 export const metadata: Metadata = { title: 'Admin – Učenici' }
 
@@ -67,6 +69,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
   const consent = parseConsentFilter(params.consent)
   const contract = parseContractFilter(params.contract)
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1)
+  const sort = parseListSort(STUDENT_SORT_KEYS, params[SORT_PARAM], params[DIR_PARAM])
 
   const isModuleView = !!scheduleId
 
@@ -82,6 +85,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
       returning,
       consent,
       contract,
+      sort,
       page,
       pageSize: PAGE_SIZE,
     }),
@@ -156,7 +160,7 @@ export default async function StudentsPage({ searchParams }: Readonly<PageProps>
         })}
       />
 
-      <StudentTable data={result.data} schoolYear={selectedYear} />
+      <StudentTable data={result.data} schoolYear={selectedYear} sort={sort} />
 
       <Pagination
         basePath="/admin/ucenici"
