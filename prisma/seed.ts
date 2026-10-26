@@ -7,7 +7,6 @@ import { PrismaClient, CourseLevel, UserRole, Prisma, type City } from '@prisma/
 // courses-data.ts is the source of truth for standard SLR program content.
 import { courses as coursesData } from '../src/lib/courses-data'
 // competitions-data.ts is the source of truth for the natjecanja names.
-import { competitions as competitionsData } from '../src/lib/competitions-data'
 import { COMPETITION_PROGRAM_SLUG } from '../src/lib/signup-links'
 import bcrypt from 'bcryptjs'
 import path from 'node:path'
@@ -1594,9 +1593,10 @@ async function seedGalleryImages() {
  * Shared across cities like the SLR catalog (`city: null`): each city creates
  * its own groups and plans its own CourseSeason.
  *
- * Module titles come from `competitions-data.ts` so the admin materials sections
- * and the public /natjecanja pages can never drift apart, plus the general
- * preparation track that the report card already offers as a preporuka.
+ * Module titles are listed here rather than taken from `competitions-data.ts`:
+ * Robokup and Natjecanje mladih tehničara are one module (owner, 2026-10-26)
+ * while their public /natjecanja pages stay separate. Pripreme is the general
+ * preparation track the report card already offers as a preporuka.
  */
 export async function seedCompetitionProgram() {
   const course = await prisma.course.upsert({
@@ -1630,10 +1630,13 @@ export async function seedCompetitionProgram() {
     select: { id: true },
   })
 
-  // The four competitions plus the general preparation track. Order matches
-  // competitions-data.ts; Pripreme sits last as the catch-all.
+  // Pripreme sits last as the catch-all. Renaming a title here creates a new
+  // module on a live DB — rename existing rows with a migration instead
+  // (20261026160000_merge_robokup_nmt_module).
   const moduleTitles = [
-    ...competitionsData.map((c) => c.title),
+    'FIRST LEGO League',
+    'World Robot Olympiad',
+    'Natjecanje mladih tehničara i Robokup',
     'Pripreme za natjecanja',
   ]
 

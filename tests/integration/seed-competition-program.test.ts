@@ -5,7 +5,7 @@ import { createCourseSeason } from './helpers/factory'
 
 /**
  * `npm run db:seed:competition` runs against the live DB, so both promises get
- * asserted: idempotent (one shared course, five natjecanja, stable ids) and
+ * asserted: idempotent (one shared course, four natjecanja, stable ids) and
  * non-destructive (a planned CourseSeason survives a re-seed).
  */
 
@@ -19,7 +19,7 @@ afterAll(async () => {
 })
 
 describe('seedCompetitionProgram', () => {
-  it('is idempotent — one shared course, five natjecanja, stable module ids', async () => {
+  it('is idempotent — one shared course, four natjecanja, stable module ids', async () => {
     await seedCompetitionProgram()
     const first = await db.course.findUniqueOrThrow({
       where: { slug: SLUG },
@@ -36,7 +36,13 @@ describe('seedCompetitionProgram', () => {
     expect(first.city).toBeNull()
     expect(first.level).toBeNull()
     expect(first.sortOrder).toBe(5)
-    expect(first.modules).toHaveLength(5)
+    // Robokup and NMT are one module; their public pages stay separate.
+    expect(first.modules.map((m) => m.title)).toEqual([
+      'FIRST LEGO League',
+      'World Robot Olympiad',
+      'Natjecanje mladih tehničara i Robokup',
+      'Pripreme za natjecanja',
+    ])
 
     await seedCompetitionProgram()
     const second = await db.course.findUniqueOrThrow({
