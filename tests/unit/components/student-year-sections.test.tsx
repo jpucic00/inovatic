@@ -54,6 +54,12 @@ vi.mock('@/components/admin/students/enrollment-payment-panel', () => ({
   ),
 }))
 
+vi.mock('@/components/admin/students/enrollment-admin-note', () => ({
+  EnrollmentAdminNote: ({ enrollmentId, note }: Readonly<{ enrollmentId: string; note: string | null }>) => (
+    <div data-testid={`admin-note-${enrollmentId}`} data-note={note ?? ''} />
+  ),
+}))
+
 // The stub SURFACES the props it is given. Reduced to a bare <div> keyed on the
 // id, the assertions below could only prove "an element rendered" — they would
 // not notice `onSetContractSigned` being dropped, `contractSignedAt` not being
@@ -308,6 +314,7 @@ describe('StudentYearSections — admin vs teacher affordances', () => {
     expect(screen.getByTestId('manage-modules-e1')).toBeInTheDocument()
     // Admin-only payment panel is present.
     expect(screen.getByTestId('payment-panel-e1')).toBeInTheDocument()
+    expect(screen.getByTestId('admin-note-e1')).toBeInTheDocument()
     // Admin gets the editable module manager, not the read-only list.
     expect(screen.queryByText('Upisani moduli')).not.toBeInTheDocument()
     // The action must actually reach the toggle, not just the element render.
@@ -328,6 +335,7 @@ describe('StudentYearSections — admin vs teacher affordances', () => {
     expect(screen.queryByTestId('manage-modules-e1')).not.toBeInTheDocument()
     // Teacher must never see the payment panel.
     expect(screen.queryByTestId('payment-panel-e1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('admin-note-e1')).not.toBeInTheDocument()
     expect(screen.getByText('Upisani moduli')).toBeInTheDocument()
     expect(screen.getByText('• Osnove robotike')).toBeInTheDocument()
     // ...but the contract toggle IS theirs — the deliberate exception to the

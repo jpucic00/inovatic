@@ -39,3 +39,15 @@ export const setEnrollmentContractSignedSchema = z.object({
   enrollmentId: z.string().min(1, 'Nevaljani podaci.'),
   signed: z.boolean({ invalid_type_error: 'Nevaljani podaci.', required_error: 'Nevaljani podaci.' }),
 })
+
+// The admin's note on the enrollment card. Same card, same grain — kept here for
+// the reason "Ugovor potpisan" is. Blank is "no note"; the action stores it as NULL.
+export const ENROLLMENT_NOTE_MAX_LENGTH = 2000
+
+export const setEnrollmentAdminNoteSchema = z.object({
+  enrollmentId: z.string().min(1, 'Nevaljani podaci.'),
+  note: z
+    .string()
+    .max(ENROLLMENT_NOTE_MAX_LENGTH, `Bilješka može imati najviše ${ENROLLMENT_NOTE_MAX_LENGTH} znakova.`)
+    .nullable(),
+})

@@ -15,6 +15,7 @@ import { DeleteEnrollmentButton } from '@/components/admin/students/delete-enrol
 import { AddEnrollmentDialog } from '@/components/admin/students/add-enrollment-dialog'
 import { ManageEnrollmentModules } from '@/components/admin/students/manage-enrollment-modules'
 import { EnrollmentPaymentPanel } from '@/components/admin/students/enrollment-payment-panel'
+import { EnrollmentAdminNote } from '@/components/admin/students/enrollment-admin-note'
 import { EnrollmentContractToggle } from '@/components/shared/enrollment-contract-toggle'
 import { EnrollmentConsents } from '@/components/shared/enrollment-consents'
 import type { EnrollmentConsents as EnrollmentConsentValues } from '@/lib/enrollment-consent'
@@ -290,6 +291,12 @@ export function StudentYearSections({
                         paidAt: m.paidAt,
                       }))}
                       groupLabel={groupLabel}
+                    />
+                  )}
+                  {isAdmin && (
+                    <EnrollmentAdminNote
+                      enrollmentId={enrollment.id}
+                      note={enrollment.adminNote}
                     />
                   )}
                   {!isAdmin && enrolledModules.length > 0 && (

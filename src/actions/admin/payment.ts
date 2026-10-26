@@ -8,6 +8,7 @@ import {
   setModulePaidSchema,
   setEnrollmentContractSignedSchema,
   setEnrollmentMonthPaidSchema,
+  setEnrollmentAdminNoteSchema,
   setEnrollmentPaymentOptionSchema,
   setEnrollmentYearPaidSchema,
 } from '@/lib/validators/admin/payment'
@@ -202,6 +203,46 @@ export async function setEnrollmentContractSigned(
       }
 
       return writeContractSigned(d.enrollmentId, row.userId, signed)
+    },
+  )
+}
+
+/**
+ * Save the admin's free-text note on this enrollment, or clear it with a blank.
+ *
+ * Admin-only and scrubbed from the teacher payload: it routinely talks about
+ * money and paperwork, so it follows the paid marks, not "Ugovor potpisan".
+ * Trimmed before storing so a note of spaces is the same as no note.
+ */
+export async function setEnrollmentAdminNote(
+  enrollmentId: string,
+  note: string | null,
+): Promise<AdminActionResult> {
+  return adminAction(
+    setEnrollmentAdminNoteSchema,
+    { enrollmentId, note },
+    async (d, { city }) => {
+      const row = await db.enrollment.findUnique({
+        where: { id: d.enrollmentId },
+        select: { userId: true, scheduledGroup: { select: { city: true } } },
+      })
+      // Cross-city rows answer exactly like nonexistent ones.
+      if (row?.scheduledGroup.city !== city) {
+        return { success: false, error: 'Upis nije pronađen.' }
+      }
+
+      try {
+        await db.enrollment.update({
+          where: { id: d.enrollmentId },
+          data: { adminNote: d.note?.trim() || null },
+        })
+      } catch (err) {
+        console.error('setEnrollmentAdminNote failed:', err)
+        return { success: false, error: 'Greška pri spremanju bilješke.' }
+      }
+
+      revalidatePath(`/admin/ucenici/${row.userId}`)
+      return { success: true }
     },
   )
 }

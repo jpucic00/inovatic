@@ -180,6 +180,9 @@ function fetchForAdmin(id: string, city?: City) {
           // family pays is a payment fact, so it follows the paid-mark scrub
           // rather than `contractSignedAt`'s teacher exception.
           paymentOption: true,
+          // The admin's own note — talks about money and paperwork, so it is
+          // scrubbed for teachers along with the paid marks.
+          adminNote: true,
           moduleEnrollments: {
             orderBy: { moduleSchedule: { module: { sortOrder: 'asc' } } },
             select: { ...moduleEnrollmentSelect, paidAt: true },
@@ -245,6 +248,7 @@ export async function buildStudentDetailForTeacher(id: string): Promise<StudentD
       ...e,
       fullYearPaidAt: null,
       paymentOption: null,
+      adminNote: null,
       moduleEnrollments: e.moduleEnrollments.map((me) => ({ ...me, paidAt: null })),
       enrollmentMonths: e.enrollmentMonths.map((m) => ({ ...m, paidAt: null })),
     })),
