@@ -39,7 +39,7 @@ function allVisibleTitles(view: GroupMaterialsView): string[] {
 }
 
 describe('kids see only the active module for their group', () => {
-  it('hides non-active module lessons; keeps the active module whole + its group material', async () => {
+  it('hides non-active module lessons; a parent gets the current lesson + its group material', async () => {
     const schoolYear = computeSchoolYear()
     const admin = await createAdmin()
     const student = await createStudent()
@@ -61,8 +61,8 @@ describe('kids see only the active module for their group', () => {
 
     const l1 = await createLesson({ courseId: course.id, moduleId: m1.id, sessionNumbers: [1] })
     const l2a = await createLesson({ courseId: course.id, moduleId: m2.id, sessionNumbers: [1] })
-    // A later lesson of the active module: the portal gets the module WHOLE,
-    // not just the lesson that is current today.
+    // A later lesson of the active module: a parent gets only the lesson that
+    // is current today (2026-10-26), not the module whole.
     const l2b = await createLesson({ courseId: course.id, moduleId: m2.id, sessionNumbers: [7] })
     const lesson = (lessonId: string, title: string) =>
       seedMaterial({ scope: 'LESSON', lessonId, audience: 'STUDENT', uploadedById: admin.id, title })
@@ -79,11 +79,11 @@ describe('kids see only the active module for their group', () => {
 
     expect(view.activeModuleId).toBe(m2.id)
     expect(view.modules.map((s) => s.moduleId)).toEqual([m2.id])
-    expect(view.modules[0].lessons.map((l) => l.id)).toEqual([l2a.id, l2b.id])
+    expect(view.modules[0].lessons.map((l) => l.id)).toEqual([l2a.id])
 
     const titles = allVisibleTitles(view)
-    expect(titles).toContain('M2 material') // active module
-    expect(titles).toContain('M2 later material') // the whole active module
+    expect(titles).toContain('M2 material') // current lesson of the active module
+    expect(titles).not.toContain('M2 later material') // a later lesson is not sent
     expect(titles).toContain('Group material') // GROUP in an active-module lesson
     expect(titles).not.toContain('M1 material') // non-active module hidden
     expect(titles).not.toContain('Group M1 material') // …and its group additions with it

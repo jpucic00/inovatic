@@ -250,8 +250,7 @@ export async function getStaffGroupLessons(groupId: string): Promise<StaffGroupL
       lessons: lessons
         .filter((l) => l.moduleId === moduleId)
         .map((l) => ({ ...l, sessionNumbers: l.sessions.map((s) => s.sessionNumber) })),
-      sessionDates:
-        moduleId !== null && hasDatedModules(kind) ? (shell.moduleSessionDates.get(moduleId) ?? null) : null,
+      sessionDates: moduleId === null ? null : (shell.moduleSessionDates.get(moduleId) ?? null),
       trialDate: moduleId === firstModuleId ? trialDate : null,
       today,
     })

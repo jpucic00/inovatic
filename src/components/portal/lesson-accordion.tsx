@@ -14,7 +14,7 @@ import { MaterialCards } from './extra-materials'
  * would print the server's day on the server and the browser's on the client —
  * a hydration mismatch, and the wrong day for anyone west of UTC.
  */
-function formatDayMonth(date: Date): string {
+export function formatDayMonth(date: Date): string {
   const dd = String(date.getUTCDate()).padStart(2, '0')
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
   return `${dd}.${mm}.`
@@ -130,6 +130,36 @@ function LessonItem({
         {open ? <LessonBody lesson={lesson} /> : null}
       </div>
     </li>
+  )
+}
+
+/**
+ * The parent's view of a dated module: the one lesson the group is on now,
+ * already open — there is nothing else to pick, so it is a card, not an
+ * accordion of one. Its sats are named, never dates (owner, 2026-10-10).
+ */
+export function CurrentLessonCard({ lesson }: Readonly<{ lesson: LessonView }>) {
+  const meta = lesson.sessionNumbers.length > 0 ? formatLessonSessions(lesson.sessionNumbers) : ''
+  return (
+    <article
+      aria-labelledby={`lekcija-${lesson.id}-naslov`}
+      className="overflow-hidden rounded-xl border border-cyan-200 bg-white"
+    >
+      <header className="border-b border-cyan-100 bg-cyan-50/60 px-4 py-3">
+        <p className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {meta ? <span className="text-xs font-medium text-gray-500">{meta}</span> : null}
+          <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+            Trenutna lekcija
+          </span>
+        </p>
+        <h3 id={`lekcija-${lesson.id}-naslov`} className="text-[15px] font-semibold leading-snug text-gray-900">
+          {lesson.title}
+        </h3>
+      </header>
+      <div className="p-4">
+        <LessonBody lesson={lesson} />
+      </div>
+    </article>
   )
 }
 

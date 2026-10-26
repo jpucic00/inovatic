@@ -158,9 +158,7 @@ export function LessonEditor({ context, initialSessionNumbers = [] }: Readonly<P
   const where = module?.title ?? course.title
   const fieldClass =
     'w-full px-3 text-sm rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent'
-  const undatedHint = isRadionica(course.kind)
-    ? 'Radionica nema numerirane sate — lekcije se redaju redom kojim su dodane.'
-    : 'Natjecanja nemaju numerirane termine — lekcije se redaju redom kojim su dodane.'
+  const undatedHint = 'Radionica nema numerirane sate — lekcije se redaju redom kojim su dodane.'
 
   return (
     <div className="max-w-3xl pb-24 sm:pb-0">
@@ -228,7 +226,7 @@ export function LessonEditor({ context, initialSessionNumbers = [] }: Readonly<P
             <SatPicker
               selected={sessionNumbers}
               onChange={setSessionNumbers}
-              isFirstModule={context.isFirstModule}
+              slots={context.sessionSlots}
               taken={context.takenSessions}
               satDates={context.satDates}
               disabled={isSaving}

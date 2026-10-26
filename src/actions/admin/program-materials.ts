@@ -9,9 +9,13 @@ import type { StaffMaterialRow } from '@/components/material/staff-material-list
 import { publicSignupPath } from '@/lib/signup-links'
 import { defaultGradesForLevel } from '@/lib/inquiry-availability'
 import type { ElementaryGrade } from '@/lib/inquiry-status'
-import { hasDatedModules } from '@/lib/program-kind'
-import { placeLessons } from '@/lib/lesson-schedule'
-import { moduleSatDateRanges, type SatDateRange } from '@/lib/lesson-sat-dates'
+import { hasDatedModules, isCompetition } from '@/lib/program-kind'
+import { lessonSessionSlots, placeLessons } from '@/lib/lesson-schedule'
+import {
+  moduleSatDateRanges,
+  seasonSatDateRanges,
+  type SatDateRange,
+} from '@/lib/lesson-sat-dates'
 import { loadHolidayDateKeys } from '@/lib/holidays'
 
 export type ProgramLessonRow = {
@@ -28,7 +32,10 @@ export type ProgramLessonModule = {
   /** null for a radionica — its lessons sit directly under the program. */
   module: { id: string; title: string } | null
   isFirstModule: boolean
-  /** Standard modules hold sats 1–7 (+ probni sat on the first); others are undated. */
+  /**
+   * Standard modules hold sats 1–7 (+ probni sat on the first), natjecanja
+   * weekly season sats; radionica lessons are undated.
+   */
   dated: boolean
   /** Display order (by first sat, undated last). */
   lessons: ProgramLessonRow[]
@@ -187,9 +194,7 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
       where: { scope: 'LESSON', lesson: { courseId: course.id } },
       _count: { _all: true },
     }),
-    hasDatedModules(course.kind)
-      ? loadSatDateRanges(course.modules, year, city)
-      : Promise.resolve(new Map<string, SatDateRange[]>()),
+    loadSatDatesFor(course, course.modules, year, city),
     db.material.groupBy({
       by: ['city'],
       where: {
@@ -233,7 +238,7 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
   const countFor = (lessonId: string, audience: 'STUDENT' | 'TEACHER') =>
     lessonCounts.find((c) => c.lessonId === lessonId && c.audience === audience)?._count._all ?? 0
 
-  const dated = hasDatedModules(course.kind)
+  const dated = hasDatedModules(course.kind) || isCompetition(course.kind)
   const lessonModuleFor = (
     module: { id: string; title: string } | null,
     isFirstModule: boolean,
@@ -322,17 +327,43 @@ export async function getProgramDetail(courseId: string): Promise<ProgramDetail>
   }
 }
 
+type SatDateModule = {
+  id: string
+  title: string
+  sortOrder: number
+  schedules: { id: string; startDate: Date | null; endDate: Date | null }[]
+}
+
+/**
+ * Sample sat dates per module for the lesson editor's hint: a standard
+ * program's module arcs, or — for a natjecanje — the weekly termini of the
+ * city's season, the same list under every natjecanje. Radionice have none.
+ */
+async function loadSatDatesFor(
+  course: { id: string; kind: ProgramKind },
+  modules: SatDateModule[],
+  schoolYear: string,
+  city: City,
+): Promise<Map<string, SatDateRange[]>> {
+  if (hasDatedModules(course.kind)) return loadSatDateRanges(modules, schoolYear, city)
+  if (!isCompetition(course.kind) || modules.length === 0) return new Map()
+  const [holidayDates, season] = await Promise.all([
+    loadHolidayDateKeys(schoolYear, city),
+    db.courseSeason.findUnique({
+      where: { courseId_schoolYear_city: { courseId: course.id, schoolYear, city } },
+      select: { startDate: true, endDate: true },
+    }),
+  ])
+  const ranges = seasonSatDateRanges({ season, holidayDates })
+  return new Map(modules.map((m) => [m.id, ranges]))
+}
+
 /**
  * Sample sat dates for every module of a standard program, in one city and
  * school year — the hint next to each sat in the lesson editor.
  */
 async function loadSatDateRanges(
-  modules: {
-    id: string
-    title: string
-    sortOrder: number
-    schedules: { id: string; startDate: Date | null; endDate: Date | null }[]
-  }[],
+  modules: SatDateModule[],
   schoolYear: string,
   city: City,
 ): Promise<Map<string, SatDateRange[]>> {
@@ -374,6 +405,8 @@ export type LessonEditorContext = {
   } | null
   /** Sats other lessons of this module already hold. */
   takenSessions: { sessionNumber: number; lessonTitle: string }[]
+  /** The sats the picker offers, in order (`lessonSessionSlots`). */
+  sessionSlots: number[]
   satDates: SatDateRange[]
   /** Other lessons of the same module — targets for "Premjesti u lekciju". */
   siblingLessons: { id: string; title: string; sessionNumbers: number[] }[]
@@ -448,7 +481,7 @@ export async function getLessonEditorContext(
   }
 
   const mod = moduleId ? course.modules.find((m) => m.id === moduleId) ?? null : null
-  const dated = hasDatedModules(course.kind) && mod !== null
+  const dated = (hasDatedModules(course.kind) || isCompetition(course.kind)) && mod !== null
   const currentLessonId = lessonRow?.id ?? null
 
   const [siblings, materials, groupMaterialCount, satDatesByModule] = await Promise.all([
@@ -472,7 +505,7 @@ export async function getLessonEditorContext(
     currentLessonId
       ? db.material.count({ where: { scope: 'GROUP', lessonId: currentLessonId } })
       : Promise.resolve(0),
-    dated ? loadSatDateRanges(course.modules, year, city) : Promise.resolve(new Map<string, SatDateRange[]>()),
+    dated ? loadSatDatesFor(course, course.modules, year, city) : Promise.resolve(new Map<string, SatDateRange[]>()),
   ])
 
   const placedSiblings = placeLessons({
@@ -510,11 +543,14 @@ export async function getLessonEditorContext(
     canEdit: m.city === null || m.city === city,
   })
 
+  const satDates = mod ? (satDatesByModule.get(mod.id) ?? []) : []
+  const isFirstModule = mod !== null && course.modules[0]?.id === mod.id
+
   return {
     viewerCity: city,
     course: { id: course.id, title: course.title, kind: course.kind },
     module: mod ? { id: mod.id, title: mod.title } : null,
-    isFirstModule: mod !== null && course.modules[0]?.id === mod.id,
+    isFirstModule,
     dated,
     lesson: lessonRow
       ? {
@@ -527,7 +563,18 @@ export async function getLessonEditorContext(
     takenSessions: placedSiblings.flatMap((l) =>
       l.sessionNumbers.map((sessionNumber) => ({ sessionNumber, lessonTitle: l.title })),
     ),
-    satDates: mod ? (satDatesByModule.get(mod.id) ?? []) : [],
+    sessionSlots: dated
+      ? lessonSessionSlots({
+          competition: isCompetition(course.kind),
+          isFirstModule,
+          seasonSessionCount: satDates.at(-1)?.sessionNumber ?? 0,
+          held: [
+            ...(lessonRow?.sessions.map((x) => x.sessionNumber) ?? []),
+            ...placedSiblings.flatMap((l) => l.sessionNumbers),
+          ],
+        })
+      : [],
+    satDates,
     siblingLessons: placedSiblings.map((l) => ({
       id: l.id,
       title: l.title,

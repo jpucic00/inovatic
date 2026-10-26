@@ -194,22 +194,31 @@ describe('createLesson', () => {
     expect(await db.lesson.count({ where: { courseId: course.id, title: 'Datirana' } })).toBe(0)
   })
 
-  it('refuses sats on a competition lesson', async () => {
+  it('places a competition lesson on weekly season sats (1–52), never the probni sat', async () => {
     await splitAdmin()
     const course = await fx.course({ kind: 'COMPETITION' })
     const mod = await createModule(course.id)
 
-    const res = await createLesson({ courseId: course.id, moduleId: mod.id, title: 'FLL sat', sessionNumbers: [1] })
+    const res = await createLesson({ courseId: course.id, moduleId: mod.id, title: 'FLL sat', sessionNumbers: [12, 13] })
+    expect(res.success).toBe(true)
+    const sessions = await db.lessonSession.findMany({ where: { moduleId: mod.id }, orderBy: { sessionNumber: 'asc' } })
+    expect(sessions.map((x) => x.sessionNumber)).toEqual([12, 13])
 
-    expect(res).toEqual({
-      success: false,
-      error: 'Lekcije ovog programa nemaju sate — vidljive su cijelo vrijeme.',
-    })
-    expect(await db.lesson.count({ where: { courseId: course.id } })).toBe(0)
+    const probni = await createLesson({ courseId: course.id, moduleId: mod.id, title: 'Probni', sessionNumbers: [0] })
+    expect(probni).toEqual({ success: false, error: 'Sat natjecanja mora biti između 1 i 52.' })
 
-    // Undated, it is fine.
+    // Undated stays fine — existing natjecanje lessons have no sats.
     const undated = await createLesson({ courseId: course.id, moduleId: mod.id, title: 'FLL', sessionNumbers: [] })
     expect(undated.success).toBe(true)
+  })
+
+  it('keeps a standard lesson inside the module\'s 7 sats', async () => {
+    await splitAdmin()
+    const course = await fx.course({ kind: 'STANDARD' })
+    const mod = await createModule(course.id)
+
+    const res = await createLesson({ courseId: course.id, moduleId: mod.id, title: 'Osmi', sessionNumbers: [8] })
+    expect(res).toEqual({ success: false, error: 'Modul ima 7 sati.' })
   })
 
   it("refuses a module of another program", async () => {

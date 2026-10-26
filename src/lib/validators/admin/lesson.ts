@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { COMPETITION_MAX_SESSION } from '@/lib/lesson-schedule'
 import {
   validateRobocampAudience,
   validateTypeUrlPairing,
@@ -13,10 +14,14 @@ const lessonFields = {
     .optional()
     .nullable()
     .transform((v) => v || null),
-  /** 0 = probni sat, 1–7 = the module's sats. Empty = undated. */
+  /**
+   * 0 = probni sat, 1–7 = a standard module's sats, up to 52 = a natjecanje's
+   * weekly season sats (`lessonPlacementError` applies the per-kind bound).
+   * Empty = undated.
+   */
   sessionNumbers: z
-    .array(z.number().int().min(0).max(7))
-    .max(8)
+    .array(z.number().int().min(0).max(COMPETITION_MAX_SESSION))
+    .max(COMPETITION_MAX_SESSION + 1)
     .refine((list) => new Set(list).size === list.length, 'Isti sat je odabran dvaput.'),
 }
 

@@ -1,5 +1,5 @@
 import { getGroupModuleArc } from '@/lib/group-module-arc'
-import { computeTrialSession } from '@/lib/session-dates'
+import { computeSeasonSessions, computeTrialSession } from '@/lib/session-dates'
 import { ACTIVE_WEEKDAYS } from '@/lib/group-end-dates'
 import { PROBNI_SAT_SESSION } from '@/lib/lesson-schedule'
 
@@ -79,4 +79,35 @@ export function moduleSatDateRanges(input: {
     )
   }
   return result
+}
+
+/**
+ * The natjecanje counterpart: sat N is the Nth weekly termin of the season, the
+ * same for every natjecanje (they all run the whole season), spanned across the
+ * six weekdays. Empty when the season is not set for that city and year.
+ */
+export function seasonSatDateRanges(input: {
+  season: { startDate: Date | null; endDate: Date | null } | null
+  holidayDates: ReadonlySet<string>
+}): SatDateRange[] {
+  if (!input.season) return []
+  const ranges = new Map<number, SatDateRange>()
+  for (const weekday of ACTIVE_WEEKDAYS) {
+    const dates = computeSeasonSessions({
+      dayOfWeek: weekday,
+      startDate: input.season.startDate,
+      endDate: input.season.endDate,
+      holidayDates: input.holidayDates,
+    })
+    dates.forEach((date, index) => {
+      const sessionNumber = index + 1
+      const current = ranges.get(sessionNumber)
+      if (!current) ranges.set(sessionNumber, { sessionNumber, from: date, to: date })
+      else {
+        if (date < current.from) current.from = date
+        if (date > current.to) current.to = date
+      }
+    })
+  }
+  return [...ranges.values()].sort((a, b) => a.sessionNumber - b.sessionNumber)
 }

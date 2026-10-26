@@ -57,6 +57,8 @@ function section(
     sortOrder: 1,
     isActive: false,
     currentLessonId: null,
+    dated: false,
+    firstLessonStart: null,
     lessons,
     teacherMaterials,
   }
@@ -65,6 +67,7 @@ function section(
 function view(partial: Partial<GroupMaterialsView>): GroupMaterialsView {
   return {
     viewer: 'STUDENT',
+    currentLessonOnly: false,
     group: {
       id: 'g1',
       name: null,

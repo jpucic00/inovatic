@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { requireAdmin } from '@/lib/auth-guard'
 import { getLessonEditorContext } from '@/actions/admin/program-materials'
-import { PROBNI_SAT_SESSION } from '@/lib/lesson-schedule'
 import { LessonEditor } from '@/components/admin/lessons/lesson-editor'
 
 export const metadata: Metadata = { title: 'Admin – Nova lekcija' }
@@ -31,7 +30,7 @@ export default async function NewLessonPage({ params, searchParams }: Readonly<P
   const satAllowed =
     context.dated &&
     Number.isInteger(sat) &&
-    ((sat >= 1 && sat <= 7) || (sat === PROBNI_SAT_SESSION && context.isFirstModule)) &&
+    context.sessionSlots.includes(sat) &&
     !context.takenSessions.some((t) => t.sessionNumber === sat)
 
   return (

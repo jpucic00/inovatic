@@ -130,7 +130,9 @@ async function seedSharedProgram() {
     })
   }
   const lesson = await createLesson({ courseId: course.id, moduleId: mod.id, title: 'Sat 1', sessionNumbers: [1] })
-  const lesson2 = await createLesson({ courseId: course.id, moduleId: mod.id, title: 'Sat 2', sessionNumbers: [2] })
+  // On sat 7, still ahead: "Sat 1" — where the rows sit — stays the current
+  // lesson, so a parent's current-lesson-only view still lists them.
+  const lesson2 = await createLesson({ courseId: course.id, moduleId: mod.id, title: 'Sat 2', sessionNumbers: [7] })
   const splitGroup = await fx.group({ courseId: course.id, city: 'SPLIT', dayOfWeek: 'Ponedjeljak' })
   const sibGroup = await fx.group({ courseId: course.id, city: 'SIBENIK', dayOfWeek: 'Ponedjeljak' })
   return { course, mod, lesson, lesson2, splitGroup, sibGroup }

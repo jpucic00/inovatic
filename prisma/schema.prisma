@@ -463,8 +463,8 @@ model CourseModule {
 /// added, while the lesson is the same everywhere. Shared by both cities.
 ///
 /// `moduleId` is null exactly for a radionica (no modules — lessons sit directly
-/// under the program). A natjecanje lesson has a module but no sessions
-/// (undated). Only admins create lessons; teachers add group materials into them.
+/// under the program). A natjecanje lesson has a module and weekly season sats
+/// (1..52). Only admins create lessons; teachers add group materials into them.
 model Lesson {
   id          String   @id @default(cuid())
   courseId    String
@@ -489,7 +489,7 @@ model Lesson {
 
 /// One termin slot of a module held by a lesson: 1–7 = the module's Nth sat on
 /// each group's own arc, 0 = the probni sat (first module of a standard program
-/// only). `moduleId` is denormalized from the lesson through a composite FK so
+/// only); for a natjecanje 1..52 = the group's Nth weekly termin of the season. `moduleId` is denormalized from the lesson through a composite FK so
 /// the DB itself guarantees one lesson per (module, sat).
 model LessonSession {
   id            String @id @default(cuid())

@@ -34,13 +34,20 @@ describe('lessonPlacementError', () => {
     ).toMatch(/nemaju sate/)
   })
 
-  it('keeps natjecanje lessons undated', () => {
+  it('lets a natjecanje lesson hold weekly season sats 1–52, never a probni sat', () => {
+    const at = (sessionNumbers: number[]) =>
+      lessonPlacementError({ kind: 'COMPETITION', moduleId: 'm1', isFirstModule: true, sessionNumbers })
+    expect(at([])).toBeNull()
+    expect(at([1])).toBeNull()
+    expect(at([12, 13, 52])).toBeNull()
+    expect(at([0])).toMatch(/između 1 i 52/)
+    expect(at([53])).toMatch(/između 1 i 52/)
+  })
+
+  it('keeps a standard lesson inside the module\'s 7 sats', () => {
     expect(
-      lessonPlacementError({ kind: 'COMPETITION', moduleId: 'm1', isFirstModule: true, sessionNumbers: [] }),
-    ).toBeNull()
-    expect(
-      lessonPlacementError({ kind: 'COMPETITION', moduleId: 'm1', isFirstModule: true, sessionNumbers: [1] }),
-    ).toMatch(/nemaju sate/)
+      lessonPlacementError({ kind: 'STANDARD', moduleId: 'm1', isFirstModule: false, sessionNumbers: [8] }),
+    ).toMatch(/7 sati/)
   })
 
   it('allows the probni sat only on the first module', () => {

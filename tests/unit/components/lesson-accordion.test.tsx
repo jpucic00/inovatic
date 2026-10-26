@@ -3,11 +3,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { MaterialType } from '@prisma/client'
 import { LessonAccordion } from '@/components/portal/lesson-accordion'
 import { MaterialList } from '@/components/portal/material-list'
-import type {
-  GroupMaterialsView,
-  LessonView,
-  MaterialItem,
-  ModuleLessonsView,
+import {
+  toCurrentLessonOnly,
+  type GroupMaterialsView,
+  type LessonView,
+  type MaterialItem,
+  type ModuleLessonsView,
 } from '@/lib/group-materials-view'
 
 vi.mock('@/components/material/robocamp-embed', () => ({
@@ -171,6 +172,8 @@ function section(overrides: Partial<ModuleLessonsView>): ModuleLessonsView {
     sortOrder: 1,
     isActive: false,
     currentLessonId: null,
+    dated: false,
+    firstLessonStart: null,
     lessons: [],
     teacherMaterials: [],
     ...overrides,
@@ -180,6 +183,7 @@ function section(overrides: Partial<ModuleLessonsView>): ModuleLessonsView {
 function view(modules: ModuleLessonsView[]): GroupMaterialsView {
   return {
     viewer: 'STUDENT',
+    currentLessonOnly: false,
     group: {
       id: 'g',
       name: null,
@@ -245,5 +249,79 @@ describe('MaterialList', () => {
 
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull()
     expect(isOpen('Lekcija R')).toBe(true)
+  })
+})
+
+describe('toCurrentLessonOnly (parent view)', () => {
+  it('keeps only the current lesson of a dated section and leaves undated ones whole', () => {
+    const cut = toCurrentLessonOnly(
+      view([
+        section({ moduleId: 'm2', dated: true, currentLessonId: 'B', lessons: DATED() }),
+        section({ moduleId: null, title: null, currentLessonId: 'R', lessons: [lesson('R'), lesson('S')] }),
+      ]),
+    )
+    expect(cut.currentLessonOnly).toBe(true)
+    expect(cut.modules[0].lessons.map((l) => l.id)).toEqual(['B'])
+    expect(cut.modules[1].lessons.map((l) => l.id)).toEqual(['R', 'S'])
+  })
+
+  it('keeps nothing of a dated section before its first lesson starts', () => {
+    const cut = toCurrentLessonOnly(view([section({ dated: true, currentLessonId: null, lessons: DATED() })]))
+    expect(cut.modules[0].lessons).toEqual([])
+  })
+})
+
+describe('MaterialList — parent view', () => {
+  it('shows the current lesson as one open card with its materials, and no other lesson', () => {
+    render(
+      <MaterialList
+        view={toCurrentLessonOnly(
+          view([section({ isActive: true, dated: true, currentLessonId: 'B', lessons: DATED() })]),
+        )}
+      />,
+    )
+
+    expect(screen.getByText('Trenutni modul')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Lekcija B' })).toBeTruthy()
+    expect(screen.getByText('Trenutna lekcija')).toBeTruthy()
+    expect(screen.getByText('Radni list B')).toBeTruthy()
+    expect(screen.queryByText(/Lekcija A|Lekcija C|Radni list A|Radni list C/)).toBeNull()
+    // A card, not an accordion: nothing to toggle.
+    expect(screen.queryByRole('button', { name: /Lekcija B/ })).toBeNull()
+  })
+
+  it('says when the first lesson starts instead of the "not published" state', () => {
+    render(
+      <MaterialList
+        view={toCurrentLessonOnly(
+          view([
+            section({
+              isActive: true,
+              dated: true,
+              currentLessonId: null,
+              firstLessonStart: new Date('2026-10-05T00:00:00Z'),
+              lessons: DATED(),
+            }),
+          ]),
+        )}
+      />,
+    )
+
+    expect(screen.getByText('Prva lekcija počinje 05.10.')).toBeTruthy()
+    expect(screen.queryByText('Materijali još nisu objavljeni')).toBeNull()
+    expect(screen.queryByText('Radni list A')).toBeNull()
+  })
+
+  it('keeps the accordion of every lesson for an undated section', () => {
+    render(
+      <MaterialList
+        view={toCurrentLessonOnly(
+          view([section({ moduleId: null, title: null, currentLessonId: 'R', lessons: [lesson('R'), lesson('S')] })]),
+        )}
+      />,
+    )
+
+    expect(isOpen('Lekcija R')).toBe(true)
+    expect(header('Lekcija S')).toBeTruthy()
   })
 })

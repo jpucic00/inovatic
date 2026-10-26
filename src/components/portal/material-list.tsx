@@ -1,6 +1,6 @@
 import { BookOpen } from 'lucide-react'
 import type { GroupMaterialsView } from '@/lib/group-materials-view'
-import { LessonAccordion } from './lesson-accordion'
+import { CurrentLessonCard, formatDayMonth, LessonAccordion } from './lesson-accordion'
 
 /**
  * The Materijali panel: the group's material, structured module → lesson.
@@ -15,9 +15,16 @@ import { LessonAccordion } from './lesson-accordion'
  * that is a natjecanje nobody has prepared yet, and a heading with nothing
  * under it reads as a broken page to a child. Only when no section has a
  * lesson does the panel fall back to the "not published yet" state.
+ *
+ * A parent's view (`currentLessonOnly`) holds just the current lesson of each
+ * dated section, shown as one open card; before the first lesson starts the
+ * section says when it does instead. Undated sections (radionica, a natjecanje
+ * without sats) keep the accordion of every lesson.
  */
 export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
-  const sections = view.modules.filter((section) => section.lessons.length > 0)
+  const sections = view.modules.filter(
+    (section) => section.lessons.length > 0 || (view.currentLessonOnly && section.firstLessonStart),
+  )
 
   if (sections.length === 0) {
     return (
@@ -51,9 +58,30 @@ export function MaterialList({ view }: Readonly<{ view: GroupMaterialsView }>) {
               <h2 className="text-lg font-semibold text-gray-900">{section.title}</h2>
             </div>
           ) : null}
-          <LessonAccordion lessons={section.lessons} currentLessonId={section.currentLessonId} />
+          <SectionLessons section={section} currentLessonOnly={view.currentLessonOnly} />
         </section>
       ))}
+    </div>
+  )
+}
+
+function SectionLessons({
+  section,
+  currentLessonOnly,
+}: Readonly<{ section: GroupMaterialsView['modules'][number]; currentLessonOnly: boolean }>) {
+  if (!currentLessonOnly || !section.dated) {
+    return <LessonAccordion lessons={section.lessons} currentLessonId={section.currentLessonId} />
+  }
+  const [lesson] = section.lessons
+  if (lesson) return <CurrentLessonCard lesson={lesson} />
+  return (
+    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center">
+      <p className="text-sm font-semibold text-gray-900">
+        {section.firstLessonStart
+          ? `Prva lekcija počinje ${formatDayMonth(section.firstLessonStart)}`
+          : 'Lekcija još nije počela'}
+      </p>
+      <p className="mt-1 text-sm text-gray-500">Materijali se pojavljuju na dan sata.</p>
     </div>
   )
 }

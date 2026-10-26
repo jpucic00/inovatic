@@ -14,6 +14,9 @@ import { classroomGroupWhere } from '@/lib/classroom-access'
  * from a nonexistent group, and never `redirect('/portal')` — that would loop
  * from inside the portal.
  *
+ * Returns which of the two it was: the materials read narrows a child's view
+ * to the current lesson and leaves the classroom on the whole module.
+ *
  * Deliberately NOT used by the gallery, evaluation or profile reads: those stay
  * behind `requirePortalChild()`, which is what keeps them off the classroom PCs.
  *
@@ -22,7 +25,7 @@ import { classroomGroupWhere } from '@/lib/classroom-access'
  */
 export async function assertPortalGroupAccess(
   groupId: string,
-): Promise<void> {
+): Promise<'CHILD' | 'CLASSROOM'> {
   const { session, studentId } = await requirePortalUser()
 
   if (studentId === null) {
@@ -31,7 +34,7 @@ export async function assertPortalGroupAccess(
       select: { id: true },
     })
     if (!group) notFound()
-    return
+    return 'CLASSROOM'
   }
 
   await requireActivePortalChild()
@@ -40,4 +43,5 @@ export async function assertPortalGroupAccess(
     select: { id: true },
   })
   if (!enrollment) notFound()
+  return 'CHILD'
 }

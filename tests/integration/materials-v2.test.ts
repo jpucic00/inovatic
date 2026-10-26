@@ -5,7 +5,8 @@
  * The rules under test:
  *   - the portal (a parent's picked child, the classroom login) runs the STUDENT
  *     viewer: only STUDENT rows, only inside lessons, only the module the group
- *     is on now — but that module WHOLE, every lesson of it;
+ *     is on now — the classroom sees that module WHOLE, a parent only its
+ *     CURRENT lesson (2026-10-26);
  *   - staff run STAFF: both audiences, every module, plus the teacher-only
  *     whole-module (MODULE) and whole-program (COURSE) rows;
  *   - createMaterial: a teacher adds GROUP rows only, into a lesson of their own
@@ -76,7 +77,7 @@ const linkFields = {
 
 // ─── STUDENT vs STAFF view ───────────────────────────────────────────────────
 
-describe('lesson view — the portal sees the active module whole, staff see everything', () => {
+describe('lesson view — parent: current lesson, classroom: active module whole, staff: everything', () => {
   /**
    * A standard Monday group whose module 1 is behind it and module 2 in
    * progress, with a STUDENT and a TEACHER row on every level a row can sit.
@@ -136,21 +137,30 @@ describe('lesson view — the portal sees the active module whole, staff see eve
     expect(view.programTeacherMaterials).toEqual([])
   }
 
-  it('a parent with the child chosen gets only STUDENT rows of the active module', async () => {
+  it('a parent with the child chosen gets only the CURRENT lesson of the active module', async () => {
     const s = await seedStandardGroup()
     const student = await createStudent()
     await createEnrollment(student.id, s.group.id)
 
     mockChildSession(student.id)
-    expectStudentView(await getEffectiveMaterialsForStudent(s.group.id), s)
+    const view = await getEffectiveMaterialsForStudent(s.group.id)
+    expect(view.currentLessonOnly).toBe(true)
+    expect(view.modules.map((m) => m.moduleId)).toEqual([s.m2.id])
+    // Sat 3 was a week ago: l2b is current, l2a (sats 1–2) is no longer sent.
+    expect(view.modules[0].dated).toBe(true)
+    expect(view.modules[0].lessons.map((l) => l.id)).toEqual([s.l2b.id])
+    expect(lessonMaterialTitles(view).sort()).toEqual(['Grupa za djecu', 'M2b za djecu'])
+    expect(view.programTeacherMaterials).toEqual([])
   })
 
-  it('the classroom login gets exactly the same STUDENT view', async () => {
+  it('the classroom login gets the whole active module', async () => {
     const s = await seedStandardGroup()
     const row = await classroomAccount('SPLIT')
 
     mockSession({ id: row.id, role: 'CLASSROOM', city: 'SPLIT' })
-    expectStudentView(await getEffectiveMaterialsForStudent(s.group.id), s)
+    const view = await getEffectiveMaterialsForStudent(s.group.id)
+    expect(view.currentLessonOnly).toBe(false)
+    expectStudentView(view, s)
   })
 
   it('STAFF sees both audiences, every module, and the teacher-only rows', async () => {
@@ -391,10 +401,12 @@ describe('database constraints', () => {
     ).resolves.toBeTruthy()
   })
 
-  it('refuses a sat outside 0–7 (LessonSession_number_check)', async () => {
+  it('refuses a sat outside 0–52 (LessonSession_number_check)', async () => {
     const { course, mod } = await base()
+    // 52 is the widest bound (a natjecanje's weekly season sats); the per-kind
+    // bound (7 for a standard module) is the action's, in lesson-rules.
     await expect(
-      createLesson({ courseId: course.id, moduleId: mod.id, sessionNumbers: [8] }),
+      createLesson({ courseId: course.id, moduleId: mod.id, sessionNumbers: [53] }),
     ).rejects.toThrow(/LessonSession_number_check/)
   })
 

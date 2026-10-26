@@ -7,6 +7,11 @@ import { buildEffectiveMaterialsWhere, type MaterialViewer } from '@/lib/materia
 import { activeEnrollmentWhere } from '@/lib/enrollment-activity'
 import { classroomGroupWhere } from '@/lib/classroom-access'
 import { teacherGroupAccessWhere } from '@/lib/teacher-guard'
+import {
+  buildGroupMaterialsView,
+  toCurrentLessonOnly,
+  viewMaterialIds,
+} from '@/lib/group-materials-view'
 import type { City } from '@prisma/client'
 
 export const runtime = 'nodejs'
@@ -53,17 +58,20 @@ async function materialVisibleInGroups(
 }
 
 /**
- * A student may download a material iff they are CURRENTLY in a program and the
- * material is visible in one of their groups.
+ * A parent may download a material iff the chosen child is CURRENTLY in a
+ * program and the material is on the child's portal page of one of their
+ * groups — which, since 2026-10-26, is only the CURRENT lesson of each dated
+ * section (`toCurrentLessonOnly`, the same cut the page applies). A link to an
+ * earlier or later lesson's file therefore stops working once the page stops
+ * listing it.
  *
  * The active check is what stops an alum pulling files: this route authorises
  * off a session, so without it "no longer part of any program" would hold at the
  * login form and not here, for as long as a JWT minted while they were still
  * enrolled survives (`revalidateTokenClaims` evicts within ~60s).
  *
- * Their group list stays deliberately unfiltered by year. An enrolled child
- * re-downloading something from their own previous group is legitimate; it is
- * being enrolled at all that is the question.
+ * Their group list stays deliberately unfiltered by year: an enrolled child's
+ * previous group still has a page, and what it lists is still theirs.
  */
 async function studentAllowed(
   userId: string,
@@ -76,13 +84,21 @@ async function studentAllowed(
 
   const enrollments = await db.enrollment.findMany({
     where: { userId },
-    select: { scheduledGroup: { select: VISIBILITY_GROUP_SELECT } },
+    select: { scheduledGroupId: true },
   })
-  return materialVisibleInGroups(
-    enrollments.map((e) => e.scheduledGroup),
-    materialId,
-    'STUDENT',
-  )
+  // Cheap pre-check first: a material visible in none of the groups at all
+  // never needs the per-group lesson placement.
+  const groups = await db.scheduledGroup.findMany({
+    where: { id: { in: enrollments.map((e) => e.scheduledGroupId) } },
+    select: VISIBILITY_GROUP_SELECT,
+  })
+  if (!(await materialVisibleInGroups(groups, materialId, 'STUDENT'))) return false
+
+  for (const group of groups) {
+    const view = toCurrentLessonOnly(await buildGroupMaterialsView(group.id, 'STUDENT'))
+    if (viewMaterialIds(view).has(materialId)) return true
+  }
+  return false
 }
 
 /**

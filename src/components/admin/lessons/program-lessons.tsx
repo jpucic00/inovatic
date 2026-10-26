@@ -66,7 +66,9 @@ function ModuleLessonsCard({
   const moduleId = entry.module?.id ?? null
   const outline = buildLessonOutline({
     lessons: entry.lessons,
-    dated: entry.dated,
+    // A natjecanje has a sat a week all season: listing every free one would
+    // bury its few lessons, so only a standard module lists its gaps.
+    dated: entry.dated && !competition,
     isFirstModule: entry.isFirstModule,
   })
   const lessonCount = entry.lessons.length

@@ -15,8 +15,40 @@
 /** The probni sat slot — the extra session before module 1's seven. */
 export const PROBNI_SAT_SESSION = 0
 
-/** Sats a lesson can hold in a module: 1..7 (`SESSIONS_PER_MODULE`). */
+/** Sats a lesson can hold in a standard module: 1..7 (`SESSIONS_PER_MODULE`). */
 export const LESSON_SESSION_NUMBERS = [1, 2, 3, 4, 5, 6, 7] as const
+
+/**
+ * Upper bound on a natjecanje lesson's sat. A natjecanje runs one sat a week
+ * across the whole season (`computeSeasonSessions`), so its sats are numbered
+ * 1..N with N depending on the season, the weekday and the holidays; 52 is a
+ * whole calendar year of weeks, more than any season can hold. Mirrored by the
+ * `LessonSession_number_check` constraint.
+ */
+export const COMPETITION_MAX_SESSION = 52
+
+/**
+ * The sats the lesson editor offers for one module. Standard: probni sat (first
+ * module only) + 1..7. Natjecanje: 1..`seasonSessionCount` — the most sats any
+ * weekday reaches in the selected season — but never fewer than the sats
+ * already held, so a shortened season cannot hide a lesson's own sat. With no
+ * season planned yet a default of 30 weeks keeps the picker usable.
+ */
+export function lessonSessionSlots(input: {
+  competition: boolean
+  isFirstModule: boolean
+  seasonSessionCount: number
+  held: readonly number[]
+}): number[] {
+  if (!input.competition) {
+    return [...(input.isFirstModule ? [PROBNI_SAT_SESSION] : []), ...LESSON_SESSION_NUMBERS]
+  }
+  const count = Math.min(
+    COMPETITION_MAX_SESSION,
+    Math.max(input.seasonSessionCount > 0 ? input.seasonSessionCount : 30, ...input.held),
+  )
+  return Array.from({ length: count }, (_, i) => i + 1)
+}
 
 type LessonInput = {
   id: string
@@ -37,6 +69,11 @@ type LessonPlacement<T extends LessonInput> = {
   /** Display order: by first sat (probni sat first), undated lessons after, by sortOrder. */
   lessons: PlacedLesson<T>[]
   currentLessonId: string | null
+  /**
+   * The module was placed on the calendar: it had session dates AND at least
+   * one lesson holds a sat. Only then is "current" a claim about today.
+   */
+  dated: boolean
 }
 
 /**
@@ -47,9 +84,9 @@ type LessonPlacement<T extends LessonInput> = {
  * current until the next lesson's first sat. Before any lesson has started
  * nothing is current — the UI decides what to open.
  *
- * Undated mode (`sessionDates` null — radionica, natjecanje, or a standard group
- * whose arc cannot be computed): the first lesson in display order is current,
- * so something is always open by default.
+ * Undated mode (`sessionDates` null — radionica, a group whose arc or season
+ * cannot be computed — or no lesson of the module holds a sat yet): the first
+ * lesson in display order is current, so something is always open by default.
  *
  * `today` must be a UTC-midnight date for the Europe/Zagreb calendar day (the
  * same convention as `@db.Date` columns and the arc's session dates).
@@ -79,8 +116,8 @@ export function placeLessons<T extends LessonInput>(input: {
 
   placed.sort(compareLessons)
 
-  if (input.sessionDates === null) {
-    return { lessons: placed, currentLessonId: placed[0]?.id ?? null }
+  if (input.sessionDates === null || !placed.some((l) => l.sessionNumbers.length > 0)) {
+    return { lessons: placed, currentLessonId: placed[0]?.id ?? null, dated: false }
   }
 
   const todayMs = input.today.getTime()
@@ -91,7 +128,7 @@ export function placeLessons<T extends LessonInput>(input: {
       current = lesson
     }
   }
-  return { lessons: placed, currentLessonId: current?.id ?? null }
+  return { lessons: placed, currentLessonId: current?.id ?? null, dated: true }
 }
 
 function compareLessons(

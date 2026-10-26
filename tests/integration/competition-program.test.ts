@@ -27,6 +27,7 @@ import {
   createTeacher,
 } from './helpers/factory'
 import { buildGroupMaterialsView } from '@/lib/group-materials-view'
+import { paymentDueCutoff } from '@/lib/payment-status'
 import { fixtureScope } from './helpers/cleanup'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -410,15 +411,16 @@ describe('monthly charges', () => {
     ).toBeNull()
   })
 
-  it('shows the student as owing money until every started month is paid', async () => {
+  it('shows the student as owing money until every due month is paid', async () => {
     const { student, enrollment } = await enrolledCompetitionStudent()
 
     const pendingPage = await getStudents({ page: 1, paymentStatus: 'PENDING' })
     expect(pendingPage.data.map((s) => s.id)).toContain(student.id)
 
-    // Pay every month that has already started.
+    // Pay every month that is due — a month falls due a week BEFORE it starts
+    // (PAYMENT_LEAD_DAYS), so in a month's last week the next one counts too.
     await db.enrollmentMonth.updateMany({
-      where: { enrollmentId: enrollment.id, periodStart: { lte: new Date() } },
+      where: { enrollmentId: enrollment.id, periodStart: { lte: paymentDueCutoff(new Date()) } },
       data: { paidAt: new Date() },
     })
 

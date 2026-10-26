@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  COMPETITION_MAX_SESSION,
   LESSON_SESSION_NUMBERS,
   PROBNI_SAT_SESSION,
   formatLessonSessions,
+  lessonSessionSlots,
   placeLessons,
 } from '@/lib/lesson-schedule'
 
@@ -27,6 +29,32 @@ describe('constants', () => {
   it('the probni sat is sat 0 and a module holds sats 1–7', () => {
     expect(PROBNI_SAT_SESSION).toBe(0)
     expect([...LESSON_SESSION_NUMBERS]).toEqual([1, 2, 3, 4, 5, 6, 7])
+  })
+})
+
+describe('lessonSessionSlots', () => {
+  it('offers a standard module its 7 sats, plus the probni sat on the first module', () => {
+    const base = { competition: false, seasonSessionCount: 0, held: [] }
+    expect(lessonSessionSlots({ ...base, isFirstModule: false })).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(lessonSessionSlots({ ...base, isFirstModule: true })).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+  })
+
+  it('offers a natjecanje one sat per week of the season, never a probni sat', () => {
+    const slots = lessonSessionSlots({ competition: true, isFirstModule: true, seasonSessionCount: 34, held: [] })
+    expect(slots[0]).toBe(1)
+    expect(slots).toHaveLength(34)
+  })
+
+  it('keeps a held sat reachable when the season is shorter, and defaults without a season', () => {
+    expect(
+      lessonSessionSlots({ competition: true, isFirstModule: false, seasonSessionCount: 20, held: [25] }),
+    ).toHaveLength(25)
+    expect(
+      lessonSessionSlots({ competition: true, isFirstModule: false, seasonSessionCount: 0, held: [] }),
+    ).toHaveLength(30)
+    expect(
+      lessonSessionSlots({ competition: true, isFirstModule: false, seasonSessionCount: 99, held: [] }),
+    ).toHaveLength(COMPETITION_MAX_SESSION)
   })
 })
 
@@ -207,7 +235,24 @@ describe('placeLessons — current lesson (dated)', () => {
     const withUndated = [lesson('u', [], -1), lesson('b', [3])]
     expect(at(d(10, 5), withUndated)).toBeNull()
     expect(at(d(12, 1), withUndated)).toBe('b')
-    expect(at(d(12, 1), [lesson('u', [])])).toBeNull()
+  })
+
+  it('falls back to undated mode when no lesson of the module holds a sat', () => {
+    // A natjecanje whose lessons predate season sats: dates exist, sats do not.
+    const placement = placeLessons({
+      lessons: [lesson('u2', [], 2), lesson('u1', [], 1)],
+      sessionDates: SESSION_DATES,
+      trialDate: null,
+      today: d(12, 1),
+    })
+    expect(placement.dated).toBe(false)
+    expect(placement.currentLessonId).toBe('u1')
+  })
+
+  it('reports dated when the module has dates and a lesson holds a sat', () => {
+    expect(
+      placeLessons({ lessons, sessionDates: SESSION_DATES, trialDate: null, today: d(9, 1) }).dated,
+    ).toBe(true)
   })
 
   it('compares against the given today regardless of input order', () => {
@@ -238,7 +283,7 @@ describe('placeLessons — current lesson (undated)', () => {
 
   it('returns null for an empty list', () => {
     const placement = placeLessons({ lessons: [], sessionDates: null, trialDate: null, today: d(10, 1) })
-    expect(placement).toEqual({ lessons: [], currentLessonId: null })
+    expect(placement).toEqual({ lessons: [], currentLessonId: null, dated: false })
   })
 
   it('returns null for an empty list in dated mode too', () => {

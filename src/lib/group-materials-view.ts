@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import type { City, Material, MaterialAudience, MaterialType, ProgramKind } from '@prisma/client'
 import { db } from '@/lib/db'
-import { hasDatedModules, isRadionica, showsAllModules } from '@/lib/program-kind'
+import { hasDatedModules, isCompetition, isRadionica, showsAllModules } from '@/lib/program-kind'
 import {
   buildEffectiveMaterialsWhere,
   visibleLessonWhere,
@@ -16,7 +16,7 @@ import { staffDisplayNames } from '@/lib/session-staff'
 import { placeLessons } from '@/lib/lesson-schedule'
 import { resolveTrialDateForGroup } from '@/lib/trial-week'
 import { zagrebDateKey } from '@/lib/attendance-window'
-import { fromDateKey } from '@/lib/session-dates'
+import { computeSeasonSessions, fromDateKey } from '@/lib/session-dates'
 
 export type MaterialItem = {
   id: string
@@ -53,6 +53,10 @@ export type ModuleLessonsView = {
   /** The module this group is working through now (standard programs only). */
   isActive: boolean
   currentLessonId: string | null
+  /** Placed on this group's calendar (`placeLessons`), so "current" is about today. */
+  dated: boolean
+  /** Dated, nothing current yet: when the first lesson begins. Null otherwise. */
+  firstLessonStart: Date | null
   lessons: LessonView[]
   /** Teacher-only "every class of this module" rows. Always empty for STUDENT. */
   teacherMaterials: MaterialItem[]
@@ -60,6 +64,11 @@ export type ModuleLessonsView = {
 
 export type GroupMaterialsView = {
   viewer: MaterialViewer
+  /**
+   * Parent view: every dated section carries only its current lesson
+   * (`toCurrentLessonOnly`). The classroom and staff keep the whole module.
+   */
+  currentLessonOnly: boolean
   group: {
     id: string
     name: string | null
@@ -144,7 +153,11 @@ export type GroupShell = {
   activeModule: { id: string; title: string; sortOrder: number } | null
   /** Modules whose lessons the PORTAL may see (staff see every module). */
   visibleModuleIds: string[]
-  /** Each standard module's 7 sats on this group's own arc, by module id. */
+  /**
+   * Each module's sats on this group's calendar, by module id: a standard
+   * module's 7 on its own arc, a natjecanje's weekly season termini. Absent =
+   * undated (radionica, no plan, no season).
+   */
   moduleSessionDates: Map<string, Date[]>
   /** The group's own school year (what its trial week is keyed on). */
   groupSchoolYear: string
@@ -177,6 +190,7 @@ export const buildGroupShell = cache(async function buildGroupShell(
             orderBy: { sortOrder: 'asc' },
             include: { schedules: true },
           },
+          seasons: { select: { schoolYear: true, city: true, startDate: true, endDate: true } },
         },
       },
       location: true,
@@ -234,6 +248,22 @@ export const buildGroupShell = cache(async function buildGroupShell(
       holidayDates,
     })
     for (const entry of arc) moduleSessionDates.set(entry.moduleId, entry.sessionDates)
+  } else if (isCompetition(kind)) {
+    // A natjecanje meets once a week all season, and every natjecanje runs the
+    // whole season — sat N of any of them is the group's Nth weekly termin.
+    const season =
+      group.course.seasons.find((x) => x.schoolYear === schoolYear && x.city === group.city) ?? null
+    const seasonDates = season
+      ? computeSeasonSessions({
+          dayOfWeek: group.dayOfWeek,
+          startDate: season.startDate,
+          endDate: season.endDate,
+          holidayDates,
+        })
+      : []
+    if (seasonDates.length > 0) {
+      for (const m of group.course.modules) moduleSessionDates.set(m.id, seasonDates)
+    }
   }
 
   return {
@@ -354,10 +384,7 @@ export async function buildGroupMaterialsView(
     sortOrder: number,
   ): ModuleLessonsView => {
     const own = lessons.filter((l) => l.moduleId === moduleId)
-    const sessionDates =
-      moduleId !== null && hasDatedModules(kind)
-        ? (shell.moduleSessionDates.get(moduleId) ?? null)
-        : null
+    const sessionDates = moduleId === null ? null : (shell.moduleSessionDates.get(moduleId) ?? null)
     const placement = placeLessons({
       lessons: own.map((l) => ({ ...l, sessionNumbers: l.sessions.map((s) => s.sessionNumber) })),
       sessionDates,
@@ -370,6 +397,11 @@ export async function buildGroupMaterialsView(
       sortOrder,
       isActive: moduleId !== null && moduleId === activeModule?.id,
       currentLessonId: placement.currentLessonId,
+      dated: placement.dated,
+      firstLessonStart:
+        placement.dated && placement.currentLessonId === null
+          ? (placement.lessons.find((l) => l.firstDate !== null)?.firstDate ?? null)
+          : null,
       lessons: placement.lessons.map((l) => ({
         id: l.id,
         title: l.title,
@@ -391,11 +423,39 @@ export async function buildGroupMaterialsView(
 
   return {
     viewer,
+    currentLessonOnly: false,
     group: shell.group,
     modules: sections,
     programTeacherMaterials,
     activeModuleId: activeModule?.id ?? null,
   }
+}
+
+/**
+ * The parent's cut of a STUDENT view (owner, 2026-10-26): a dated section keeps
+ * only the lesson that is current on this group's calendar — from the day of
+ * its first sat until the next lesson's — and nothing before the first lesson
+ * starts. An undated section (radionica, a natjecanje without sats) has no
+ * "current" on the calendar and keeps every lesson, as before.
+ *
+ * Applied on the server so the other lessons never reach the browser; the
+ * download route applies the same cut (`currentLessonMaterialIds`).
+ */
+export function toCurrentLessonOnly(view: GroupMaterialsView): GroupMaterialsView {
+  return {
+    ...view,
+    currentLessonOnly: true,
+    modules: view.modules.map((section) =>
+      section.dated
+        ? { ...section, lessons: section.lessons.filter((l) => l.id === section.currentLessonId) }
+        : section,
+    ),
+  }
+}
+
+/** Every material id the view lists — what the portal may download from it. */
+export function viewMaterialIds(view: GroupMaterialsView): Set<string> {
+  return new Set(view.modules.flatMap((s) => s.lessons.flatMap((l) => l.materials.map((m) => m.id))))
 }
 
 function pushTo<K>(map: Map<K, MaterialItem[]>, key: K, item: MaterialItem) {

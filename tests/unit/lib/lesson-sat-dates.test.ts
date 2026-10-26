@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moduleSatDateRanges } from '@/lib/lesson-sat-dates'
+import { moduleSatDateRanges, seasonSatDateRanges } from '@/lib/lesson-sat-dates'
 
 const d = (month: number, day: number) => new Date(Date.UTC(2026, month - 1, day))
 const key = (date: Date) => date.toISOString().slice(0, 10)
@@ -52,5 +52,31 @@ describe('moduleSatDateRanges', () => {
       trialWeek: null,
     })
     expect(ranges.get('m1')).toBeUndefined()
+  })
+})
+
+describe('seasonSatDateRanges', () => {
+  it('numbers the season one sat a week, spanning the six weekdays', () => {
+    const ranges = seasonSatDateRanges({
+      season: { startDate: d(10, 5), endDate: d(10, 31) },
+      holidayDates: new Set(),
+    })
+    expect(ranges.map((r) => r.sessionNumber)).toEqual([1, 2, 3, 4])
+    expect(key(ranges[0].from)).toBe('2026-10-05')
+    expect(key(ranges[0].to)).toBe('2026-10-10')
+  })
+
+  it('drops a holiday week for that weekday instead of making it up', () => {
+    // Wednesday 7.10. is off: Wednesday groups start on 14.10. and end a sat short.
+    const ranges = seasonSatDateRanges({
+      season: { startDate: d(10, 5), endDate: d(10, 31) },
+      holidayDates: new Set(['2026-10-07']),
+    })
+    expect(key(ranges[0].to)).toBe('2026-10-14')
+    expect(ranges).toHaveLength(4)
+  })
+
+  it('is empty without a season', () => {
+    expect(seasonSatDateRanges({ season: null, holidayDates: new Set() })).toEqual([])
   })
 })

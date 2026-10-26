@@ -1,14 +1,14 @@
 'use client'
 
-import { LESSON_SESSION_NUMBERS, PROBNI_SAT_SESSION } from '@/lib/lesson-schedule'
+import { PROBNI_SAT_SESSION } from '@/lib/lesson-schedule'
 import { satDateLabel } from '@/lib/lesson-outline'
 import type { SatDateRange } from '@/lib/lesson-sat-dates'
 
 interface Props {
   selected: readonly number[]
   onChange: (next: number[]) => void
-  /** Only the program's first module has a probni sat slot. */
-  isFirstModule: boolean
+  /** The sats to offer, in order (`lessonSessionSlots` — standard 0/1–7, natjecanje 1..N). */
+  slots: readonly number[]
   /** Sats other lessons of this module hold — not selectable here. */
   taken: readonly { sessionNumber: number; lessonTitle: string }[]
   satDates: readonly SatDateRange[]
@@ -21,8 +21,7 @@ interface Props {
  * stored: the lesson is bound to the sat NUMBER, and each group reaches it on
  * its own day.
  */
-export function SatPicker({ selected, onChange, isFirstModule, taken, satDates, disabled }: Readonly<Props>) {
-  const slots = [...(isFirstModule ? [PROBNI_SAT_SESSION] : []), ...LESSON_SESSION_NUMBERS]
+export function SatPicker({ selected, onChange, slots, taken, satDates, disabled }: Readonly<Props>) {
   const takenBy = new Map(taken.map((t) => [t.sessionNumber, t.lessonTitle]))
 
   const toggle = (n: number) => {
@@ -65,7 +64,7 @@ export function SatPicker({ selected, onChange, isFirstModule, taken, satDates, 
       </div>
       {satDates.length === 0 ? (
         <p className="mt-2 text-xs text-gray-500">
-          Primjeri datuma nisu dostupni — plan ove školske godine još nema datume modula.
+          Primjeri datuma nisu dostupni — plan ove školske godine još nema datume.
         </p>
       ) : (
         <p className="mt-2 text-xs text-gray-500">
