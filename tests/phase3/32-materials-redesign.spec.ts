@@ -12,6 +12,7 @@ import {
   createLessonOnProgramPage,
   seedLesson,
   openLesson,
+  pinLessonToCurrentSat,
   addTeacherProgramMaterial,
   type LessonTarget,
   type TeacherData,
@@ -30,7 +31,12 @@ const RUN_ID = newRunId()
 // zero-width and specs that never changed start failing on the litter.
 // Best-effort by design: it swallows, so a teardown problem can never turn a
 // green run red.
+// A parent sees only the current lesson, so the spec's lesson is pinned to the
+// group's current sat; this puts back whatever lesson held that sat before.
+let restoreCurrentSat: (() => Promise<void>) | null = null
+
 test.afterAll(async () => {
+  await restoreCurrentSat?.()
   await cleanupRunFixtures(RUN_ID)
 })
 
@@ -128,6 +134,7 @@ test.describe('Phase 3 — Materials redesign: lessons, RoboCamp in the lesson, 
         { title: KIDS_LINK_TITLE, url: 'https://example.com/radni-list' },
       ],
     })
+    restoreCurrentSat = await pinLessonToCurrentSat(seeded.groupId, lessonAId)
     const section = (heading: string) =>
       page.locator('section').filter({ has: page.getByRole('heading', { level: 2, name: heading }) })
     await expect(section('Materijali za polaznike').getByText(ROBOCAMP_TITLE)).toBeVisible()

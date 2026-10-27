@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight, Plus } from 'lucide-react'
 import type { ProgramLessonModule, ProgramLessonRow } from '@/actions/admin/program-materials'
-import { buildLessonOutline, satDateLabel } from '@/lib/lesson-outline'
+import { buildLessonOutline, NO_SAT_HINT, NO_SAT_LABEL, satDateLabel } from '@/lib/lesson-outline'
 import { formatLessonSessions, PROBNI_SAT_SESSION } from '@/lib/lesson-schedule'
 import { croatianPlural } from '@/lib/format'
 import { StaffMaterialList } from '@/components/material/staff-material-list'
@@ -158,8 +158,9 @@ function LessonRow({
   const counts = `${lesson.teacherCount} nast. · ${lesson.studentCount} pol.`
   let label: string | null = null
   if (lesson.sessionNumbers.length > 0) label = formatLessonSessions(lesson.sessionNumbers)
-  // A dated module's lesson without a sat is reached by no group on any date.
-  else if (dated) label = 'Bez sata'
+  // A dated module's lesson without a sat is reached by no group on any date,
+  // so a parent never sees it — the admin has to pick its sat.
+  else if (dated) label = NO_SAT_LABEL
 
   return (
     <li>
@@ -173,6 +174,9 @@ function LessonRow({
         {label ? <SatColumn label={label} date={null} warn={lesson.sessionNumbers.length === 0} /> : null}
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-gray-900">{lesson.title}</span>
+          {label === NO_SAT_LABEL ? (
+            <span className="block text-xs text-amber-700">{NO_SAT_HINT}</span>
+          ) : null}
           <span className="block text-xs text-gray-500 sm:hidden">{counts}</span>
         </span>
         <span className="hidden shrink-0 text-xs tabular-nums text-gray-500 sm:inline">{counts}</span>

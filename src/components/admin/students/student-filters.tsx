@@ -66,18 +66,18 @@ export function StudentFilters({
     if (search) sp.set('search', search)
 
     if (showFilters) {
-      const courseId = overrides.courseId ?? currentCourseId ?? ''
-      const groupId = overrides.groupId ?? currentGroupId ?? ''
-      const payment = overrides.payment ?? currentPayment ?? ''
-      const returning = overrides.returning ?? currentReturning ?? ''
-      const consent = overrides.consent ?? currentConsent ?? ''
-      const contract = overrides.contract ?? currentContract ?? ''
-      if (courseId) sp.set('courseId', courseId)
-      if (groupId) sp.set('groupId', groupId)
-      if (payment) sp.set('payment', payment)
-      if (returning) sp.set('returning', returning)
-      if (consent) sp.set('consent', consent)
-      if (contract) sp.set('contract', contract)
+      const current: Record<string, string | undefined> = {
+        courseId: currentCourseId,
+        groupId: currentGroupId,
+        payment: currentPayment,
+        returning: currentReturning,
+        consent: currentConsent,
+        contract: currentContract,
+      }
+      for (const [key, value] of Object.entries(current)) {
+        const next = overrides[key] ?? value ?? ''
+        if (next) sp.set(key, next)
+      }
     }
 
     return sp.toString()

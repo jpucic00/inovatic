@@ -638,25 +638,30 @@ test.describe.serial('Phase 2 Step 6 — Admin Inquiry Management', () => {
   // ── Table sorting ──────────────────────────────────────────────────────────
 
   test.describe('Table Sorting', () => {
-    test('clicking "Datum" header sorts the table', async ({ page }) => {
+    // The list is paginated, so the headers are links: the server sorts the
+    // whole filtered list (?sort=&dir=), not the 20 rows the page holds.
+    test('clicking "Datum" header sorts the whole list through the URL', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti`)
-      const dateHeader = page.locator('th button', { hasText: 'Datum' })
+      const dateHeader = page.locator('th a', { hasText: 'Datum' })
       await expect(dateHeader).toBeVisible()
       // Click once → ascending
       await dateHeader.click()
-      await expect(page.locator('th button svg').first()).toBeVisible()
+      await expect(page).toHaveURL(/sort=createdAt&dir=asc/)
+      await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Datum')
       // Click again → descending
       await dateHeader.click()
-      await expect(page.locator('th button svg').first()).toBeVisible()
+      await expect(page).toHaveURL(/sort=createdAt&dir=desc/)
+      await expect(page.locator('th[aria-sort="descending"]')).toContainText('Datum')
     })
 
     test('clicking "Roditelj" header sorts alphabetically', async ({ page }) => {
       await loginAsAdmin(page)
       await page.goto(`${BASE}/admin/upiti`)
-      const parentHeader = page.locator('th button', { hasText: 'Roditelj' })
+      const parentHeader = page.locator('th a', { hasText: 'Roditelj' })
       await expect(parentHeader).toBeVisible()
       await parentHeader.click()
+      await expect(page).toHaveURL(/sort=parentName&dir=asc/)
       // Table still renders rows after sort
       await expect(page.locator('tbody tr').first()).toBeVisible()
     })

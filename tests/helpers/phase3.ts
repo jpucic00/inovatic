@@ -20,6 +20,8 @@ import { db } from '@/lib/db'
 import { computeSchoolYear } from '@/lib/school-year'
 import { getCurrentActiveModuleForGroup } from '@/lib/active-module'
 import { loadHolidayDateKeys } from '@/lib/holidays'
+import { getGroupModuleArc } from '@/lib/group-module-arc'
+import { zagrebDateKey } from '@/lib/attendance-window'
 import { grantLogin, grantParentLogin, uniqueParentEmail } from './seed'
 
 export const BASE = 'http://localhost:3000'
@@ -418,6 +420,69 @@ export async function groupLessonTarget(groupId: string): Promise<LessonTarget> 
   return { courseId: course.id, moduleId: active.id, moduleTitle: active.title }
 }
 
+/**
+ * Put a spec's lesson on the group's latest sat reached today, so a parent sees
+ * it: a parent gets only the current lesson, and in a dated module a lesson
+ * with no sat is never current. Any lesson already holding that sat (dev data,
+ * typically) is moved aside for the run — call the returned function in
+ * `afterAll` to put it back. Standard modules only.
+ */
+export async function pinLessonToCurrentSat(groupId: string, lessonId: string): Promise<() => Promise<void>> {
+  const schoolYear = computeSchoolYear()
+  const [group, lesson] = await Promise.all([
+    db.scheduledGroup.findUniqueOrThrow({
+      where: { id: groupId },
+      select: {
+        city: true,
+        dayOfWeek: true,
+        course: { select: { modules: { include: { schedules: { where: { schoolYear } } } } } },
+      },
+    }),
+    db.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { moduleId: true } }),
+  ])
+  const moduleId = lesson.moduleId
+  if (!moduleId) throw new Error('pinLessonToCurrentSat: the lesson has no module')
+
+  const arc = getGroupModuleArc({
+    dayOfWeek: group.dayOfWeek,
+    modules: group.course.modules.map((m) => {
+      const schedule = m.schedules.find((s) => s.city === group.city) ?? null
+      return {
+        id: m.id,
+        title: m.title,
+        sortOrder: m.sortOrder,
+        schedule: schedule ? { id: schedule.id, startDate: schedule.startDate, endDate: schedule.endDate } : null,
+      }
+    }),
+    holidayDates: await loadHolidayDateKeys(schoolYear, group.city),
+  })
+  const today = zagrebDateKey(new Date())
+  const reached = (arc.find((e) => e.moduleId === moduleId)?.sessionDates ?? []).filter(
+    (d) => d.toISOString().slice(0, 10) <= today,
+  ).length
+  if (reached === 0) {
+    throw new Error(
+      'pinLessonToCurrentSat: the group has not reached a sat of this module yet — run `npm run db:refresh-dev-dates -- --apply`',
+    )
+  }
+
+  const displaced = await db.lessonSession.findUnique({
+    where: { moduleId_sessionNumber: { moduleId, sessionNumber: reached } },
+  })
+  if (displaced) await db.lessonSession.delete({ where: { id: displaced.id } })
+  await db.lessonSession.deleteMany({ where: { lessonId } })
+  await db.lessonSession.create({ data: { lessonId, moduleId, sessionNumber: reached } })
+
+  return async () => {
+    await db.lessonSession.deleteMany({ where: { lessonId } })
+    if (displaced) {
+      await db.lessonSession.create({
+        data: { lessonId: displaced.lessonId, moduleId, sessionNumber: displaced.sessionNumber },
+      })
+    }
+  }
+}
+
 async function adminUserId(): Promise<string> {
   const admin = await db.user.findUniqueOrThrow({ where: { email: ADMIN_EMAIL }, select: { id: true } })
   return admin.id
@@ -560,7 +625,8 @@ export async function createLessonOnProgramPage(
 }
 
 /**
- * Open one lesson of a lesson accordion — the portal's, or the staff group
+ * Open one lesson of a lesson accordion — the portal's (or a parent's single
+ * current-lesson card), or the staff group
  * view's (`/nastavnik/grupa/<id>/materijali`, `/admin/grupe/<id>`). The staff
  * view also folds whole modules, so any folded module is opened first. Returns
  * the lesson's `<li>` for scoping assertions.
@@ -588,7 +654,9 @@ export async function openLesson(page: Page, lessonTitle: string): Promise<Locat
       await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 })
     }).toPass({ timeout: 20000 })
   }
-  return page.locator('li').filter({ has: heading })
+  // A parent's single current-lesson card is an <article>, accordion lessons
+  // are <li>s; the innermost match is the lesson itself.
+  return page.locator('li, article').filter({ has: heading }).last()
 }
 
 /** One audience section ("Za nastavnike" / "Za polaznike") of an open staff lesson. */

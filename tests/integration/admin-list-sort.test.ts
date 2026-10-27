@@ -124,6 +124,29 @@ describe('getStudents — sort spans every page', () => {
     expect(first.data.map((r) => r.id)).toEqual([returningStudentId])
     expect(first.data[0].isReturning).toBe(true)
   })
+
+  it('sorts only what a filter leaves, and counts only that', async () => {
+    const names: string[] = []
+    for (let page = 1; page <= 2; page++) {
+      const result = await getStudents({
+        search: MARKER,
+        schoolYear: YEAR,
+        returning: 'NEW',
+        sort: { key: 'name', dir: 'desc' },
+        page,
+        pageSize: 1,
+      })
+      expect(result.total).toBe(2)
+      names.push(...result.data.map((r) => r.firstName))
+    }
+    expect(names).toEqual(['Cvita', 'Ana'])
+  })
+
+  it('falls back to newest first for a key it does not know', async () => {
+    // The action is callable directly; it must not trust the page's parsing.
+    const sort = { key: 'nope', dir: 'asc' } as unknown as StudentSort
+    expect(await studentPages(sort)).toEqual(['Ana', 'Cvita', 'Čedo'])
+  })
 })
 
 async function inquiryPages(view: 'ALL' | 'WAITLIST', sort?: InquirySort) {

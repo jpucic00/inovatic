@@ -13,6 +13,7 @@ import {
   materialCard,
   groupLessonTarget,
   openLesson,
+  pinLessonToCurrentSat,
   seedLesson,
   croatianDateRegex,
   type TeacherData,
@@ -30,7 +31,12 @@ const RUN_ID = newRunId()
 // zero-width and specs that never changed start failing on the litter.
 // Best-effort by design: it swallows, so a teardown problem can never turn a
 // green run red.
+// A parent sees only the current lesson, so the spec's lesson is pinned to the
+// group's current sat; this puts back whatever lesson held that sat before.
+let restoreCurrentSat: (() => Promise<void>) | null = null
+
 test.afterAll(async () => {
+  await restoreCurrentSat?.()
   await cleanupRunFixtures(RUN_ID)
 })
 
@@ -85,11 +91,12 @@ test.describe('Phase 3 Step 16 — End-to-end', () => {
     // on today, holding one kids' link, so the teacher flow can hide it and the
     // student can see/lose it. Seeded directly — the lesson editor itself is
     // covered by 24-materials.
-    await seedLesson({
+    const { lessonId } = await seedLesson({
       target: await groupLessonTarget(groupId),
       title: LESSON_TITLE,
       studentLinks: [{ title: COURSE_MATERIAL, url: 'https://example.com/e2e/program' }],
     })
+    restoreCurrentSat = await pinLessonToCurrentSat(groupId, lessonId)
     seeded = {
       teacher: { email: TEACHER.email, password: t.password, teacherId: t.teacherId },
       studentId: s.studentId,

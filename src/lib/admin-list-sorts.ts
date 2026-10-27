@@ -5,7 +5,7 @@
  * cannot be sortable in the UI and ignored by the query.
  */
 import { formatChildName } from '@/lib/format'
-import { GRADE_SORT_KEY, type Grade } from '@/lib/inquiry-status'
+import { GRADE_SORT_KEY, INQUIRY_STATUS_LABELS, type Grade } from '@/lib/inquiry-status'
 import { PAYMENT_STATUS_SORT_KEY, type PaymentStatus } from '@/lib/payment-status'
 import type { SortValue } from '@/lib/list-sort'
 
@@ -58,13 +58,19 @@ export function inquirySortValue(key: InquirySortKey, row: InquirySortFields): S
     case 'parentName':
       return row.parentName
     case 'childName':
-      // A proslava has no child; it sorts after every name.
-      return row.type === 'PARTY' ? 'zzz' : formatChildName(row, '')
+      // A proslava has no child; it sorts after every name. U+FFFF carries the
+      // highest collation weight, so it also lands after Ž, which 'zzz' did not.
+      return row.type === 'PARTY' ? '\uFFFF' : formatChildName(row, '')
     case 'childGrade':
       return row.childGrade ? (GRADE_SORT_KEY[row.childGrade as Grade] ?? 999) : 999
     case 'status':
-      return row.status
+      // By the label the admin reads, not the enum code.
+      return statusSortValue(row.status)
   }
+}
+
+function statusSortValue(status: string): string {
+  return INQUIRY_STATUS_LABELS[status] ?? status
 }
 
 export const WAITLIST_SORT_KEYS = ['position', 'waitlistedAt', 'child', 'parent', 'status', 'groups'] as const
@@ -90,7 +96,8 @@ export function waitlistSortValue(key: WaitlistSortKey, row: WaitlistSortFields)
     case 'parent':
       return row.parentName
     case 'status':
-      return row.status
+      // By the label the admin reads, not the enum code.
+      return statusSortValue(row.status)
     case 'groups':
       // Rows with a free acceptable group first — that is what the admin scans for.
       return row.waitlist?.hasFreeSpot ? 0 : 1

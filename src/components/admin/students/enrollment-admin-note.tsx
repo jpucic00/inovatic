@@ -40,6 +40,12 @@ export function EnrollmentAdminNote({ enrollmentId, note }: Readonly<Props>) {
     })
   }
 
+  const savedNote = note ? (
+    <p className="text-sm text-gray-700 whitespace-pre-wrap [overflow-wrap:anywhere]">{note}</p>
+  ) : (
+    <p className="text-xs text-gray-400">Nema bilješke.</p>
+  )
+
   return (
     <div className="mt-3 pt-3 border-t border-gray-200">
       <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -88,10 +94,8 @@ export function EnrollmentAdminNote({ enrollmentId, note }: Readonly<Props>) {
             </button>
           </div>
         </div>
-      ) : note ? (
-        <p className="text-sm text-gray-700 whitespace-pre-wrap [overflow-wrap:anywhere]">{note}</p>
       ) : (
-        <p className="text-xs text-gray-400">Nema bilješke.</p>
+        savedNote
       )}
     </div>
   )

@@ -166,3 +166,40 @@ describe('GET /api/download — a parent downloads only the current lesson', () 
     expect((await download(s.files.a.id)).status).toBe(200)
   })
 })
+
+describe('GET /api/download — the cut covers group additions and a season not yet started', () => {
+  it("refuses a parent the group's own file in a past lesson, the classroom keeps it", async () => {
+    const s = await seedCompetitionGroup()
+    const own = await createMaterial({
+      scope: 'GROUP',
+      scheduledGroupId: s.group.id,
+      lessonId: s.a.id,
+      audience: 'STUDENT',
+      title: 'grupa-prva',
+      type: 'DOCUMENT',
+      fileUrl: 'https://res.cloudinary.com/dgc2tp4f8/raw/upload/v1/test/grupa-prva.pdf',
+      externalUrl: null,
+    })
+
+    mockChildSession(s.student.id)
+    expect((await download(own.id)).status).toBe(404)
+
+    const row = await classroomAccount('SPLIT')
+    mockSession({ id: row.id, role: 'CLASSROOM', city: 'SPLIT' })
+    expect((await download(own.id)).status).toBe(200)
+  })
+
+  it('refuses a parent every dated lesson before the season starts', async () => {
+    const s = await seedCompetitionGroup()
+    await db.courseSeason.updateMany({
+      where: { courseId: s.group.courseId },
+      data: { startDate: mondayWeeksAgo(-2), endDate: mondayWeeksAgo(-30) },
+    })
+
+    mockChildSession(s.student.id)
+    for (const file of [s.files.a, s.files.b, s.files.c]) {
+      expect((await download(file.id)).status).toBe(404)
+    }
+    expect((await download(s.files.p.id)).status).toBe(200)
+  })
+})

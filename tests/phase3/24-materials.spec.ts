@@ -11,6 +11,7 @@ import {
   openAddGroupMaterial,
   addTeacherProgramMaterial,
   openLesson,
+  pinLessonToCurrentSat,
   lessonAudienceSection,
   materialCard,
   cloudinaryAssetStatus,
@@ -35,7 +36,12 @@ const RUN_ID = newRunId()
 // zero-width and specs that never changed start failing on the litter.
 // Best-effort by design: it swallows, so a teardown problem can never turn a
 // green run red.
+// A parent sees only the current lesson, so the spec's lesson is pinned to the
+// group's current sat; this puts back whatever lesson held that sat before.
+let restoreCurrentSat: (() => Promise<void>) | null = null
+
 test.afterAll(async () => {
+  await restoreCurrentSat?.()
   await cleanupRunFixtures(RUN_ID)
 })
 
@@ -111,6 +117,7 @@ test.describe('Phase 3 Step 13 — Materials (Materijali v2: lessons + audience)
       teacherLinks: [TEACHER_LINK],
       studentLinks: [STUDENT_LINK],
     })
+    restoreCurrentSat = await pinLessonToCurrentSat(seeded.groupId, lessonId)
 
     // Saved in one transaction with the lesson, each under its own audience.
     const section = (heading: string) =>

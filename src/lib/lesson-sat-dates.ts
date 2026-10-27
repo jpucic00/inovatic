@@ -102,10 +102,11 @@ export function seasonSatDateRanges(input: {
     dates.forEach((date, index) => {
       const sessionNumber = index + 1
       const current = ranges.get(sessionNumber)
-      if (!current) ranges.set(sessionNumber, { sessionNumber, from: date, to: date })
-      else {
+      if (current) {
         if (date < current.from) current.from = date
         if (date > current.to) current.to = date
+      } else {
+        ranges.set(sessionNumber, { sessionNumber, from: date, to: date })
       }
     })
   }

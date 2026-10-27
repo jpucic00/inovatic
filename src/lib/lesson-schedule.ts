@@ -80,9 +80,11 @@ type LessonPlacement<T extends LessonInput> = {
  * Orders a module's lessons and picks the current one.
  *
  * Dated mode (`sessionDates` given — a standard module on a group with a usable
- * arc): a lesson becomes current on the Zagreb day of its first sat and stays
- * current until the next lesson's first sat. Before any lesson has started
- * nothing is current — the UI decides what to open.
+ * arc, or a natjecanje season): the current lesson is the one holding the latest
+ * sat the group has reached (Zagreb day), and it stays current across days and
+ * sats no lesson holds. A lesson split over sats 1 and 3 is current on 1, gives
+ * way on 2, and is current again on 3. Before any lesson has started nothing is
+ * current — the UI decides what to open.
  *
  * Undated mode (`sessionDates` null — radionica, a group whose arc or season
  * cannot be computed — or no lesson of the module holds a sat yet): the first
@@ -120,15 +122,21 @@ export function placeLessons<T extends LessonInput>(input: {
     return { lessons: placed, currentLessonId: placed[0]?.id ?? null, dated: false }
   }
 
+  // The lesson holding the group's latest sat reached so far — every sat, not
+  // only a lesson's first, so a lesson on sats 1 and 3 is current again on sat 3
+  // after another lesson had sat 2.
   const todayMs = input.today.getTime()
-  let current: PlacedLesson<T> | null = null
+  let currentLessonId: string | null = null
+  let currentMs = Number.NEGATIVE_INFINITY
   for (const lesson of placed) {
-    if (lesson.firstDate === null || lesson.firstDate.getTime() > todayMs) continue
-    if (current === null || lesson.firstDate.getTime() > (current.firstDate as Date).getTime()) {
-      current = lesson
+    for (const n of lesson.sessionNumbers) {
+      const ms = dateOf(n)?.getTime()
+      if (ms === undefined || ms > todayMs || ms <= currentMs) continue
+      currentMs = ms
+      currentLessonId = lesson.id
     }
   }
-  return { lessons: placed, currentLessonId: current?.id ?? null, dated: true }
+  return { lessons: placed, currentLessonId, dated: true }
 }
 
 function compareLessons(

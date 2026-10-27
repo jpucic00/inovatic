@@ -207,13 +207,28 @@ describe('placeLessons — current lesson (dated)', () => {
     expect(at(d(12, 20))).toBe('c')
   })
 
-  it('uses the FIRST sat of a lesson spanning non-contiguous sats', () => {
+  it('makes a lesson current again on a later sat after another lesson had the gap', () => {
     const split = [lesson('x', [2, 6]), lesson('y', [4])]
     expect(at(d(10, 5), split)).toBeNull()
     expect(at(d(10, 12), split)).toBe('x')
-    // y takes over on sat 4, and x's sat 6 does NOT bring it back.
+    // y takes over on sat 4 and keeps sat 5, which nobody holds…
     expect(at(d(10, 26), split)).toBe('y')
-    expect(at(d(11, 9), split)).toBe('y')
+    expect(at(d(11, 2), split)).toBe('y')
+    // …and x's sat 6 brings it back, through the end of the module.
+    expect(at(d(11, 9), split)).toBe('x')
+    expect(at(d(12, 20), split)).toBe('x')
+  })
+
+  it('follows each group\'s own dates when a holiday pushes its sats back', () => {
+    // Vrtuljak on sats 1 and 3, Ringišpil on 2. A holiday on 12.10. moves this
+    // group's sats 2–7 a week later: on 19.10. it is on sat 2, not sat 3.
+    const vr = [lesson('vrtuljak', [1, 3]), lesson('ringispil', [2])]
+    const shifted = [d(10, 5), d(10, 19), d(10, 26), d(11, 2), d(11, 9), d(11, 16), d(11, 23)]
+    const on = (today: Date, sessionDates: Date[]) =>
+      placeLessons({ lessons: vr, sessionDates, trialDate: null, today }).currentLessonId
+    expect(on(d(10, 19), SESSION_DATES)).toBe('vrtuljak')
+    expect(on(d(10, 19), shifted)).toBe('ringispil')
+    expect(on(d(10, 26), shifted)).toBe('vrtuljak')
   })
 
   it('makes a probni sat lesson current on the trial date', () => {

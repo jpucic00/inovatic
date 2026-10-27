@@ -101,7 +101,7 @@ export default async function ProgramDetailPage({ params }: Readonly<PageProps>)
   } else if (radionica) {
     lessonsHint = 'Radionica nema module ni numerirane sate — lekcije se redaju redom kojim su dodane.'
   } else if (competition) {
-    lessonsHint = `Lekcije po natjecanju, bez numeriranih termina. ${lessonsHint}`
+    lessonsHint = `Lekcije po natjecanju; sat N je N-ti tjedni termin grupe u sezoni. ${lessonsHint}`
   }
 
   return (

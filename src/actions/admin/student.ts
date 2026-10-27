@@ -60,8 +60,8 @@ import {
   type EnrollmentConsents,
 } from '@/lib/enrollment-consent'
 import { contractEnrollmentWhere, type ContractFilter } from '@/lib/contract-filter'
-import { sortRows, type ListSort } from '@/lib/list-sort'
-import { studentSortValue, type StudentSortKey } from '@/lib/admin-list-sorts'
+import { parseListSort, sortRows, type ListSort } from '@/lib/list-sort'
+import { STUDENT_SORT_KEYS, studentSortValue, type StudentSortKey } from '@/lib/admin-list-sorts'
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
 
@@ -1057,13 +1057,17 @@ export async function getStudents(
 
   let rows: StudentRow[]
   let total: number
-  if (filters.sort) {
+  // Re-parsed: the action is callable directly, not only from the page.
+  const sort = filters.sort
+    ? parseListSort(STUDENT_SORT_KEYS, filters.sort.key, filters.sort.dir)
+    : undefined
+  if (sort) {
     // Plaćanje and Ponovni upis are computed per row, not columns, so a sorted
     // list is resolved whole and paged afterwards — sorting one page of rows
     // the database cut in creation order is the bug this replaces. A year's
     // roster is a few hundred children, which is what makes that affordable.
     const all = toRows(await db.user.findMany({ where, select, orderBy }))
-    const sorted = sortRows(all, filters.sort, studentSortValue)
+    const sorted = sortRows(all, sort, studentSortValue)
     rows = sorted.slice(skip, skip + pageSize)
     total = all.length
   } else {

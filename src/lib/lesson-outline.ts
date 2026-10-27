@@ -1,6 +1,13 @@
 import { LESSON_SESSION_NUMBERS, PROBNI_SAT_SESSION } from '@/lib/lesson-schedule'
 
 /**
+ * A lesson of a dated module that holds no sat is current on no date, so a
+ * parent never sees it. Shown on the program page and in the sat picker.
+ */
+export const NO_SAT_LABEL = 'Bez odabranog termina'
+export const NO_SAT_HINT = 'Roditelji ne vide ovu lekciju dok joj ne odaberete sat.'
+
+/**
  * What a module's card on the program page lists, in order: its lessons, and —
  * for a DATED module — every sat no lesson holds yet, in its own position, so a
  * gap in the curriculum reads as a gap rather than disappearing.

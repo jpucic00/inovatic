@@ -1,7 +1,7 @@
 'use client'
 
 import { PROBNI_SAT_SESSION } from '@/lib/lesson-schedule'
-import { satDateLabel } from '@/lib/lesson-outline'
+import { NO_SAT_HINT, NO_SAT_LABEL, satDateLabel } from '@/lib/lesson-outline'
 import type { SatDateRange } from '@/lib/lesson-sat-dates'
 
 interface Props {
@@ -62,6 +62,11 @@ export function SatPicker({ selected, onChange, slots, taken, satDates, disabled
           )
         })}
       </div>
+      {selected.length === 0 ? (
+        <p role="status" className="mt-2 text-xs font-medium text-amber-700">
+          {NO_SAT_LABEL}. {NO_SAT_HINT}
+        </p>
+      ) : null}
       {satDates.length === 0 ? (
         <p className="mt-2 text-xs text-gray-500">
           Primjeri datuma nisu dostupni — plan ove školske godine još nema datume.
