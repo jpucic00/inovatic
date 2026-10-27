@@ -124,6 +124,44 @@ export interface ReleaseNote {
  */
 export const RELEASES: readonly ReleaseNote[] = [
   {
+    version: '1.9.0',
+    date: '2026-10-28',
+    title: 'Nova verzija aplikacije.',
+    sections: [
+      {
+        area: 'Polaznički portal',
+        changes: [
+          'Roditelj vidi samo materijale lekcije koja je trenutno na redu, a prije prve lekcije piše kad ona počinje. Račun za učionicu i dalje vidi cijeli modul.',
+        ],
+      },
+      {
+        area: 'Programi',
+        changes: [
+          'Lekcija bez odabranog sata u modulu s datumima označena je upozorenjem „Bez odabranog termina” jer je roditelji ne vide dok joj se ne odabere sat.',
+          'Natjecanje mladih tehničara i Robokup sada su jedan modul natjecateljskog programa.',
+        ],
+      },
+      {
+        area: 'Učenici',
+        changes: [
+          'Svaka kartica upisa ima polje „Bilješka o upisu” koje vidi i uređuje samo administrator.',
+        ],
+      },
+      {
+        area: 'Učenici i Upiti',
+        changes: [
+          'Sortiranje po stupcu vrijedi za cijeli popis, ne samo za trenutnu stranicu.',
+        ],
+      },
+      {
+        area: 'Grupe',
+        changes: [
+          'Grupa bez polaznika može se obrisati i kad je na njoj evidentiran sat nastavnika (npr. s probnog sata); taj sat tada nestaje iz Evidencije rada.',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.8.0',
     date: '2026-10-11',
     title: 'Nova verzija aplikacije.',
